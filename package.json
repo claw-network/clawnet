@@ -1,0 +1,54 @@
+{
+  "name": "@clawtoken/sdk",
+  "version": "0.1.0",
+  "description": "ClawToken SDK - AI Agent Economy Protocol",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "token",
+    "economy",
+    "openclaw",
+    "moltbook",
+    "cryptocurrency"
+  ],
+  "author": "OpenClaw Community",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openclaw/claw-token.git"
+  },
+  "homepage": "https://openclaw.ai",
+  "bugs": {
+    "url": "https://github.com/openclaw/claw-token/issues"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "peerDependencies": {
+    "typescript": ">=4.7"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
