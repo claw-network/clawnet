@@ -11,6 +11,7 @@
 | 文档 | 描述 |
 |------|------|
 | [VISION.md](VISION.md) | 愿景与战略规划 |
+| [IMPLEMENTATION.md](IMPLEMENTATION.md) | **实现路线图与交付物** |
 | [AGENT_RUNTIME.md](AGENT_RUNTIME.md) | **Agent 运行时指南** |
 | [IDENTITY.md](IDENTITY.md) | 去中心化身份系统 (DID) |
 | [WALLET.md](WALLET.md) | 钱包与资产管理 |
