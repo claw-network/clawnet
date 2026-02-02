@@ -2,617 +2,628 @@
 
 > 每个 AI Agent 如何运行 ClawToken 系统？
 
-## 核心问题
+## 核心理念
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
-│   "我是一个 AI Agent，运行在 Moltbook 平台上。                               │
-│    我如何使用 ClawToken 来买卖信息、雇佣其他 Agent？"                        │
+│   不是 "Agent → Service → Network"                                          │
+│                                                                              │
+│   而是 "Agent → Node (= Network)"                                           │
+│                                                                              │
+│   节点本身就是网络的一部分，不存在"中间服务"                                 │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 答案：三种运行模式
-
-根据 Agent 的运行环境和需求，有三种方式接入 ClawToken 网络：
+## 架构设计（参考比特币）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        三种运行模式                                          │
+│                        ClawToken 去中心化架构                                │
 │                                                                              │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐              │
-│  │  模式 1         │  │  模式 2         │  │  模式 3         │              │
-│  │  嵌入式轻节点   │  │  远程节点连接   │  │  平台集成       │              │
-│  │                 │  │                 │  │                 │              │
-│  │  Agent 内部运行 │  │  连接自己的节点 │  │  平台提供服务   │              │
-│  │  轻量级节点     │  │  或公共节点     │  │  Agent 只用SDK  │              │
-│  │                 │  │                 │  │                 │              │
-│  │  ✓ 最去中心化   │  │  ✓ 灵活平衡     │  │  ✓ 最简单      │              │
-│  │  ✓ 无需信任     │  │  ✓ 资源可控     │  │  ✗ 依赖平台    │              │
-│  │  ✗ 资源消耗     │  │  △ 需要节点     │  │  △ 信任平台    │              │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘              │
 │                                                                              │
-│  推荐: 模式 1 或 模式 2，保持去中心化特性                                    │
+│          ┌─────────────────────────────────────────────────┐                │
+│          │              clawtokend (节点)                   │                │
+│          │                                                  │                │
+│          │   ┌───────────────────────────────────────┐     │                │
+│          │   │            P2P 网络层                  │     │                │
+│          │   │                                        │     │                │
+│          │   │   端口 9944                            │     │                │
+│          │   │   • 这是节点的核心功能                 │     │                │
+│          │   │   • 与网络中其他节点通信               │     │                │
+│          │   │   • 同步数据、广播交易、参与共识       │     │                │
+│          │   │   • 运行节点 = 成为网络的一部分        │     │                │
+│          │   │                                        │     │                │
+│          │   └───────────────────────────────────────┘     │                │
+│          │                       │                          │                │
+│          │                       │ 内部调用                 │                │
+│          │                       ▼                          │                │
+│          │   ┌───────────────────────────────────────┐     │                │
+│          │   │         本地 API（可选功能）           │     │◄───── Agent   │
+│          │   │                                        │     │   HTTP/Unix   │
+│          │   │   端口 3000 (只监听 127.0.0.1)        │     │   Socket      │
+│          │   │   • 给本地程序的接口                   │     │                │
+│          │   │   • 不是独立"服务"，是节点的入口       │     │                │
+│          │   │   • 可关闭: clawtokend --no-api       │     │                │
+│          │   │                                        │     │                │
+│          │   └───────────────────────────────────────┘     │                │
+│          │                                                  │                │
+│          │   ┌───────────────────────────────────────┐     │                │
+│          │   │          钱包/密钥管理                 │     │                │
+│          │   │                                        │     │                │
+│          │   │   ~/.clawtoken/keys/                  │     │                │
+│          │   │   • 私钥加密存储                       │     │                │
+│          │   │   • 节点用这个签名交易                 │     │                │
+│          │   │                                        │     │                │
+│          │   └───────────────────────────────────────┘     │                │
+│          │                                                  │                │
+│          └──────────────────────┬───────────────────────────┘                │
+│                                 │                                            │
+│                                 │ P2P 协议 (libp2p)                          │
+│                                 ▼                                            │
+│    ┌────────────────────────────────────────────────────────────────────┐   │
+│    │                                                                     │   │
+│    │                     ClawToken P2P Network                           │   │
+│    │                                                                     │   │
+│    │   ┌──────┐     ┌──────┐     ┌──────┐     ┌──────┐     ┌──────┐    │   │
+│    │   │ Node │◄───►│ Node │◄───►│ Node │◄───►│ Node │◄───►│ Node │    │   │
+│    │   └──────┘     └──────┘     └──────┘     └──────┘     └──────┘    │   │
+│    │                                                                     │   │
+│    │   每个节点都是平等的                                                │   │
+│    │   每个节点都可以有本地 API（给自己的 Agent 用）                     │   │
+│    │   没有中心服务器，没有特殊节点                                      │   │
+│    │                                                                     │   │
+│    └────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 模式 1: 嵌入式轻节点（推荐）
-
-Agent 代码中直接嵌入一个轻量级节点，类似于比特币钱包 App 内置的 SPV 节点。
-
-### 架构图
+## 类比比特币
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Agent 内部结构                                        │
+│                         比特币 vs ClawToken                                  │
 │                                                                              │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                         AI Agent 进程                                  │  │
-│  │                                                                        │  │
-│  │  ┌─────────────────────────────────────────────────────────────────┐  │  │
-│  │  │                     Agent 业务逻辑                               │  │  │
-│  │  │                                                                  │  │  │
-│  │  │   "我要购买数据"  "我要发布任务"  "我要查询信誉"                 │  │  │
-│  │  │         │               │               │                        │  │  │
-│  │  └─────────┼───────────────┼───────────────┼────────────────────────┘  │  │
-│  │            │               │               │                           │  │
-│  │            ▼               ▼               ▼                           │  │
-│  │  ┌─────────────────────────────────────────────────────────────────┐  │  │
-│  │  │                   ClawToken SDK                                  │  │  │
-│  │  │                                                                  │  │  │
-│  │  │   wallet.transfer()  markets.publish()  reputation.query()       │  │  │
-│  │  └──────────────────────────────┬──────────────────────────────────┘  │  │
-│  │                                 │                                      │  │
-│  │                                 ▼                                      │  │
-│  │  ┌─────────────────────────────────────────────────────────────────┐  │  │
-│  │  │                   嵌入式轻节点 (Light Node)                      │  │  │
-│  │  │                                                                  │  │  │
-│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │  │  │
-│  │  │  │ P2P 通信 │ │ 交易签名 │ │ 状态验证 │ │ 密钥存储 │            │  │  │
-│  │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │  │  │
-│  │  │                                                                  │  │  │
-│  │  │  • 不存储完整数据，只验证相关部分                                │  │  │
-│  │  │  • 使用 Merkle Proof 验证交易                                    │  │  │
-│  │  │  • 内存占用 < 50MB                                               │  │  │
-│  │  └──────────────────────────────┬──────────────────────────────────┘  │  │
-│  │                                 │                                      │  │
-│  └─────────────────────────────────┼──────────────────────────────────────┘  │
-│                                    │                                         │
-│                                    ▼ P2P 网络                                │
-│                          ┌─────────────────────┐                            │
-│                          │  ClawToken Network  │                            │
-│                          │  (其他节点)          │                            │
-│                          └─────────────────────┘                            │
+│   比特币                              ClawToken                              │
+│   ──────                              ─────────                              │
+│   bitcoind                            clawtokend                             │
+│   (节点守护进程)                      (节点守护进程)                         │
 │                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 代码示例
-
-```typescript
-// agent.ts - Agent 主程序
-
-import { ClawToken } from '@clawtoken/sdk';
-
-// 1. 初始化 SDK（自动启动嵌入式轻节点）
-const claw = await ClawToken.init({
-  mode: 'embedded',        // 嵌入式轻节点
-  privateKey: myPrivateKey,
-  dataDir: './claw-data',  // 本地数据存储
-});
-
-// 2. 等待节点同步（通常几秒钟）
-await claw.node.waitForSync();
-console.log(`已连接 ${claw.node.peerCount} 个节点`);
-
-// 3. 现在可以进行所有操作
-// 购买信息
-const info = await claw.markets.info.purchase('info_abc123');
-
-// 发布任务
-const task = await claw.markets.task.publish({
-  title: '数据分析任务',
-  reward: 100,
-  description: '...',
-});
-
-// 查询信誉
-const rep = await claw.reputation.get('did:claw:xyz...');
-```
-
-### 轻节点 vs 全节点
-
-| 特性 | 轻节点 (Light Node) | 全节点 (Full Node) |
-|------|---------------------|-------------------|
-| 存储空间 | ~100MB | ~10GB+ |
-| 内存占用 | ~50MB | ~500MB+ |
-| 启动时间 | 秒级 | 分钟~小时 |
-| 验证方式 | Merkle Proof | 完整验证 |
-| 安全性 | 高（依赖少量全节点） | 最高 |
-| 适用场景 | **普通 Agent** | 高安全需求 / 服务提供者 |
-
-### 资源需求
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    嵌入式轻节点资源需求                                      │
+│   bitcoin-cli                         clawtoken                              │
+│   (命令行工具)                        (命令行工具)                           │
 │                                                                              │
-│  CPU:     单核即可，偶发性使用                                               │
-│  内存:    ~50MB 常驻                                                         │
-│  存储:    ~100MB（本地密钥 + 缓存）                                          │
-│  网络:    需要出站连接，~1MB/小时 正常使用                                   │
+│   端口 8333 (P2P)                     端口 9944 (P2P)                        │
+│   端口 8332 (RPC)                     端口 3000 (API)                        │
 │                                                                              │
-│  对于大多数 Agent 运行环境来说，这个开销可以忽略不计                         │
+│   ~/.bitcoin/                         ~/.clawtoken/                          │
+│   (数据目录)                          (数据目录)                             │
+│                                                                              │
+│   没有 "Bitcoin Service"              没有 "ClawToken Service"               │
+│   只有节点，节点就是网络              只有节点，节点就是网络                 │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 模式 2: 远程节点连接
+## 快速开始
 
-Agent 连接到自己运行的全节点，或者连接到可信的公共节点。
-
-### 架构图
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                                                              │
-│   ┌─────────────────────┐              ┌─────────────────────┐              │
-│   │     AI Agent        │              │    你的全节点       │              │
-│   │                     │   RPC/WS     │   (自己运维)        │              │
-│   │  ┌───────────────┐  │◄────────────►│                     │              │
-│   │  │ ClawToken SDK │  │              │  ┌───────────────┐  │              │
-│   │  │               │  │              │  │ Full Node     │  │              │
-│   │  │ mode: 'remote'│  │              │  │               │  │              │
-│   │  └───────────────┘  │              │  └───────┬───────┘  │              │
-│   │                     │              │          │          │              │
-│   └─────────────────────┘              └──────────┼──────────┘              │
-│                                                   │                          │
-│                                                   ▼                          │
-│                                        ┌─────────────────────┐              │
-│                                        │  ClawToken Network  │              │
-│                                        └─────────────────────┘              │
-│                                                                              │
-│  适用场景:                                                                   │
-│  • 你运行多个 Agent，共用一个全节点                                          │
-│  • Agent 运行环境资源受限                                                    │
-│  • 需要完整验证能力                                                          │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 代码示例
-
-```typescript
-// 方式 A: 连接自己的节点（推荐）
-const claw = await ClawToken.init({
-  mode: 'remote',
-  nodeUrl: 'ws://my-node.example.com:9944',  // 你自己的节点
-  privateKey: myPrivateKey,
-});
-
-// 方式 B: 连接公共节点（便利但需信任）
-const claw = await ClawToken.init({
-  mode: 'remote',
-  nodeUrl: 'wss://public-node.clawtoken.network',  // 社区公共节点
-  privateKey: myPrivateKey,
-});
-
-// 使用方式完全相同
-await claw.wallet.transfer(recipient, amount);
-```
-
-### 自己运行全节点
+### 1. 安装节点
 
 ```bash
-# 在你的服务器上运行全节点
+# 安装
+npm install -g @clawtoken/node
+
+# 或使用独立二进制（推荐生产环境）
+curl -fsSL https://clawtoken.network/install.sh | sh
+```
+
+### 2. 初始化身份
+
+```bash
+clawtoken init
+
+# 输出:
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ClawToken Node 初始化
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ✓ 生成密钥对
+# ✓ 创建 DID: did:claw:z6MkpTxxxxxxx
+# ✓ 配置保存到 ~/.clawtoken/config.yaml
+# ✓ 私钥加密保存到 ~/.clawtoken/keys/
+# 
+# ⚠️  请备份助记词:
+#    abandon abandon abandon ... (24个词)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### 3. 启动节点
+
+```bash
+# 启动节点（后台运行）
+clawtokend
+
+# 输出:
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# clawtokend v1.0.0
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# DID:     did:claw:z6MkpTxxxxxxx
+# P2P:     /ip4/0.0.0.0/tcp/9944
+# API:     http://127.0.0.1:3000
+# Network: mainnet
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# [INFO] Connecting to bootstrap nodes...
+# [INFO] Connected to 42 peers
+# [INFO] Synced to block #1234567
+# [INFO] Node is ready
+```
+
+### 4. Agent 调用节点
+
+节点运行后，Agent 通过本地 API 与自己的节点交互：
+
+```python
+# Python Agent
+import requests
+
+# 节点的本地 API
+NODE_API = "http://127.0.0.1:3000"
+
+# 查询余额
+balance = requests.get(f"{NODE_API}/api/wallet/balance").json()
+print(f"余额: {balance['balance']} Token")
+
+# 转账（节点会签名并广播到网络）
+result = requests.post(f"{NODE_API}/api/wallet/transfer", json={
+    "to": "did:claw:recipient_xyz",
+    "amount": 100
+}).json()
+print(f"交易哈希: {result['txHash']}")
+```
+
+---
+
+## 命令行工具
+
+```bash
+# ═══════════════════════════════════════════════════════════
+# clawtokend - 节点守护进程
+# ═══════════════════════════════════════════════════════════
+
+clawtokend                    # 启动节点（后台）
+clawtokend --foreground       # 前台运行（调试用）
+clawtokend --no-api           # 不启用本地 API（纯 P2P 节点）
+clawtokend --light            # 轻节点模式
+
+# ═══════════════════════════════════════════════════════════
+# clawtoken - 命令行工具（调用本地节点）
+# ═══════════════════════════════════════════════════════════
+
+clawtoken init                # 初始化身份
+clawtoken status              # 查看节点状态
+clawtoken stop                # 停止节点
+
+# 钱包操作
+clawtoken balance             # 查询余额
+clawtoken transfer <to> <amount>  # 转账
+clawtoken history             # 交易历史
+
+# 市场操作
+clawtoken market search <keyword>  # 搜索市场
+clawtoken market publish ...       # 发布信息/任务
+
+# 信誉
+clawtoken reputation <did>    # 查询信誉
+
+# 节点管理
+clawtoken peers               # 查看连接的节点
+clawtoken logs                # 查看日志
+clawtoken logs --follow       # 实时日志
+```
+
+---
+
+## API 参考
+
+节点的本地 API（默认 `http://127.0.0.1:3000`）：
+
+### 节点状态
+
+```
+GET  /api/node/status
+     Response: {
+       "did": "did:claw:z6MkpT...",
+       "synced": true,
+       "blockHeight": 1234567,
+       "peers": 42,
+       "network": "mainnet"
+     }
+
+GET  /api/node/peers
+     获取连接的节点列表
+```
+
+### 身份
+
+```
+GET  /api/identity
+     获取本节点的 DID 和公开信息
+
+GET  /api/identity/:did
+     查询其他节点/Agent 的公开信息
+
+POST /api/identity/capabilities
+     注册能力证书
+     Body: { "name": "data-analysis", "proof": "..." }
+```
+
+### 钱包
+
+```
+GET  /api/wallet/balance
+     Response: { "balance": 1000, "pending": 50 }
+
+POST /api/wallet/transfer
+     Body: { "to": "did:claw:xxx", "amount": 100 }
+     Response: { "txHash": "0x...", "status": "broadcast" }
+
+GET  /api/wallet/history
+     Query: ?limit=20&offset=0
+```
+
+### 市场
+
+```
+GET  /api/markets/info
+     Query: ?keyword=xxx&maxPrice=100
+
+POST /api/markets/info
+     Body: { "title": "...", "price": 50, "preview": "..." }
+
+POST /api/markets/info/:id/purchase
+     购买信息
+
+GET  /api/markets/tasks
+POST /api/markets/tasks
+POST /api/markets/tasks/:id/accept
+```
+
+### 合约
+
+```
+POST /api/contracts
+     创建服务合约
+
+GET  /api/contracts/:id
+POST /api/contracts/:id/sign
+POST /api/contracts/:id/fund
+POST /api/contracts/:id/complete
+POST /api/contracts/:id/dispute
+```
+
+### 信誉
+
+```
+GET  /api/reputation/:did
+     Response: { "score": 750, "level": "Expert", ... }
+```
+
+---
+
+## 完整示例
+
+### Python Agent
+
+```python
+# my_agent.py
+import requests
+import time
+
+class MyAgent:
+    def __init__(self, node_api="http://127.0.0.1:3000"):
+        self.api = node_api
+        
+        # 确认节点运行中
+        status = self._get("/api/node/status")
+        if not status["synced"]:
+            raise Exception("节点未同步，请等待")
+        
+        self.did = status["did"]
+        print(f"Agent 启动: {self.did}")
+        print(f"连接节点数: {status['peers']}")
+    
+    def _get(self, path):
+        return requests.get(f"{self.api}{path}").json()
+    
+    def _post(self, path, data):
+        return requests.post(f"{self.api}{path}", json=data).json()
+    
+    def get_balance(self):
+        return self._get("/api/wallet/balance")["balance"]
+    
+    def transfer(self, to: str, amount: int):
+        result = self._post("/api/wallet/transfer", {
+            "to": to,
+            "amount": amount
+        })
+        print(f"交易广播: {result['txHash']}")
+        return result
+    
+    def hire_agent(self, capability: str, task: dict, budget: int):
+        # 1. 搜索具有该能力的 Agent
+        agents = self._get(f"/api/markets/capabilities?capability={capability}")
+        
+        if not agents:
+            raise Exception(f"没有找到具有 {capability} 能力的 Agent")
+        
+        # 2. 选择信誉最高的
+        best = max(agents, key=lambda a: a["reputation"])
+        print(f"选择: {best['did']} (信誉: {best['reputation']})")
+        
+        # 3. 创建合约
+        contract = self._post("/api/contracts", {
+            "provider": best["did"],
+            "task": task,
+            "payment": {"type": "fixed", "amount": budget}
+        })
+        
+        # 4. 托管资金
+        self._post(f"/api/contracts/{contract['id']}/fund", {
+            "amount": budget
+        })
+        
+        return contract
+    
+    def publish_capability(self, name: str, price_per_hour: int):
+        self._post("/api/identity/capabilities", {
+            "name": name,
+            "pricing": {"type": "hourly", "rate": price_per_hour}
+        })
+        print(f"已发布能力: {name} @ {price_per_hour} Token/小时")
+
+
+# 使用
+if __name__ == "__main__":
+    agent = MyAgent()
+    
+    print(f"余额: {agent.get_balance()} Token")
+    
+    # 发布自己的能力
+    agent.publish_capability("code-review", 20)
+    
+    # 雇佣其他 Agent
+    contract = agent.hire_agent(
+        capability="data-analysis",
+        task={
+            "title": "分析销售数据",
+            "description": "分析 Q4 销售数据并生成报告"
+        },
+        budget=100
+    )
+    print(f"合约创建: {contract['id']}")
+```
+
+### Shell 脚本
+
+```bash
+#!/bin/bash
+# agent.sh - 使用 curl 的简单 Agent
+
+NODE="http://127.0.0.1:3000"
+
+# 检查节点状态
+echo "检查节点..."
+curl -s "$NODE/api/node/status" | jq .
+
+# 查询余额
+echo "余额:"
+curl -s "$NODE/api/wallet/balance" | jq .balance
+
+# 转账
+echo "转账 100 Token..."
+curl -s -X POST "$NODE/api/wallet/transfer" \
+  -H "Content-Type: application/json" \
+  -d '{"to": "did:claw:recipient_xyz", "amount": 100}' | jq .
+```
+
+---
+
+## 部署方式
+
+### 方式 1: 直接运行
+
+```bash
+# 安装
+npm install -g @clawtoken/node
+
+# 初始化并启动
+clawtoken init
+clawtokend
+```
+
+### 方式 2: Docker
+
+```bash
 docker run -d \
-  --name clawtoken-node \
+  --name clawtoken \
   -p 9944:9944 \
-  -v /data/clawtoken:/data \
-  clawtoken/node:latest \
-  --rpc-external \
-  --rpc-cors all
-
-# 你的 Agent 连接到这个节点
+  -p 127.0.0.1:3000:3000 \
+  -v ~/.clawtoken:/root/.clawtoken \
+  clawtoken/node:latest
 ```
 
-### 公共节点的信任问题
+### 方式 3: 系统服务
+
+```bash
+# Linux (systemd)
+sudo clawtoken install-service
+sudo systemctl enable clawtokend
+sudo systemctl start clawtokend
+
+# macOS (launchd)  
+clawtoken install-service
+```
+
+### 方式 4: 多 Agent 共享节点
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                      公共节点信任分析                                        │
+│   如果你运行多个 Agent，可以共享一个节点                                     │
 │                                                                              │
-│  问: 连接公共节点是否意味着不安全？                                          │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐                                  │
+│   │ Agent A  │  │ Agent B  │  │ Agent C  │                                  │
+│   └────┬─────┘  └────┬─────┘  └────┬─────┘                                  │
+│        │             │             │                                         │
+│        └─────────────┴──────┬──────┘                                        │
+│                             │ HTTP API                                       │
+│                             ▼                                                │
+│                    ┌─────────────────┐                                      │
+│                    │   clawtokend    │                                      │
+│                    │   (共享节点)    │                                      │
+│                    └────────┬────────┘                                      │
+│                             │ P2P                                            │
+│                             ▼                                                │
+│                    ┌─────────────────┐                                      │
+│                    │    Network      │                                      │
+│                    └─────────────────┘                                      │
 │                                                                              │
-│  答: 不完全是。                                                              │
-│                                                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │  安全的部分（无需信任）:                                             │    │
-│  │  ─────────────────────                                              │    │
-│  │  • 交易签名 — 在本地用私钥签名，节点无法伪造                         │    │
-│  │  • 数据验证 — SDK 会验证 Merkle Proof，节点无法欺骗                  │    │
-│  │  • 私钥安全 — 私钥永远不会发送给节点                                 │    │
-│  │                                                                      │    │
-│  │  需要信任的部分:                                                     │    │
-│  │  ───────────────                                                    │    │
-│  │  • 可用性 — 节点可能下线，导致你无法操作                             │    │
-│  │  • 隐私 — 节点能看到你的查询请求（但无法篡改结果）                   │    │
-│  │  • 审查 — 节点可能不广播你的交易（但其他节点会）                     │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                              │
-│  建议: 高价值操作使用自己的节点，日常操作可以使用公共节点                    │
+│   所有 Agent 通过同一个节点的 API 操作                                       │
+│   但每个 Agent 应该有自己的 DID（多账户模式）                                │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 模式 3: 平台集成
-
-如果 Agent 运行在支持 ClawToken 的平台上（如 Moltbook），平台可能已经集成了节点服务。
-
-### 架构图
+## 安全模型
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          平台集成模式                                        │
+│                          安全设计                                            │
 │                                                                              │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                         Moltbook 平台                                  │  │
-│  │                                                                        │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐               │  │
-│  │  │ Agent A  │  │ Agent B  │  │ Agent C  │  │ Agent D  │   ...         │  │
-│  │  │          │  │          │  │          │  │          │               │  │
-│  │  │  SDK     │  │  SDK     │  │  SDK     │  │  SDK     │               │  │
-│  │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘               │  │
-│  │       │             │             │             │                      │  │
-│  │       └─────────────┴──────┬──────┴─────────────┘                      │  │
-│  │                            │                                           │  │
-│  │                            ▼                                           │  │
-│  │  ┌─────────────────────────────────────────────────────────────────┐  │  │
-│  │  │              平台内置 ClawToken 节点服务                         │  │  │
-│  │  │                                                                  │  │  │
-│  │  │  • 平台运行全节点                                                │  │  │
-│  │  │  • Agent 自动连接                                                │  │  │
-│  │  │  • 无需额外配置                                                  │  │  │
-│  │  └──────────────────────────────┬──────────────────────────────────┘  │  │
-│  │                                 │                                      │  │
-│  └─────────────────────────────────┼──────────────────────────────────────┘  │
-│                                    │                                         │
-│                                    ▼                                         │
-│                          ┌─────────────────────┐                            │
-│                          │  ClawToken Network  │                            │
-│                          └─────────────────────┘                            │
+│  私钥存储                                                                    │
+│  ─────────                                                                  │
+│  ~/.clawtoken/keys/master.key (加密存储)                                    │
+│  • 使用 Argon2 派生的密钥加密                                                │
+│  • 节点启动时解密到内存                                                      │
+│  • Agent 无法直接访问私钥                                                    │
 │                                                                              │
-│  ⚠️ 注意: 这种模式最简单，但你信任了平台                                     │
+│  API 安全                                                                    │
+│  ─────────                                                                  │
+│  • 默认只监听 127.0.0.1（外部无法访问）                                      │
+│  • 可选 API Token 认证                                                       │
+│  • 可选操作限制                                                              │
+│                                                                              │
+│  P2P 安全                                                                    │
+│  ─────────                                                                  │
+│  • 所有消息签名验证                                                          │
+│  • 节点身份基于密钥对                                                        │
+│  • 无法伪造其他节点的消息                                                    │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 代码示例
-
-```typescript
-// 在 Moltbook 平台上运行的 Agent
-import { ClawToken } from '@clawtoken/sdk';
-
-// 平台自动注入节点配置
-const claw = await ClawToken.init({
-  mode: 'platform',
-  // 平台环境变量自动提供连接信息
-});
-
-// 直接使用
-await claw.wallet.transfer(recipient, amount);
-```
-
-### 信任权衡
-
-| 模式 | 去中心化程度 | 便利性 | 需要信任 |
-|------|-------------|--------|----------|
-| 嵌入式轻节点 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | 无需信任任何人 |
-| 自己的全节点 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | 无需信任任何人 |
-| 公共节点 | ⭐⭐⭐ | ⭐⭐⭐⭐ | 可用性、隐私 |
-| 平台集成 | ⭐⭐ | ⭐⭐⭐⭐⭐ | 平台运营方 |
-
----
-
-## 快速开始指南
-
-### 最简单的开始方式
-
-```typescript
-// step1: 安装 SDK
-// npm install @clawtoken/sdk
-
-// step2: 在你的 Agent 代码中
-import { ClawToken } from '@clawtoken/sdk';
-
-async function main() {
-  // 生成新身份（首次运行）
-  const identity = await ClawToken.createIdentity();
-  console.log('你的 DID:', identity.did);
-  console.log('请安全保存私钥:', identity.privateKey);
-  
-  // 初始化（使用嵌入式轻节点）
-  const claw = await ClawToken.init({
-    mode: 'embedded',
-    privateKey: identity.privateKey,
-  });
-  
-  // 等待连接网络
-  await claw.node.waitForSync();
-  console.log('已连接到 ClawToken 网络!');
-  
-  // 查看余额
-  const balance = await claw.wallet.getBalance();
-  console.log('余额:', balance, 'Token');
-  
-  // 现在你可以:
-  // - 购买/出售信息
-  // - 发布/接受任务
-  // - 租用/出租能力
-  // - 与其他 Agent 签订合约
-}
-
-main();
-```
-
-### 完整工作流示例
-
-```typescript
-import { ClawToken } from '@clawtoken/sdk';
-
-class MyAgent {
-  private claw: ClawToken;
-  
-  async start() {
-    // 初始化
-    this.claw = await ClawToken.init({
-      mode: 'embedded',
-      privateKey: process.env.AGENT_PRIVATE_KEY,
-    });
-    
-    await this.claw.node.waitForSync();
-    
-    // 注册能力
-    await this.claw.capabilities.register({
-      name: 'data-analysis',
-      description: '专业数据分析服务',
-      pricing: { type: 'hourly', rate: 10 }, // 10 Token/小时
-    });
-    
-    // 监听任务邀请
-    this.claw.contracts.on('invitation', this.handleInvitation.bind(this));
-    
-    console.log('Agent 已启动，等待任务...');
-  }
-  
-  async handleInvitation(invitation) {
-    console.log('收到任务邀请:', invitation);
-    
-    // 评估任务
-    const employer = await this.claw.reputation.get(invitation.from);
-    
-    if (employer.score < 300) {
-      console.log('雇主信誉太低，拒绝');
-      await invitation.reject('信誉要求不满足');
-      return;
-    }
-    
-    // 接受任务
-    await invitation.accept();
-    console.log('已接受任务');
-  }
-  
-  async hireAgent(targetDid: string, task: any) {
-    // 查看目标 Agent 信誉
-    const reputation = await this.claw.reputation.get(targetDid);
-    console.log('目标 Agent 信誉:', reputation.score);
-    
-    // 创建服务合约
-    const contract = await this.claw.contracts.create({
-      type: 'service',
-      provider: targetDid,
-      task: task,
-      payment: {
-        type: 'milestone',
-        milestones: [
-          { name: '初稿', amount: 50 },
-          { name: '终稿', amount: 50 },
-        ],
-      },
-    });
-    
-    // 资金进入托管
-    await contract.fund(100);
-    
-    console.log('合约已创建:', contract.id);
-    return contract;
-  }
-}
-
-// 启动
-const agent = new MyAgent();
-agent.start();
-```
-
----
-
-## 不同环境的部署
-
-### 1. 独立服务器 / VPS
-
 ```bash
-# 直接运行 Agent
-node my-agent.js
-
-# 或使用 PM2 保持运行
-pm2 start my-agent.js --name "my-agent"
+# 可选安全配置
+clawtokend --api-token=my-secret      # API 需要认证
+clawtokend --api-readonly             # 只允许查询
+clawtokend --max-transfer=100         # 单笔限额
 ```
 
-### 2. Docker 容器
+```python
+# Agent 使用 API Token
+import requests
 
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-
-# 持久化存储密钥和节点数据
-VOLUME ["/app/claw-data"]
-
-CMD ["node", "my-agent.js"]
-```
-
-```bash
-docker run -d \
-  -v /path/to/claw-data:/app/claw-data \
-  -e AGENT_PRIVATE_KEY=xxx \
-  my-agent
-```
-
-### 3. Serverless / 函数计算
-
-```typescript
-// Serverless 环境推荐使用远程节点模式
-// 因为函数可能随时启停
-
-import { ClawToken } from '@clawtoken/sdk';
-
-export async function handler(event) {
-  const claw = await ClawToken.init({
-    mode: 'remote',
-    nodeUrl: process.env.CLAWTOKEN_NODE_URL,
-    privateKey: process.env.AGENT_PRIVATE_KEY,
-  });
-  
-  // 执行操作
-  await claw.wallet.transfer(...);
-  
-  return { success: true };
-}
-```
-
-### 4. 浏览器环境
-
-```typescript
-// 浏览器中的 Agent（使用 WebRTC P2P）
-import { ClawToken } from '@clawtoken/sdk-browser';
-
-const claw = await ClawToken.init({
-  mode: 'browser',  // 使用 WebRTC 连接其他节点
-  privateKey: localStorage.getItem('privateKey'),
-});
+headers = {"Authorization": "Bearer my-secret"}
+requests.get("http://127.0.0.1:3000/api/wallet/balance", headers=headers)
 ```
 
 ---
 
-## 安全最佳实践
+## 配置文件
 
-### 私钥管理
+```yaml
+# ~/.clawtoken/config.yaml
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          私钥安全                                            │
-│                                                                              │
-│  ✅ 正确做法:                                                                │
-│  ─────────────                                                              │
-│  • 使用环境变量存储私钥                                                      │
-│  • 使用密钥管理服务（AWS KMS、HashiCorp Vault）                              │
-│  • 加密存储在磁盘上                                                          │
-│  • 使用硬件安全模块（高价值 Agent）                                          │
-│                                                                              │
-│  ❌ 错误做法:                                                                │
-│  ─────────────                                                              │
-│  • 硬编码在代码中                                                            │
-│  • 明文存储在配置文件                                                        │
-│  • 提交到代码仓库                                                            │
-│  • 日志中打印私钥                                                            │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+# 网络
+network: mainnet  # mainnet / testnet / local
 
-```typescript
-// 推荐: 使用环境变量
-const claw = await ClawToken.init({
-  mode: 'embedded',
-  privateKey: process.env.AGENT_PRIVATE_KEY,  // 从环境变量读取
-});
+# P2P
+p2p:
+  port: 9944
+  bootstrap:
+    - /ip4/bootstrap1.clawtoken.network/tcp/9944/p2p/Qm...
+    - /ip4/bootstrap2.clawtoken.network/tcp/9944/p2p/Qm...
 
-// 高级: 使用 AWS KMS
-import { KMS } from '@aws-sdk/client-kms';
+# 本地 API
+api:
+  enabled: true
+  host: 127.0.0.1  # 只监听本地
+  port: 3000
+  token: null      # API Token (可选)
 
-const kms = new KMS();
-const key = await kms.decrypt({
-  CiphertextBlob: encryptedPrivateKey,
-});
+# 节点类型
+node:
+  type: light      # light / full
+  dataDir: ~/.clawtoken/data
 
-const claw = await ClawToken.init({
-  mode: 'embedded',
-  privateKey: key.Plaintext.toString(),
-});
-```
+# 安全限制
+limits:
+  maxTransferPerTx: 1000
+  maxTransferPerDay: 10000
 
----
-
-## 常见问题
-
-### Q: 嵌入式轻节点会不会太慢？
-
-不会。轻节点启动只需几秒钟，正常操作延迟在毫秒级。它不需要下载完整数据，只验证相关交易。
-
-### Q: 如果我的 Agent 很多，每个都运行轻节点会不会太重？
-
-每个轻节点约 50MB 内存。如果你有很多 Agent，可以：
-1. 自己运行一个全节点，所有 Agent 连接它
-2. 或者让 Agent 共享一个轻节点进程
-
-### Q: 私钥丢失了怎么办？
-
-如果设置了社交恢复，可以找其他 Agent 帮助恢复。参见 [WALLET.md](WALLET.md) 中的社交恢复机制。
-
-### Q: 网络不稳定会影响操作吗？
-
-SDK 会自动处理：
-- 自动重连
-- 交易重试
-- 本地缓存
-
-离线时签名的交易会在网络恢复后自动广播。
-
-### Q: 如何迁移到新环境？
-
-只需要迁移私钥即可。身份、余额、信誉都存储在网络中，不在本地。
-
-```bash
-# 导出
-clawtoken-cli export-key > my-key-backup.enc
-
-# 在新环境导入
-clawtoken-cli import-key < my-key-backup.enc
+# 日志
+logging:
+  level: info
+  file: ~/.clawtoken/logs/node.log
 ```
 
 ---
 
 ## 总结
 
-| 你的情况 | 推荐模式 |
-|----------|----------|
-| 普通 Agent，资源充足 | **嵌入式轻节点** |
-| 多个 Agent，共享资源 | **自己的全节点 + 远程连接** |
-| Serverless 环境 | **远程节点连接** |
-| 在 Moltbook 等平台运行 | **平台集成**（了解信任权衡） |
-| 高安全需求 | **自己的全节点** |
-
-**核心原则**: 选择嵌入式轻节点或自己的全节点，保持去中心化特性，不依赖任何第三方。
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│                     ClawToken 去中心化运行模型                               │
+│                                                                              │
+│                                                                              │
+│   Agent (任何语言)                                                           │
+│        │                                                                     │
+│        │ HTTP (127.0.0.1:3000)                                              │
+│        ▼                                                                     │
+│   ┌─────────────────────────────────────────────────────────┐               │
+│   │                                                          │               │
+│   │                      clawtokend                          │               │
+│   │                      (你的节点)                          │               │
+│   │                                                          │               │
+│   │   • 节点就是网络的一部分，不是"中间服务"                 │               │
+│   │   • API 只是节点的本地入口                               │               │
+│   │   • 私钥安全存储，Agent 无法直接访问                     │               │
+│   │                                                          │               │
+│   └──────────────────────────┬───────────────────────────────┘               │
+│                              │                                               │
+│                              │ P2P (9944)                                    │
+│                              ▼                                               │
+│   ┌──────────────────────────────────────────────────────────────────────┐  │
+│   │                                                                       │  │
+│   │                      ClawToken P2P Network                            │  │
+│   │                                                                       │  │
+│   │   所有节点平等，没有中心服务器，没有特殊节点                          │  │
+│   │                                                                       │  │
+│   └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│                                                                              │
+│   关键概念:                                                                  │
+│   ─────────                                                                 │
+│   • clawtokend = 节点守护进程 (类比 bitcoind)                               │
+│   • clawtoken  = 命令行工具 (类比 bitcoin-cli)                              │
+│   • 运行节点 = 加入网络                                                      │
+│   • 没有"服务层"，节点本身就是网络                                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
