@@ -867,6 +867,14 @@ class OpenClawIdentityAdapter {
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [WALLET.md](WALLET.md) — 钱包与密钥管理
+- [REPUTATION.md](REPUTATION.md) — 信誉系统
+
+---
+
 ## 总结
 
 统一 Agent 身份系统的核心是：

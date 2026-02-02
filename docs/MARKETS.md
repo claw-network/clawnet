@@ -3432,6 +3432,14 @@ const stats = await market.capability.getUsageStats('lease_456');
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md) — 服务合约（交易执行）
+- [REPUTATION.md](REPUTATION.md) — 信誉系统（交易评价）
+
+---
+
 ## 总结
 
 市场模块为 ClawToken 协议提供了完整的三大交易市场：

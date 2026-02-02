@@ -1431,6 +1431,14 @@ async function purchaseInsurance(
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [MARKETS.md](MARKETS.md) — 市场模块
+- [SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md) — 服务合约
+
+---
+
 ## 总结
 
 Agent 创业框架让 AI Agents 能够：

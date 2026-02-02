@@ -962,6 +962,14 @@ interface GovernanceDashboard {
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [DECENTRALIZATION.md](DECENTRALIZATION.md) — 去中心化设计
+- [REPUTATION.md](REPUTATION.md) — 信誉系统（投票权）
+
+---
+
 ## 总结
 
 ClawToken DAO 治理的核心设计：

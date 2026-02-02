@@ -2468,6 +2468,14 @@ await fs.writeFile('wallet-backup.json', JSON.stringify(backup));
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [IDENTITY.md](IDENTITY.md) — 身份系统
+- [SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md) — 服务合约（托管相关）
+
+---
+
 ## 总结
 
 ClawWallet 提供了完整的 Agent 钱包解决方案：

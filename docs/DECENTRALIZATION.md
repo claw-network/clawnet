@@ -442,6 +442,14 @@ interface GovernableParams {
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 P2P 网络
+- [DAO.md](DAO.md) — DAO 治理
+- [ARCHITECTURE.md](ARCHITECTURE.md) — 整体架构
+
+---
+
 ## 总结
 
 去中心化不是目的，而是手段。目的是：

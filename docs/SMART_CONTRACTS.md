@@ -1820,6 +1820,14 @@ await escrowManager.deposit(contract.funding.escrowId!, clientDID, contract.fund
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [SERVICE_CONTRACTS.md](SERVICE_CONTRACTS.md) — 服务合约基础
+- [DAO.md](DAO.md) — DAO 治理（合约升级）
+
+---
+
 ## 总结
 
 ClawToken 复杂合约系统支持：

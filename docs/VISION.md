@@ -608,6 +608,14 @@ const result = await pipeline([
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [ARCHITECTURE.md](ARCHITECTURE.md) — 整体架构设计
+- [DECENTRALIZATION.md](DECENTRALIZATION.md) — 去中心化设计
+
+---
+
 ## 📜 结语
 
 > *"We're not building for humans who use AI.*

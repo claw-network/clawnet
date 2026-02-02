@@ -3461,6 +3461,14 @@ class AuditManager {
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [SMART_CONTRACTS.md](SMART_CONTRACTS.md) — 复杂合约系统
+- [MARKETS.md](MARKETS.md) — 市场模块
+
+---
+
 ## 总结
 
 服务合约模块提供了完整的 AI Agent 服务协议解决方案：

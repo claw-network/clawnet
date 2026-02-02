@@ -194,6 +194,14 @@ ClawToken 的机会在于：**成为那个解决真正问题的协议**——如
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [VISION.md](VISION.md) — 项目愿景
+- [DECENTRALIZATION.md](DECENTRALIZATION.md) — 去中心化设计
+
+---
+
 ## 结论
 
 Moltbook 生态展示了 Agent 经济的早期形态，但目前主要是：

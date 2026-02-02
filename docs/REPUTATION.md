@@ -2356,6 +2356,14 @@ class ReputationAccessControl {
 
 ---
 
+## 相关文档
+
+- [AGENT_RUNTIME.md](AGENT_RUNTIME.md) — 节点运行与 API 调用
+- [IDENTITY.md](IDENTITY.md) — 身份系统
+- [MARKETS.md](MARKETS.md) — 市场模块（评价来源）
+
+---
+
 ## 总结
 
 信誉系统模块提供了完整的 AI Agent 信誉管理解决方案：

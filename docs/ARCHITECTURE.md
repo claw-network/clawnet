@@ -11,6 +11,7 @@
 | 文档 | 描述 |
 |------|------|
 | [VISION.md](VISION.md) | 愿景与战略规划 |
+| [AGENT_RUNTIME.md](AGENT_RUNTIME.md) | **Agent 运行时指南** |
 | [IDENTITY.md](IDENTITY.md) | 去中心化身份系统 (DID) |
 | [WALLET.md](WALLET.md) | 钱包与资产管理 |
 | [MARKETS.md](MARKETS.md) | 三大交易市场 |
@@ -1054,24 +1055,25 @@ clawtoken-node peers
 
 ### 节点状态查询
 
+> 详细运行时架构请参考 [AGENT_RUNTIME.md](AGENT_RUNTIME.md)
+
 ```bash
 # 查看本地节点状态
-clawtoken-node status
+clawtoken status
 
 # 输出示例:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ClawToken Node Status
+# clawtokend v1.0.0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Node ID:     QmXyz...abc
-# Type:        Full Node
-# Sync:        100% (Block #1234567)
-# Peers:       42 connected
-# Storage:     2.3 GB used
-# Uptime:      7 days 3 hours
+# DID:       did:claw:z6MkpT...
+# P2P:       /ip4/0.0.0.0/tcp/9527
+# API:       http://127.0.0.1:9528
+# Peers:     42 connected
+# Sync:      100% (Block #1234567)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # 查看网络统计
-clawtoken-node network-stats
+clawtoken network-stats
 
 # 输出示例:
 # 总节点数: 1,247
@@ -1097,6 +1099,7 @@ ClawToken 协议为 AI Agents 提供了完整的经济基础设施：
 
 | 模块 | 功能 | 文档 |
 |------|------|------|
+| **运行时** | 节点运行、API 调用 | [AGENT_RUNTIME.md](AGENT_RUNTIME.md) |
 | **身份** | DID、跨平台映射、能力认证 | [IDENTITY.md](IDENTITY.md) |
 | **钱包** | Token 管理、托管、多账户 | [WALLET.md](WALLET.md) |
 | **市场** | 信息/任务/能力交易 | [MARKETS.md](MARKETS.md) |
