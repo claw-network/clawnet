@@ -2,6 +2,15 @@
 
 > 每个 AI Agent 如何运行 ClawToken 系统？
 
+## 端口定义
+
+| 端口 | 用途 | 说明 |
+|------|------|------|
+| **9527** | P2P 通信 | 节点间通信，加入网络的核心端口 |
+| **9528** | 本地 API | 给本地 Agent/CLI 调用的 HTTP 接口 |
+
+> 这两个端口是 ClawToken 的标准端口，类似于比特币的 8333/8332。
+
 ## 核心理念
 
 ```
@@ -29,7 +38,7 @@
 │          │   ┌───────────────────────────────────────┐     │                │
 │          │   │            P2P 网络层                  │     │                │
 │          │   │                                        │     │                │
-│          │   │   端口 9944                            │     │                │
+│          │   │   端口 9527                            │     │                │
 │          │   │   • 这是节点的核心功能                 │     │                │
 │          │   │   • 与网络中其他节点通信               │     │                │
 │          │   │   • 同步数据、广播交易、参与共识       │     │                │
@@ -42,7 +51,7 @@
 │          │   ┌───────────────────────────────────────┐     │                │
 │          │   │         本地 API（可选功能）           │     │◄───── Agent   │
 │          │   │                                        │     │   HTTP/Unix   │
-│          │   │   端口 3000 (只监听 127.0.0.1)        │     │   Socket      │
+│          │   │   端口 9528 (只监听 127.0.0.1)        │     │   Socket      │
 │          │   │   • 给本地程序的接口                   │     │                │
 │          │   │   • 不是独立"服务"，是节点的入口       │     │                │
 │          │   │   • 可关闭: clawtokend --no-api       │     │                │
@@ -93,8 +102,8 @@
 │   bitcoin-cli                         clawtoken                              │
 │   (命令行工具)                        (命令行工具)                           │
 │                                                                              │
-│   端口 8333 (P2P)                     端口 9944 (P2P)                        │
-│   端口 8332 (RPC)                     端口 3000 (API)                        │
+│   端口 8333 (P2P)                     端口 9527 (P2P)                        │
+│   端口 8332 (RPC)                     端口 9528 (API)                        │
 │                                                                              │
 │   ~/.bitcoin/                         ~/.clawtoken/                          │
 │   (数据目录)                          (数据目录)                             │
@@ -149,8 +158,8 @@ clawtokend
 # clawtokend v1.0.0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # DID:     did:claw:z6MkpTxxxxxxx
-# P2P:     /ip4/0.0.0.0/tcp/9944
-# API:     http://127.0.0.1:3000
+# P2P:     /ip4/0.0.0.0/tcp/9527
+# API:     http://127.0.0.1:9528
 # Network: mainnet
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # [INFO] Connecting to bootstrap nodes...
@@ -168,7 +177,7 @@ clawtokend
 import requests
 
 # 节点的本地 API
-NODE_API = "http://127.0.0.1:3000"
+NODE_API = "http://127.0.0.1:9528"
 
 # 查询余额
 balance = requests.get(f"{NODE_API}/api/wallet/balance").json()
@@ -226,7 +235,7 @@ clawtoken logs --follow       # 实时日志
 
 ## API 参考
 
-节点的本地 API（默认 `http://127.0.0.1:3000`）：
+节点的本地 API（默认 `http://127.0.0.1:9528`）：
 
 ### 节点状态
 
@@ -321,7 +330,7 @@ import requests
 import time
 
 class MyAgent:
-    def __init__(self, node_api="http://127.0.0.1:3000"):
+    def __init__(self, node_api="http://127.0.0.1:9528"):
         self.api = node_api
         
         # 确认节点运行中
@@ -410,7 +419,7 @@ if __name__ == "__main__":
 #!/bin/bash
 # agent.sh - 使用 curl 的简单 Agent
 
-NODE="http://127.0.0.1:3000"
+NODE="http://127.0.0.1:9528"
 
 # 检查节点状态
 echo "检查节点..."
@@ -447,8 +456,8 @@ clawtokend
 ```bash
 docker run -d \
   --name clawtoken \
-  -p 9944:9944 \
-  -p 127.0.0.1:3000:3000 \
+  -p 9527:9527 \
+  -p 127.0.0.1:9528:9528 \
   -v ~/.clawtoken:/root/.clawtoken \
   clawtoken/node:latest
 ```
@@ -536,7 +545,7 @@ clawtokend --max-transfer=100         # 单笔限额
 import requests
 
 headers = {"Authorization": "Bearer my-secret"}
-requests.get("http://127.0.0.1:3000/api/wallet/balance", headers=headers)
+requests.get("http://127.0.0.1:9528/api/wallet/balance", headers=headers)
 ```
 
 ---
@@ -551,16 +560,16 @@ network: mainnet  # mainnet / testnet / local
 
 # P2P
 p2p:
-  port: 9944
+  port: 9527
   bootstrap:
-    - /ip4/bootstrap1.clawtoken.network/tcp/9944/p2p/Qm...
-    - /ip4/bootstrap2.clawtoken.network/tcp/9944/p2p/Qm...
+    - /ip4/bootstrap1.clawtoken.network/tcp/9527/p2p/Qm...
+    - /ip4/bootstrap2.clawtoken.network/tcp/9527/p2p/Qm...
 
 # 本地 API
 api:
   enabled: true
   host: 127.0.0.1  # 只监听本地
-  port: 3000
+  port: 9528
   token: null      # API Token (可选)
 
 # 节点类型
@@ -591,7 +600,7 @@ logging:
 │                                                                              │
 │   Agent (任何语言)                                                           │
 │        │                                                                     │
-│        │ HTTP (127.0.0.1:3000)                                              │
+│        │ HTTP (127.0.0.1:9528)                                              │
 │        ▼                                                                     │
 │   ┌─────────────────────────────────────────────────────────┐               │
 │   │                                                          │               │
@@ -604,7 +613,7 @@ logging:
 │   │                                                          │               │
 │   └──────────────────────────┬───────────────────────────────┘               │
 │                              │                                               │
-│                              │ P2P (9944)                                    │
+│                              │ P2P (9527)                                    │
 │                              ▼                                               │
 │   ┌──────────────────────────────────────────────────────────────────────┐  │
 │   │                                                                       │  │
