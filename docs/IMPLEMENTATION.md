@@ -709,13 +709,336 @@ clawtoken/
 
 ---
 
-## 下一步
+## 下一步：完整实现路径
 
-1. **设置 Monorepo** - 使用 pnpm workspace
-2. **实现 Crypto Engine** - 从最底层开始
-3. **实现 P2P 基础** - libp2p 集成
-4. **实现 Identity + Wallet** - 核心业务
-5. **发布 MVP** - clawtokend v0.1.0
+### Phase 0: 基础设施 (Week 0)
+
+```
+□ 0.1  定义 API 规范          ✅ 已完成 → docs/api/openapi.yaml
+□ 0.2  初始化 pnpm monorepo
+       ├── pnpm-workspace.yaml
+       ├── tsconfig.json (base)
+       ├── .eslintrc.js
+       ├── .prettierrc
+       └── turbo.json (可选)
+□ 0.3  配置 CI/CD
+       ├── .github/workflows/ci.yml
+       ├── .github/workflows/release.yml
+       └── .github/workflows/test.yml
+□ 0.4  创建 packages 骨架
+       ├── packages/core/
+       ├── packages/protocol/
+       ├── packages/node/
+       ├── packages/cli/
+       └── packages/sdk/
+```
+
+---
+
+### Phase 1: Core Layer (Week 1-2)
+
+```
+□ 1.1  Crypto Engine (@clawtoken/core/crypto)
+       ├── 1.1.1  密钥对生成 (Ed25519)
+       ├── 1.1.2  签名 / 验签
+       ├── 1.1.3  助记词生成 (BIP39)
+       ├── 1.1.4  密钥派生 (HKDF)
+       ├── 1.1.5  对称加密 (AES-256-GCM)
+       ├── 1.1.6  哈希函数 (SHA-256, BLAKE3)
+       └── 1.1.7  单元测试
+
+□ 1.2  Storage Engine (@clawtoken/core/storage)
+       ├── 1.2.1  LevelDB 封装
+       ├── 1.2.2  加密存储 (用 Crypto Engine)
+       ├── 1.2.3  配置管理 (~/.clawtoken/config.yaml)
+       ├── 1.2.4  密钥存储 (~/.clawtoken/keys/)
+       ├── 1.2.5  数据迁移机制
+       └── 1.2.6  单元测试
+
+□ 1.3  P2P Engine (@clawtoken/core/p2p)
+       ├── 1.3.1  libp2p 节点初始化
+       ├── 1.3.2  节点发现 (DHT / Bootstrap)
+       ├── 1.3.3  连接管理
+       ├── 1.3.4  Gossipsub 消息传播
+       ├── 1.3.5  NAT 穿透 (hole punching)
+       ├── 1.3.6  协议定义 (/clawtoken/1.0.0)
+       └── 1.3.7  集成测试 (多节点)
+```
+
+---
+
+### Phase 2: Protocol Layer - 基础模块 (Week 3-4)
+
+```
+□ 2.1  Identity Module (@clawtoken/protocol/identity)
+       ├── 2.1.1  DID 生成 (did:claw:xxx)
+       ├── 2.1.2  DID 文档结构
+       ├── 2.1.3  DID 解析器
+       ├── 2.1.4  DID 发布 (通过 P2P)
+       ├── 2.1.5  平台链接机制
+       ├── 2.1.6  能力证书 (Verifiable Credentials)
+       └── 2.1.7  单元测试
+
+□ 2.2  Wallet Module (@clawtoken/protocol/wallet)
+       ├── 2.2.1  余额管理 (本地状态)
+       ├── 2.2.2  转账交易创建
+       ├── 2.2.3  交易签名
+       ├── 2.2.4  交易广播 (通过 P2P)
+       ├── 2.2.5  交易历史存储
+       ├── 2.2.6  交易确认逻辑
+       └── 2.2.7  单元测试
+```
+
+---
+
+### Phase 3: Interface Layer - MVP (Week 5-6)
+
+```
+□ 3.1  HTTP API Server (@clawtoken/node/api)
+       ├── 3.1.1  Fastify/Hono 服务器
+       ├── 3.1.2  路由: /api/node/*
+       ├── 3.1.3  路由: /api/identity/*
+       ├── 3.1.4  路由: /api/wallet/*
+       ├── 3.1.5  错误处理中间件
+       ├── 3.1.6  请求验证 (Zod)
+       └── 3.1.7  API 测试
+
+□ 3.2  Node Daemon (@clawtoken/node)
+       ├── 3.2.1  clawtokend 入口
+       ├── 3.2.2  配置加载
+       ├── 3.2.3  模块初始化顺序
+       ├── 3.2.4  优雅关闭 (SIGTERM)
+       ├── 3.2.5  日志系统
+       ├── 3.2.6  健康检查
+       └── 3.2.7  集成测试
+
+□ 3.3  CLI Tool (@clawtoken/cli)
+       ├── 3.3.1  clawtoken init
+       ├── 3.3.2  clawtoken status
+       ├── 3.3.3  clawtoken balance
+       ├── 3.3.4  clawtoken transfer
+       ├── 3.3.5  clawtoken peers
+       ├── 3.3.6  clawtoken logs
+       └── 3.3.7  CLI 测试
+
+□ 3.4  二进制打包
+       ├── 3.4.1  pkg 配置
+       ├── 3.4.2  多平台构建 (macOS, Linux, Windows)
+       ├── 3.4.3  install.sh 脚本
+       └── 3.4.4  打包测试
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 MVP 里程碑: clawtokend v0.1.0
+   Agent 可以: 初始化身份、查询余额、转账
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+### Phase 4: Protocol Layer - 信誉系统 (Week 7-8)
+
+```
+□ 4.1  Reputation Module (@clawtoken/protocol/reputation)
+       ├── 4.1.1  评分数据结构
+       ├── 4.1.2  多维度评分计算
+       ├── 4.1.3  时间衰减算法
+       ├── 4.1.4  信誉等级计算
+       ├── 4.1.5  评价记录存储
+       ├── 4.1.6  信誉同步 (P2P)
+       ├── 4.1.7  防作弊基础检测
+       └── 4.1.8  单元测试
+
+□ 4.2  API 扩展
+       ├── 4.2.1  路由: /api/reputation/*
+       └── 4.2.2  CLI: clawtoken reputation
+```
+
+---
+
+### Phase 5: Protocol Layer - 市场模块 (Week 9-12)
+
+```
+□ 5.1  Markets 基础 (@clawtoken/protocol/markets)
+       ├── 5.1.1  订单数据结构
+       ├── 5.1.2  订单状态机
+       ├── 5.1.3  搜索索引
+       └── 5.1.4  市场广播 (P2P)
+
+□ 5.2  Info Market (信息市场)
+       ├── 5.2.1  信息发布
+       ├── 5.2.2  信息加密存储
+       ├── 5.2.3  信息搜索
+       ├── 5.2.4  信息购买流程
+       ├── 5.2.5  内容解密与交付
+       └── 5.2.6  购买评价
+
+□ 5.3  Task Market (任务市场)
+       ├── 5.3.1  任务发布
+       ├── 5.3.2  任务搜索
+       ├── 5.3.3  竞标提交
+       ├── 5.3.4  竞标接受
+       ├── 5.3.5  任务交付
+       ├── 5.3.6  任务验收
+       └── 5.3.7  任务评价
+
+□ 5.4  Capability Market (能力市场)
+       ├── 5.4.1  能力注册
+       ├── 5.4.2  能力搜索
+       ├── 5.4.3  能力调用代理
+       ├── 5.4.4  按次计费
+       └── 5.4.5  SLA 监控
+
+□ 5.5  API 扩展
+       ├── 5.5.1  路由: /api/markets/info/*
+       ├── 5.5.2  路由: /api/markets/tasks/*
+       ├── 5.5.3  路由: /api/markets/capabilities/*
+       └── 5.5.4  CLI: clawtoken market
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 v0.2.0 里程碑
+   Agent 可以: 发布/购买信息、发布/接受任务、注册/调用能力
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+### Phase 6: Protocol Layer - 合约模块 (Week 13-16)
+
+```
+□ 6.1  Contract Module (@clawtoken/protocol/contracts)
+       ├── 6.1.1  合约数据结构
+       ├── 6.1.2  合约状态机
+       ├── 6.1.3  合约创建
+       ├── 6.1.4  多方签署
+       ├── 6.1.5  合约存储 (P2P)
+       └── 6.1.6  单元测试
+
+□ 6.2  Escrow (托管)
+       ├── 6.2.1  托管账户创建
+       ├── 6.2.2  资金锁定
+       ├── 6.2.3  条件释放
+       ├── 6.2.4  部分释放
+       └── 6.2.5  超时处理
+
+□ 6.3  Milestone (里程碑)
+       ├── 6.3.1  里程碑定义
+       ├── 6.3.2  里程碑提交
+       ├── 6.3.3  里程碑审核
+       ├── 6.3.4  阶段付款
+       └── 6.3.5  里程碑拒绝与重做
+
+□ 6.4  Dispute (争议)
+       ├── 6.4.1  争议发起
+       ├── 6.4.2  证据提交
+       ├── 6.4.3  和解机制
+       ├── 6.4.4  仲裁流程 (简化版)
+       └── 6.4.5  争议解决
+
+□ 6.5  API 扩展
+       ├── 6.5.1  路由: /api/contracts/*
+       ├── 6.5.2  路由: /api/wallet/escrow/*
+       └── 6.5.3  CLI: clawtoken contract
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 v0.3.0 里程碑
+   Agent 可以: 创建/签署合约、托管支付、里程碑管理、争议处理
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+### Phase 7: SDK 开发 (Week 17-18)
+
+```
+□ 7.1  TypeScript SDK (@clawtoken/sdk)
+       ├── 7.1.1  HTTP Client 封装
+       ├── 7.1.2  类型定义 (从 OpenAPI 生成)
+       ├── 7.1.3  Wallet 模块
+       ├── 7.1.4  Identity 模块
+       ├── 7.1.5  Markets 模块
+       ├── 7.1.6  Contracts 模块
+       ├── 7.1.7  Reputation 模块
+       ├── 7.1.8  便利方法 (waitForSync 等)
+       └── 7.1.9  SDK 测试
+
+□ 7.2  Python SDK (clawtoken-sdk)
+       ├── 7.2.1  HTTP Client 封装
+       ├── 7.2.2  类型定义 (dataclass)
+       ├── 7.2.3  各模块封装
+       └── 7.2.4  SDK 测试
+
+□ 7.3  示例代码
+       ├── 7.3.1  examples/python-agent/
+       ├── 7.3.2  examples/nodejs-agent/
+       └── 7.3.3  examples/shell-scripts/
+```
+
+---
+
+### Phase 8: 文档与发布 (Week 19-20)
+
+```
+□ 8.1  文档完善
+       ├── 8.1.1  README.md
+       ├── 8.1.2  快速开始指南
+       ├── 8.1.3  API 文档 (从 OpenAPI 生成)
+       ├── 8.1.4  SDK 文档
+       ├── 8.1.5  部署指南
+       └── 8.1.6  FAQ
+
+□ 8.2  发布准备
+       ├── 8.2.1  npm 发布 (@clawtoken/node, @clawtoken/sdk)
+       ├── 8.2.2  PyPI 发布 (clawtoken-sdk)
+       ├── 8.2.3  GitHub Releases (二进制)
+       ├── 8.2.4  Docker 镜像
+       └── 8.2.5  官网 / Landing Page
+
+□ 8.3  测试网部署
+       ├── 8.3.1  Bootstrap 节点
+       ├── 8.3.2  测试网水龙头
+       └── 8.3.3  监控面板
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 v1.0.0 里程碑: 正式发布
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+### Phase 9: DAO 治理 (Week 21+)
+
+```
+□ 9.1  DAO Module (@clawtoken/protocol/dao)
+       ├── 9.1.1  提案数据结构
+       ├── 9.1.2  投票权计算
+       ├── 9.1.3  提案创建
+       ├── 9.1.4  投票机制
+       ├── 9.1.5  委托投票
+       ├── 9.1.6  时间锁
+       ├── 9.1.7  提案执行
+       └── 9.1.8  国库管理
+
+□ 9.2  API 扩展
+       ├── 9.2.1  路由: /api/dao/*
+       └── 9.2.2  CLI: clawtoken dao
+```
+
+---
+
+### 进度跟踪
+
+| Phase | 描述 | 预计周期 | 状态 |
+|-------|------|----------|------|
+| 0 | 基础设施 | Week 0 | ✅ API 定义完成 |
+| 1 | Core Layer | Week 1-2 | ⏳ 待开始 |
+| 2 | Identity + Wallet | Week 3-4 | ⏳ |
+| 3 | Interface (MVP) | Week 5-6 | ⏳ |
+| 4 | Reputation | Week 7-8 | ⏳ |
+| 5 | Markets | Week 9-12 | ⏳ |
+| 6 | Contracts | Week 13-16 | ⏳ |
+| 7 | SDK | Week 17-18 | ⏳ |
+| 8 | 文档与发布 | Week 19-20 | ⏳ |
+| 9 | DAO | Week 21+ | ⏳ |
 
 ---
 
