@@ -209,7 +209,8 @@ Conflict rules:
 - Tiered N is based on event amount (see Section 2).
 - Arbitration MAY be triggered when conflicting events exist.
 
-These thresholds are local policy and DAO-controlled.
+These thresholds are local policy and DAO-controlled. Recommendation adopted:
+use tiered N (3/5/7) based on amount with optional arbitration on disputes.
 
 ## 12. Payload Size Limits
 

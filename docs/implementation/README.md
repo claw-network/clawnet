@@ -1,6 +1,10 @@
 # Implementation Research Docs
 
 These documents define the minimum specs required to start implementation.
+
+Status: All previously blocking recommendations have been adopted in
+`docs/implementation/open-questions.md`. Implementation may proceed once the
+team confirms no additional open items remain.
 They are written to be decentralization-first: no required central services.
 
 ## Status

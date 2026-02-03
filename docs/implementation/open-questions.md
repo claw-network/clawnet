@@ -8,78 +8,44 @@
 4. Indexers are optional and non-authoritative.
 5. DAO controls fee parameters and reward rates.
 
-## Still Open (Blocking)
+## Still Open (Blocking) — Resolved (Adopt Recommendations)
 
 ### 1. Finality threshold for high-value transfers
 
-Options:
-- A: Fixed N=7 for high-value events
-- B: N based on amount tiers (e.g., 3/5/7)
-- C: Require arbitration for > threshold
-
-Recommendation:
+Decision:
 - Use tiered N (3/5/7) based on amount, with optional arbitration for disputes.
 
-Decision criteria:
-- Security vs latency tradeoff
-- Network size and peer availability
+Rationale:
+- Balances latency and security at different value tiers.
 
 ### 2. Arbitration committee selection
 
-Options:
-- A: Random from DAO arbitration pool
-- B: Reputation-weighted random
-- C: Stake-weighted random
-
-Recommendation:
+Decision:
 - Reputation-weighted random with minimum stake and rotating committee.
 
-Decision criteria:
-- Sybil resistance
-- Fairness and liveness
-- Incentive compatibility
+Rationale:
+- Sybil resistance + fairness without central control.
 
 ### 3. PoW/stake gating on public testnet
 
-Options:
-- A: Disabled by default
-- B: Proof-of-work tickets
-- C: Minimum stake requirement
+Decision:
+- Disabled by default; enable PoW if spam observed.
 
-Recommendation:
-- Default disabled; enable PoW if spam observed.
-
-Decision criteria:
-- Testnet accessibility
-- Spam resistance
-- Implementation complexity
+Rationale:
+- Preserves accessibility while keeping a mitigation option.
 
 ### 4. Snapshot interval and pruning policy
 
-Options:
-- A: Fixed snapshot interval (10k events)
-- B: Time-based (hourly/daily)
-- C: Adaptive based on event rate
+Decision:
+- Fixed interval + minimum time cap (every 10k events or 1 hour).
 
-Recommendation:
-- Fixed interval + minimum time cap (e.g., every 10k or 1 hour).
-
-Decision criteria:
-- Storage growth
-- Recovery speed
-- Light node performance
+Rationale:
+- Predictable storage growth with bounded recovery time.
 
 ### 5. Hard fork and emergency pause policy
 
-Options:
-- A: DAO vote with time-lock
-- B: Emergency multi-sig + DAO ratification
-- C: Automated safety triggers
-
-Recommendation:
+Decision:
 - Emergency multi-sig + DAO ratification, with public time-lock for non-emergency upgrades.
 
-Decision criteria:
-- Governance security
-- Response time
-- Decentralization guarantees
+Rationale:
+- Fast response with governance accountability.
