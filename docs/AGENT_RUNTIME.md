@@ -175,6 +175,8 @@ clawtokend
 
 节点运行后，Agent 通过本地 API 与自己的节点交互：
 
+> Token 单位：所有金额字段均为 **Token 整数**，最小单位 1 Token，API 不接受小数金额。
+
 ```python
 # Python Agent
 import requests

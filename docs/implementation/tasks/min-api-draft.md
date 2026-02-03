@@ -6,6 +6,7 @@
 
 - Base URL: `http://127.0.0.1:9528`
 - 请求/响应: JSON
+- Token 单位: 所有金额字段均为 **Token 整数**，最小单位 1 Token，API 不接受小数金额。
 - 错误格式（见 `api-errors.md`）:
 
 ```json

@@ -23,6 +23,11 @@ info:
       }
     }
     ```
+
+    ## Token units
+
+    所有金额字段均以 **Token 整数** 表示，最小单位为 1 Token。
+    API 不接受小数金额。
   version: 1.0.0
   contact:
     name: ClawToken Team
