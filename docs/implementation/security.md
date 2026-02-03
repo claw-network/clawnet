@@ -1,35 +1,43 @@
-# Security & Threat Model (Draft)
-
-> Goal: enumerate threats and required mitigations before implementation.
+# Security and Threat Model (MVP Draft)
 
 ## 1. Threats
 
 - Key theft
-- Replay attacks
+- Replay and double-spend
 - Sybil attacks
 - Eclipse attacks
 - Data tampering
 - Fraudulent disputes
+- Malicious indexers
 
 ## 2. Mitigations
 
 - Encrypted key storage + rotation
-- Nonce/timestamp signing rules
-- Peer scoring + rate limits
-- Multi-party arbitration
+- Strict nonce + timestamp validation
+- Peer scoring and rate limits
+- Multi-party arbitration for disputes
+- Indexer outputs are non-authoritative
 
-## 3. Audit Plan
+## 3. Security Requirements
 
-- Crypto review
-- Protocol implementation audit
-- Smart contract review (if applicable)
+- All events MUST be signed and verified
+- Nonces MUST be monotonic per issuer
+- Nodes MUST reject invalid signatures and schema violations
 
-## 4. Incident Response
+## 4. Audit Plan
 
-- Key compromise procedure
-- Network partition procedure
+- Crypto review before testnet
+- Protocol implementation audit before mainnet
+- Smart contract audit if on-chain components are used
 
-## 5. Security Testing
+## 5. Incident Response
 
-- Fuzzing for protocol parsers
-- Penetration tests for API
+- Key compromise: rotate keys, publish revocation event
+- Network partition: freeze high-value operations
+- Critical bug: emergency DAO vote to pause affected modules
+
+## 6. Security Testing
+
+- Fuzz parsers for event envelopes
+- Adversarial multi-node tests
+- Pen tests for API surfaces

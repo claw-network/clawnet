@@ -1,4 +1,4 @@
-# Protocol Specification (Draft)
+# Protocol Specification (MVP Draft)
 
 This document defines the minimum protocol rules so any node can independently
 validate state. All statements using MUST/SHOULD are normative.
@@ -14,10 +14,20 @@ validate state. All statements using MUST/SHOULD are normative.
 
 - The protocol is event-sourced.
 - Nodes store an append-only event log and derive state via deterministic reducers.
-- No central sequencer exists. Ordering is established by local validation rules
-  and optional finality heuristics.
+- There is no central sequencer. Ordering is established by local validation
+  rules and optional finality heuristics.
+- Indexers are optional and non-authoritative.
 
-## 2. Event Envelope
+## 2. Data Types
+
+- Timestamp: milliseconds since Unix epoch.
+- Amount: unsigned integer string in microtoken (1e-6 Token).
+- DID: "did:claw:" + multibase(base58btc(Ed25519 public key)).
+- Address: "claw" + base58check payload.
+- Hash: lowercase hex SHA-256 digest.
+- ID: ASCII string, max length 64.
+
+## 3. Event Envelope
 
 All protocol events MUST be wrapped in an envelope:
 
@@ -40,15 +50,15 @@ Rules:
 
 - v MUST be the protocol version.
 - issuer MUST be a valid did:claw DID.
-- ts MUST be milliseconds since epoch.
+- ts MUST be within +/- 10 minutes of local time, otherwise quarantine.
 - nonce MUST be strictly increasing per issuer.
 - payload MUST conform to the event type schema.
 - prev MAY reference the last accepted event hash for issuer.
-- sig MUST be a detached signature over canonical bytes (see Section 3).
+- sig MUST be a detached signature over canonical bytes (see Section 4).
 - pub MUST match issuer DID.
 - hash MUST be SHA-256(canonical bytes without hash field).
 
-## 3. Canonical Serialization and Signing
+## 4. Canonical Serialization and Signing
 
 - Canonical JSON MUST follow JCS (RFC 8785).
 - The signing bytes are JCS(envelope without sig and hash fields).
@@ -60,18 +70,16 @@ Signature verification:
 - Extract pub key from envelope.pub (multibase).
 - Verify signature over the canonical bytes with domain separation.
 
-## 4. Replay Protection
+## 5. Replay Protection
 
 - Each issuer maintains a monotonic nonce.
 - Nodes MUST reject events where nonce <= last_accepted_nonce for issuer.
-- Nodes MAY keep a short window to tolerate minor reordering but MUST NOT accept
-  duplicate nonces.
+- Nodes MAY keep a small acceptance window (e.g., last 5 nonces) for out-of-order
+  delivery but MUST NOT accept duplicates.
 
-## 5. Event Types and Minimal Schemas
+## 6. Event Types and Schemas (MVP)
 
-### 5.1 identity.create
-
-Required payload fields:
+### 6.1 identity.create
 
 ```json
 {
@@ -84,9 +92,9 @@ Required payload fields:
 Rules:
 
 - did MUST be derived from publicKey per crypto-spec.
-- document MUST be signed by the same issuer.
+- document MUST be signed by issuer.
 
-### 5.2 identity.update
+### 6.2 identity.update
 
 ```json
 {
@@ -98,10 +106,10 @@ Rules:
 
 Rules:
 
-- prevDocHash MUST match the current document hash.
-- Update MUST be signed by a key authorized in current document.
+- prevDocHash MUST match current document hash.
+- Update MUST be signed by a key authorized in current doc.
 
-### 5.3 wallet.transfer
+### 6.3 wallet.transfer
 
 ```json
 {
@@ -115,11 +123,11 @@ Rules:
 
 Rules:
 
-- Amounts use microtoken integer strings.
 - Issuer MUST control the from address.
 - Balance MUST be >= amount + fee.
+- fee MUST be >= minimum fee.
 
-### 5.4 wallet.escrow.create
+### 6.4 wallet.escrow.create
 
 ```json
 {
@@ -131,7 +139,7 @@ Rules:
 }
 ```
 
-### 5.5 wallet.escrow.release
+### 6.5 wallet.escrow.release
 
 ```json
 {
@@ -141,7 +149,7 @@ Rules:
 }
 ```
 
-### 5.6 market.listing.publish
+### 6.6 market.listing.publish
 
 ```json
 {
@@ -151,7 +159,12 @@ Rules:
 }
 ```
 
-### 5.7 market.order.create
+Rules:
+
+- listingId MUST be unique.
+- data MUST include pricing and seller DID.
+
+### 6.7 market.order.create
 
 ```json
 {
@@ -162,15 +175,13 @@ Rules:
 }
 ```
 
-### 5.8 contract.create / contract.sign / contract.complete
+### 6.8 contract.create / contract.sign / contract.complete
 
-Minimal rules:
+- contract.create MUST be signed by initiator.
+- contract.sign MUST be signed by the signer DID.
+- contract.complete MUST be signed by both parties or authorized arbiter.
 
-- contract.create MUST be signed by initiator
-- contract.sign MUST be signed by the signer DID
-- contract.complete MUST be signed by both parties or authorized arbiter
-
-### 5.9 reputation.record
+### 6.9 reputation.record
 
 ```json
 {
@@ -183,10 +194,10 @@ Minimal rules:
 
 Rules:
 
-- ref MUST point to a valid event (e.g. completed order or contract).
-- reputation.record MUST be verifiable by any node.
+- ref MUST point to a valid completed event.
+- record MUST be verifiable by any node.
 
-## 6. Validation Pipeline
+## 7. Validation Pipeline
 
 Nodes MUST validate events in this order:
 
@@ -199,46 +210,40 @@ Nodes MUST validate events in this order:
 
 If any step fails, the event MUST be rejected.
 
-## 7. State Reducers
+## 8. Reducers and State
 
-- Reducers MUST be deterministic.
-- Reducers MUST be pure: same input log -> same state.
+- Reducers MUST be deterministic and pure.
 - Reducers MUST be versioned.
 
 Conflicts:
 
-- Two events with same nonce from same issuer: keep the lower hash and reject
-  the other.
-- Identity update conflicts: require prevDocHash match, else reject.
+- Two events with same nonce from same issuer: keep lower hash, reject other.
+- identity.update conflicts: require prevDocHash match, else reject.
 
-## 8. Finality (MVP)
+## 9. Finality (MVP)
 
-MVP finality is probabilistic:
+- An event is considered confirmed after N confirmations (default N=3).
+- High-value operations MAY require higher N or arbitration.
 
-- An event is considered "confirmed" after N confirmations (default N=3).
-- Confirmation counts are derived from peer acknowledgements and local sync.
-- For high-value events, nodes MAY require higher N or arbitration.
-
-## 9. Payload Size Limits
+## 10. Payload Size Limits
 
 - Envelope size MUST be <= 1 MB.
-- Larger payloads MUST be stored out-of-band (IPFS or content-addressed storage)
-  with hash reference inside payload.
+- Larger payloads MUST be stored out-of-band (IPFS/content hash)
+  with hash reference in payload.
 
-## 10. Versioning and Upgrades
+## 11. Versioning and Upgrades
 
 - Envelope v indicates protocol version.
-- Nodes MUST reject events with unknown major versions.
+- Nodes MUST reject unknown major versions.
 - Minor versions SHOULD be backward compatible.
-- Upgrade policy is defined in rollout.md.
 
-## 11. Decentralization Guarantees
+## 12. Decentralization Guarantees
 
 - No event type requires a central sequencer.
 - Indexers are optional and non-authoritative.
 - Any node can validate from the event log alone.
 
-## 12. Conformance Tests
+## 13. Conformance Tests
 
 - Canonical serialization test vectors
 - Signature verification tests

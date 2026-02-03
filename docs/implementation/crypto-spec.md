@@ -1,13 +1,13 @@
-# Crypto Specification (Draft)
+# Crypto Specification (MVP Draft)
 
-This document defines cryptographic primitives, key formats, and signing rules.
+Defines cryptographic primitives, key formats, and signing rules.
 All parameters are defaults unless overridden by DAO governance.
 
 ## 1. Algorithms (MVP)
 
 - Signatures: Ed25519
 - Key agreement: X25519
-- Hashing: SHA-256 (protocol) and BLAKE3 (content)
+- Hashing: SHA-256 (protocol), BLAKE3 (content)
 - Symmetric encryption: AES-256-GCM
 - KDF: Argon2id (passwords), HKDF-SHA256 (derivations)
 
@@ -37,9 +37,9 @@ All parameters are defaults unless overridden by DAO governance.
 
 ## 4. Signing Rules
 
-- Use detached Ed25519 signatures
+- Detached Ed25519 signatures
 - Signing payload = "clawtoken:event:v1:" + JCS(envelope without sig/hash)
-- Signature is encoded as base58btc
+- Signature encoded as base58btc
 
 ## 5. Encryption At Rest
 
@@ -71,7 +71,7 @@ Stored format:
 
 - Operational keys SHOULD rotate every 90 days or 100k signatures
 - Rotation events MUST be recorded in the event log
-- Old keys MUST remain valid for verification, not for signing
+- Old keys remain valid for verification, not for signing
 
 ## 7. Social Recovery
 
@@ -92,4 +92,4 @@ Test vectors MUST be published for:
 
 - Never sign non-canonical bytes
 - Reject signatures from keys not authorized by DID document
-- Avoid weak passwords; enforce minimum length 12
+- Enforce password length >= 12

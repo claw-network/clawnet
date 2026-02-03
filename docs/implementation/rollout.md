@@ -1,24 +1,26 @@
-# Rollout Plan (Draft)
-
-> Goal: phased releases without centralized control.
+# Rollout Plan (MVP Draft)
 
 ## 1. Alpha
 
-- Single-node demos
-- Deterministic state checks
+- Single-node MVP
+- Deterministic reducer tests
+- Developer-only distribution
 
-## 2. Beta
+## 2. Beta (Testnet)
 
 - Multi-node testnet
-- Community-run bootstrap nodes
+- Community bootstrap nodes
 - Snapshot distribution
+- Faucet and test tokens
 
 ## 3. Mainnet
 
-- DAO-managed parameters
-- Upgrade policy and compatibility window
+- DAO-controlled parameters
+- Upgrade windows published in advance
+- Emergency pause policy
 
 ## 4. Upgrade Strategy
 
 - Version negotiation
-- Graceful deprecation
+- Backward compatibility for 1 minor version
+- Emergency rollback policy

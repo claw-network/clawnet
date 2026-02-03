@@ -1,35 +1,70 @@
-# Storage Specification (Draft)
+# Storage Specification (MVP Draft)
 
-> Goal: define local data model and persistence guarantees.
+Defines local storage layout and persistence guarantees.
 
 ## 1. Storage Engine
 
-- Candidate: LevelDB / RocksDB / SQLite
-- Requirements: append-only log + key-value index
+- Default: LevelDB (RocksDB optional)
+- Requirements: append-only log + KV indexes
 
-## 2. Data Model
+## 2. Directory Layout
 
-- Event log (immutable)
-- State snapshots (periodic)
-- Index tables (by DID, tx hash, order id)
+```
+~/.clawtoken/
+  data/
+    events.db
+    state.db
+    snapshots/
+  logs/
+  keys/
+```
 
-## 3. Integrity
+## 3. Key Prefixes
 
-- Every record includes hash + signature
-- Merkle root per batch or snapshot
+- ev:<hash> -> event envelope bytes
+- st:<module> -> module state snapshot
+- ix:did:<did> -> list of event hashes
+- ix:addr:<address> -> list of tx hashes
+- meta:version -> schema version
 
-## 4. Migration
+## 4. Event Log
 
-- Schema versioning
-- Forward-only migrations
-- Recovery from corrupted index
+- Immutable records
+- Hash must match envelope hash
+- Garbage collection not permitted for confirmed events
 
-## 5. Indexing
+## 5. State Snapshots
 
-- Local index for fast lookup
+- Snapshot every 10,000 events (configurable)
+- Snapshot includes module state + last event hash
+
+Snapshot format (JSON + hash):
+
+```json
+{
+  "v": 1,
+  "at": "<event hash>",
+  "state": { /* module state */ }
+}
+```
+
+## 6. Indexes
+
+- Indexes are derived and can be rebuilt
 - External indexers are optional and non-authoritative
 
-## 6. Retention & Pruning
+## 7. Migration
 
-- Minimal history retention rules
-- Snapshots for compact nodes
+- Schema version stored in meta:version
+- Migrations must be forward-only
+- Node must refuse downgrade to older schema
+
+## 8. Corruption Recovery
+
+- If index corruption detected, rebuild from event log
+- If event log corrupted, node enters quarantine mode
+
+## 9. Privacy
+
+- Sensitive data must be encrypted or stored off-chain
+- Only hashes stored in event log for large payloads

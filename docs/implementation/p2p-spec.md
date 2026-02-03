@@ -1,7 +1,6 @@
-# P2P Specification (Draft)
+# P2P Specification (MVP Draft)
 
-This document defines network behavior for interoperable nodes.
-No node has privileged status.
+Defines network behavior for interoperable nodes. No privileged nodes.
 
 ## 1. libp2p Stack
 
@@ -40,9 +39,9 @@ No node has privileged status.
 
 ## 5. Discovery
 
-- DHT (Kademlia) is required
-- Bootstrap list is optional and community-run
-- Nodes MUST function with empty bootstrap list in private networks
+- DHT (Kademlia) required
+- Bootstrap list optional and community-run
+- Nodes MUST function with empty bootstrap in private networks
 
 ## 6. Sync Strategy
 
@@ -60,7 +59,15 @@ No node has privileged status.
 }
 ```
 
-Responses MUST include ordered events and a continuation cursor.
+Response:
+
+```json
+{
+  "type": "range.response",
+  "events": ["<event bytes>"],
+  "cursor": "<next hash>"
+}
+```
 
 ## 7. Anti-Spam
 
@@ -70,13 +77,13 @@ Responses MUST include ordered events and a continuation cursor.
 
 ## 8. Sybil Resistance (optional)
 
-- Proof-of-work tickets or stake-based admission MAY be enabled by DAO
+- Proof-of-work tickets or stake gating MAY be enabled by DAO
 - MUST be optional for private networks
 
 ## 9. NAT Traversal
 
 - Hole punching supported
-- Relay is optional and community-run
+- Relay optional and community-run
 
 ## 10. Metrics
 
