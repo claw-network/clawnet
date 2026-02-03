@@ -17,19 +17,8 @@ Defines network behavior for interoperable nodes. No privileged nodes.
 
 ### 2.1 Peer Rotation Announcement
 
-Rotation records are signed by the old peer key and broadcast on
-`/clawtoken/1.0.0/requests`:
-
-```json
-{
-  "type": "peer.rotate",
-  "old": "<oldPeerId>",
-  "new": "<newPeerId>",
-  "ts": 1700000000000,
-  "sig": "<signature by old peer key>",
-  "sigNew": "<optional signature by new peer key>"
-}
-```
+Rotation records are RequestMessage bodies (see Section 4.1) and broadcast on
+`/clawtoken/1.0.0/requests`.
 
 ## 3. Topics
 
@@ -39,23 +28,60 @@ Rotation records are signed by the old peer key and broadcast on
 
 ## 4. Message Envelope
 
-```json
-{
-  "v": 1,
-  "topic": "/clawtoken/1.0.0/events",
-  "sender": "<peerId>",
-  "ts": 1700000000000,
-  "payload": "<bytes>",
-  "sig": "<signature>"
+The P2P envelope MUST be encoded as FlatBuffers with content type
+`application/clawtoken-stream`. JSON envelopes are not supported.
+
+FlatBuffers schema (excerpt):
+
+```fbs
+table P2PEnvelope {
+  v:ushort;
+  topic:string;
+  sender:string;
+  ts:ulong;
+  contentType:string; // MUST be "application/clawtoken-stream"
+  payload:[ubyte];
+  sig:string;         // base58btc Ed25519 signature
 }
 ```
 
-- payload MUST be base64 (RFC 4648) of the JCS canonical bytes of the full event envelope (including sig and hash).
-- sig MUST be signed by peer key
-- Message envelope MUST be serialized with JCS (RFC 8785).
-- payload is base64 (RFC 4648) of the canonical event bytes.
-- sig is base58btc of Ed25519 signature over:
-  "clawtoken:p2p:v1:" + JCS(envelope without sig).
+Encoding rules:
+- Message envelope MUST be serialized as FlatBuffers with the schema above.
+- payload is raw bytes; its meaning depends on the topic (Section 4.1).
+
+Signature rules:
+- sig MUST be signed by peer key.
+- Signing bytes are: "clawtoken:p2p:v1:" + FlatBuffers bytes of the envelope
+  with sig set to empty.
+
+### 4.1 Payload Message Types (FlatBuffers)
+
+- /events: payload MUST be the canonical bytes of the full event envelope
+  (including sig and hash) as defined in `protocol-spec.md`.
+- /requests: payload MUST be a FlatBuffers RequestMessage.
+- /responses: payload MUST be a FlatBuffers ResponseMessage.
+
+FlatBuffers schema (excerpt):
+
+```fbs
+enum RequestType : byte { range_request = 1, peer_rotate = 2, pow_ticket = 3, stake_proof = 4 }
+enum ResponseType : byte { range_response = 1 }
+
+table RequestMessage {
+  type:RequestType;
+  rangeRequest:RangeRequest;
+  peerRotate:PeerRotate;
+  powTicket:PowTicket;
+  stakeProof:StakeProof;
+}
+
+table ResponseMessage {
+  type:ResponseType;
+  rangeResponse:RangeResponse;
+}
+```
+
+Only the field corresponding to `type` MUST be set; all other fields MUST be null.
 
 ## 5. Discovery
 
@@ -71,26 +97,25 @@ Rotation records are signed by the old peer key and broadcast on
 
 ### 6.1 Range Request
 
-```json
-{
-  "type": "range.request",
-  "from": "<event hash>",
-  "limit": 1000
+Range requests/responses are carried in RequestMessage/ResponseMessage payloads.
+
+FlatBuffers schema (excerpt):
+
+```fbs
+table RangeRequest {
+  from:string;  // event hash
+  limit:uint;
+}
+
+table EventBytes {
+  data:[ubyte];
+}
+
+table RangeResponse {
+  events:[EventBytes]; // canonical event bytes
+  cursor:string;
 }
 ```
-
-Response:
-
-```json
-{
-  "type": "range.response",
-  "events": ["<event bytes>"],
-  "cursor": "<next hash>"
-}
-```
-
-Encoding:
-- events are base64-encoded canonical event bytes (same as payload).
 
 ## 7. Anti-Spam
 
@@ -117,42 +142,24 @@ MUST only count eligible peers.
 
 ### 8.2 PoW Ticket
 
-PoW tickets are announced over `/clawtoken/1.0.0/requests`:
-
-```json
-{
-  "type": "pow.ticket",
-  "peer": "<peerId>",
-  "ts": 1700000000000,
-  "nonce": "<random>",
-  "difficulty": 20,
-  "hash": "<sha256 of JCS({peer,ts,nonce}) prefixed by 'clawtoken:pow:v1:'>",
-  "sig": "<signature by peer key>"
-}
-```
+PoW tickets are RequestMessage bodies (PowTicket) announced over
+`/clawtoken/1.0.0/requests`.
 
 Validation:
 - hash MUST have at least `difficulty` leading zero bits.
 - ts MUST be within MAX_CLOCK_SKEW_MS (see protocol-spec constants).
 - sig MUST verify for the peer key.
-- PoW signing bytes: JCS(pow ticket without sig), prefixed by
+- PoW signing bytes: FlatBuffers bytes of PowTicket with sig empty, prefixed by
   "clawtoken:pow:v1:".
+
+PoW hash bytes:
+- "clawtoken:pow:v1:" + FlatBuffers bytes of PowTicket with hash/sig empty.
+- hash MUST equal lowercase hex SHA-256 of the PoW hash bytes.
 
 ### 8.3 Stake Proof
 
-Stake proofs are announced over `/clawtoken/1.0.0/requests`:
-
-```json
-{
-  "type": "stake.proof",
-  "peer": "<peerId>",
-  "controller": "<did:claw:...>",
-  "stakeEvent": "<event hash>",
-  "minStake": "<microtoken>",
-  "sig": "<signature by peer key>",
-  "sigController": "<signature by controller DID key>"
-}
-```
+Stake proofs are RequestMessage bodies (StakeProof) announced over
+`/clawtoken/1.0.0/requests`.
 
 Validation:
 - stakeEvent MUST exist in the local event log.
@@ -163,8 +170,38 @@ Validation:
   This binds peerId to controller DID for stake gating.
 
 Stake proof signing bytes:
-- JCS(stake proof without sig and sigController), prefixed by
+- FlatBuffers bytes of StakeProof with sig/sigController empty, prefixed by
   "clawtoken:stakeproof:v1:".
+
+FlatBuffers schema (excerpt):
+
+```fbs
+table PeerRotate {
+  old:string;
+  new:string;
+  ts:ulong;
+  sig:string;
+  sigNew:string;
+}
+
+table PowTicket {
+  peer:string;
+  ts:ulong;
+  nonce:string;
+  difficulty:uint;
+  hash:string;
+  sig:string;
+}
+
+table StakeProof {
+  peer:string;
+  controller:string;   // did:claw
+  stakeEvent:string;   // event hash
+  minStake:string;     // microtoken
+  sig:string;
+  sigController:string;
+}
+```
 
 ## 9. NAT Traversal
 
