@@ -170,7 +170,8 @@ Validation:
 - stake amount MUST be >= minStake.
 - sig MUST verify for the peer key.
 - sigController MUST verify for the controller DID key over the stake proof body.
-  This binds peerId to controller DID for stake gating.
+  This serves as the only binding between peerId and controller DID for stake
+  gating; no separate peerId↔DID mapping is required.
 
 Stake proof signing bytes:
 - FlatBuffers bytes of StakeProof with sig/sigController empty, prefixed by

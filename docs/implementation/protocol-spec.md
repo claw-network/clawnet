@@ -72,6 +72,7 @@ Rules:
 - sig MUST be a detached signature over canonical bytes (see Section 5).
 - pub MUST match issuer DID.
 - hash MUST be SHA-256(canonical bytes without sig and hash fields).
+- hash is the stable identifier for deduplication, indexing, and conflict resolution.
 
 ## 5. Canonical Serialization and Signing
 
