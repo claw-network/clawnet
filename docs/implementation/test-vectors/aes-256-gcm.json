@@ -1,0 +1,8 @@
+{
+  "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "nonceHex": "0f0e0d0c0b0a090807060504",
+  "plaintext": "clawtoken-test",
+  "plaintextHex": "636c6177746f6b656e2d74657374",
+  "ciphertextHex": "c75cd02b2fb8c4cb85f2c53a4bee",
+  "tagHex": "f676fec63036444163f3fb669688e373"
+}

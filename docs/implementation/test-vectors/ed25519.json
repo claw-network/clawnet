@@ -1,0 +1,8 @@
+{
+  "name": "ed25519-clawtoken-test",
+  "privateKeyHex": "381ea641a651f1e2011b948ee45c69a989a9582d29d9512b60c6d6dd78bea9bc",
+  "publicKeyHex": "28e4b24dc96e47a480a4c74fb70e7635ae2a4c5330ef7d6a8ec79dc46a57931b",
+  "messageHex": "636c6177746f6b656e2d74657374",
+  "signatureHex": "a90fc630b7f4d95211055b60265907368997259b473d725b6ba69ce1db2d2cfaafb9fded7a22a9cdd8d1bec4f7eb397106102ba2a91013f542e3b15f3c241c04",
+  "address": "claw1K1ZonSqQDEoAufMT6pHz5GFU3A94pQvZxBPYHMiA5K2R2Gkhn"
+}

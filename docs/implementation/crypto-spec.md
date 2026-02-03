@@ -35,22 +35,28 @@ All parameters are defaults unless overridden by DAO governance.
 - DID = "did:claw:" + multibase(base58btc(Ed25519 public key))
 - DID document MUST include verification methods for keys in use
 
-## 4. Signing Rules
+## 4. Address Derivation
+
+- Address = "claw" + base58check(version + publicKey + checksum)
+- Version byte = 0x00
+- Checksum = first 4 bytes of SHA-256(publicKey)
+
+## 5. Signing Rules
 
 - Detached Ed25519 signatures
 - Signing payload = "clawtoken:event:v1:" + JCS(envelope without sig/hash)
 - Signature encoded as base58btc
 
-## 5. Encryption At Rest
+## 6. Encryption At Rest
 
-### 5.1 Argon2id Defaults
+### 6.1 Argon2id Defaults
 
 - time cost: 3
 - memory: 65536 KB
 - parallelism: 4
 - output length: 32 bytes
 
-### 5.2 AES-256-GCM Defaults
+### 6.2 AES-256-GCM Defaults
 
 - nonce: 12 bytes random
 - tag: 16 bytes
@@ -67,28 +73,34 @@ Stored format:
 }
 ```
 
-## 6. Key Rotation
+## 7. Key Rotation
 
 - Operational keys SHOULD rotate every 90 days or 100k signatures
 - Rotation events MUST be recorded in the event log
 - Old keys remain valid for verification, not for signing
 
-## 7. Social Recovery
+## 8. Social Recovery
 
 - Recovery uses Shamir secret sharing (t of n)
 - Guardians MUST be independent DIDs
 - Recovery events MUST be signed by at least t guardians
 
-## 8. Test Vectors
+## 9. Test Vectors (MVP)
 
-Test vectors MUST be published for:
+Test vectors are stored in `docs/implementation/test-vectors/`:
 
-- JCS serialization
-- Ed25519 signatures
-- DID derivation
-- AES-GCM encryption
+- ed25519.json
+- sha256.json
+- aes-256-gcm.json
+- jcs.json
 
-## 9. Security Considerations
+An optional verification helper is provided:
+
+```
+node docs/implementation/test-vectors/verify.js
+```
+
+## 10. Security Considerations
 
 - Never sign non-canonical bytes
 - Reject signatures from keys not authorized by DID document

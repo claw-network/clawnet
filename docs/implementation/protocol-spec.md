@@ -3,7 +3,7 @@
 This document defines the minimum protocol rules so any node can independently
 validate state. All statements using MUST/SHOULD are normative.
 
-## 0. Terms
+## 0. Conventions
 
 - MUST, SHOULD, MAY are as defined in RFC 2119.
 - Event: an authenticated state transition message.
@@ -18,16 +18,29 @@ validate state. All statements using MUST/SHOULD are normative.
   rules and optional finality heuristics.
 - Indexers are optional and non-authoritative.
 
-## 2. Data Types
+## 2. Constants (MVP defaults)
+
+- MAX_EVENT_SIZE = 1_000_000 bytes
+- MAX_CLOCK_SKEW_MS = 10 * 60 * 1000
+- NONCE_WINDOW = 5 (out-of-order tolerance window)
+- FINALITY_TIME_MS = 30 * 60 * 1000
+- FINALITY_TIERS (amount -> peer count):
+  - <= 100_000_000 microtoken (100 Token): N=3
+  - <= 1_000_000_000 microtoken (1,000 Token): N=5
+  - > 1_000_000_000 microtoken: N=7
+
+All constants are DAO-controlled unless marked fixed.
+
+## 3. Data Types
 
 - Timestamp: milliseconds since Unix epoch.
 - Amount: unsigned integer string in microtoken (1e-6 Token).
 - DID: "did:claw:" + multibase(base58btc(Ed25519 public key)).
-- Address: "claw" + base58check payload.
+- Address: "claw" + base58check(version + publicKey + checksum).
 - Hash: lowercase hex SHA-256 digest.
 - ID: ASCII string, max length 64.
 
-## 3. Event Envelope
+## 4. Event Envelope
 
 All protocol events MUST be wrapped in an envelope:
 
@@ -50,15 +63,15 @@ Rules:
 
 - v MUST be the protocol version.
 - issuer MUST be a valid did:claw DID.
-- ts MUST be within +/- 10 minutes of local time, otherwise quarantine.
+- ts MUST be within +/- MAX_CLOCK_SKEW_MS or be quarantined.
 - nonce MUST be strictly increasing per issuer.
 - payload MUST conform to the event type schema.
 - prev MAY reference the last accepted event hash for issuer.
-- sig MUST be a detached signature over canonical bytes (see Section 4).
+- sig MUST be a detached signature over canonical bytes (see Section 5).
 - pub MUST match issuer DID.
 - hash MUST be SHA-256(canonical bytes without hash field).
 
-## 4. Canonical Serialization and Signing
+## 5. Canonical Serialization and Signing
 
 - Canonical JSON MUST follow JCS (RFC 8785).
 - The signing bytes are JCS(envelope without sig and hash fields).
@@ -68,136 +81,102 @@ Rules:
 Signature verification:
 
 - Extract pub key from envelope.pub (multibase).
-- Verify signature over the canonical bytes with domain separation.
+- Verify signature over canonical bytes with domain separation.
 
-## 5. Replay Protection
+## 6. Replay Protection
 
 - Each issuer maintains a monotonic nonce.
 - Nodes MUST reject events where nonce <= last_accepted_nonce for issuer.
-- Nodes MAY keep a small acceptance window (e.g., last 5 nonces) for out-of-order
-  delivery but MUST NOT accept duplicates.
+- Nodes MAY accept out-of-order delivery within NONCE_WINDOW and reorder by nonce
+  before applying.
 
-## 6. Event Types and Schemas (MVP)
+## 7. Event Types (Aligned with WALLET/MARKETS/CONTRACTS)
 
-### 6.1 identity.create
+The following event names align with:
+- `docs/WALLET.md` (transactions, escrow, permissions)
+- `docs/MARKETS.md` (listing, order, bid, submission, dispute)
+- `docs/SERVICE_CONTRACTS.md` (contract lifecycle, milestones, disputes)
 
-```json
-{
-  "did": "did:claw:...",
-  "publicKey": "<multibase>",
-  "document": { /* DID doc */ }
-}
-```
+### 7.1 Identity
 
-Rules:
+- identity.create (MVP)
+- identity.update (MVP)
+- identity.platform.link (MVP+)
+- identity.capability.register (MVP)
 
-- did MUST be derived from publicKey per crypto-spec.
-- document MUST be signed by issuer.
+### 7.2 Wallet (TransactionType alignment)
 
-### 6.2 identity.update
+- wallet.transfer (MVP)
+- wallet.escrow.create (MVP)
+- wallet.escrow.fund (MVP)
+- wallet.escrow.release (MVP)
+- wallet.escrow.refund (MVP)
+- wallet.escrow.dispute (MVP+)
+- wallet.stake (MVP+)
+- wallet.unstake (MVP+)
+- wallet.governance.lock (MVP+)
+- wallet.governance.unlock (MVP+)
+- wallet.fee (system)
+- wallet.reward (system)
+- wallet.mint (system)
+- wallet.burn (system)
 
-```json
-{
-  "did": "did:claw:...",
-  "document": { /* new DID doc */ },
-  "prevDocHash": "<hash>"
-}
-```
+### 7.3 Markets
 
-Rules:
+- market.listing.publish (MVP)
+- market.listing.update (MVP)
+- market.listing.remove (MVP+)
+- market.order.create (MVP)
+- market.order.update (MVP)
+- market.bid.submit (Task market, MVP+)
+- market.bid.accept (Task market, MVP+)
+- market.bid.reject (Task market, MVP+)
+- market.bid.withdraw (Task market, MVP+)
+- market.submission.submit (Task market, MVP+)
+- market.submission.review (Task market, MVP+)
+- market.subscription.start (Info market, MVP+)
+- market.subscription.cancel (Info market, MVP+)
+- market.capability.lease.start (Capability market, MVP+)
+- market.capability.lease.pause (Capability market, MVP+)
+- market.capability.lease.resume (Capability market, MVP+)
+- market.capability.lease.terminate (Capability market, MVP+)
+- market.capability.invoke (Capability usage record, MVP+)
+- market.dispute.open (MVP+)
+- market.dispute.response (MVP+)
+- market.dispute.resolve (MVP+)
 
-- prevDocHash MUST match current document hash.
-- Update MUST be signed by a key authorized in current doc.
+### 7.4 Service Contracts
 
-### 6.3 wallet.transfer
+- contract.create (MVP)
+- contract.negotiate.offer (MVP+)
+- contract.negotiate.counter (MVP+)
+- contract.negotiate.accept (MVP+)
+- contract.sign (MVP)
+- contract.activate (MVP)
+- contract.milestone.submit (MVP+)
+- contract.milestone.approve (MVP+)
+- contract.milestone.reject (MVP+)
+- contract.complete (MVP)
+- contract.dispute.open (MVP+)
+- contract.dispute.resolve (MVP+)
+- contract.settlement.execute (MVP+)
+- contract.terminate (MVP)
 
-```json
-{
-  "from": "claw1...",
-  "to": "claw1...",
-  "amount": "1000000",
-  "fee": "1000",
-  "memo": "optional"
-}
-```
+### 7.5 Reputation
 
-Rules:
+- reputation.record (MVP)
 
-- Issuer MUST control the from address.
-- Balance MUST be >= amount + fee.
-- fee MUST be >= minimum fee.
+## 8. Detailed Event Schemas (Field-Level Alignment)
 
-### 6.4 wallet.escrow.create
+Field-level schemas are maintained in dedicated files for versioning and reuse:
 
-```json
-{
-  "escrowId": "escrow_...",
-  "depositor": "claw1...",
-  "beneficiary": "claw1...",
-  "amount": "1000000",
-  "rules": [ /* release rules */ ]
-}
-```
+- `docs/implementation/event-schemas/identity.md`
+- `docs/implementation/event-schemas/wallet.md`
+- `docs/implementation/event-schemas/markets.md`
+- `docs/implementation/event-schemas/contracts.md`
+- `docs/implementation/event-schemas/reputation.md`
 
-### 6.5 wallet.escrow.release
-
-```json
-{
-  "escrowId": "escrow_...",
-  "amount": "500000",
-  "ruleId": "rule_1"
-}
-```
-
-### 6.6 market.listing.publish
-
-```json
-{
-  "listingId": "listing_...",
-  "market": "info|task|capability",
-  "data": { /* listing body */ }
-}
-```
-
-Rules:
-
-- listingId MUST be unique.
-- data MUST include pricing and seller DID.
-
-### 6.7 market.order.create
-
-```json
-{
-  "orderId": "order_...",
-  "listingId": "listing_...",
-  "buyer": "did:claw:...",
-  "price": "1000000"
-}
-```
-
-### 6.8 contract.create / contract.sign / contract.complete
-
-- contract.create MUST be signed by initiator.
-- contract.sign MUST be signed by the signer DID.
-- contract.complete MUST be signed by both parties or authorized arbiter.
-
-### 6.9 reputation.record
-
-```json
-{
-  "target": "did:claw:...",
-  "dimension": "transaction|quality|fulfillment|social|behavior",
-  "score": 0,
-  "ref": "<event hash>"
-}
-```
-
-Rules:
-
-- ref MUST point to a valid completed event.
-- record MUST be verifiable by any node.
-
-## 7. Validation Pipeline
+## 9. Validation Pipeline
 
 Nodes MUST validate events in this order:
 
@@ -210,40 +189,47 @@ Nodes MUST validate events in this order:
 
 If any step fails, the event MUST be rejected.
 
-## 8. Reducers and State
+## 10. Reducers and State
 
 - Reducers MUST be deterministic and pure.
 - Reducers MUST be versioned.
+- State is derived solely from validated events.
 
-Conflicts:
+Conflict rules:
 
 - Two events with same nonce from same issuer: keep lower hash, reject other.
 - identity.update conflicts: require prevDocHash match, else reject.
+- order update conflicts: accept only valid forward transitions.
 
-## 9. Finality (MVP)
+## 11. Finality (MVP)
 
-- An event is considered confirmed after N confirmations (default N=3).
-- High-value operations MAY require higher N or arbitration.
+- An event is considered confirmed after:
+  - observed from N distinct peers according to FINALITY_TIERS OR
+  - FINALITY_TIME_MS without conflicting events.
+- Tiered N is based on event amount (see Section 2).
+- Arbitration MAY be triggered when conflicting events exist.
 
-## 10. Payload Size Limits
+These thresholds are local policy and DAO-controlled.
 
-- Envelope size MUST be <= 1 MB.
+## 12. Payload Size Limits
+
+- Envelope size MUST be <= MAX_EVENT_SIZE.
 - Larger payloads MUST be stored out-of-band (IPFS/content hash)
   with hash reference in payload.
 
-## 11. Versioning and Upgrades
+## 13. Versioning and Upgrades
 
 - Envelope v indicates protocol version.
 - Nodes MUST reject unknown major versions.
 - Minor versions SHOULD be backward compatible.
 
-## 12. Decentralization Guarantees
+## 14. Decentralization Guarantees
 
 - No event type requires a central sequencer.
 - Indexers are optional and non-authoritative.
 - Any node can validate from the event log alone.
 
-## 13. Conformance Tests
+## 15. Conformance Tests
 
 - Canonical serialization test vectors
 - Signature verification tests
