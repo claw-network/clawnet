@@ -4,6 +4,20 @@
 
 ---
 
+## 实施前置条件（必须补齐的规范）
+
+当前文档为路线图与交付物清单。进入实作前，需要补齐以下规范与研究文档，确保任何节点都能**独立验证**协议状态、避免中心化依赖：
+
+- `docs/implementation/protocol-spec.md` — 事件/状态模型、最终性、序列化
+- `docs/implementation/crypto-spec.md` — 密钥/签名/加密与 DID 规则
+- `docs/implementation/p2p-spec.md` — P2P 协议、发现/同步、反滥用
+- `docs/implementation/storage-spec.md` — 本地存储模型、索引、迁移
+- `docs/implementation/economics.md` — 费用与激励参数
+- `docs/implementation/security.md` — 威胁模型与审计计划
+- `docs/implementation/testing-plan.md` — 多节点测试与基准
+- `docs/implementation/rollout.md` — 测试网/主网发布策略
+- `docs/implementation/open-questions.md` — 未决问题清单
+
 ## 交付物总览
 
 ```
