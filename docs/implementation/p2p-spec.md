@@ -31,6 +31,9 @@ Rotation records are RequestMessage bodies (see Section 4.1) and broadcast on
 The P2P envelope MUST be encoded as FlatBuffers with content type
 `application/clawtoken-stream`. JSON envelopes are not supported.
 
+Schema file:
+- `docs/implementation/p2p-spec.fbs`
+
 FlatBuffers schema (excerpt):
 
 ```fbs

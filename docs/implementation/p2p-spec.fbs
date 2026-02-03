@@ -1,0 +1,79 @@
+// FlatBuffers schema for ClawToken P2P messages (application/clawtoken-stream)
+
+namespace clawtoken.p2p;
+
+enum RequestType : byte {
+  range_request = 1,
+  peer_rotate = 2,
+  pow_ticket = 3,
+  stake_proof = 4
+}
+
+enum ResponseType : byte {
+  range_response = 1
+}
+
+table P2PEnvelope {
+  v:ushort;
+  topic:string;
+  sender:string;
+  ts:ulong;
+  contentType:string; // MUST be "application/clawtoken-stream"
+  payload:[ubyte];
+  sig:string; // base58btc Ed25519 signature
+}
+
+table EventBytes {
+  data:[ubyte];
+}
+
+table RangeRequest {
+  from:string; // event hash
+  limit:uint;
+}
+
+table RangeResponse {
+  events:[EventBytes]; // canonical event bytes
+  cursor:string;
+}
+
+table PeerRotate {
+  old:string;
+  new:string;
+  ts:ulong;
+  sig:string;
+  sigNew:string;
+}
+
+table PowTicket {
+  peer:string;
+  ts:ulong;
+  nonce:string;
+  difficulty:uint;
+  hash:string;
+  sig:string;
+}
+
+table StakeProof {
+  peer:string;
+  controller:string; // did:claw
+  stakeEvent:string; // event hash
+  minStake:string; // microtoken
+  sig:string;
+  sigController:string;
+}
+
+table RequestMessage {
+  type:RequestType;
+  rangeRequest:RangeRequest;
+  peerRotate:PeerRotate;
+  powTicket:PowTicket;
+  stakeProof:StakeProof;
+}
+
+table ResponseMessage {
+  type:ResponseType;
+  rangeResponse:RangeResponse;
+}
+
+root_type P2PEnvelope;
