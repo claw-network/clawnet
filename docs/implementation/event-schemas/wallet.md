@@ -1,5 +1,9 @@
 # Wallet Event Schemas
 
+Resource concurrency:
+- For escrow update events, payload MUST include resourcePrev (hash of the last
+  accepted event for that escrowId). For escrow.create, resourcePrev MUST be null.
+
 ## wallet.transfer
 
 REQUIRED:
@@ -7,6 +11,10 @@ REQUIRED:
 - to
 - amount
 - fee
+
+Notes:
+- from and to are DIDs or claw addresses.
+- issuer MUST control the from account (DID or address).
 
 OPTIONAL:
 - memo
@@ -23,6 +31,7 @@ REQUIRED:
 - beneficiary
 - amount
 - releaseRules
+- resourcePrev (must be null)
 
 OPTIONAL:
 - arbiter
@@ -37,6 +46,7 @@ DERIVED:
 
 REQUIRED:
 - escrowId
+- resourcePrev
 - amount
 
 DERIVED:
@@ -46,6 +56,7 @@ DERIVED:
 
 REQUIRED:
 - escrowId
+- resourcePrev
 - amount
 - ruleId
 
@@ -56,6 +67,7 @@ DERIVED:
 
 REQUIRED:
 - escrowId
+- resourcePrev
 - amount
 - reason
 
@@ -66,6 +78,7 @@ DERIVED:
 
 REQUIRED:
 - escrowId
+- resourcePrev
 - reason
 
 OPTIONAL:

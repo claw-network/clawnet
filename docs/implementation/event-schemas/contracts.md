@@ -2,6 +2,11 @@
 
 Aligns to ServiceContract in `docs/SERVICE_CONTRACTS.md`.
 
+Resource concurrency:
+- For any event that mutates an existing contract or milestone, payload MUST
+  include resourcePrev (hash of the last accepted event for that contractId).
+  For contract.create, resourcePrev MUST be null.
+
 ## contract.create
 
 REQUIRED:
@@ -11,6 +16,7 @@ REQUIRED:
 - terms
 - payment
 - timeline
+- resourcePrev (must be null)
 
 OPTIONAL:
 - milestones
@@ -25,6 +31,7 @@ DERIVED:
 
 REQUIRED:
 - contractId
+- resourcePrev
 - signer
 
 DERIVED:
@@ -34,6 +41,7 @@ DERIVED:
 
 REQUIRED:
 - contractId
+- resourcePrev
 
 DERIVED:
 - status = active
@@ -42,6 +50,7 @@ DERIVED:
 
 REQUIRED:
 - contractId
+- resourcePrev
 - milestoneId
 - submissionId
 
@@ -52,6 +61,7 @@ OPTIONAL:
 
 REQUIRED:
 - contractId
+- resourcePrev
 - milestoneId
 
 OPTIONAL:
@@ -61,6 +71,7 @@ OPTIONAL:
 
 REQUIRED:
 - contractId
+- resourcePrev
 - milestoneId
 
 OPTIONAL:
@@ -70,12 +81,14 @@ OPTIONAL:
 
 REQUIRED:
 - contractId
+- resourcePrev
 - status = completed
 
 ## contract.dispute.open
 
 REQUIRED:
 - contractId
+- resourcePrev
 - reason
 
 OPTIONAL:
@@ -85,6 +98,7 @@ OPTIONAL:
 
 REQUIRED:
 - contractId
+- resourcePrev
 - resolution
 
 OPTIONAL:
@@ -94,4 +108,5 @@ OPTIONAL:
 
 REQUIRED:
 - contractId
+- resourcePrev
 - reason

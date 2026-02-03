@@ -32,7 +32,8 @@ Defines local storage layout and persistence guarantees.
 
 - Immutable records
 - Hash must match envelope hash
-- Garbage collection not permitted for confirmed events
+- Full nodes MUST NOT garbage collect confirmed events.
+- Light nodes MAY prune per Section 10.
 
 ## 5. State Snapshots
 
@@ -68,8 +69,12 @@ Snapshot format (JSON + hash):
 Remote snapshot acceptance policy (light nodes):
 
 - Require >= 2 distinct peer signatures
-- Reject snapshots if peer signatures are not from known peers
+- Reject snapshots if peer signatures are not from eligible peers
 - Recompute hash before acceptance
+
+Eligible peers are those authenticated via libp2p and either:
+- present in a local allowlist/trust set, OR
+- have passed the active sybil-resistance policy (PoW/stake) on public networks.
 
 ## 7. Indexes
 

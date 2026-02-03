@@ -37,9 +37,10 @@ All parameters are defaults unless overridden by DAO governance.
 
 ## 4. Address Derivation
 
-- Address = "claw" + base58check(version + publicKey + checksum)
+- Address = "claw" + base58(version + publicKey + checksum)
 - Version byte = 0x00
 - Checksum = first 4 bytes of SHA-256(publicKey)
+- Note: this is not Bitcoin base58check (single SHA-256 checksum only).
 
 ## 5. Signing Rules
 

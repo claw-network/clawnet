@@ -1,5 +1,8 @@
 # Identity Event Schemas
 
+Resource concurrency:
+- identity.update uses prevDocHash as the resourcePrev guard.
+
 ## identity.create
 
 REQUIRED:

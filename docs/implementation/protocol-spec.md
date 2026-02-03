@@ -28,6 +28,7 @@ validate state. All statements using MUST/SHOULD are normative.
   - <= 100_000_000 microtoken (100 Token): N=3
   - <= 1_000_000_000 microtoken (1,000 Token): N=5
   - > 1_000_000_000 microtoken: N=7
+- DEFAULT_FINALITY_N = 3 (used when event has no amount)
 
 All constants are DAO-controlled unless marked fixed.
 
@@ -36,7 +37,8 @@ All constants are DAO-controlled unless marked fixed.
 - Timestamp: milliseconds since Unix epoch.
 - Amount: unsigned integer string in microtoken (1e-6 Token).
 - DID: "did:claw:" + multibase(base58btc(Ed25519 public key)).
-- Address: "claw" + base58check(version + publicKey + checksum).
+- Address: "claw" + base58(version + publicKey + checksum).
+- Checksum: first 4 bytes of SHA-256(publicKey).
 - Hash: lowercase hex SHA-256 digest.
 - ID: ASCII string, max length 64.
 
@@ -69,7 +71,7 @@ Rules:
 - prev MAY reference the last accepted event hash for issuer.
 - sig MUST be a detached signature over canonical bytes (see Section 5).
 - pub MUST match issuer DID.
-- hash MUST be SHA-256(canonical bytes without hash field).
+- hash MUST be SHA-256(canonical bytes without sig and hash fields).
 
 ## 5. Canonical Serialization and Signing
 
@@ -77,6 +79,7 @@ Rules:
 - The signing bytes are JCS(envelope without sig and hash fields).
 - Domain separation MUST prepend the ASCII string:
   "clawtoken:event:v1:" before hashing for signature.
+- Event hash MUST be SHA-256(JCS(envelope without sig and hash fields)).
 
 Signature verification:
 
@@ -86,9 +89,11 @@ Signature verification:
 ## 6. Replay Protection
 
 - Each issuer maintains a monotonic nonce.
-- Nodes MUST reject events where nonce <= last_accepted_nonce for issuer.
-- Nodes MAY accept out-of-order delivery within NONCE_WINDOW and reorder by nonce
-  before applying.
+- Nodes MUST track committedNonce per issuer (highest contiguous accepted nonce).
+- Nodes MUST reject events where nonce <= committedNonce.
+- Nodes MAY buffer events with nonce in (committedNonce, committedNonce + NONCE_WINDOW].
+- Buffered events MUST be applied in nonce order once gaps are filled.
+- Events beyond the NONCE_WINDOW MUST be rejected.
 
 ## 7. Event Types (Aligned with WALLET/MARKETS/CONTRACTS)
 
@@ -189,6 +194,9 @@ Nodes MUST validate events in this order:
 
 If any step fails, the event MUST be rejected.
 
+Authorization rules (examples):
+- For wallet.transfer, issuer MUST control the from account (DID or address).
+
 ## 10. Reducers and State
 
 - Reducers MUST be deterministic and pure.
@@ -200,6 +208,12 @@ Conflict rules:
 - Two events with same nonce from same issuer: keep lower hash, reject other.
 - identity.update conflicts: require prevDocHash match, else reject.
 - order update conflicts: accept only valid forward transitions.
+- Resource conflicts: for any event that mutates a resource identified by a
+  stable id (e.g., escrowId, contractId, orderId, listingId, leaseId, disputeId),
+  payload MUST include resourcePrev (hash of last accepted event for that
+  resource). If the resource already exists and resourcePrev is missing or does
+  not match, reject. For create events, resourcePrev MAY be omitted or null.
+  If two events share the same resourcePrev, keep lower hash and reject others.
 
 ## 11. Finality (MVP)
 
@@ -208,6 +222,10 @@ Conflict rules:
   - FINALITY_TIME_MS without conflicting events.
 - Tiered N is based on event amount (see Section 2).
 - Arbitration MAY be triggered when conflicting events exist.
+- If an event has no amount field, use DEFAULT_FINALITY_N.
+- Peer-count finality MUST only be used when sybil resistance is enabled
+  (PoW/stake) or peers are from a local allowlist. Otherwise, nodes MUST
+  fall back to time-based finality only.
 
 These thresholds are local policy and DAO-controlled. Recommendation adopted:
 use tiered N (3/5/7) based on amount with optional arbitration on disputes.

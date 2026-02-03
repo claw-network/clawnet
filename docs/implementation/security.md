@@ -34,6 +34,9 @@
 
 - Key compromise: rotate keys, publish revocation event
 - Network partition: freeze high-value operations
+- High-value = top finality tier (see FINALITY_TIERS). Nodes SHOULD reject
+  new high-value transfers during partition detection and rely on
+  time-based finality only until the partition clears.
 - Critical bug: emergency DAO vote to pause affected modules
 
 ## 6. Security Testing

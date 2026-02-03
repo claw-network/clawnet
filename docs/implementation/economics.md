@@ -15,11 +15,16 @@ Defines fees and incentives. All parameters are DAO-controlled unless fixed.
 - Task market: 5%
 - Capability market: 3%
 
-Fee formula:
+Fee formula (market fees only):
 
 ```
-fee = clamp(amount * rate, min_fee, max_fee)
+fee = clamp(amount * rate, market_min_fee, market_max_fee)
 ```
+
+Market fee bounds:
+
+- market_min_fee: 0.001 Token
+- market_max_fee: 100,000 Token
 
 ### 2.2 Escrow Fees
 
@@ -33,15 +38,20 @@ Escrow fee formula:
 fee = max(min_escrow_fee, amount * base_rate + amount * holding_rate * days)
 ```
 
+Notes:
+- Escrow fees are not subject to market_min_fee/market_max_fee.
+
 ### 2.3 Transaction Fees
 
 - Base fee: 0.001 Token
 - Priority fee: 1 Token (optional)
 
-### 2.4 Caps
+Notes:
+- Transaction fees are fixed values and not subject to market fee caps.
 
-- Minimum fee: 1 Token
-- Maximum fee: 100,000 Token
+### 2.4 Market Fee Caps
+
+Market fee caps apply only to market fees (Section 2.1).
 
 ## 3. Treasury
 
@@ -50,14 +60,16 @@ fee = max(min_escrow_fee, amount * base_rate + amount * holding_rate * days)
 
 ## 4. Node Incentives (MVP defaults)
 
-- Relay reward per confirmed event: 0.0001 Token
 - Validator reward per snapshot interval: 1 Token
-- Rewards are paid from Treasury
+- Relay reward per confirmed event: 0.0001 Token (optional, non-consensus)
+- Rewards paid from Treasury MUST be deterministic
 
 Distribution:
 
-- Relay rewards distributed to peers that first delivered a valid event
 - Validator rewards distributed to nodes that produce valid snapshots
+- Relay rewards MUST NOT use "first seen" attribution for consensus payouts.
+  If relay rewards are enabled, they MUST be paid off-chain or via a deterministic
+  on-chain rule defined by DAO.
 
 ## 5. Slashing
 

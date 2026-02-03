@@ -15,6 +15,22 @@ Defines network behavior for interoperable nodes. No privileged nodes.
 - Node keypair is distinct from wallet/identity keys
 - Nodes MAY rotate peer keys but MUST announce rotation
 
+### 2.1 Peer Rotation Announcement
+
+Rotation records are signed by the old peer key and broadcast on
+`/clawtoken/1.0.0/requests`:
+
+```json
+{
+  "type": "peer.rotate",
+  "old": "<oldPeerId>",
+  "new": "<newPeerId>",
+  "ts": 1700000000000,
+  "sig": "<signature by old peer key>",
+  "sigNew": "<optional signature by new peer key>"
+}
+```
+
 ## 3. Topics
 
 - /clawtoken/1.0.0/events
@@ -34,8 +50,12 @@ Defines network behavior for interoperable nodes. No privileged nodes.
 }
 ```
 
-- payload MUST be canonical bytes of the event envelope
+- payload MUST be JCS canonical bytes of the full event envelope (including sig and hash)
 - sig MUST be signed by peer key
+- Message envelope MUST be serialized with JCS (RFC 8785).
+- payload is base64 (RFC 4648) of the canonical event bytes.
+- sig is base58btc of Ed25519 signature over:
+  "clawtoken:p2p:v1:" + JCS(envelope without sig).
 
 ## 5. Discovery
 

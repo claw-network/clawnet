@@ -1,5 +1,11 @@
 # Markets Event Schemas
 
+Resource concurrency:
+- For any event that mutates an existing resource (listingId, orderId, bidId,
+  submissionId, leaseId, disputeId), payload MUST include resourcePrev (hash of
+  the last accepted event for that resource).
+- For create events, resourcePrev is OPTIONAL; if provided it MUST be null.
+
 ## market.listing.publish
 
 Aligns to MarketListing.
@@ -36,6 +42,7 @@ Market-specific marketData:
 
 REQUIRED:
 - listingId
+- resourcePrev
 - status
 
 OPTIONAL:
@@ -66,6 +73,7 @@ DERIVED:
 
 REQUIRED:
 - orderId
+- resourcePrev
 - status
 
 OPTIONAL:
@@ -108,6 +116,7 @@ DERIVED:
 
 REQUIRED:
 - submissionId
+- resourcePrev
 - approved
 - feedback
 
