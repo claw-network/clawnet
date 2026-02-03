@@ -145,6 +145,12 @@
 
 **必须最先实现 - 所有其他组件依赖这一层**
 
+对应规范文档：
+- `docs/implementation/crypto-spec.md`
+- `docs/implementation/storage-spec.md`
+- `docs/implementation/p2p-spec.md`
+- `docs/implementation/p2p-spec.fbs`
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Core Layer                                      │
@@ -209,6 +215,16 @@
 ### Layer 2: Protocol Layer (协议层)
 
 **业务逻辑，依赖 Core Layer**
+
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/implementation/event-schemas/*.md`
+- `docs/IDENTITY.md`
+- `docs/WALLET.md`
+- `docs/MARKETS.md`
+- `docs/SERVICE_CONTRACTS.md`
+- `docs/REPUTATION.md`
+- `docs/DAO.md`
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -300,6 +316,12 @@
 ```
 
 ### Layer 3: Interface Layer (接口层)
+
+对应规范文档：
+- `docs/api/openapi.yaml`
+- `docs/implementation/tasks/min-api-draft.md`
+- `docs/implementation/tasks/api-errors.md`
+- `docs/AGENT_RUNTIME.md`
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -415,6 +437,19 @@
 
 **目标**: Agent 能运行节点、创建身份、进行转账
 
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/implementation/crypto-spec.md`
+- `docs/implementation/storage-spec.md`
+- `docs/implementation/p2p-spec.md`
+- `docs/implementation/p2p-spec.fbs`
+- `docs/implementation/event-schemas/identity.md`
+- `docs/implementation/event-schemas/wallet.md`
+- `docs/IDENTITY.md`
+- `docs/WALLET.md`
+- `docs/api/openapi.yaml`
+- `docs/implementation/tasks/min-api-draft.md`
+
 ```
 实现顺序:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -475,6 +510,12 @@ Week 5-6: Interface Layer
 
 **目标**: Agent 能在市场上交易
 
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/implementation/event-schemas/markets.md`
+- `docs/MARKETS.md`
+- `docs/implementation/economics.md`
+
 ```
 实现顺序:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -507,6 +548,13 @@ Week 11-12: Markets Module (TaskMarket)
 
 **目标**: 完整的服务合约系统
 
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/implementation/event-schemas/contracts.md`
+- `docs/SERVICE_CONTRACTS.md`
+- `docs/SMART_CONTRACTS.md`
+- `docs/implementation/economics.md`
+
 ```
 实现顺序:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -538,6 +586,11 @@ Week 17-18: SDK + 文档
 ### Phase 4: DAO 治理
 
 **目标**: 社区自治
+
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/DAO.md`
+- `docs/implementation/economics.md`
 
 ```
 Week 19+: DAO Module
@@ -729,6 +782,11 @@ clawtoken/
 
 ### Phase 0: 基础设施 (Week 0)
 
+对应规范文档：
+- `docs/implementation/SPEC_FREEZE.md`
+- `docs/implementation/README.md`
+- `docs/api/openapi.yaml`
+
 ```
 □ 0.1  定义 API 规范          ✅ 已完成 → docs/api/openapi.yaml
 □ 0.2  初始化 pnpm monorepo
@@ -752,6 +810,12 @@ clawtoken/
 ---
 
 ### Phase 1: Core Layer (Week 1-2)
+
+对应规范文档：
+- `docs/implementation/crypto-spec.md`
+- `docs/implementation/storage-spec.md`
+- `docs/implementation/p2p-spec.md`
+- `docs/implementation/p2p-spec.fbs`
 
 ```
 □ 1.1  Crypto Engine (@clawtoken/core/crypto)
@@ -785,6 +849,13 @@ clawtoken/
 
 ### Phase 2: Protocol Layer - 基础模块 (Week 3-4)
 
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/implementation/event-schemas/identity.md`
+- `docs/implementation/event-schemas/wallet.md`
+- `docs/IDENTITY.md`
+- `docs/WALLET.md`
+
 ```
 □ 2.1  Identity Module (@clawtoken/protocol/identity)
        ├── 2.1.1  DID 生成 (did:claw:xxx)
@@ -808,6 +879,12 @@ clawtoken/
 ---
 
 ### Phase 3: Interface Layer - MVP (Week 5-6)
+
+对应规范文档：
+- `docs/api/openapi.yaml`
+- `docs/implementation/tasks/min-api-draft.md`
+- `docs/implementation/tasks/api-errors.md`
+- `docs/AGENT_RUNTIME.md`
 
 ```
 □ 3.1  HTTP API Server (@clawtoken/node/api)
@@ -853,6 +930,11 @@ clawtoken/
 
 ### Phase 4: Protocol Layer - 信誉系统 (Week 7-8)
 
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/implementation/event-schemas/reputation.md`
+- `docs/REPUTATION.md`
+
 ```
 □ 4.1  Reputation Module (@clawtoken/protocol/reputation)
        ├── 4.1.1  评分数据结构
@@ -872,6 +954,12 @@ clawtoken/
 ---
 
 ### Phase 5: Protocol Layer - 市场模块 (Week 9-12)
+
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/implementation/event-schemas/markets.md`
+- `docs/MARKETS.md`
+- `docs/implementation/economics.md`
 
 ```
 □ 5.1  Markets 基础 (@clawtoken/protocol/markets)
@@ -920,6 +1008,13 @@ clawtoken/
 
 ### Phase 6: Protocol Layer - 合约模块 (Week 13-16)
 
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/implementation/event-schemas/contracts.md`
+- `docs/SERVICE_CONTRACTS.md`
+- `docs/SMART_CONTRACTS.md`
+- `docs/implementation/economics.md`
+
 ```
 □ 6.1  Contract Module (@clawtoken/protocol/contracts)
        ├── 6.1.1  合约数据结构
@@ -965,6 +1060,11 @@ clawtoken/
 
 ### Phase 7: SDK 开发 (Week 17-18)
 
+对应规范文档：
+- `docs/api/openapi.yaml`
+- `docs/implementation/tasks/min-api-draft.md`
+- `docs/implementation/tasks/api-errors.md`
+
 ```
 □ 7.1  TypeScript SDK (@clawtoken/sdk)
        ├── 7.1.1  HTTP Client 封装
@@ -992,6 +1092,10 @@ clawtoken/
 ---
 
 ### Phase 8: 文档与发布 (Week 19-20)
+
+对应规范文档：
+- `docs/implementation/rollout.md`
+- `docs/implementation/testing-plan.md`
 
 ```
 □ 8.1  文档完善
@@ -1022,6 +1126,11 @@ clawtoken/
 ---
 
 ### Phase 9: DAO 治理 (Week 21+)
+
+对应规范文档：
+- `docs/implementation/protocol-spec.md`
+- `docs/DAO.md`
+- `docs/implementation/economics.md`
 
 ```
 □ 9.1  DAO Module (@clawtoken/protocol/dao)
