@@ -2,8 +2,8 @@
 
 Resource concurrency:
 - For any event that mutates an existing resource (listingId, orderId, bidId,
-  submissionId, leaseId, disputeId), payload MUST include resourcePrev (hash of
-  the last accepted event for that resource).
+  submissionId, leaseId, disputeId, subscriptionId), payload MUST include
+  resourcePrev (hash of the last accepted event for that resource).
 - For create events, resourcePrev is OPTIONAL; if provided it MUST be null.
 
 ## market.listing.publish

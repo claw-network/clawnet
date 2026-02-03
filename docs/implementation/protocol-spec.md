@@ -37,7 +37,7 @@ All constants are DAO-controlled unless marked fixed.
 - Timestamp: milliseconds since Unix epoch.
 - Amount: unsigned integer string in microtoken (1e-6 Token).
 - DID: "did:claw:" + multibase(base58btc(Ed25519 public key)).
-- Address: "claw" + base58(version + publicKey + checksum).
+- Address: "claw" + base58btc(version + publicKey + checksum).
 - Checksum: first 4 bytes of SHA-256(publicKey).
 - Hash: lowercase hex SHA-256 digest.
 - ID: ASCII string, max length 64.

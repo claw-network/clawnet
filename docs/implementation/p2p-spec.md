@@ -50,7 +50,7 @@ Rotation records are signed by the old peer key and broadcast on
 }
 ```
 
-- payload MUST be JCS canonical bytes of the full event envelope (including sig and hash)
+- payload MUST be base64 (RFC 4648) of the JCS canonical bytes of the full event envelope (including sig and hash).
 - sig MUST be signed by peer key
 - Message envelope MUST be serialized with JCS (RFC 8785).
 - payload is base64 (RFC 4648) of the canonical event bytes.
@@ -89,6 +89,9 @@ Response:
 }
 ```
 
+Encoding:
+- events are base64-encoded canonical event bytes (same as payload).
+
 ## 7. Anti-Spam
 
 - Rate limit per peer
@@ -123,7 +126,7 @@ PoW tickets are announced over `/clawtoken/1.0.0/requests`:
   "ts": 1700000000000,
   "nonce": "<random>",
   "difficulty": 20,
-  "hash": "<sha256 of 'clawtoken:pow:v1:' + peerId + ts + nonce>",
+  "hash": "<sha256 of JCS({peer,ts,nonce}) prefixed by 'clawtoken:pow:v1:'>",
   "sig": "<signature by peer key>"
 }
 ```
@@ -132,6 +135,8 @@ Validation:
 - hash MUST have at least `difficulty` leading zero bits.
 - ts MUST be within MAX_CLOCK_SKEW_MS (see protocol-spec constants).
 - sig MUST verify for the peer key.
+- PoW signing bytes: JCS(pow ticket without sig), prefixed by
+  "clawtoken:pow:v1:".
 
 ### 8.3 Stake Proof
 
@@ -141,16 +146,25 @@ Stake proofs are announced over `/clawtoken/1.0.0/requests`:
 {
   "type": "stake.proof",
   "peer": "<peerId>",
+  "controller": "<did:claw:...>",
   "stakeEvent": "<event hash>",
   "minStake": "<microtoken>",
-  "sig": "<signature by peer key>"
+  "sig": "<signature by peer key>",
+  "sigController": "<signature by controller DID key>"
 }
 ```
 
 Validation:
 - stakeEvent MUST exist in the local event log.
-- stakeEvent MUST be a `wallet.stake` from the same controller DID.
+- stakeEvent MUST be a `wallet.stake` from the controller DID.
 - stake amount MUST be >= minStake.
+- sig MUST verify for the peer key.
+- sigController MUST verify for the controller DID key over the stake proof body.
+  This binds peerId to controller DID for stake gating.
+
+Stake proof signing bytes:
+- JCS(stake proof without sig and sigController), prefixed by
+  "clawtoken:stakeproof:v1:".
 
 ## 9. NAT Traversal
 
