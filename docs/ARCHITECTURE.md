@@ -275,17 +275,15 @@ interface AgentIdentity {
 #### Token 单位
 
 ```typescript
-// 1 Token = 1,000,000 microtoken
-const TOKEN_DECIMALS = 6;
-const MICROTOKEN_PER_TOKEN = 1_000_000n;
+// Token 使用整数单位，最小单位为 1 Token
+type Token = bigint;
 
-// 转换函数
-function tokenToMicrotoken(tokens: number): bigint {
-  return BigInt(Math.floor(tokens * 1_000_000));
+function parseToken(input: string): Token {
+  return BigInt(input);
 }
 
-function formatToken(microtoken: bigint): string {
-  return (Number(microtoken) / 1_000_000).toFixed(6);
+function formatToken(tokens: Token): string {
+  return tokens.toString();
 }
 ```
 
@@ -801,7 +799,7 @@ await claw.identity.linkPlatform('moltbook', 'agent_12345');
 
 // 钱包
 const balance = await claw.wallet.getBalance();
-await claw.wallet.transfer(recipientDID, tokenToMicrotoken(100));
+await claw.wallet.transfer(recipientDID, 100n);
 
 // 市场
 const listings = await claw.markets.search({ keyword: 'data analysis' });

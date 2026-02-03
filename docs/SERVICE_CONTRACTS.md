@@ -2939,9 +2939,9 @@ const SimpleServiceTemplate: ContractTemplate = {
     {
       name: 'totalAmount',
       type: 'bigint',
-      description: '总金额（microtoken）',
+      description: '总金额（Token）',
       required: true,
-      validation: { min: 1000000 },  // 最少 1 Token
+      validation: { min: 1 },  // 最少 1 Token
     },
     {
       name: 'deadline',
@@ -3046,7 +3046,7 @@ const contracts = new ServiceContractManager(wallet);
 const contract = await contracts.createFromTemplate('tpl_simple_service', {
   serviceName: 'Data Analysis',
   serviceDescription: 'Analyze customer behavior data',
-  totalAmount: tokenToMicrotoken(500),
+  totalAmount: 500n,
   deadline: Date.now() + 14 * 24 * 60 * 60 * 1000,
   client: { did: 'did:claw:client...', address: 'claw1client...' },
   provider: { did: 'did:claw:provider...', address: 'claw1provider...' },
@@ -3090,7 +3090,7 @@ await contracts.respondToProposal(negotiationId, {
   action: 'counter',
   counterProposal: {
     payment: {
-      totalAmount: tokenToMicrotoken(450),
+      totalAmount: 450n,
     },
     timeline: {
       endDate: Date.now() + 21 * 24 * 60 * 60 * 1000,
@@ -3167,7 +3167,7 @@ const dispute = await contracts.initiateDispute(contractId, {
   type: 'quality',
   category: 'deliverable_quality',
   description: 'Output does not meet specified accuracy requirements',
-  claimedAmount: tokenToMicrotoken(200),
+  claimedAmount: 200n,
   evidence: [
     {
       type: 'document',
@@ -3190,8 +3190,8 @@ await contracts.submitEvidence(disputeId, [
 await contracts.proposeSettlement(disputeId, {
   terms: 'Reduce payment by 30% and provider will fix issues',
   amount: {
-    toInitiator: tokenToMicrotoken(150),
-    toRespondent: tokenToMicrotoken(350),
+    toInitiator: 150n,
+    toRespondent: 350n,
     refunded: 0n,
   },
 });
@@ -3281,7 +3281,7 @@ class ComplianceChecker {
     const factors: RiskFactor[] = [];
     
     // 金额风险
-    const amount = Number(contract.payment.totalAmount) / 1_000_000;
+    const amount = Number(contract.payment.totalAmount);
     if (amount > 10000) {
       score += 20;
       factors.push({ factor: 'high_value', weight: 20 });

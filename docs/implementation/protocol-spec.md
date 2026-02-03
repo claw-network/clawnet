@@ -25,19 +25,19 @@ validate state. All statements using MUST/SHOULD are normative.
 - NONCE_WINDOW = 5 (out-of-order tolerance window)
 - FINALITY_TIME_MS = 30 * 60 * 1000
 - FINALITY_TIERS (amount -> peer count):
-  - <= 100_000_000 microtoken (100 Token): N=3
-  - <= 1_000_000_000 microtoken (1,000 Token): N=5
-  - > 1_000_000_000 microtoken: N=7
+  - <= 100 Token: N=3
+  - <= 1,000 Token: N=5
+  - > 1,000 Token: N=7
 - DEFAULT_FINALITY_N = 3 (used when event has no amount)
-- MIN_TRANSFER_AMOUNT = 1_000 microtoken (0.001 Token)
-- MIN_ESCROW_AMOUNT = 100_000 microtoken (0.1 Token)
+- MIN_TRANSFER_AMOUNT = 1 Token
+- MIN_ESCROW_AMOUNT = 1 Token
 
 All constants are DAO-controlled unless marked fixed.
 
 ## 3. Data Types
 
 - Timestamp: milliseconds since Unix epoch.
-- Amount: unsigned integer string in microtoken (1e-6 Token).
+- Amount: unsigned integer string in Token (smallest unit is 1 Token).
 - DID: "did:claw:" + multibase(base58btc(Ed25519 public key)).
 - Address: "claw" + base58btc(version + publicKey + checksum).
 - Checksum: first 4 bytes of SHA-256(publicKey).

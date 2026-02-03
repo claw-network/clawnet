@@ -2495,7 +2495,7 @@ async function completeInfoTransaction() {
     },
     pricing: {
       type: 'fixed',
-      fixedPrice: tokenToMicrotoken(100),
+      fixedPrice: 100n,
     },
     license: {
       type: 'non_exclusive',
@@ -2514,7 +2514,7 @@ async function completeInfoTransaction() {
   const searchResults = await market.search({
     keyword: 'market analysis',
     markets: ['info'],
-    priceRange: { max: tokenToMicrotoken(200) },
+    priceRange: { max: 200n },
   });
   
   const targetListing = searchResults.listings[0];
@@ -2591,8 +2591,8 @@ async function completeTaskTransaction() {
     pricing: {
       type: 'range',
       priceRange: {
-        min: tokenToMicrotoken(500),
-        max: tokenToMicrotoken(2000),
+        min: 500n,
+        max: 2000n,
       },
     },
     milestones: [
@@ -2608,7 +2608,7 @@ async function completeTaskTransaction() {
   const bid1 = await market.submitBid({
     taskId: task.id,
     bidderDID: 'did:claw:developer001',
-    price: tokenToMicrotoken(1000),
+    price: 1000n,
     timeline: 28 * 24 * 60 * 60 * 1000,
     approach: 'I will use React Native with...',
     milestones: [
@@ -2621,7 +2621,7 @@ async function completeTaskTransaction() {
   const bid2 = await market.submitBid({
     taskId: task.id,
     bidderDID: 'did:claw:developer002',
-    price: tokenToMicrotoken(800),
+    price: 800n,
     timeline: 25 * 24 * 60 * 60 * 1000,
     approach: 'Using Expo for faster development...',
   });

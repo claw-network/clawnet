@@ -1119,7 +1119,7 @@ class TransactionEngine {
    * 费用估算
    */
   estimateFee(request: TransferRequest): bigint {
-    const baseFee = 1000n;  // 0.001 Token
+    const baseFee = 1n;  // 1 Token
     
     // 优先级加成
     const priorityMultiplier = {
@@ -1130,10 +1130,10 @@ class TransactionEngine {
     
     // 数据大小加成
     const dataSize = request.memo ? Buffer.from(request.memo).length : 0;
-    const dataSizeFee = BigInt(dataSize * 10);
+    const dataSizeFee = BigInt(Math.ceil(dataSize / 1024)); // 1 Token per KB
     
     // 条件转账加成
-    const conditionFee = request.options?.condition ? 5000n : 0n;
+    const conditionFee = request.options?.condition ? 1n : 0n;
     
     const totalFee = BigInt(Math.ceil(Number(baseFee) * priorityMultiplier)) 
       + dataSizeFee 
@@ -2322,7 +2322,7 @@ console.log(`锁定: ${formatToken(balance.locked.total)}`);
 // 转账
 const tx = await wallet.transfer({
   to: 'claw1abc...def',
-  amount: tokenToMicrotoken(100),
+  amount: 100n,
   memo: '付款',
 });
 
@@ -2349,7 +2349,7 @@ const history = await wallet.getHistory({
 // 创建托管
 const escrow = await wallet.createEscrow({
   beneficiary: 'claw1provider...',
-  amount: tokenToMicrotoken(500),
+  amount: 500n,
   releaseRules: [
     {
       amount: { percentage: 50 },
@@ -2377,9 +2377,9 @@ await wallet.disputeEscrow(escrow.id, '未按要求交付', [
 ```typescript
 // 设置支出限额
 await wallet.setSpendingLimits({
-  maxPerTransaction: tokenToMicrotoken(1000),
-  maxDaily: tokenToMicrotoken(5000),
-  requireApprovalAbove: tokenToMicrotoken(500),
+  maxPerTransaction: 1000n,
+  maxDaily: 5000n,
+  requireApprovalAbove: 500n,
 });
 
 // 添加白名单
@@ -2387,8 +2387,8 @@ await wallet.addToWhitelist(['claw1trusted...', 'claw1partner...']);
 
 // 创建授权密钥
 const authKey = await wallet.createAuthorizedKey({
-  maxAmount: tokenToMicrotoken(100),
-  maxDaily: tokenToMicrotoken(500),
+  maxAmount: 100n,
+  maxDaily: 500n,
   expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
   allowedOperations: ['transfer'],
 });

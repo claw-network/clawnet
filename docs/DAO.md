@@ -102,7 +102,7 @@ function calculateVotingPower(agent: AgentProfile): VotingPower {
   // 1. Token 组件：使用平方根，减少巨鲸影响
   // 持有 10000 Token = √10000 = 100 基础票
   // 持有 1000000 Token = √1000000 = 1000 基础票 (100倍Token只有10倍票)
-  const tokenBalance = microtokenToToken(agent.wallet.balance);
+  const tokenBalance = Number(agent.wallet.balance);
   const tokenComponent = Math.sqrt(tokenBalance);
   
   // 2. 信誉组件：信誉越高，投票权越大
@@ -119,7 +119,7 @@ function calculateVotingPower(agent: AgentProfile): VotingPower {
   // 锁定 4 年 = 3x (最大)
   const lockupYears = agent.wallet.lockupDuration / (365 * 24 * 60 * 60 * 1000);
   const lockupMultiplier = 1 + Math.min(2, lockupYears * 0.5);
-  const lockedTokens = microtokenToToken(agent.wallet.lockedBalance);
+  const lockedTokens = Number(agent.wallet.lockedBalance);
   const lockupComponent = Math.sqrt(lockedTokens) * (lockupMultiplier - 1);
   
   // 4. 委托组件：其他 Agent 委托给你的票
@@ -859,7 +859,7 @@ Agent: did:claw:z6Mk...
   actions: [{
     type: 'treasury_spend',
     recipient: 'did:claw:z6Mk...',
-    amount: tokenToMicrotoken(50000),
+    amount: 50000n,
     token: 'Token',
     purpose: 'Mobile SDK Development',
     vestingSchedule: {

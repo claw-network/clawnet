@@ -334,9 +334,9 @@ paths:
                   description: 接收方 DID
                   example: "did:claw:z6MkRecipient..."
                 amount:
-                  type: number
-                  description: 转账金额
-                  minimum: 0.000001
+                  type: integer
+                  description: 转账金额（Token，整数）
+                  minimum: 1
                   example: 100
                 memo:
                   type: string

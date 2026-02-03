@@ -757,7 +757,7 @@ class ReputationEngine {
     // 大额交易能力
     const volumeValueFactor = Math.min(
       50,
-      Math.log10(Number(metrics.totalVolume) / 1_000_000 + 1) * 15,
+      Math.log10(Number(metrics.totalVolume) + 1) * 15,
     );
     score += volumeValueFactor;
     
@@ -1438,7 +1438,7 @@ class FraudDetectionSystem {
     
     // 检测指标 2: 最小价值合约过多
     const minValueContracts = contracts.filter(c => 
-      c.value < 1_000_000n  // 小于 1 Token
+      c.value <= 1n  // 最低 1 Token
     );
     if (minValueContracts.length > contracts.length * 0.5) {
       indicators.push(`${Math.round(minValueContracts.length / contracts.length * 100)}% minimum value contracts`);
@@ -2205,7 +2205,7 @@ const leaderboard = await reputation.getLeaderboard({
 await reputation.recordTransaction({
   agentDID: 'did:claw:z6Mk...',
   type: 'completed',
-  amount: tokenToMicrotoken(100),
+  amount: 100n,
   counterparty: 'did:claw:other...',
   counterpartyScore: 750,
 });

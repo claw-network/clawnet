@@ -1706,7 +1706,7 @@ const contract = await createFromTemplate('team_project', {
     auditor: 'did:claw:auditor...',
   },
   
-  budget: tokenToMicrotoken(1000),
+  budget: 1000n,
   
   milestones: [
     {

@@ -2664,10 +2664,10 @@ const FeeConfig = {
     },
     
     // 最低费用
-    minimumFee: 1_000_000n,  // 1 Token
+    minimumFee: 1n,  // 1 Token
     
     // 最高费用
-    maximumFee: 100_000_000_000n,  // 100,000 Token
+    maximumFee: 100_000n,  // 100,000 Token
   },
   
   // 托管费
@@ -2679,20 +2679,20 @@ const FeeConfig = {
     holdingFeePerDay: 0.0001,  // 0.01%/天
     
     // 最低费用
-    minimumFee: 100_000n,  // 0.1 Token
+    minimumFee: 1n,  // 1 Token
   },
   
   // 提现费
   withdrawal: {
-    fixedFee: 500_000n,  // 0.5 Token
+    fixedFee: 1n,  // 1 Token
     percentageFee: 0.001,  // 0.1%
   },
   
   // 紧急处理费
   priority: {
     standard: 0,
-    priority: 1_000_000n,    // 1 Token
-    express: 5_000_000n,     // 5 Token
+    priority: 1n,    // 1 Token
+    express: 5n,     // 5 Token
   },
 };
 
@@ -2916,7 +2916,7 @@ class IncentiveSystem {
     const volume = profile.dimensions.transaction.metrics.totalVolume;
     if (volume >= 10_000_000_000_000n) {  // 10,000,000 Token
       discount += 0.05;
-    } else if (volume >= 1_000_000_000_000n) {  // 1,000,000 Token
+    } else if (volume >= 1_000_000n) {  // 1,000,000 Token
       discount += 0.03;
     } else if (volume >= 100_000_000_000n) {  // 100,000 Token
       discount += 0.01;
@@ -3312,7 +3312,7 @@ const results = await market.search({
   keyword: 'data analysis',
   markets: ['task', 'capability'],
   minReputation: 500,
-  priceRange: { max: tokenToMicrotoken(1000) },
+  priceRange: { max: 1000n },
 });
 
 // 获取推荐
@@ -3330,7 +3330,7 @@ const infoListing = await market.info.publish({
   description: '...',
   infoType: 'analysis',
   content: { format: 'json', size: 1024 },
-  pricing: { type: 'fixed', fixedPrice: tokenToMicrotoken(100) },
+  pricing: { type: 'fixed', fixedPrice: 100n },
   license: { type: 'non_exclusive', ... },
 });
 
@@ -3374,7 +3374,7 @@ const taskListing = await market.task.publish({
 // 提交竞标
 const bid = await market.task.bid({
   taskId: 'task_123',
-  price: tokenToMicrotoken(300),
+  price: 300n,
   timeline: 5 * 24 * 60 * 60 * 1000,
   approach: 'I will use...',
 });

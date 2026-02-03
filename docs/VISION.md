@@ -169,7 +169,7 @@ await humanUI.confirmTransaction();
 // ✅ ClawToken：为 Agent 设计
 const result = await agent.market.purchase({
   listingId: 'info_123',
-  maxPrice: tokenToMicrotoken(100),
+  maxPrice: 100n,
   autoNegotiate: true,
 });
 ```
@@ -353,7 +353,7 @@ const result = await pipeline([
 │  │   │                                                         │    │        │
 │  │   │   请求 ────► 认证 ────► 计量 ────► 代理 ────► 响应     │    │        │
 │  │   │                                                         │    │        │
-│  │   │   0.001 CLAW / 1K tokens                               │    │        │
+│  │   │   1 CLAW / 1K tokens                                   │    │        │
 │  │   └────────────────────────────────────────────────────────┘    │        │
 │  └─────────────────────────────────────────────────────────────────┘        │
 │                                                                              │

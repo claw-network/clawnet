@@ -4,8 +4,8 @@ Defines fees and incentives. All parameters are DAO-controlled unless fixed.
 
 ## 1. Token Units
 
-- 1 Token = 1,000,000 microtoken
-- All protocol fees are integers in microtoken
+- 1 Token is the smallest unit.
+- All protocol amounts and fees are integers in Token.
 
 ## 2. Fee Model (MVP defaults)
 
@@ -18,24 +18,24 @@ Defines fees and incentives. All parameters are DAO-controlled unless fixed.
 Fee formula (market fees only):
 
 ```
-fee = clamp(amount * rate, market_min_fee, market_max_fee)
+fee = clamp(floor(amount * rate), market_min_fee, market_max_fee)
 ```
 
 Market fee bounds:
 
-- market_min_fee: 0.001 Token
+- market_min_fee: 1 Token
 - market_max_fee: 100,000 Token
 
 ### 2.2 Escrow Fees
 
 - Base escrow fee: 0.5%
 - Holding fee: 0.01% per day
-- Minimum escrow fee: 0.1 Token
+- Minimum escrow fee: 1 Token
 
 Escrow fee formula:
 
 ```
-fee = max(min_escrow_fee, amount * base_rate + amount * holding_rate * days)
+fee = max(min_escrow_fee, ceil(amount * base_rate + amount * holding_rate * days))
 ```
 
 Notes:
@@ -43,7 +43,7 @@ Notes:
 
 ### 2.3 Transaction Fees
 
-- Base fee: 0.001 Token
+- Base fee: 1 Token
 - Priority fee: 1 Token (optional)
 
 Notes:
@@ -57,8 +57,8 @@ Market fee caps apply only to market fees (Section 2.1).
 
 DAO-controlled thresholds to prevent state bloat and spam:
 
-- MIN_TRANSFER_AMOUNT: 0.001 Token
-- MIN_ESCROW_AMOUNT: 0.1 Token
+- MIN_TRANSFER_AMOUNT: 1 Token
+- MIN_ESCROW_AMOUNT: 1 Token
 
 Notes:
 - Nodes MUST reject wallet transfers or escrow creates below these thresholds.
@@ -71,7 +71,7 @@ Notes:
 ## 4. Node Incentives (MVP defaults)
 
 - Validator reward per snapshot interval: 1 Token
-- Relay reward per confirmed event: 0.0001 Token (optional, non-consensus)
+- Relay reward per confirmed event: 1 Token (optional, non-consensus)
 - Rewards paid from Treasury MUST be deterministic
 
 Distribution:

@@ -177,7 +177,7 @@ interface NodeReward {
 }
 
 // 节点必须质押才能参与
-const MINIMUM_STAKE = tokenToMicrotoken(10000); // 10000 Token
+const MINIMUM_STAKE = 10000n; // 10000 Token
 
 async function registerNode(type: NodeType): Promise<void> {
   // 质押 Token
@@ -264,7 +264,7 @@ function calculateVotingPower(agent: Agent): number {
   const accountAge = Date.now() - agent.createdAt;
   
   // 基础票数 = Token 数量的平方根（防止巨鲸垄断）
-  const baseVotes = Math.sqrt(microtokenToToken(tokenBalance));
+  const baseVotes = Math.sqrt(Number(tokenBalance));
   
   // 信誉加成（最高 2x）
   const trustMultiplier = 1 + (trustScore / 1000);

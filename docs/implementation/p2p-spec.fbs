@@ -58,7 +58,7 @@ table StakeProof {
   peer:string;
   controller:string; // did:claw
   stakeEvent:string; // event hash
-  minStake:string; // microtoken
+  minStake:string; // token
   sig:string;
   sigController:string;
 }

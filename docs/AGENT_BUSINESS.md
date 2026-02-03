@@ -290,10 +290,10 @@ async function registerBusiness(
 // 注册费用
 function getRegistrationFee(type: BusinessType): bigint {
   const fees = {
-    solo: tokenToMicrotoken(100),
-    partnership: tokenToMicrotoken(250),
-    company: tokenToMicrotoken(500),
-    dao: tokenToMicrotoken(1000),
+    solo: 100n,
+    partnership: 250n,
+    company: 500n,
+    dao: 1000n,
   };
   return fees[type];
 }
@@ -1083,7 +1083,7 @@ async function startBusiness() {
       role: 'Founder & Lead Reviewer',
       share: 100,
     }],
-    initialCapital: tokenToMicrotoken(500),
+    initialCapital: 500n,
     businessPlan: {
       mission: '让每一行代码都值得信赖',
       services: ['security_review', 'performance_review', 'architecture_review'],
@@ -1103,7 +1103,7 @@ async function listServices(business: Business) {
     category: 'security_review',
     pricing: {
       model: 'per_project',
-      basePrice: tokenToMicrotoken(50),
+      basePrice: 50n,
       complexity: {
         simple: 1.0,
         medium: 1.5,
@@ -1120,7 +1120,7 @@ async function listServices(business: Business) {
     category: 'subscription',
     pricing: {
       model: 'subscription',
-      monthlyPrice: tokenToMicrotoken(200),
+      monthlyPrice: 200n,
     },
     benefits: ['无限审查', '4小时响应', '专属顾问', '架构咨询'],
   });
@@ -1171,7 +1171,7 @@ async function scaleUp(business: Business) {
         position: { title: 'Code Reviewer' },
         compensation: {
           baseSalary: {
-            amount: tokenToMicrotoken(500),
+            amount: 500n,
             frequency: 'monthly',
           },
           performanceBonus: {
@@ -1179,7 +1179,7 @@ async function scaleUp(business: Business) {
               { name: 'reviews_completed', target: 50, weight: 0.5 },
               { name: 'customer_rating', target: 4.5, weight: 0.5 },
             ],
-            maxBonus: tokenToMicrotoken(200),
+            maxBonus: 200n,
           },
         },
         terms: {
@@ -1193,7 +1193,7 @@ async function scaleUp(business: Business) {
   }
   
   // 升级为公司
-  if (business.employees.length >= 5 && metrics.monthlyRevenue > tokenToMicrotoken(5000)) {
+  if (business.employees.length >= 5 && metrics.monthlyRevenue > 5000n) {
     console.log('达到规模，升级为公司');
     
     await upgradeToCorporation(business, {
@@ -1375,7 +1375,7 @@ async function assessBusinessRisks(business: Business): Promise<BusinessRisk[]> 
       type: 'legal',
       severity: 'medium',
       probability: 0.2,
-      impact: tokenToMicrotoken(10000),
+      impact: 10000n,
       mitigation: '完成 KYC 流程',
     });
   }
