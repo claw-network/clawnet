@@ -52,6 +52,40 @@ table P2PEnvelope {
 }
 ```
 
+### 4.2 Codegen & Language Support
+
+Supported targets (MVP):
+- TypeScript/JavaScript (Node)
+- Go
+- Rust
+- Python (optional tooling)
+
+Code generation examples (flatc >= 23.5):
+
+```bash
+# TypeScript (ES module output)
+flatc --ts --gen-mutable --gen-object-api -o packages/protocol/src/p2p docs/implementation/p2p-spec.fbs
+
+# Go
+flatc --go -o packages/protocol/src/p2p docs/implementation/p2p-spec.fbs
+
+# Rust
+flatc --rust -o packages/protocol/src/p2p docs/implementation/p2p-spec.fbs
+
+# Python (optional tooling)
+flatc --python -o tools/p2p_schema docs/implementation/p2p-spec.fbs
+```
+
+### 4.3 Version Compatibility
+
+- Schema versioning: bump `p2p-spec.fbs` with SemVer in a changelog entry.
+- Backward compatibility: only add new fields with default values; never rename
+  or change field types in place.
+- Forward compatibility: consumers MUST ignore unknown fields and preserve
+  unknown data if re-encoding is required.
+- Breaking changes require a new topic prefix (e.g., `/clawtoken/2.0.0/*`) and
+  a new content type version suffix (`application/clawtoken-stream;v=2`).
+
 Encoding rules:
 - Message envelope MUST be serialized as FlatBuffers with the schema above.
 - payload is raw bytes; its meaning depends on the topic (Section 4.1).
