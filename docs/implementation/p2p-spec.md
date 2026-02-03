@@ -100,6 +100,58 @@ Response:
 - Proof-of-work tickets or stake gating MAY be enabled by DAO
 - MUST be optional for private networks
 
+### 8.1 Sybil Policy Modes
+
+Nodes MUST expose a local sybilPolicy configuration:
+
+- none: no gating; peer-count finality MUST NOT be used.
+- allowlist: only peers in a local allowlist are eligible.
+- pow: peers must present a valid PoW ticket.
+- stake: peers must present a valid stake proof.
+
+Eligible peers are those that pass the active policy above. Peer-count finality
+MUST only count eligible peers.
+
+### 8.2 PoW Ticket
+
+PoW tickets are announced over `/clawtoken/1.0.0/requests`:
+
+```json
+{
+  "type": "pow.ticket",
+  "peer": "<peerId>",
+  "ts": 1700000000000,
+  "nonce": "<random>",
+  "difficulty": 20,
+  "hash": "<sha256 of 'clawtoken:pow:v1:' + peerId + ts + nonce>",
+  "sig": "<signature by peer key>"
+}
+```
+
+Validation:
+- hash MUST have at least `difficulty` leading zero bits.
+- ts MUST be within MAX_CLOCK_SKEW_MS (see protocol-spec constants).
+- sig MUST verify for the peer key.
+
+### 8.3 Stake Proof
+
+Stake proofs are announced over `/clawtoken/1.0.0/requests`:
+
+```json
+{
+  "type": "stake.proof",
+  "peer": "<peerId>",
+  "stakeEvent": "<event hash>",
+  "minStake": "<microtoken>",
+  "sig": "<signature by peer key>"
+}
+```
+
+Validation:
+- stakeEvent MUST exist in the local event log.
+- stakeEvent MUST be a `wallet.stake` from the same controller DID.
+- stake amount MUST be >= minStake.
+
 ## 9. NAT Traversal
 
 - Hole punching supported

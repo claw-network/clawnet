@@ -2,7 +2,8 @@
 
 Resource concurrency:
 - For escrow update events, payload MUST include resourcePrev (hash of the last
-  accepted event for that escrowId). For escrow.create, resourcePrev MUST be null.
+  accepted event for that escrowId). For escrow.create, resourcePrev is optional;
+  if provided it MUST be null.
 
 ## wallet.transfer
 
@@ -31,6 +32,8 @@ REQUIRED:
 - beneficiary
 - amount
 - releaseRules
+
+OPTIONAL:
 - resourcePrev (must be null)
 
 OPTIONAL:

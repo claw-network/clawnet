@@ -225,7 +225,8 @@ Conflict rules:
 - If an event has no amount field, use DEFAULT_FINALITY_N.
 - Peer-count finality MUST only be used when sybil resistance is enabled
   (PoW/stake) or peers are from a local allowlist. Otherwise, nodes MUST
-  fall back to time-based finality only.
+  fall back to time-based finality only. See `docs/implementation/p2p-spec.md`
+  Section 8 for eligible peer policy.
 
 These thresholds are local policy and DAO-controlled. Recommendation adopted:
 use tiered N (3/5/7) based on amount with optional arbitration on disputes.

@@ -23,6 +23,7 @@ OPTIONAL:
 - restrictions
 - expiresAt
 - metadata
+- resourcePrev (must be null)
 
 DERIVED:
 - seller.reputation/verified
@@ -48,6 +49,15 @@ REQUIRED:
 OPTIONAL:
 - metadata
 
+## market.listing.remove (MVP+)
+
+REQUIRED:
+- listingId
+- resourcePrev
+
+DERIVED:
+- status = removed
+
 ## market.order.create
 
 Aligns to Order.
@@ -64,6 +74,7 @@ REQUIRED:
 
 OPTIONAL:
 - pricing.discounts, pricing.fees
+- resourcePrev (must be null)
 
 DERIVED:
 - seller.did (from listing)
@@ -93,6 +104,7 @@ REQUIRED:
 
 OPTIONAL:
 - proposal.milestones
+- resourcePrev (must be null)
 
 DERIVED:
 - bidder.reputation
@@ -108,6 +120,7 @@ REQUIRED:
 
 OPTIONAL:
 - notes
+- resourcePrev (must be null)
 
 DERIVED:
 - status = pending_review
@@ -136,6 +149,36 @@ DERIVED:
 - credentials
 - status = active
 
+OPTIONAL:
+- resourcePrev (must be null)
+
+## market.capability.lease.pause (MVP+)
+
+REQUIRED:
+- leaseId
+- resourcePrev
+
+DERIVED:
+- status = paused
+
+## market.capability.lease.resume (MVP+)
+
+REQUIRED:
+- leaseId
+- resourcePrev
+
+DERIVED:
+- status = active
+
+## market.capability.lease.terminate (MVP+)
+
+REQUIRED:
+- leaseId
+- resourcePrev
+
+DERIVED:
+- status = terminated
+
 ## market.capability.invoke
 
 REQUIRED:
@@ -157,3 +200,73 @@ REQUIRED:
 
 OPTIONAL:
 - claimAmount
+- resourcePrev (must be null)
+
+## market.dispute.response (MVP+)
+
+REQUIRED:
+- disputeId
+- resourcePrev
+- response
+
+OPTIONAL:
+- evidence
+
+## market.dispute.resolve (MVP+)
+
+REQUIRED:
+- disputeId
+- resourcePrev
+- resolution
+
+OPTIONAL:
+- notes
+
+## market.bid.accept (MVP+)
+
+REQUIRED:
+- bidId
+- resourcePrev
+
+DERIVED:
+- status = accepted
+
+## market.bid.reject (MVP+)
+
+REQUIRED:
+- bidId
+- resourcePrev
+
+DERIVED:
+- status = rejected
+
+## market.bid.withdraw (MVP+)
+
+REQUIRED:
+- bidId
+- resourcePrev
+
+DERIVED:
+- status = withdrawn
+
+## market.subscription.start (MVP+)
+
+REQUIRED:
+- subscriptionId
+- listingId
+- buyer.did
+
+OPTIONAL:
+- resourcePrev (must be null)
+
+DERIVED:
+- status = active
+
+## market.subscription.cancel (MVP+)
+
+REQUIRED:
+- subscriptionId
+- resourcePrev
+
+DERIVED:
+- status = cancelled
