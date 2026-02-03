@@ -35,6 +35,10 @@ servers:
   - url: http://127.0.0.1:9528
     description: 本地节点 API
 
+security:
+  - {}
+  - ApiKeyAuth: []
+
 tags:
   - name: Node
     description: 节点状态与管理
@@ -77,6 +81,14 @@ paths:
                 network: "mainnet"
                 version: "1.0.0"
                 uptime: 3600
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/node/peers:
     get:
@@ -97,6 +109,14 @@ paths:
                       $ref: '#/components/schemas/PeerInfo'
                   total:
                     type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/node/config:
     get:
@@ -110,6 +130,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeConfig'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   # --------------------------------------------------------------------------
   # Identity
@@ -132,6 +160,14 @@ paths:
                 publicKey: "z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
                 created: 1706745600000
                 updated: 1706745600000
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/identity/{did}:
     get:
@@ -153,12 +189,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Identity'
+        '400':
+          description: DID 格式无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: DID 不存在
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/identity/capabilities:
     get:
@@ -177,6 +227,14 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Capability'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
     post:
       tags: [Identity]
@@ -209,6 +267,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Capability'
+        '400':
+          description: 能力注册参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   # --------------------------------------------------------------------------
   # Wallet
@@ -230,6 +302,14 @@ paths:
                 available: 950
                 pending: 50
                 locked: 0
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/wallet/transfer:
     post:
@@ -278,7 +358,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/wallet/history:
     get:
       tags: [Wallet]
@@ -318,6 +405,14 @@ paths:
                     type: integer
                   hasMore:
                     type: boolean
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/wallet/escrow:
     post:
@@ -350,6 +445,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Escrow'
+        '402':
+          description: 余额不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/wallet/escrow/{escrowId}:
     get:
@@ -369,6 +478,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Escrow'
+        '404':
+          description: 托管不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/wallet/escrow/{escrowId}/release:
     post:
@@ -400,6 +523,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransferResult'
+        '404':
+          description: 托管不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 托管状态不允许或释放条件未满足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   # --------------------------------------------------------------------------
   # Markets - Info Market
@@ -459,6 +602,14 @@ paths:
                     type: integer
                   hasMore:
                     type: boolean
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
     post:
       tags: [Markets]
@@ -512,6 +663,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InfoListing'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/markets/info/{listingId}:
     get:
@@ -531,6 +690,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InfoListing'
+        '404':
+          description: 商品不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/markets/info/{listingId}/purchase:
     post:
@@ -564,6 +737,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '404':
+          description: 商品不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 商品不可用或订单状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   # --------------------------------------------------------------------------
   # Markets - Task Market
@@ -620,6 +813,14 @@ paths:
                       $ref: '#/components/schemas/TaskListing'
                   total:
                     type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
     post:
       tags: [Markets]
@@ -670,6 +871,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskListing'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/markets/tasks/{taskId}:
     get:
@@ -689,6 +898,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskListing'
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/markets/tasks/{taskId}/bids:
     get:
@@ -713,6 +936,20 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Bid'
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
     post:
       tags: [Markets]
@@ -749,6 +986,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Bid'
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/markets/tasks/{taskId}/accept:
     post:
@@ -779,6 +1030,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Contract'
+        '404':
+          description: 任务或竞标不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   # --------------------------------------------------------------------------
   # Markets - Capability Market
@@ -822,6 +1087,14 @@ paths:
                       $ref: '#/components/schemas/CapabilityProvider'
                   total:
                     type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/markets/capabilities/{providerId}/invoke:
     post:
@@ -866,6 +1139,26 @@ paths:
                     type: number
                   txHash:
                     type: string
+        '402':
+          description: 余额不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 能力提供方不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   # --------------------------------------------------------------------------
   # Contracts
@@ -906,6 +1199,14 @@ paths:
                       $ref: '#/components/schemas/Contract'
                   total:
                     type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
     post:
       tags: [Contracts]
@@ -937,6 +1238,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Contract'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/contracts/{contractId}:
     get:
@@ -956,6 +1265,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Contract'
+        '404':
+          description: 合约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/contracts/{contractId}/sign:
     post:
@@ -975,6 +1298,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Contract'
+        '404':
+          description: 合约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 合约状态不允许当前操作
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/contracts/{contractId}/fund:
     post:
@@ -1005,6 +1348,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Contract'
+        '402':
+          description: 余额不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 合约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 合约状态不允许当前操作
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/contracts/{contractId}/milestones/{milestoneId}/complete:
     post:
@@ -1042,6 +1411,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Milestone'
+        '400':
+          description: 里程碑无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 合约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 合约状态不允许当前操作
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/contracts/{contractId}/milestones/{milestoneId}/approve:
     post:
@@ -1079,6 +1474,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Milestone'
+        '400':
+          description: 里程碑无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: 合约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 合约状态不允许当前操作
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/contracts/{contractId}/dispute:
     post:
@@ -1116,6 +1537,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Dispute'
+        '404':
+          description: 合约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 争议不允许
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   # --------------------------------------------------------------------------
   # Reputation
@@ -1152,6 +1593,20 @@ paths:
                 totalTransactions: 156
                 successRate: 0.98
                 averageRating: 4.7
+        '404':
+          description: 信誉记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /api/reputation/{did}/reviews:
     get:
@@ -1190,11 +1645,51 @@ paths:
                     type: integer
                   averageRating:
                     type: number
+        '404':
+          description: 信誉记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
 # ============================================================================
 # COMPONENTS
 # ============================================================================
 components:
+  responses:
+    UnauthorizedError:
+      description: 未授权
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ForbiddenError:
+      description: 权限不足或操作不允许
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimitedError:
+      description: 请求过多
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: 服务内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
   schemas:
     # ------------------------------------------------------------------------
     # Common
