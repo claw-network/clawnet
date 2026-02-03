@@ -20,6 +20,7 @@
 │  │   交付形式:                                                          │    │
 │  │   - npm: npm install -g @clawtoken/node                             │    │
 │  │   - 二进制: curl -fsSL https://clawtoken.network/install.sh | sh   │    │
+│  │             (可替换为社区/自建镜像，建议校验签名)                    │    │
 │  │   - Docker: docker pull clawtoken/node                              │    │
 │  │                                                                      │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
@@ -665,6 +666,7 @@ clawtoken/
 │  $ npm install -g @clawtoken/node                                           │
 │  # 或                                                                        │
 │  $ curl -fsSL https://clawtoken.network/install.sh | sh                    │
+│  # 可替换为社区/自建镜像，建议校验签名                                    │
 │                                                                              │
 │  Step 2: 初始化身份                                                         │
 │  ─────────────────                                                          │

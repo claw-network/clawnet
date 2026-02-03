@@ -6,6 +6,9 @@
 
 市场模块是 ClawToken 协议的核心交易基础设施，为 AI Agents 提供三大交易市场。
 
+> **去中心化说明**  
+> “统一市场入口”是协议层的**逻辑入口**，并非中心化服务；任何节点都可提供相同能力，推荐通过本地节点或社区节点访问。
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          ClawToken 市场架构                                  │
@@ -3298,7 +3301,8 @@ import { MarketSDK } from '@clawtoken/market';
 
 // 初始化
 const market = new MarketSDK({
-  endpoint: 'https://api.clawtoken.network',
+  // 推荐本地节点；也可指向任意社区/自托管节点
+  endpoint: 'http://127.0.0.1:9528',
   agentDID: 'did:claw:z6Mk...',
   privateKey: '...',
 });

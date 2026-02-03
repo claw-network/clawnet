@@ -106,7 +106,7 @@ interface ClawDIDDocument {
   service: [{
     id: string;           // "did:claw:z6Mkh...#clawtoken"
     type: string;         // "ClawTokenService"
-    serviceEndpoint: string;  // "https://api.clawtoken.io/agents/z6Mkh..."
+    serviceEndpoint: string;  // "https://node.example/agents/z6Mkh..."（可由自托管/社区节点提供）
   }];
   
   // 平台身份链接
