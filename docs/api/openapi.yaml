@@ -109,6 +109,8 @@ paths:
                       $ref: '#/components/schemas/PeerInfo'
                   total:
                     type: integer
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -227,6 +229,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Capability'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -405,6 +409,8 @@ paths:
                     type: integer
                   hasMore:
                     type: boolean
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -602,6 +608,8 @@ paths:
                     type: integer
                   hasMore:
                     type: boolean
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -813,6 +821,8 @@ paths:
                       $ref: '#/components/schemas/TaskListing'
                   total:
                     type: integer
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -936,6 +946,8 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Bid'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '404':
           description: 任务不存在
           content:
@@ -1087,6 +1099,8 @@ paths:
                       $ref: '#/components/schemas/CapabilityProvider'
                   total:
                     type: integer
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -1199,6 +1213,8 @@ paths:
                       $ref: '#/components/schemas/Contract'
                   total:
                     type: integer
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -1645,6 +1661,8 @@ paths:
                     type: integer
                   averageRating:
                     type: number
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
         '404':
           description: 信誉记录不存在
           content:
@@ -1672,7 +1690,7 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     ForbiddenError:
-      description: 权限不足或操作不允许
+      description: 权限不足或业务规则不允许当前操作
       content:
         application/json:
           schema:
