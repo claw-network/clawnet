@@ -69,7 +69,8 @@ Snapshot format (JSON + hash):
 Remote snapshot acceptance policy (light nodes):
 
 - Require >= 2 distinct peer signatures
-- Reject snapshots if peer signatures are not from eligible peers
+- Reject snapshots if peer signatures are not from eligible peers as defined by
+  `docs/implementation/p2p-spec.md` (sybilPolicy allowlist/PoW/stake).
 - Recompute hash before acceptance
 
 Eligible peers are those authenticated via libp2p and either:

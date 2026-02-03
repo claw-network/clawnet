@@ -14,8 +14,8 @@ REQUIRED:
 - fee
 
 Notes:
-- from and to are DIDs or claw addresses.
-- issuer MUST control the from account (DID or address).
+- from and to MUST be claw addresses (not DIDs).
+- issuer MUST control the from address.
 
 OPTIONAL:
 - memo

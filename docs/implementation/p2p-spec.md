@@ -15,6 +15,10 @@ Defines network behavior for interoperable nodes. No privileged nodes.
 - Node keypair is distinct from wallet/identity keys
 - Nodes MAY rotate peer keys but MUST announce rotation
 
+PeerId validation:
+- Implementations MUST verify that the peerId is derived from the presented
+  public key per libp2p multihash rules for Ed25519 keys.
+
 ### 2.1 Peer Rotation Announcement
 
 Rotation records are RequestMessage bodies (see Section 4.1) and broadcast on

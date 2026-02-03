@@ -196,7 +196,9 @@ Nodes MUST validate events in this order:
 If any step fails, the event MUST be rejected.
 
 Authorization rules (examples):
-- For wallet.transfer, issuer MUST control the from account (DID or address).
+- For wallet.transfer, issuer MUST control the from address (claw...).
+- API layers MAY accept DID input, but MUST resolve DID -> claw address before
+  constructing and signing the event.
 
 ## 10. Reducers and State
 
@@ -228,6 +230,12 @@ Conflict rules:
   (PoW/stake) or peers are from a local allowlist. Otherwise, nodes MUST
   fall back to time-based finality only. See `docs/implementation/p2p-spec.md`
   Section 8 for eligible peer policy.
+
+Finality overrides for non-amount events (MVP):
+- governance.* (parameter change, treasury spend, protocol upgrade): N=7 or
+  time-based only.
+- wallet.mint / wallet.burn / wallet.reward / wallet.fee: N=7.
+- identity.update / reputation.record: DEFAULT_FINALITY_N.
 
 These thresholds are local policy and DAO-controlled. Recommendation adopted:
 use tiered N (3/5/7) based on amount with optional arbitration on disputes.
