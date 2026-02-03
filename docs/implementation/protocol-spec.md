@@ -29,6 +29,8 @@ validate state. All statements using MUST/SHOULD are normative.
   - <= 1_000_000_000 microtoken (1,000 Token): N=5
   - > 1_000_000_000 microtoken: N=7
 - DEFAULT_FINALITY_N = 3 (used when event has no amount)
+- MIN_TRANSFER_AMOUNT = 1_000 microtoken (0.001 Token)
+- MIN_ESCROW_AMOUNT = 100_000 microtoken (0.1 Token)
 
 All constants are DAO-controlled unless marked fixed.
 
@@ -199,6 +201,10 @@ Authorization rules (examples):
 - For wallet.transfer, issuer MUST control the from address (claw...).
 - API layers MAY accept DID input, but MUST resolve DID -> claw address before
   constructing and signing the event.
+
+Amount thresholds (anti-dust):
+- wallet.transfer amount MUST be >= MIN_TRANSFER_AMOUNT.
+- wallet.escrow.create amount MUST be >= MIN_ESCROW_AMOUNT.
 
 ## 10. Reducers and State
 

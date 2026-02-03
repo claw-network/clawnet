@@ -53,6 +53,16 @@ Notes:
 
 Market fee caps apply only to market fees (Section 2.1).
 
+### 2.5 Minimum Amounts (Anti-dust)
+
+DAO-controlled thresholds to prevent state bloat and spam:
+
+- MIN_TRANSFER_AMOUNT: 0.001 Token
+- MIN_ESCROW_AMOUNT: 0.1 Token
+
+Notes:
+- Nodes MUST reject wallet transfers or escrow creates below these thresholds.
+
 ## 3. Treasury
 
 - 100% of protocol fees flow into Treasury

@@ -55,6 +55,8 @@ table P2PEnvelope {
 Encoding rules:
 - Message envelope MUST be serialized as FlatBuffers with the schema above.
 - payload is raw bytes; its meaning depends on the topic (Section 4.1).
+- FlatBuffers builders MUST NOT force default values; serialization MUST be
+  deterministic for identical inputs.
 
 Signature rules:
 - sig MUST be signed by peer key.
