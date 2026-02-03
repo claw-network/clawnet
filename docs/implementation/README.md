@@ -12,6 +12,8 @@ They are written to be decentralization-first: no required central services.
 - These specs are normative. Implementation SHOULD NOT begin until all sections
   are at least in a stable draft state with review sign-off.
 - All parameters marked as DAO-controlled must be changeable via governance.
+- Unit/amount freeze (MVP): 1 Token is the smallest unit; minimum fee = 1 Token;
+  minimum transfer/escrow amount = 1 Token.
 
 ## Index
 
