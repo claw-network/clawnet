@@ -620,17 +620,17 @@ clawtoken/
 
 ```
 □ 0.1  定义 API 规范          ✅ 已完成 → docs/api/openapi.yaml
-□ 0.2  初始化 pnpm monorepo
+□ 0.2  初始化 pnpm monorepo   ✅ 已完成
        ├── pnpm-workspace.yaml
        ├── tsconfig.json (base)
        ├── .eslintrc.js
        ├── .prettierrc
        └── turbo.json (可选)
-□ 0.3  配置 CI/CD
-       ├── .github/workflows/ci.yml
-       ├── .github/workflows/release.yml
-       └── .github/workflows/test.yml
-□ 0.4  创建 packages 骨架
+□ 0.3  配置 CI/CD             ⏳ 部分完成（仅 ci.yml）
+       ├── .github/workflows/ci.yml ✅
+       ├── .github/workflows/release.yml ⏳
+       └── .github/workflows/test.yml ⏳
+□ 0.4  创建 packages 骨架     ✅ 已完成
        ├── packages/core/
        ├── packages/protocol/
        ├── packages/node/
@@ -649,31 +649,31 @@ clawtoken/
 - `docs/implementation/p2p-spec.fbs`
 
 ```
-□ 1.1  Crypto Engine (@clawtoken/core/crypto)
-       ├── 1.1.1  密钥对生成 (Ed25519)
-       ├── 1.1.2  签名 / 验签
-       ├── 1.1.3  助记词生成 (BIP39)
-       ├── 1.1.4  密钥派生 (HKDF)
-       ├── 1.1.5  对称加密 (AES-256-GCM)
-       ├── 1.1.6  哈希函数 (SHA-256, BLAKE3)
-       └── 1.1.7  单元测试
+□ 1.1  Crypto Engine (@clawtoken/core/crypto)  ⏳ 进行中
+       ├── 1.1.1  密钥对生成 (Ed25519) ✅
+       ├── 1.1.2  签名 / 验签 ✅
+       ├── 1.1.3  助记词生成 (BIP39) ⏳
+       ├── 1.1.4  密钥派生 (HKDF) ⏳
+       ├── 1.1.5  对称加密 (AES-256-GCM) ✅
+       ├── 1.1.6  哈希函数 (SHA-256, BLAKE3) ✅
+       └── 1.1.7  单元测试 ✅
 
-□ 1.2  Storage Engine (@clawtoken/core/storage)
-       ├── 1.2.1  LevelDB 封装
-       ├── 1.2.2  加密存储 (用 Crypto Engine)
-       ├── 1.2.3  配置管理 (~/.clawtoken/config.yaml)
-       ├── 1.2.4  密钥存储 (~/.clawtoken/keys/)
-       ├── 1.2.5  数据迁移机制
-       └── 1.2.6  单元测试
+□ 1.2  Storage Engine (@clawtoken/core/storage)  ⏳ 进行中
+       ├── 1.2.1  LevelDB 封装 ⏳（已提供内存型 KV + EventStore）
+       ├── 1.2.2  加密存储 (用 Crypto Engine) ⏳
+       ├── 1.2.3  配置管理 (~/.clawtoken/config.yaml) ⏳
+       ├── 1.2.4  密钥存储 (~/.clawtoken/keys/) ⏳
+       ├── 1.2.5  数据迁移机制 ⏳
+       └── 1.2.6  单元测试 ⏳
 
-□ 1.3  P2P Engine (@clawtoken/core/p2p)
-       ├── 1.3.1  libp2p 节点初始化
-       ├── 1.3.2  节点发现 (DHT / Bootstrap)
-       ├── 1.3.3  连接管理
-       ├── 1.3.4  Gossipsub 消息传播
-       ├── 1.3.5  NAT 穿透 (hole punching)
-       ├── 1.3.6  协议定义 (/clawtoken/1.0.0)
-       └── 1.3.7  集成测试 (多节点)
+□ 1.3  P2P Engine (@clawtoken/core/p2p)  ⏳ 待开始
+       ├── 1.3.1  libp2p 节点初始化 ⏳
+       ├── 1.3.2  节点发现 (DHT / Bootstrap) ⏳
+       ├── 1.3.3  连接管理 ⏳
+       ├── 1.3.4  Gossipsub 消息传播 ⏳
+       ├── 1.3.5  NAT 穿透 (hole punching) ⏳
+       ├── 1.3.6  协议定义 (/clawtoken/1.0.0) ⏳（FlatBuffers 编解码已在 @clawtoken/protocol 完成）
+       └── 1.3.7  集成测试 (多节点) ⏳
 ```
 
 ---
@@ -985,8 +985,8 @@ clawtoken/
 
 | Phase | 描述 | 预计周期 | 状态 |
 |-------|------|----------|------|
-| 0 | 基础设施 | Week 0 | ✅ API 定义完成 |
-| 1 | Core Layer | Week 1-2 | ⏳ 待开始 |
+| 0 | 基础设施 | Week 0 | ✅ 已完成（CI/CD 部分完成） |
+| 1 | Core Layer | Week 1-2 | ⏳ 进行中 |
 | 2 | Identity + Wallet | Week 3-4 | ⏳ |
 | 3 | Interface (MVP) | Week 5-6 | ⏳ |
 | 4 | Reputation | Week 7-8 | ⏳ |
@@ -1006,4 +1006,4 @@ clawtoken/
 
 ---
 
-*最后更新: 2026年2月2日*
+*最后更新: 2026年2月4日*
