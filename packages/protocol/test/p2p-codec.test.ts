@@ -31,6 +31,21 @@ const sampleResponse = {
   },
 };
 
+const snapshotRequest = {
+  type: RequestType.SnapshotRequest,
+  snapshotRequest: {
+    from: 'snap-0',
+  },
+};
+
+const snapshotResponse = {
+  type: ResponseType.SnapshotResponse,
+  snapshotResponse: {
+    hash: 'snap-1',
+    snapshot: new Uint8Array([9, 8, 7]),
+  },
+};
+
 describe('p2p codec', () => {
   it('encodes and decodes request messages', () => {
     const bytes = encodeRequestMessageBytes(sampleRequest);
@@ -45,6 +60,19 @@ describe('p2p codec', () => {
     expect(decoded.type).toBe(sampleResponse.type);
     expect(decoded.rangeResponse?.cursor).toBe('next');
     expect(decoded.rangeResponse?.events[0]).toEqual(sampleResponse.rangeResponse.events[0]);
+  });
+
+  it('encodes and decodes snapshot messages', () => {
+    const reqBytes = encodeRequestMessageBytes(snapshotRequest);
+    const decodedReq = decodeRequestMessageBytes(reqBytes);
+    expect(decodedReq.type).toBe(snapshotRequest.type);
+    expect(decodedReq.snapshotRequest).toEqual(snapshotRequest.snapshotRequest);
+
+    const respBytes = encodeResponseMessageBytes(snapshotResponse);
+    const decodedResp = decodeResponseMessageBytes(respBytes);
+    expect(decodedResp.type).toBe(snapshotResponse.type);
+    expect(decodedResp.snapshotResponse?.hash).toBe('snap-1');
+    expect(decodedResp.snapshotResponse?.snapshot).toEqual(snapshotResponse.snapshotResponse.snapshot);
   });
 
   it('encodes and decodes envelopes', () => {

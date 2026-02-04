@@ -6,11 +6,13 @@ enum RequestType : byte {
   range_request = 1,
   peer_rotate = 2,
   pow_ticket = 3,
-  stake_proof = 4
+  stake_proof = 4,
+  snapshot_request = 5
 }
 
 enum ResponseType : byte {
-  range_response = 1
+  range_response = 1,
+  snapshot_response = 2
 }
 
 table P2PEnvelope {
@@ -35,6 +37,15 @@ table RangeRequest {
 table RangeResponse {
   events:[EventBytes]; // canonical event bytes
   cursor:string;
+}
+
+table SnapshotRequest {
+  from:string; // last known snapshot hash (empty for latest)
+}
+
+table SnapshotResponse {
+  hash:string;    // snapshot hash
+  snapshot:[ubyte];
 }
 
 table PeerRotate {
@@ -69,11 +80,13 @@ table RequestMessage {
   peerRotate:PeerRotate;
   powTicket:PowTicket;
   stakeProof:StakeProof;
+  snapshotRequest:SnapshotRequest;
 }
 
 table ResponseMessage {
   type:ResponseType;
   rangeResponse:RangeResponse;
+  snapshotResponse:SnapshotResponse;
 }
 
 root_type P2PEnvelope;

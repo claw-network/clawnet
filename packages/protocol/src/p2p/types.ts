@@ -5,10 +5,12 @@ export enum RequestType {
   PeerRotate = 2,
   PowTicket = 3,
   StakeProof = 4,
+  SnapshotRequest = 5,
 }
 
 export enum ResponseType {
   RangeResponse = 1,
+  SnapshotResponse = 2,
 }
 
 export interface P2PEnvelope {
@@ -29,6 +31,15 @@ export interface RangeRequest {
 export interface RangeResponse {
   events: Uint8Array[];
   cursor: string;
+}
+
+export interface SnapshotRequest {
+  from: string;
+}
+
+export interface SnapshotResponse {
+  hash: string;
+  snapshot: Uint8Array;
 }
 
 export interface PeerRotate {
@@ -63,9 +74,11 @@ export interface RequestMessage {
   peerRotate?: PeerRotate;
   powTicket?: PowTicket;
   stakeProof?: StakeProof;
+  snapshotRequest?: SnapshotRequest;
 }
 
 export interface ResponseMessage {
   type: ResponseType;
   rangeResponse?: RangeResponse;
+  snapshotResponse?: SnapshotResponse;
 }

@@ -10,6 +10,8 @@ import {
   RequestType,
   ResponseMessage,
   ResponseType,
+  SnapshotRequest,
+  SnapshotResponse,
   StakeProof,
 } from './types.js';
 
@@ -179,6 +181,22 @@ export function encodeRangeResponse(builder: Builder, response: RangeResponse): 
   return builder.endObject();
 }
 
+export function encodeSnapshotRequest(builder: Builder, request: SnapshotRequest): number {
+  const fromOffset = builder.createString(request.from);
+  builder.startObject(1);
+  builder.addFieldOffset(0, fromOffset, 0);
+  return builder.endObject();
+}
+
+export function encodeSnapshotResponse(builder: Builder, response: SnapshotResponse): number {
+  const hashOffset = builder.createString(response.hash);
+  const snapshotOffset = builder.createByteVector(response.snapshot);
+  builder.startObject(2);
+  builder.addFieldOffset(0, hashOffset, 0);
+  builder.addFieldOffset(1, snapshotOffset, 0);
+  return builder.endObject();
+}
+
 export function encodePeerRotate(builder: Builder, rotate: PeerRotate): number {
   const oldOffset = builder.createString(rotate.old);
   const newOffset = builder.createString(rotate['new']);
@@ -230,6 +248,7 @@ export function encodeRequestMessage(builder: Builder, message: RequestMessage):
   let peerRotateOffset = 0;
   let powTicketOffset = 0;
   let stakeProofOffset = 0;
+  let snapshotRequestOffset = 0;
 
   switch (message.type) {
     case RequestType.RangeRequest:
@@ -248,33 +267,44 @@ export function encodeRequestMessage(builder: Builder, message: RequestMessage):
       if (!message.stakeProof) throw new Error('stakeProof body required');
       stakeProofOffset = encodeStakeProof(builder, message.stakeProof);
       break;
+    case RequestType.SnapshotRequest:
+      if (!message.snapshotRequest) throw new Error('snapshotRequest body required');
+      snapshotRequestOffset = encodeSnapshotRequest(builder, message.snapshotRequest);
+      break;
     default:
       throw new Error(`Unsupported request type ${message.type}`);
   }
 
-  builder.startObject(5);
+  builder.startObject(6);
   builder.addFieldInt8(0, message.type, 0);
   if (rangeRequestOffset) builder.addFieldOffset(1, rangeRequestOffset, 0);
   if (peerRotateOffset) builder.addFieldOffset(2, peerRotateOffset, 0);
   if (powTicketOffset) builder.addFieldOffset(3, powTicketOffset, 0);
   if (stakeProofOffset) builder.addFieldOffset(4, stakeProofOffset, 0);
+  if (snapshotRequestOffset) builder.addFieldOffset(5, snapshotRequestOffset, 0);
   return builder.endObject();
 }
 
 export function encodeResponseMessage(builder: Builder, message: ResponseMessage): number {
   let rangeResponseOffset = 0;
+  let snapshotResponseOffset = 0;
   switch (message.type) {
     case ResponseType.RangeResponse:
       if (!message.rangeResponse) throw new Error('rangeResponse body required');
       rangeResponseOffset = encodeRangeResponse(builder, message.rangeResponse);
       break;
+    case ResponseType.SnapshotResponse:
+      if (!message.snapshotResponse) throw new Error('snapshotResponse body required');
+      snapshotResponseOffset = encodeSnapshotResponse(builder, message.snapshotResponse);
+      break;
     default:
       throw new Error(`Unsupported response type ${message.type}`);
   }
 
-  builder.startObject(2);
+  builder.startObject(3);
   builder.addFieldInt8(0, message.type, 0);
   if (rangeResponseOffset) builder.addFieldOffset(1, rangeResponseOffset, 0);
+  if (snapshotResponseOffset) builder.addFieldOffset(2, snapshotResponseOffset, 0);
   return builder.endObject();
 }
 
@@ -318,6 +348,19 @@ export function decodeRangeResponse(reader: FlatBufferReader, table: number): Ra
   return {
     events,
     cursor: reader.readStringField(table, 1) ?? '',
+  };
+}
+
+export function decodeSnapshotRequest(reader: FlatBufferReader, table: number): SnapshotRequest {
+  return {
+    from: reader.readStringField(table, 0) ?? '',
+  };
+}
+
+export function decodeSnapshotResponse(reader: FlatBufferReader, table: number): SnapshotResponse {
+  return {
+    hash: reader.readStringField(table, 0) ?? '',
+    snapshot: reader.readByteVectorField(table, 1) ?? new Uint8Array(),
   };
 }
 
@@ -377,6 +420,11 @@ export function decodeRequestMessage(reader: FlatBufferReader, table: number): R
       if (stakeTable !== null) message.stakeProof = decodeStakeProof(reader, stakeTable);
       break;
     }
+    case RequestType.SnapshotRequest: {
+      const snapshotTable = reader.readTableField(table, 5);
+      if (snapshotTable !== null) message.snapshotRequest = decodeSnapshotRequest(reader, snapshotTable);
+      break;
+    }
     default:
       break;
   }
@@ -390,6 +438,11 @@ export function decodeResponseMessage(reader: FlatBufferReader, table: number): 
     case ResponseType.RangeResponse: {
       const respTable = reader.readTableField(table, 1);
       if (respTable !== null) message.rangeResponse = decodeRangeResponse(reader, respTable);
+      break;
+    }
+    case ResponseType.SnapshotResponse: {
+      const snapshotTable = reader.readTableField(table, 2);
+      if (snapshotTable !== null) message.snapshotResponse = decodeSnapshotResponse(reader, snapshotTable);
       break;
     }
     default:

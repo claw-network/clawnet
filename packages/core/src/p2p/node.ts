@@ -62,7 +62,6 @@ export class P2PNode {
         listen: this.config.listen,
       },
       connectionManager: {
-        minConnections: this.config.connectionManager?.minConnections ?? 0,
         maxConnections: this.config.connectionManager?.maxConnections ?? 100,
       },
       transports: [tcp()],
@@ -152,6 +151,34 @@ export class P2PNode {
       pubsub.getSubscribers?.(topic)?.map((peer: { toString: () => string }) => peer.toString()) ??
       []
     );
+  }
+
+  async getPeerPublicKey(peerId: string): Promise<Uint8Array | null> {
+    if (!this.node?.peerStore?.get) {
+      return null;
+    }
+    try {
+      const record = await this.node.peerStore.get(peerId);
+      const publicKey = record?.id?.publicKey ?? record?.publicKey;
+      if (!publicKey) {
+        return null;
+      }
+      if (publicKey.bytes) {
+        return publicKey.bytes as Uint8Array;
+      }
+      if (publicKey.raw) {
+        return publicKey.raw as Uint8Array;
+      }
+      if (publicKey.marshal) {
+        return publicKey.marshal() as Uint8Array;
+      }
+      if (publicKey.toBytes) {
+        return publicKey.toBytes() as Uint8Array;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   private getPubsub(): any {

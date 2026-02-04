@@ -107,8 +107,14 @@ Signature rules:
 FlatBuffers schema (excerpt):
 
 ```fbs
-enum RequestType : byte { range_request = 1, peer_rotate = 2, pow_ticket = 3, stake_proof = 4 }
-enum ResponseType : byte { range_response = 1 }
+enum RequestType : byte {
+  range_request = 1,
+  peer_rotate = 2,
+  pow_ticket = 3,
+  stake_proof = 4,
+  snapshot_request = 5
+}
+enum ResponseType : byte { range_response = 1, snapshot_response = 2 }
 
 table RequestMessage {
   type:RequestType;
@@ -116,11 +122,13 @@ table RequestMessage {
   peerRotate:PeerRotate;
   powTicket:PowTicket;
   stakeProof:StakeProof;
+  snapshotRequest:SnapshotRequest;
 }
 
 table ResponseMessage {
   type:ResponseType;
   rangeResponse:RangeResponse;
+  snapshotResponse:SnapshotResponse;
 }
 ```
 
@@ -159,6 +167,32 @@ table RangeResponse {
   cursor:string;
 }
 ```
+
+### 6.2 Snapshot Sync
+
+Snapshot sync is used for cold-start nodes to bootstrap state faster.
+Snapshots are encoded as raw JSON bytes (see `storage-spec.md`) inside the
+SnapshotResponse body.
+
+FlatBuffers schema (excerpt):
+
+```fbs
+table SnapshotRequest {
+  from:string; // last known snapshot hash (empty for latest)
+}
+
+table SnapshotResponse {
+  hash:string;    // snapshot hash
+  snapshot:[ubyte];
+}
+```
+
+Rules:
+- Nodes SHOULD respond with the latest snapshot if `from` is empty or differs
+  from the latest snapshot hash.
+- Nodes MAY ignore snapshot requests if no snapshot is available.
+- Receivers MUST validate snapshot hash/signatures per `storage-spec.md` before
+  accepting.
 
 ## 7. Anti-Spam
 

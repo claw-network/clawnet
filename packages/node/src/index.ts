@@ -13,3 +13,5 @@ export class ClawTokenNode {
     throw new Error('Not implemented: node runtime is not yet wired');
   }
 }
+
+export * from './p2p/sync.js';

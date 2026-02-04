@@ -6,3 +6,4 @@ export * from './level.js';
 export * from './memory.js';
 export * from './migrations.js';
 export * from './paths.js';
+export * from './snapshots.js';
