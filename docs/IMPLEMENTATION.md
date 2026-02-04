@@ -649,22 +649,22 @@ clawtoken/
 - `docs/implementation/p2p-spec.fbs`
 
 ```
-□ 1.1  Crypto Engine (@clawtoken/core/crypto)  ⏳ 进行中
+□ 1.1  Crypto Engine (@clawtoken/core/crypto)  ✅ 已完成
        ├── 1.1.1  密钥对生成 (Ed25519) ✅
        ├── 1.1.2  签名 / 验签 ✅
-       ├── 1.1.3  助记词生成 (BIP39) ⏳
-       ├── 1.1.4  密钥派生 (HKDF) ⏳
+       ├── 1.1.3  助记词生成 (BIP39) ✅
+       ├── 1.1.4  密钥派生 (HKDF) ✅
        ├── 1.1.5  对称加密 (AES-256-GCM) ✅
        ├── 1.1.6  哈希函数 (SHA-256, BLAKE3) ✅
        └── 1.1.7  单元测试 ✅
 
 □ 1.2  Storage Engine (@clawtoken/core/storage)  ⏳ 进行中
-       ├── 1.2.1  LevelDB 封装 ⏳（已提供内存型 KV + EventStore）
-       ├── 1.2.2  加密存储 (用 Crypto Engine) ⏳
-       ├── 1.2.3  配置管理 (~/.clawtoken/config.yaml) ⏳
-       ├── 1.2.4  密钥存储 (~/.clawtoken/keys/) ⏳
-       ├── 1.2.5  数据迁移机制 ⏳
-       └── 1.2.6  单元测试 ⏳
+       ├── 1.2.1  LevelDB 封装 ✅
+       ├── 1.2.2  加密存储 (用 Crypto Engine) ✅
+       ├── 1.2.3  配置管理 (~/.clawtoken/config.yaml) ✅
+       ├── 1.2.4  密钥存储 (~/.clawtoken/keys/) ✅
+       ├── 1.2.5  数据迁移机制 ✅
+       └── 1.2.6  单元测试 ✅
 
 □ 1.3  P2P Engine (@clawtoken/core/p2p)  ⏳ 待开始
        ├── 1.3.1  libp2p 节点初始化 ⏳

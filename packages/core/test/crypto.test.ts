@@ -10,6 +10,11 @@ import {
   eventHashHex,
   eventSigningBytes,
   hexToBytes,
+  hkdfSha256,
+  mnemonicToEntropy,
+  mnemonicToSeedSync,
+  entropyToMnemonic,
+  validateMnemonic,
   publicKeyFromAddress,
   sha256Hex,
   signBytes,
@@ -74,6 +79,32 @@ describe('crypto vectors', () => {
       tagHex: v.tagHex,
     });
     expect(bytesToHex(plaintext)).toBe(v.plaintextHex);
+  });
+
+  it('bip39 mnemonic vectors match', () => {
+    const mnemonic =
+      'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+    const entropy = mnemonicToEntropy(mnemonic);
+    expect(bytesToHex(entropy)).toBe('00000000000000000000000000000000');
+    expect(entropyToMnemonic(entropy)).toBe(mnemonic);
+    expect(validateMnemonic(mnemonic)).toBe(true);
+
+    const seed = mnemonicToSeedSync(mnemonic, 'TREZOR');
+    expect(bytesToHex(seed)).toBe(
+      'c55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e5349553' +
+        '1f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04',
+    );
+  });
+
+  it('hkdf-sha256 matches RFC 5869 vector', () => {
+    const ikm = hexToBytes('0b'.repeat(22));
+    const salt = hexToBytes('000102030405060708090a0b0c');
+    const info = hexToBytes('f0f1f2f3f4f5f6f7f8f9');
+    const okm = hkdfSha256(ikm, salt, info, 42);
+    expect(bytesToHex(okm)).toBe(
+      '3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf' +
+        '34007208d5b887185865',
+    );
   });
 
   it('event hash/signing bytes are deterministic', () => {
