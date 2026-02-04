@@ -613,6 +613,8 @@ clawtoken/
 
 ### Phase 0: 基础设施 (Week 0)
 
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
+
 对应规范文档：
 - `docs/implementation/SPEC_FREEZE.md`
 - `docs/implementation/README.md`
@@ -642,6 +644,8 @@ clawtoken/
 
 ### Phase 1: Core Layer (Week 1-2)
 
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
+
 对应规范文档：
 - `docs/implementation/crypto-spec.md`
 - `docs/implementation/storage-spec.md`
@@ -666,19 +670,21 @@ clawtoken/
        ├── 1.2.5  数据迁移机制 ✅
        └── 1.2.6  单元测试 ✅
 
-□ 1.3  P2P Engine (@clawtoken/core/p2p)  ⏳ 待开始
-       ├── 1.3.1  libp2p 节点初始化 ⏳
-       ├── 1.3.2  节点发现 (DHT / Bootstrap) ⏳
-       ├── 1.3.3  连接管理 ⏳
-       ├── 1.3.4  Gossipsub 消息传播 ⏳
-       ├── 1.3.5  NAT 穿透 (hole punching) ⏳
-       ├── 1.3.6  协议定义 (/clawtoken/1.0.0) ⏳（FlatBuffers 编解码已在 @clawtoken/protocol 完成）
-       └── 1.3.7  集成测试 (多节点) ⏳
+□ 1.3  P2P Engine (@clawtoken/core/p2p)  ✅ 已完成
+       ├── 1.3.1  libp2p 节点初始化 ✅
+       ├── 1.3.2  节点发现 (DHT / Bootstrap) ✅
+       ├── 1.3.3  连接管理 ✅
+       ├── 1.3.4  Gossipsub 消息传播 ✅
+       ├── 1.3.5  NAT 穿透 (hole punching) ✅
+       ├── 1.3.6  协议定义 (/clawtoken/1.0.0) ✅（FlatBuffers 编解码已在 @clawtoken/protocol 完成）
+       └── 1.3.7  集成测试 (多节点) ✅
 ```
 
 ---
 
 ### Phase 2: Protocol Layer - 基础模块 (Week 3-4)
+
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
 
 对应规范文档：
 - `docs/implementation/protocol-spec.md`
@@ -710,6 +716,8 @@ clawtoken/
 ---
 
 ### Phase 3: Interface Layer - MVP (Week 5-6)
+
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
 
 对应规范文档：
 - `docs/api/openapi.yaml`
@@ -761,6 +769,8 @@ clawtoken/
 
 ### Phase 4: Protocol Layer - 信誉系统 (Week 7-8)
 
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
+
 对应规范文档：
 - `docs/implementation/protocol-spec.md`
 - `docs/implementation/event-schemas/reputation.md`
@@ -785,6 +795,8 @@ clawtoken/
 ---
 
 ### Phase 5: Protocol Layer - 市场模块 (Week 9-12)
+
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
 
 对应规范文档：
 - `docs/implementation/protocol-spec.md`
@@ -839,6 +851,8 @@ clawtoken/
 
 ### Phase 6: Protocol Layer - 合约模块 (Week 13-16)
 
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
+
 对应规范文档：
 - `docs/implementation/protocol-spec.md`
 - `docs/implementation/event-schemas/contracts.md`
@@ -891,6 +905,8 @@ clawtoken/
 
 ### Phase 7: SDK 开发 (Week 17-18)
 
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
+
 对应规范文档：
 - `docs/api/openapi.yaml`
 - `docs/implementation/tasks/min-api-draft.md`
@@ -923,6 +939,8 @@ clawtoken/
 ---
 
 ### Phase 8: 文档与发布 (Week 19-20)
+
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
 
 对应规范文档：
 - `docs/implementation/rollout.md`
@@ -957,6 +975,8 @@ clawtoken/
 ---
 
 ### Phase 9: DAO 治理 (Week 21+)
+
+**要求：每个 Phase 开始前，必须先阅读对应的规范文档。**
 
 对应规范文档：
 - `docs/implementation/protocol-spec.md`

@@ -47,14 +47,13 @@ export class LevelStore implements KVStore {
 
   async *iterator(prefix = ''): AsyncIterable<{ key: string; value: Uint8Array }> {
     const hasPrefix = prefix.length > 0;
-    const iterator = this.db.iterator(
-      hasPrefix
-        ? {
-            gte: prefix,
-            lt: `${prefix}\xff`,
-          }
-        : undefined,
-    );
+    const options = hasPrefix
+      ? {
+          gte: prefix,
+          lt: `${prefix}\xff`,
+        }
+      : {};
+    const iterator = this.db.iterator(options);
 
     for await (const [key, value] of iterator) {
       if (value === undefined || value === null) {
