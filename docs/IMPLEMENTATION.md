@@ -8,15 +8,15 @@
 
 当前文档为路线图与交付物清单。进入实作前，需要补齐以下规范与研究文档，确保任何节点都能**独立验证**协议状态、避免中心化依赖：
 
-- `docs/implementation/protocol-spec.md` — 事件/状态模型、最终性、序列化
-- `docs/implementation/crypto-spec.md` — 密钥/签名/加密与 DID 规则
-- `docs/implementation/p2p-spec.md` — P2P 协议、发现/同步、反滥用
-- `docs/implementation/storage-spec.md` — 本地存储模型、索引、迁移
-- `docs/implementation/economics.md` — 费用与激励参数
-- `docs/implementation/security.md` — 威胁模型与审计计划
-- `docs/implementation/testing-plan.md` — 多节点测试与基准
-- `docs/implementation/rollout.md` — 测试网/主网发布策略
-- `docs/implementation/open-questions.md` — 未决问题清单
+- ✅ `docs/implementation/protocol-spec.md` — 事件/状态模型、最终性、序列化
+- ✅ `docs/implementation/crypto-spec.md` — 密钥/签名/加密与 DID 规则
+- ✅ `docs/implementation/p2p-spec.md` — P2P 协议、发现/同步、反滥用
+- ✅ `docs/implementation/storage-spec.md` — 本地存储模型、索引、迁移
+- ✅ `docs/implementation/economics.md` — 费用与激励参数
+- ✅ `docs/implementation/security.md` — 威胁模型与审计计划
+- ✅ `docs/implementation/testing-plan.md` — 多节点测试与基准
+- ✅ `docs/implementation/rollout.md` — 测试网/主网发布策略
+- ✅ `docs/implementation/open-questions.md` — 未决问题清单
 
 ## 交付物总览
 
@@ -431,177 +431,6 @@
 
 ---
 
-## 实现阶段
-
-### Phase 1: MVP (最小可用产品)
-
-**目标**: Agent 能运行节点、创建身份、进行转账
-
-对应规范文档：
-- `docs/implementation/protocol-spec.md`
-- `docs/implementation/crypto-spec.md`
-- `docs/implementation/storage-spec.md`
-- `docs/implementation/p2p-spec.md`
-- `docs/implementation/p2p-spec.fbs`
-- `docs/implementation/event-schemas/identity.md`
-- `docs/implementation/event-schemas/wallet.md`
-- `docs/IDENTITY.md`
-- `docs/WALLET.md`
-- `docs/api/openapi.yaml`
-- `docs/implementation/tasks/min-api-draft.md`
-
-```
-实现顺序:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Week 1-2: Core Layer
-├── Crypto Engine
-│   ├── 密钥生成 (Ed25519)
-│   ├── 签名/验签
-│   ├── 助记词生成
-│   └── 哈希函数
-│
-├── Storage Engine
-│   ├── 本地 KV 存储 (LevelDB)
-│   ├── 加密密钥存储
-│   └── 配置管理
-│
-└── P2P Engine (基础)
-    ├── libp2p 集成
-    ├── 节点发现 (DHT)
-    └── 基础消息传递
-
-Week 3-4: Identity + Wallet
-├── Identity Module
-│   ├── DID 生成
-│   ├── DID 文档
-│   └── DID 解析
-│
-└── Wallet Module
-    ├── 余额存储
-    ├── 转账交易
-    └── 交易历史
-
-Week 5-6: Interface Layer
-├── HTTP API Server
-│   ├── /api/node/status
-│   ├── /api/identity
-│   ├── /api/wallet/balance
-│   └── /api/wallet/transfer
-│
-├── CLI Tool
-│   ├── clawtoken init
-│   ├── clawtoken status
-│   ├── clawtoken balance
-│   └── clawtoken transfer
-│
-└── Node Daemon
-    ├── clawtokend 启动逻辑
-    ├── 配置加载
-    └── 优雅关闭
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-交付物:
-- clawtokend + clawtoken CLI
-- Agent 可以: 初始化身份、查询余额、转账
-```
-
-### Phase 2: 市场功能
-
-**目标**: Agent 能在市场上交易
-
-对应规范文档：
-- `docs/implementation/protocol-spec.md`
-- `docs/implementation/event-schemas/markets.md`
-- `docs/MARKETS.md`
-- `docs/implementation/economics.md`
-
-```
-实现顺序:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Week 7-8: Reputation Module
-├── 评分存储
-├── 评分计算
-├── 评价记录
-└── 信誉等级
-
-Week 9-10: Markets Module (InfoMarket)
-├── 信息发布
-├── 信息搜索
-├── 信息购买
-└── 评价
-
-Week 11-12: Markets Module (TaskMarket)
-├── 任务发布
-├── 任务竞标
-├── 任务交付
-└── 支付结算
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-交付物:
-- 信息市场 + 任务市场
-- Agent 可以: 发布/购买信息、发布/接受任务
-```
-
-### Phase 3: 合约与进阶
-
-**目标**: 完整的服务合约系统
-
-对应规范文档：
-- `docs/implementation/protocol-spec.md`
-- `docs/implementation/event-schemas/contracts.md`
-- `docs/SERVICE_CONTRACTS.md`
-- `docs/SMART_CONTRACTS.md`
-- `docs/implementation/economics.md`
-
-```
-实现顺序:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Week 13-14: Contract Module
-├── 合约创建
-├── 合约签署
-├── 资金托管
-└── 里程碑管理
-
-Week 15-16: 能力市场 + 高级功能
-├── Capability Market
-├── 争议仲裁
-├── 多签合约
-└── 条件触发
-
-Week 17-18: SDK + 文档
-├── TypeScript SDK
-├── Python SDK
-├── API 文档
-└── 集成示例
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-交付物:
-- 完整服务合约
-- 多语言 SDK
-```
-
-### Phase 4: DAO 治理
-
-**目标**: 社区自治
-
-对应规范文档：
-- `docs/implementation/protocol-spec.md`
-- `docs/DAO.md`
-- `docs/implementation/economics.md`
-
-```
-Week 19+: DAO Module
-├── 提案系统
-├── 投票机制
-├── 国库管理
-└── 参数治理
-```
-
----
-
 ## 代码结构
 
 ```
@@ -779,6 +608,8 @@ clawtoken/
 ---
 
 ## 下一步：完整实现路径
+
+以下 Phase 覆盖 MVP 到长期阶段的全部实施路径。
 
 ### Phase 0: 基础设施 (Week 0)
 
