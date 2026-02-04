@@ -40,6 +40,9 @@ export interface SnapshotRequest {
 export interface SnapshotResponse {
   hash: string;
   snapshot: Uint8Array;
+  totalBytes?: number;
+  chunkIndex?: number;
+  chunkCount?: number;
 }
 
 export interface PeerRotate {

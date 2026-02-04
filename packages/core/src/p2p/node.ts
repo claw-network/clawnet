@@ -23,9 +23,11 @@ export type MessageHandler = (message: PubsubMessage) => void | Promise<void>;
 export class P2PNode {
   private node: any;
   private readonly config: P2PConfig;
+  private readonly peerIdOverride?: unknown;
 
-  constructor(config: Partial<P2PConfig> = {}) {
+  constructor(config: Partial<P2PConfig> = {}, peerId?: unknown) {
     this.config = { ...DEFAULT_P2P_CONFIG, ...config };
+    this.peerIdOverride = peerId;
   }
 
   async start(): Promise<void> {
@@ -57,7 +59,7 @@ export class P2PNode {
       services.dcutr = dcutr();
     }
 
-    this.node = await createLibp2p({
+    const options: any = {
       addresses: {
         listen: this.config.listen,
       },
@@ -76,7 +78,13 @@ export class P2PNode {
           ]
         : [],
       services,
-    });
+    };
+
+    if (this.peerIdOverride) {
+      options.peerId = this.peerIdOverride;
+    }
+
+    this.node = await createLibp2p(options);
   }
 
   async stop(): Promise<void> {

@@ -191,9 +191,12 @@ export function encodeSnapshotRequest(builder: Builder, request: SnapshotRequest
 export function encodeSnapshotResponse(builder: Builder, response: SnapshotResponse): number {
   const hashOffset = builder.createString(response.hash);
   const snapshotOffset = builder.createByteVector(response.snapshot);
-  builder.startObject(2);
+  builder.startObject(5);
   builder.addFieldOffset(0, hashOffset, 0);
   builder.addFieldOffset(1, snapshotOffset, 0);
+  builder.addFieldInt32(2, response.totalBytes ?? 0, 0);
+  builder.addFieldInt32(3, response.chunkIndex ?? 0, 0);
+  builder.addFieldInt32(4, response.chunkCount ?? 0, 0);
   return builder.endObject();
 }
 
@@ -361,6 +364,9 @@ export function decodeSnapshotResponse(reader: FlatBufferReader, table: number):
   return {
     hash: reader.readStringField(table, 0) ?? '',
     snapshot: reader.readByteVectorField(table, 1) ?? new Uint8Array(),
+    totalBytes: reader.readUint32Field(table, 2, 0),
+    chunkIndex: reader.readUint32Field(table, 3, 0),
+    chunkCount: reader.readUint32Field(table, 4, 0),
   };
 }
 

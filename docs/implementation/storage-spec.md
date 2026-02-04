@@ -48,7 +48,7 @@ Snapshot format (JSON + hash):
   "at": "<event hash>",
   "prev": "<prev snapshot hash or null>",
   "state": { /* module state */ },
-  "hash": "<sha256 of canonical snapshot without signatures>",
+  "hash": "<sha256 of canonical snapshot without signatures or hash>",
   "signatures": [
     { "peer": "<peerId>", "sig": "<signature>" }
   ]

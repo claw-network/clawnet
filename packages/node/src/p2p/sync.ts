@@ -1,6 +1,12 @@
-import { bytesToUtf8 } from '@clawtoken/core/utils';
+import { bytesToUtf8, concatBytes } from '@clawtoken/core/utils';
 import { eventHashHex } from '@clawtoken/core/protocol';
-import { EventStore, SnapshotStore } from '@clawtoken/core/storage';
+import {
+  EventStore,
+  SnapshotRecord,
+  SnapshotStore,
+  verifySnapshotHash,
+  verifySnapshotSignatures,
+} from '@clawtoken/core/storage';
 import { P2PNode, PubsubMessage, TOPIC_EVENTS, TOPIC_REQUESTS, TOPIC_RESPONSES } from '@clawtoken/core/p2p';
 import {
   CONTENT_TYPE,
@@ -26,8 +32,12 @@ export interface P2PSyncConfig {
   maxRangeLimit: number;
   maxRangeBytes: number;
   maxSnapshotBytes: number;
+  maxSnapshotTotalBytes: number;
+  minSnapshotSignatures: number;
   verifySignatures: boolean;
   verifyEventHash: boolean;
+  verifySnapshotHash: boolean;
+  verifySnapshotSignatures: boolean;
   subscribeEvents: boolean;
 }
 
@@ -42,10 +52,22 @@ const DEFAULT_SYNC_CONFIG: P2PSyncConfig = {
   maxRangeLimit: 256,
   maxRangeBytes: 900_000,
   maxSnapshotBytes: 900_000,
+  maxSnapshotTotalBytes: 8_000_000,
+  minSnapshotSignatures: 2,
   verifySignatures: true,
   verifyEventHash: true,
+  verifySnapshotHash: true,
+  verifySnapshotSignatures: true,
   subscribeEvents: true,
 };
+
+interface SnapshotChunkState {
+  totalBytes: number;
+  chunkCount: number;
+  received: Map<number, Uint8Array>;
+  receivedBytes: number;
+  updatedAt: number;
+}
 
 export class P2PSync {
   private readonly config: P2PSyncConfig;
@@ -53,6 +75,8 @@ export class P2PSync {
   private unsubscribeRequests?: () => void;
   private unsubscribeResponses?: () => void;
   private unsubscribeEvents?: () => void;
+  private readonly snapshotChunks = new Map<string, SnapshotChunkState>();
+  private readonly snapshotChunkTtlMs = 5 * 60 * 1000;
 
   constructor(
     private readonly node: P2PNode,
@@ -228,17 +252,40 @@ export class P2PSync {
     if (request.snapshotRequest.from && request.snapshotRequest.from === latest.hash) {
       return;
     }
-    if (latest.bytes.length > this.config.maxSnapshotBytes) {
+    if (latest.bytes.length > this.config.maxSnapshotTotalBytes) {
       return;
     }
-    const response: ResponseMessage = {
-      type: ResponseType.SnapshotResponse,
-      snapshotResponse: {
-        hash: latest.hash,
-        snapshot: latest.bytes,
-      },
-    };
-    await this.publishResponse(response);
+    if (latest.bytes.length <= this.config.maxSnapshotBytes) {
+      const response: ResponseMessage = {
+        type: ResponseType.SnapshotResponse,
+        snapshotResponse: {
+          hash: latest.hash,
+          snapshot: latest.bytes,
+          totalBytes: latest.bytes.length,
+          chunkIndex: 0,
+          chunkCount: 1,
+        },
+      };
+      await this.publishResponse(response);
+      return;
+    }
+    const chunkCount = Math.ceil(latest.bytes.length / this.config.maxSnapshotBytes);
+    for (let i = 0; i < chunkCount; i++) {
+      const start = i * this.config.maxSnapshotBytes;
+      const end = Math.min(start + this.config.maxSnapshotBytes, latest.bytes.length);
+      const chunk = latest.bytes.subarray(start, end);
+      const response: ResponseMessage = {
+        type: ResponseType.SnapshotResponse,
+        snapshotResponse: {
+          hash: latest.hash,
+          snapshot: chunk,
+          totalBytes: latest.bytes.length,
+          chunkIndex: i,
+          chunkCount,
+        },
+      };
+      await this.publishResponse(response);
+    }
   }
 
   private async applyRangeResponse(response: RangeResponse | null): Promise<void> {
@@ -257,22 +304,33 @@ export class P2PSync {
     if (!response.hash || !response.snapshot.length) {
       return;
     }
-    if (response.snapshot.length > this.config.maxSnapshotBytes) {
+    const snapshotBytes = this.collectSnapshotBytes(response);
+    if (!snapshotBytes) {
       return;
     }
-    let snapshot: { hash?: string };
+    let snapshot: SnapshotRecord;
     try {
-      snapshot = JSON.parse(bytesToUtf8(response.snapshot)) as { hash?: string };
+      snapshot = JSON.parse(bytesToUtf8(snapshotBytes)) as SnapshotRecord;
     } catch {
       return;
     }
-    if (typeof snapshot?.hash !== 'string' || !snapshot.hash) {
+    if (!snapshot?.hash || snapshot.hash !== response.hash) {
       return;
     }
-    if (snapshot.hash !== response.hash) {
+    if (this.config.verifySnapshotHash && !verifySnapshotHash(snapshot)) {
       return;
     }
-    await this.snapshotStore.saveSnapshot(snapshot as any);
+    if (this.config.verifySnapshotSignatures) {
+      const { ok } = await verifySnapshotSignatures(
+        snapshot,
+        (peerId) => this.resolvePublicKey(peerId),
+        { minSignatures: this.config.minSnapshotSignatures },
+      );
+      if (!ok) {
+        return;
+      }
+    }
+    await this.snapshotStore.saveSnapshot(snapshot);
   }
 
   private async applyEventBytes(eventBytes: Uint8Array): Promise<void> {
@@ -357,5 +415,78 @@ export class P2PSync {
       return this.resolvePeerPublicKey(peerId);
     }
     return this.node.getPeerPublicKey(peerId);
+  }
+
+  private collectSnapshotBytes(response: SnapshotResponse): Uint8Array | null {
+    const chunkCount = response.chunkCount ?? 0;
+    const chunkIndex = response.chunkIndex ?? 0;
+    const totalBytes =
+      response.totalBytes && response.totalBytes > 0 ? response.totalBytes : response.snapshot.length;
+
+    if (totalBytes <= 0 || totalBytes > this.config.maxSnapshotTotalBytes) {
+      return null;
+    }
+    if (chunkCount <= 1) {
+      if (response.snapshot.length > this.config.maxSnapshotBytes) {
+        return null;
+      }
+      if (response.snapshot.length !== totalBytes) {
+        return null;
+      }
+      return response.snapshot;
+    }
+    if (chunkIndex < 0 || chunkIndex >= chunkCount) {
+      return null;
+    }
+    if (response.snapshot.length > this.config.maxSnapshotBytes) {
+      return null;
+    }
+
+    this.cleanupSnapshotChunks();
+    const key = response.hash;
+    let state = this.snapshotChunks.get(key);
+    if (!state || state.totalBytes !== totalBytes || state.chunkCount !== chunkCount) {
+      state = {
+        totalBytes,
+        chunkCount,
+        received: new Map(),
+        receivedBytes: 0,
+        updatedAt: Date.now(),
+      };
+      this.snapshotChunks.set(key, state);
+    }
+    if (!state.received.has(chunkIndex)) {
+      state.received.set(chunkIndex, response.snapshot);
+      state.receivedBytes += response.snapshot.length;
+      state.updatedAt = Date.now();
+    }
+    if (state.received.size !== chunkCount) {
+      return null;
+    }
+
+    const parts: Uint8Array[] = [];
+    let assembledBytes = 0;
+    for (let i = 0; i < chunkCount; i++) {
+      const part = state.received.get(i);
+      if (!part) {
+        return null;
+      }
+      parts.push(part);
+      assembledBytes += part.length;
+    }
+    this.snapshotChunks.delete(key);
+    if (assembledBytes !== totalBytes) {
+      return null;
+    }
+    return concatBytes(...parts);
+  }
+
+  private cleanupSnapshotChunks(): void {
+    const now = Date.now();
+    for (const [hash, state] of this.snapshotChunks.entries()) {
+      if (now - state.updatedAt > this.snapshotChunkTtlMs) {
+        this.snapshotChunks.delete(hash);
+      }
+    }
   }
 }

@@ -43,6 +43,9 @@ const snapshotResponse = {
   snapshotResponse: {
     hash: 'snap-1',
     snapshot: new Uint8Array([9, 8, 7]),
+    totalBytes: 3,
+    chunkIndex: 0,
+    chunkCount: 1,
   },
 };
 
@@ -73,6 +76,9 @@ describe('p2p codec', () => {
     expect(decodedResp.type).toBe(snapshotResponse.type);
     expect(decodedResp.snapshotResponse?.hash).toBe('snap-1');
     expect(decodedResp.snapshotResponse?.snapshot).toEqual(snapshotResponse.snapshotResponse.snapshot);
+    expect(decodedResp.snapshotResponse?.totalBytes).toBe(3);
+    expect(decodedResp.snapshotResponse?.chunkIndex).toBe(0);
+    expect(decodedResp.snapshotResponse?.chunkCount).toBe(1);
   });
 
   it('encodes and decodes envelopes', () => {

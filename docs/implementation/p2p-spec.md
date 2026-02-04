@@ -184,6 +184,9 @@ table SnapshotRequest {
 table SnapshotResponse {
   hash:string;    // snapshot hash
   snapshot:[ubyte];
+  totalBytes:uint;   // full snapshot size in bytes
+  chunkIndex:uint;   // 0-based index
+  chunkCount:uint;   // total number of chunks
 }
 ```
 
@@ -193,6 +196,9 @@ Rules:
 - Nodes MAY ignore snapshot requests if no snapshot is available.
 - Receivers MUST validate snapshot hash/signatures per `storage-spec.md` before
   accepting.
+- Large snapshots MAY be sent in chunks: `chunkCount > 1` indicates chunked
+  transfer, and receivers MUST reassemble by `chunkIndex` into a byte array of
+  length `totalBytes` before validating.
 
 ## 7. Anti-Spam
 
