@@ -1,0 +1,17 @@
+{
+  "name": "@clawtoken/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "clawtoken": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "dependencies": {
+    "@clawtoken/node": "workspace:*"
+  }
+}

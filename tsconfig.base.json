@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "useDefineForClassFields": true,
+    "paths": {
+      "@clawtoken/core": ["packages/core/src/index.ts"],
+      "@clawtoken/core/*": ["packages/core/src/*"],
+      "@clawtoken/protocol": ["packages/protocol/src/index.ts"],
+      "@clawtoken/protocol/*": ["packages/protocol/src/*"],
+      "@clawtoken/node": ["packages/node/src/index.ts"],
+      "@clawtoken/sdk": ["packages/sdk/src/index.ts"]
+    }
+  }
+}
