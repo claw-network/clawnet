@@ -30,7 +30,19 @@ export interface NodeRuntimeConfig {
     requestRangeOnStart?: boolean;
     requestSnapshotOnStart?: boolean;
   };
+  resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
 }
+
+export const DEFAULT_SYNC_RUNTIME_CONFIG = {
+  rangeIntervalMs: 30_000,
+  snapshotIntervalMs: 5 * 60_000,
+  requestRangeOnStart: true,
+  requestSnapshotOnStart: true,
+};
+
+export const DEFAULT_NODE_RUNTIME_CONFIG: NodeRuntimeConfig = {
+  sync: { ...DEFAULT_SYNC_RUNTIME_CONFIG },
+};
 
 export class ClawTokenNode {
   private readonly config: NodeRuntimeConfig;
@@ -45,7 +57,14 @@ export class ClawTokenNode {
   private peerPrivateKey?: Uint8Array;
 
   constructor(config: NodeRuntimeConfig = {}) {
-    this.config = config;
+    this.config = {
+      ...DEFAULT_NODE_RUNTIME_CONFIG,
+      ...config,
+      sync: {
+        ...DEFAULT_SYNC_RUNTIME_CONFIG,
+        ...config.sync,
+      },
+    };
   }
 
   async start(): Promise<void> {
@@ -78,11 +97,20 @@ export class ClawTokenNode {
     this.peerId = peerId;
     this.peerPrivateKey = privateKey;
 
+    const {
+      rangeIntervalMs,
+      snapshotIntervalMs,
+      requestRangeOnStart,
+      requestSnapshotOnStart,
+      ...syncOptions
+    } = this.config.sync ?? {};
+
     this.sync = new P2PSync(this.p2p, this.eventStore, this.snapshotStore, {
       peerId: peerId.toString(),
       peerPrivateKey: privateKey,
       resolvePeerPublicKey: (id) => this.p2p?.getPeerPublicKey(id) ?? Promise.resolve(null),
-      ...this.config.sync,
+      resolveControllerPublicKey: this.config.resolveControllerPublicKey,
+      ...syncOptions,
     });
     await this.sync.start();
 
@@ -201,4 +229,5 @@ export class ClawTokenNode {
   }
 }
 
+export { DEFAULT_P2P_SYNC_CONFIG } from './p2p/sync.js';
 export * from './p2p/sync.js';

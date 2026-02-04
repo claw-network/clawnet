@@ -1,5 +1,5 @@
-import { bytesToUtf8, concatBytes } from '@clawtoken/core/utils';
-import { eventHashHex } from '@clawtoken/core/protocol';
+import { bytesToUtf8, concatBytes, hexToBytes } from '@clawtoken/core/utils';
+import { eventHashHex, MAX_CLOCK_SKEW_MS } from '@clawtoken/core/protocol';
 import {
   EventStore,
   SnapshotRecord,
@@ -23,9 +23,15 @@ import {
   encodeP2PEnvelopeBytes,
   encodeRequestMessageBytes,
   encodeResponseMessageBytes,
+  powTicketHashHex,
   signP2PEnvelope,
+  verifyPowTicketSignature,
   verifyP2PEnvelopeSignature,
+  verifyStakeProofControllerSignature,
+  verifyStakeProofPeerSignature,
 } from '@clawtoken/protocol/p2p';
+
+export type SybilPolicy = 'none' | 'allowlist' | 'pow' | 'stake';
 
 export interface P2PSyncConfig {
   maxEnvelopeBytes: number;
@@ -34,6 +40,11 @@ export interface P2PSyncConfig {
   maxSnapshotBytes: number;
   maxSnapshotTotalBytes: number;
   minSnapshotSignatures: number;
+  sybilPolicy: SybilPolicy;
+  allowlist: string[];
+  powTicketTtlMs: number;
+  stakeProofTtlMs: number;
+  minPowDifficulty: number;
   verifySignatures: boolean;
   verifyEventHash: boolean;
   verifySnapshotHash: boolean;
@@ -45,15 +56,21 @@ export interface P2PSyncOptions extends Partial<P2PSyncConfig> {
   peerId: string;
   peerPrivateKey: Uint8Array;
   resolvePeerPublicKey?: (peerId: string) => Promise<Uint8Array | null>;
+  resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
 }
 
-const DEFAULT_SYNC_CONFIG: P2PSyncConfig = {
+export const DEFAULT_P2P_SYNC_CONFIG: P2PSyncConfig = {
   maxEnvelopeBytes: 1_000_000,
   maxRangeLimit: 256,
   maxRangeBytes: 900_000,
   maxSnapshotBytes: 900_000,
   maxSnapshotTotalBytes: 8_000_000,
   minSnapshotSignatures: 2,
+  sybilPolicy: 'none',
+  allowlist: [],
+  powTicketTtlMs: 10 * 60 * 1000,
+  stakeProofTtlMs: 60 * 60 * 1000,
+  minPowDifficulty: 0,
   verifySignatures: true,
   verifyEventHash: true,
   verifySnapshotHash: true,
@@ -72,11 +89,15 @@ interface SnapshotChunkState {
 export class P2PSync {
   private readonly config: P2PSyncConfig;
   private readonly resolvePeerPublicKey?: (peerId: string) => Promise<Uint8Array | null>;
+  private readonly resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
   private unsubscribeRequests?: () => void;
   private unsubscribeResponses?: () => void;
   private unsubscribeEvents?: () => void;
   private readonly snapshotChunks = new Map<string, SnapshotChunkState>();
   private readonly snapshotChunkTtlMs = 5 * 60 * 1000;
+  private readonly allowlist = new Set<string>();
+  private readonly powTickets = new Map<string, { receivedAt: number }>();
+  private readonly stakeProofs = new Map<string, { receivedAt: number }>();
 
   constructor(
     private readonly node: P2PNode,
@@ -84,8 +105,14 @@ export class P2PSync {
     private readonly snapshotStore: SnapshotStore | null,
     private readonly options: P2PSyncOptions,
   ) {
-    this.config = { ...DEFAULT_SYNC_CONFIG, ...options };
+    this.config = { ...DEFAULT_P2P_SYNC_CONFIG, ...options };
     this.resolvePeerPublicKey = options.resolvePeerPublicKey;
+    this.resolveControllerPublicKey = options.resolveControllerPublicKey;
+    for (const peer of this.config.allowlist ?? []) {
+      if (peer) {
+        this.allowlist.add(peer);
+      }
+    }
   }
 
   async start(): Promise<void> {
@@ -179,6 +206,12 @@ export class P2PSync {
         break;
       case RequestType.SnapshotRequest:
         await this.handleSnapshotRequest(request);
+        break;
+      case RequestType.PowTicket:
+        await this.handlePowTicket(request, envelope.sender);
+        break;
+      case RequestType.StakeProof:
+        await this.handleStakeProof(request, envelope.sender);
         break;
       default:
         break;
@@ -321,12 +354,13 @@ export class P2PSync {
       return;
     }
     if (this.config.verifySnapshotSignatures) {
-      const { ok } = await verifySnapshotSignatures(
+      const { validPeers } = await verifySnapshotSignatures(
         snapshot,
         (peerId) => this.resolvePublicKey(peerId),
-        { minSignatures: this.config.minSnapshotSignatures },
+        { minSignatures: 1 },
       );
-      if (!ok) {
+      const eligiblePeers = validPeers.filter((peer) => this.isPeerEligible(peer));
+      if (eligiblePeers.length < this.config.minSnapshotSignatures) {
         return;
       }
     }
@@ -417,6 +451,109 @@ export class P2PSync {
     return this.node.getPeerPublicKey(peerId);
   }
 
+  private async handlePowTicket(request: RequestMessage, sender: string): Promise<void> {
+    const ticket = request.powTicket;
+    if (!ticket || ticket.peer !== sender) {
+      return;
+    }
+    const now = Date.now();
+    const ts = Number(ticket.ts ?? 0n);
+    if (Number.isNaN(ts) || Math.abs(now - ts) > MAX_CLOCK_SKEW_MS) {
+      return;
+    }
+    const expected = powTicketHashHex(ticket);
+    if (expected !== ticket.hash.toLowerCase()) {
+      return;
+    }
+    if (!hasLeadingZeroBits(expected, ticket.difficulty)) {
+      return;
+    }
+    if (ticket.difficulty < this.config.minPowDifficulty) {
+      return;
+    }
+    const publicKey = await this.resolvePublicKey(ticket.peer);
+    if (!publicKey) {
+      return;
+    }
+    const ok = await verifyPowTicketSignature(ticket, publicKey);
+    if (!ok) {
+      return;
+    }
+    this.powTickets.set(ticket.peer, { receivedAt: now });
+  }
+
+  private async handleStakeProof(request: RequestMessage, sender: string): Promise<void> {
+    const proof = request.stakeProof;
+    if (!proof || proof.peer !== sender) {
+      return;
+    }
+    if (!(await this.eventStore.hasEvent(proof.stakeEvent))) {
+      return;
+    }
+    const peerPublicKey = await this.resolvePublicKey(proof.peer);
+    if (!peerPublicKey) {
+      return;
+    }
+    const okPeer = await verifyStakeProofPeerSignature(proof, peerPublicKey);
+    if (!okPeer) {
+      return;
+    }
+    if (!this.resolveControllerPublicKey) {
+      return;
+    }
+    const controllerKey = await this.resolveControllerPublicKey(proof.controller);
+    if (!controllerKey) {
+      return;
+    }
+    const okController = await verifyStakeProofControllerSignature(proof, controllerKey);
+    if (!okController) {
+      return;
+    }
+    this.stakeProofs.set(proof.peer, { receivedAt: Date.now() });
+  }
+
+  private isPeerEligible(peerId: string): boolean {
+    if (this.allowlist.has(peerId)) {
+      return true;
+    }
+    switch (this.config.sybilPolicy) {
+      case 'none':
+        return true;
+      case 'allowlist':
+        return this.allowlist.has(peerId);
+      case 'pow':
+        return this.isPowEligible(peerId);
+      case 'stake':
+        return this.isStakeEligible(peerId);
+      default:
+        return false;
+    }
+  }
+
+  private isPowEligible(peerId: string): boolean {
+    this.cleanupSybilCaches();
+    return this.powTickets.has(peerId);
+  }
+
+  private isStakeEligible(peerId: string): boolean {
+    this.cleanupSybilCaches();
+    return this.stakeProofs.has(peerId);
+  }
+
+  private cleanupSybilCaches(): void {
+    const now = Date.now();
+    for (const [peer, entry] of this.powTickets.entries()) {
+      if (now - entry.receivedAt > this.config.powTicketTtlMs) {
+        this.powTickets.delete(peer);
+      }
+    }
+    for (const [peer, entry] of this.stakeProofs.entries()) {
+      if (now - entry.receivedAt > this.config.stakeProofTtlMs) {
+        this.stakeProofs.delete(peer);
+      }
+    }
+  }
+
   private collectSnapshotBytes(response: SnapshotResponse): Uint8Array | null {
     const chunkCount = response.chunkCount ?? 0;
     const chunkIndex = response.chunkIndex ?? 0;
@@ -489,4 +626,34 @@ export class P2PSync {
       }
     }
   }
+}
+
+function hasLeadingZeroBits(hashHex: string, difficulty: number): boolean {
+  if (difficulty <= 0) {
+    return true;
+  }
+  const bytes = hexToBytes(hashHex);
+  let remaining = difficulty;
+  for (const byte of bytes) {
+    if (remaining <= 0) {
+      return true;
+    }
+    if (byte === 0) {
+      remaining -= 8;
+      continue;
+    }
+    let mask = 0x80;
+    while (mask > 0) {
+      if ((byte & mask) !== 0) {
+        return remaining <= 0;
+      }
+      remaining -= 1;
+      if (remaining <= 0) {
+        return true;
+      }
+      mask >>= 1;
+    }
+    return remaining <= 0;
+  }
+  return remaining <= 0;
 }
