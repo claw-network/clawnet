@@ -307,6 +307,19 @@ paths:
       tags: [Wallet]
       summary: 获取余额
       operationId: getBalance
+      parameters:
+        - name: did
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 钱包 DID（与 address 二选一）
+        - name: address
+          in: query
+          required: false
+          schema:
+            type: string
+          description: claw 地址（与 did 二选一）
       responses:
         '200':
           description: 余额信息
@@ -332,7 +345,7 @@ paths:
     post:
       tags: [Wallet]
       summary: 转账
-      description: 向指定 DID 转账 Token
+      description: 向指定地址/DID 转账 Token
       operationId: transfer
       requestBody:
         required: true
@@ -340,22 +353,43 @@ paths:
           application/json:
             schema:
               type: object
-              required: [to, amount]
+              required: [did, passphrase, to, amount, nonce]
               properties:
+                did:
+                  type: string
+                  description: 发行者 DID（用于签名）
+                passphrase:
+                  type: string
+                  description: 本地密钥解锁口令
                 to:
                   type: string
-                  description: 接收方 DID
-                  example: "did:claw:z6MkRecipient..."
+                  description: 接收方 DID 或 claw 地址
+                  example: "claw1recipient..."
                 amount:
                   type: integer
                   description: 转账金额（Token，整数）
                   minimum: 1
                   example: 100
+                fee:
+                  type: integer
+                  description: 手续费（Token，整数）
+                  minimum: 1
+                  example: 1
                 memo:
                   type: string
                   description: 备注
                   maxLength: 256
                   example: "Payment for data analysis"
+                nonce:
+                  type: integer
+                  description: 发行者单调递增 nonce
+                  minimum: 1
+                prev:
+                  type: string
+                  description: 上一条事件 hash（可选）
+                ts:
+                  type: integer
+                  description: 事件时间戳（毫秒）
       responses:
         '200':
           description: 转账成功
@@ -389,6 +423,18 @@ paths:
       summary: 获取交易历史
       operationId: getTransactionHistory
       parameters:
+        - name: did
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 钱包 DID（与 address 二选一）
+        - name: address
+          in: query
+          required: false
+          schema:
+            type: string
+          description: claw 地址（与 did 二选一）
         - name: limit
           in: query
           schema:
@@ -445,18 +491,50 @@ paths:
           application/json:
             schema:
               type: object
-              required: [amount, contractId]
+              required: [did, passphrase, beneficiary, amount, releaseRules, nonce]
               properties:
+                did:
+                  type: string
+                  description: 发行者 DID（托管发起方）
+                passphrase:
+                  type: string
+                  description: 本地密钥解锁口令
+                escrowId:
+                  type: string
+                  description: 托管 ID（可选）
+                beneficiary:
+                  type: string
+                  description: 受益方 DID 或 claw 地址
                 amount:
                   type: number
                   example: 500
-                contractId:
-                  type: string
-                  example: "contract_abc123"
-                releaseConditions:
+                releaseRules:
                   type: array
                   items:
-                    $ref: '#/components/schemas/ReleaseCondition'
+                    type: object
+                resourcePrev:
+                  type: string
+                  description: 可选的资源前序 hash（创建时可为 null）
+                arbiter:
+                  type: string
+                refundRules:
+                  type: array
+                  items:
+                    type: object
+                expiresAt:
+                  type: integer
+                nonce:
+                  type: integer
+                  description: 发行者单调递增 nonce
+                prev:
+                  type: string
+                  description: 上一条事件 hash（可选）
+                ts:
+                  type: integer
+                  description: 事件时间戳（毫秒）
+                autoFund:
+                  type: boolean
+                  description: 是否自动生成 escrow.fund 事件
       responses:
         '201':
           description: 托管创建成功
@@ -530,11 +608,23 @@ paths:
             schema:
               type: object
               properties:
+                did:
+                  type: string
+                passphrase:
+                  type: string
                 amount:
                   type: number
                   description: 释放金额（可部分释放）
-                reason:
+                ruleId:
                   type: string
+                resourcePrev:
+                  type: string
+                nonce:
+                  type: integer
+                prev:
+                  type: string
+                ts:
+                  type: integer
       responses:
         '200':
           description: 释放成功
@@ -562,6 +652,90 @@ paths:
           $ref: '#/components/responses/RateLimitedError'
         '500':
           $ref: '#/components/responses/InternalError'
+
+  /api/wallet/escrow/{escrowId}/fund:
+    post:
+      tags: [Wallet]
+      summary: 托管充值
+      operationId: fundEscrow
+      parameters:
+        - name: escrowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [did, passphrase, amount, resourcePrev, nonce]
+              properties:
+                did:
+                  type: string
+                passphrase:
+                  type: string
+                amount:
+                  type: number
+                resourcePrev:
+                  type: string
+                nonce:
+                  type: integer
+                prev:
+                  type: string
+                ts:
+                  type: integer
+      responses:
+        '200':
+          description: 充值成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResult'
+
+  /api/wallet/escrow/{escrowId}/refund:
+    post:
+      tags: [Wallet]
+      summary: 托管退款
+      operationId: refundEscrow
+      parameters:
+        - name: escrowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [did, passphrase, amount, resourcePrev, reason, nonce]
+              properties:
+                did:
+                  type: string
+                passphrase:
+                  type: string
+                amount:
+                  type: number
+                resourcePrev:
+                  type: string
+                reason:
+                  type: string
+                nonce:
+                  type: integer
+                prev:
+                  type: string
+                ts:
+                  type: integer
+      responses:
+        '200':
+          description: 退款成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransferResult'
 
   # --------------------------------------------------------------------------
   # Markets - Info Market

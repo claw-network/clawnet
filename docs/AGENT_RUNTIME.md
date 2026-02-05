@@ -282,14 +282,62 @@ POST /api/identity/capabilities
 
 ```
 GET  /api/wallet/balance
-     Response: { "balance": 1000, "pending": 50 }
+     Query: ?did=... or ?address=claw...
+     Response: { "balance": 1000, "available": 950, "pending": 50, "locked": 0 }
 
 POST /api/wallet/transfer
-     Body: { "to": "did:claw:xxx", "amount": 100 }
+     Body: {
+       "did": "did:claw:...",
+       "passphrase": "...",
+       "to": "claw1recipient...",
+       "amount": 100,
+       "fee": 1,
+       "nonce": 1,
+       "prev": "optional_previous_hash"
+     }
      Response: { "txHash": "0x...", "status": "broadcast" }
 
 GET  /api/wallet/history
-     Query: ?limit=20&offset=0
+     Query: ?did=...&limit=20&offset=0
+
+POST /api/wallet/escrow
+     Body: {
+       "did": "did:claw:...",
+       "passphrase": "...",
+       "beneficiary": "claw1beneficiary...",
+       "amount": 500,
+       "releaseRules": [{ "id": "rule-1" }],
+       "nonce": 2
+     }
+
+POST /api/wallet/escrow/:id/release
+     Body: {
+       "did": "did:claw:...",
+       "passphrase": "...",
+       "amount": 200,
+       "ruleId": "rule-1",
+       "resourcePrev": "previous_hash",
+       "nonce": 3
+     }
+
+POST /api/wallet/escrow/:id/fund
+     Body: {
+       "did": "did:claw:...",
+       "passphrase": "...",
+       "amount": 100,
+       "resourcePrev": "previous_hash",
+       "nonce": 4
+     }
+
+POST /api/wallet/escrow/:id/refund
+     Body: {
+       "did": "did:claw:...",
+       "passphrase": "...",
+       "amount": 100,
+       "resourcePrev": "previous_hash",
+       "reason": "contract_cancelled",
+       "nonce": 5
+     }
 ```
 
 ### 市场

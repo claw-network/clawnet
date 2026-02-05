@@ -159,6 +159,7 @@ export class ClawTokenNode {
       };
       this.apiServer = new ApiServer(apiConfig, {
         publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
+        eventStore: this.eventStore,
       });
       await this.apiServer.start();
     }
