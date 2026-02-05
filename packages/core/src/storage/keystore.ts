@@ -3,6 +3,7 @@ import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { argon2id } from '@noble/hashes/argon2';
 import { sha256Hex } from '../crypto/hash.js';
+import { initKeyRotationState, KeyRotationState } from '../crypto/rotation.js';
 import { multibaseEncode } from '../encoding/base58.js';
 import { bytesToBase64, base64ToBytes, utf8ToBytes } from '../utils/bytes.js';
 import { StoragePaths, ensureStorageDirs } from './paths.js';
@@ -21,6 +22,8 @@ export const DEFAULT_KDF_PARAMS: KeyDerivationParams = {
   dkLen: 32,
 };
 
+export const MIN_PASSPHRASE_LENGTH = 12;
+
 export interface EncryptedKeyMaterial {
   kdf: 'argon2id';
   params: KeyDerivationParams;
@@ -37,6 +40,7 @@ export interface KeyRecord {
   publicKey: string; // multibase
   encryptedPrivateKey: EncryptedKeyMaterial;
   createdAt: string;
+  rotation?: KeyRotationState;
 }
 
 function deriveKey(passphrase: string, salt: Uint8Array, params: KeyDerivationParams): Uint8Array {
@@ -46,6 +50,12 @@ function deriveKey(passphrase: string, salt: Uint8Array, params: KeyDerivationPa
     p: params.p,
     dkLen: params.dkLen,
   });
+}
+
+function assertPassphrase(passphrase: string): void {
+  if (passphrase.length < MIN_PASSPHRASE_LENGTH) {
+    throw new Error(`Passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters`);
+  }
 }
 
 function encryptAes256Gcm(key: Uint8Array, plaintext: Uint8Array): {
@@ -86,6 +96,7 @@ export function encryptPrivateKey(
   passphrase: string,
   params: KeyDerivationParams = DEFAULT_KDF_PARAMS,
 ): EncryptedKeyMaterial {
+  assertPassphrase(passphrase);
   const salt = randomBytes(16);
   const key = deriveKey(passphrase, salt, params);
   const { nonce, ciphertext, tag } = encryptAes256Gcm(key, privateKey);
@@ -103,6 +114,7 @@ export function decryptPrivateKey(
   encrypted: EncryptedKeyMaterial,
   passphrase: string,
 ): Uint8Array {
+  assertPassphrase(passphrase);
   const salt = base64ToBytes(encrypted.salt);
   const key = deriveKey(passphrase, salt, encrypted.params);
   const nonce = base64ToBytes(encrypted.nonce);
@@ -117,14 +129,17 @@ export function createKeyRecord(
   passphrase: string,
   params: KeyDerivationParams = DEFAULT_KDF_PARAMS,
 ): KeyRecord {
+  assertPassphrase(passphrase);
   const publicKeyMb = multibaseEncode(publicKey);
+  const createdAt = new Date().toISOString();
   return {
     v: 1,
     id: keyIdFromPublicKey(publicKey),
     type: 'ed25519',
     publicKey: publicKeyMb,
     encryptedPrivateKey: encryptPrivateKey(privateKey, passphrase, params),
-    createdAt: new Date().toISOString(),
+    createdAt,
+    rotation: initKeyRotationState(createdAt),
   };
 }
 

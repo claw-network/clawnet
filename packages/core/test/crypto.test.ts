@@ -19,7 +19,12 @@ import {
   sha256Hex,
   signBytes,
   verifySignature,
+  generateX25519Keypair,
+  x25519SharedSecret,
+  splitSecret,
+  combineShares,
 } from '../src/index.js';
+import { randomBytes } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '../../..');
@@ -123,6 +128,21 @@ describe('crypto vectors', () => {
     expect(hash1).toBe(hash2);
 
     const signBytes = eventSigningBytes(envelope);
-    expect(signBytes.length).toBe(32);
+    expect(signBytes.length).toBeGreaterThan(32);
+  });
+
+  it('x25519 shared secrets match', () => {
+    const alice = generateX25519Keypair();
+    const bob = generateX25519Keypair();
+    const secretA = x25519SharedSecret(alice.privateKey, bob.publicKey);
+    const secretB = x25519SharedSecret(bob.privateKey, alice.publicKey);
+    expect(bytesToHex(secretA)).toBe(bytesToHex(secretB));
+  });
+
+  it('shamir split/combine recovers secret', () => {
+    const secret = randomBytes(32);
+    const shares = splitSecret(secret, 3, 5);
+    const recovered = combineShares([shares[0], shares[2], shares[4]]);
+    expect(bytesToHex(recovered)).toBe(bytesToHex(secret));
   });
 });

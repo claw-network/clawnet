@@ -1,3 +1,4 @@
+import { canonicalizeBytes } from '@clawtoken/core/crypto';
 import { bytesToUtf8, concatBytes, hexToBytes } from '@clawtoken/core/utils';
 import { eventHashHex, MAX_CLOCK_SKEW_MS } from '@clawtoken/core/protocol';
 import {
@@ -25,6 +26,8 @@ import {
   encodeResponseMessageBytes,
   powTicketHashHex,
   signP2PEnvelope,
+  verifyPeerRotateNewSignature,
+  verifyPeerRotateOldSignature,
   verifyPowTicketSignature,
   verifyP2PEnvelopeSignature,
   verifyStakeProofControllerSignature,
@@ -40,6 +43,13 @@ export interface P2PSyncConfig {
   maxSnapshotBytes: number;
   maxSnapshotTotalBytes: number;
   minSnapshotSignatures: number;
+  rateLimitWindowMs: number;
+  maxMessagesPerWindow: number;
+  maxBytesPerWindow: number;
+  minPeerScore: number;
+  scoreIncrease: number;
+  scoreDecrease: number;
+  scoreDecayMs: number;
   sybilPolicy: SybilPolicy;
   allowlist: string[];
   powTicketTtlMs: number;
@@ -49,6 +59,8 @@ export interface P2PSyncConfig {
   verifyEventHash: boolean;
   verifySnapshotHash: boolean;
   verifySnapshotSignatures: boolean;
+  verifySnapshotState: boolean;
+  verifyPeerId: boolean;
   subscribeEvents: boolean;
 }
 
@@ -57,6 +69,10 @@ export interface P2PSyncOptions extends Partial<P2PSyncConfig> {
   peerPrivateKey: Uint8Array;
   resolvePeerPublicKey?: (peerId: string) => Promise<Uint8Array | null>;
   resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
+  validateSnapshotState?: (
+    snapshot: SnapshotRecord,
+    events: Uint8Array[],
+  ) => Promise<boolean> | boolean;
 }
 
 export const DEFAULT_P2P_SYNC_CONFIG: P2PSyncConfig = {
@@ -66,6 +82,13 @@ export const DEFAULT_P2P_SYNC_CONFIG: P2PSyncConfig = {
   maxSnapshotBytes: 900_000,
   maxSnapshotTotalBytes: 8_000_000,
   minSnapshotSignatures: 2,
+  rateLimitWindowMs: 60_000,
+  maxMessagesPerWindow: 200,
+  maxBytesPerWindow: 2_000_000,
+  minPeerScore: -10,
+  scoreIncrease: 1,
+  scoreDecrease: 1,
+  scoreDecayMs: 10 * 60 * 1000,
   sybilPolicy: 'none',
   allowlist: [],
   powTicketTtlMs: 10 * 60 * 1000,
@@ -75,6 +98,8 @@ export const DEFAULT_P2P_SYNC_CONFIG: P2PSyncConfig = {
   verifyEventHash: true,
   verifySnapshotHash: true,
   verifySnapshotSignatures: true,
+  verifySnapshotState: true,
+  verifyPeerId: true,
   subscribeEvents: true,
 };
 
@@ -90,6 +115,10 @@ export class P2PSync {
   private readonly config: P2PSyncConfig;
   private readonly resolvePeerPublicKey?: (peerId: string) => Promise<Uint8Array | null>;
   private readonly resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
+  private readonly validateSnapshotState?: (
+    snapshot: SnapshotRecord,
+    events: Uint8Array[],
+  ) => Promise<boolean> | boolean;
   private unsubscribeRequests?: () => void;
   private unsubscribeResponses?: () => void;
   private unsubscribeEvents?: () => void;
@@ -98,6 +127,9 @@ export class P2PSync {
   private readonly allowlist = new Set<string>();
   private readonly powTickets = new Map<string, { receivedAt: number }>();
   private readonly stakeProofs = new Map<string, { receivedAt: number }>();
+  private readonly peerStats = new Map<string, { windowStart: number; count: number; bytes: number }>();
+  private readonly peerScores = new Map<string, { score: number; updatedAt: number }>();
+  private readonly peerRotations = new Map<string, { newPeer: string; ts: number }>();
 
   constructor(
     private readonly node: P2PNode,
@@ -108,6 +140,7 @@ export class P2PSync {
     this.config = { ...DEFAULT_P2P_SYNC_CONFIG, ...options };
     this.resolvePeerPublicKey = options.resolvePeerPublicKey;
     this.resolveControllerPublicKey = options.resolveControllerPublicKey;
+    this.validateSnapshotState = options.validateSnapshotState;
     for (const peer of this.config.allowlist ?? []) {
       if (peer) {
         this.allowlist.add(peer);
@@ -206,6 +239,9 @@ export class P2PSync {
         break;
       case RequestType.SnapshotRequest:
         await this.handleSnapshotRequest(request);
+        break;
+      case RequestType.PeerRotate:
+        await this.handlePeerRotate(request, envelope.sender);
         break;
       case RequestType.PowTicket:
         await this.handlePowTicket(request, envelope.sender);
@@ -364,12 +400,42 @@ export class P2PSync {
         return;
       }
     }
+    const latest = await this.snapshotStore.loadLatestSnapshot();
+    if (snapshot.prev) {
+      if (!latest || latest.hash !== snapshot.prev) {
+        return;
+      }
+    } else if (latest) {
+      return;
+    }
+    if (this.config.verifySnapshotState) {
+      if (!this.validateSnapshotState) {
+        return;
+      }
+      const events = await this.collectEventsForSnapshot(latest?.at ?? null, snapshot.at);
+      if (!events) {
+        return;
+      }
+      const ok = await this.validateSnapshotState(snapshot, events);
+      if (!ok) {
+        return;
+      }
+    }
     await this.snapshotStore.saveSnapshot(snapshot);
   }
 
   private async applyEventBytes(eventBytes: Uint8Array): Promise<void> {
     const envelope = this.parseEventEnvelope(eventBytes);
     if (!envelope) {
+      return;
+    }
+    let canonical: Uint8Array;
+    try {
+      canonical = canonicalizeBytes(envelope);
+    } catch {
+      return;
+    }
+    if (!bytesEqual(canonical, eventBytes)) {
       return;
     }
     const hash = envelope.hash;
@@ -382,7 +448,11 @@ export class P2PSync {
         return;
       }
     }
-    await this.eventStore.appendEvent(hash, eventBytes);
+    try {
+      await this.eventStore.appendEvent(hash, eventBytes);
+    } catch {
+      return;
+    }
   }
 
   private parseEventEnvelope(eventBytes: Uint8Array): Record<string, unknown> | null {
@@ -417,30 +487,68 @@ export class P2PSync {
 
   private async decodeEnvelope(message: PubsubMessage): Promise<P2PEnvelope | null> {
     if (message.data.length > this.config.maxEnvelopeBytes) {
+      if (message.from) {
+        this.updatePeerScore(message.from, -this.config.scoreDecrease);
+      }
       return null;
     }
     let envelope: P2PEnvelope;
     try {
       envelope = decodeP2PEnvelopeBytes(message.data);
     } catch {
+      if (message.from) {
+        this.updatePeerScore(message.from, -this.config.scoreDecrease);
+      }
+      return null;
+    }
+    const sender = envelope.sender || message.from || '';
+    if (!sender) {
+      return null;
+    }
+    if (!envelope.sender && sender) {
+      envelope.sender = sender;
+    }
+    if (message.from && envelope.sender && message.from !== envelope.sender) {
+      this.updatePeerScore(sender, -this.config.scoreDecrease);
+      return null;
+    }
+    if (this.isRateLimited(sender, message.data.length)) {
+      this.updatePeerScore(sender, -this.config.scoreDecrease);
+      return null;
+    }
+    if (!this.isPeerScoreEligible(sender)) {
       return null;
     }
     if (envelope.contentType !== CONTENT_TYPE) {
+      this.updatePeerScore(sender, -this.config.scoreDecrease);
       return null;
     }
-    if (envelope.sender === this.options.peerId) {
+    if (sender === this.options.peerId) {
       return null;
+    }
+    let publicKey: Uint8Array | null = null;
+    if (this.config.verifyPeerId || this.config.verifySignatures) {
+      publicKey = await this.resolvePublicKey(sender);
+      if (!publicKey) {
+        this.updatePeerScore(sender, -this.config.scoreDecrease);
+        return null;
+      }
+    }
+    if (this.config.verifyPeerId) {
+      const okPeerId = await this.verifyPeerId(sender, publicKey);
+      if (!okPeerId) {
+        this.updatePeerScore(sender, -this.config.scoreDecrease);
+        return null;
+      }
     }
     if (this.config.verifySignatures) {
-      const publicKey = await this.resolvePublicKey(envelope.sender);
-      if (!publicKey) {
-        return null;
-      }
       const ok = await verifyP2PEnvelopeSignature(envelope, publicKey);
       if (!ok) {
+        this.updatePeerScore(sender, -this.config.scoreDecrease);
         return null;
       }
     }
+    this.updatePeerScore(sender, this.config.scoreIncrease);
     return envelope;
   }
 
@@ -462,7 +570,13 @@ export class P2PSync {
       return;
     }
     const expected = powTicketHashHex(ticket);
-    if (expected !== ticket.hash.toLowerCase()) {
+    if (ticket.hash !== ticket.hash.toLowerCase()) {
+      return;
+    }
+    if (!/^[0-9a-f]{64}$/.test(ticket.hash)) {
+      return;
+    }
+    if (expected !== ticket.hash) {
       return;
     }
     if (!hasLeadingZeroBits(expected, ticket.difficulty)) {
@@ -487,7 +601,29 @@ export class P2PSync {
     if (!proof || proof.peer !== sender) {
       return;
     }
-    if (!(await this.eventStore.hasEvent(proof.stakeEvent))) {
+    const stakeBytes = await this.eventStore.getEvent(proof.stakeEvent);
+    if (!stakeBytes) {
+      return;
+    }
+    const stakeEnvelope = this.parseEventEnvelope(stakeBytes);
+    if (!stakeEnvelope) {
+      return;
+    }
+    if (stakeEnvelope.hash !== proof.stakeEvent) {
+      return;
+    }
+    if (stakeEnvelope.type !== 'wallet.stake') {
+      return;
+    }
+    if (stakeEnvelope.issuer !== proof.controller) {
+      return;
+    }
+    const payload = stakeEnvelope.payload as Record<string, unknown> | undefined;
+    const amount = typeof payload?.amount === 'string' ? payload.amount : null;
+    if (!amount) {
+      return;
+    }
+    if (compareTokenAmounts(amount, proof.minStake) < 0) {
       return;
     }
     const peerPublicKey = await this.resolvePublicKey(proof.peer);
@@ -510,6 +646,37 @@ export class P2PSync {
       return;
     }
     this.stakeProofs.set(proof.peer, { receivedAt: Date.now() });
+  }
+
+  private async handlePeerRotate(request: RequestMessage, sender: string): Promise<void> {
+    const rotate = request.peerRotate;
+    if (!rotate) {
+      return;
+    }
+    if (sender !== rotate.old && sender !== rotate['new']) {
+      return;
+    }
+    const ts = Number(rotate.ts ?? 0n);
+    if (Number.isNaN(ts) || Math.abs(Date.now() - ts) > MAX_CLOCK_SKEW_MS) {
+      return;
+    }
+    const oldKey = await this.resolvePublicKey(rotate.old);
+    const newKey = await this.resolvePublicKey(rotate['new']);
+    if (!oldKey || !newKey) {
+      return;
+    }
+    const okOld = await verifyPeerRotateOldSignature(rotate, oldKey);
+    if (!okOld) {
+      return;
+    }
+    const okNew = await verifyPeerRotateNewSignature(rotate, newKey);
+    if (!okNew) {
+      return;
+    }
+    this.peerRotations.set(rotate.old, { newPeer: rotate['new'], ts });
+    if (this.allowlist.has(rotate.old)) {
+      this.allowlist.add(rotate['new']);
+    }
   }
 
   private isPeerEligible(peerId: string): boolean {
@@ -618,6 +785,48 @@ export class P2PSync {
     return concatBytes(...parts);
   }
 
+  private async collectEventsForSnapshot(
+    prevAt: string | null,
+    targetAt: string,
+  ): Promise<Uint8Array[] | null> {
+    if (!targetAt) {
+      return null;
+    }
+    const events: Uint8Array[] = [];
+    let cursor = prevAt ?? '';
+    let totalBytes = 0;
+    const maxTotalBytes = this.config.maxSnapshotTotalBytes;
+    let guard = 0;
+
+    while (guard < 10_000) {
+      guard += 1;
+      const range = await this.eventStore.getEventLogRange(
+        cursor,
+        this.config.maxRangeLimit,
+        this.config.maxRangeBytes,
+      );
+      if (!range.events.length) {
+        return null;
+      }
+      for (const eventBytes of range.events) {
+        events.push(eventBytes);
+        totalBytes += eventBytes.length;
+        if (totalBytes > maxTotalBytes) {
+          return null;
+        }
+      }
+      if (!range.cursor) {
+        return null;
+      }
+      cursor = range.cursor;
+      if (cursor === targetAt) {
+        return events;
+      }
+    }
+
+    return null;
+  }
+
   private cleanupSnapshotChunks(): void {
     const now = Date.now();
     for (const [hash, state] of this.snapshotChunks.entries()) {
@@ -625,6 +834,80 @@ export class P2PSync {
         this.snapshotChunks.delete(hash);
       }
     }
+  }
+
+  private isRateLimited(peerId: string, bytes: number): boolean {
+    const now = Date.now();
+    const windowMs = this.config.rateLimitWindowMs;
+    const current = this.peerStats.get(peerId);
+    if (!current || now - current.windowStart >= windowMs) {
+      this.peerStats.set(peerId, { windowStart: now, count: 1, bytes });
+      return false;
+    }
+    current.count += 1;
+    current.bytes += bytes;
+    this.peerStats.set(peerId, current);
+    return (
+      current.count > this.config.maxMessagesPerWindow ||
+      current.bytes > this.config.maxBytesPerWindow
+    );
+  }
+
+  private updatePeerScore(peerId: string, delta: number): void {
+    const now = Date.now();
+    const current = this.peerScores.get(peerId);
+    let score = current?.score ?? 0;
+    const updatedAt = current?.updatedAt ?? now;
+    if (now - updatedAt > this.config.scoreDecayMs) {
+      score = 0;
+    }
+    score += delta;
+    this.peerScores.set(peerId, { score, updatedAt: now });
+  }
+
+  private isPeerScoreEligible(peerId: string): boolean {
+    const score = this.peerScores.get(peerId)?.score ?? 0;
+    return score >= this.config.minPeerScore;
+  }
+
+  private async verifyPeerId(peerId: string, publicKey: Uint8Array): Promise<boolean> {
+    try {
+      const factory: any = await import('@libp2p/peer-id-factory');
+      const createFromPubKey =
+        factory.createFromPubKey ?? factory.createFromPublicKey ?? factory.createFromPubKeyBytes;
+      if (typeof createFromPubKey !== 'function') {
+        return false;
+      }
+      try {
+        const derived = await createFromPubKey(publicKey);
+        if (derived?.toString?.() === peerId) {
+          return true;
+        }
+      } catch {
+        // try raw key conversion below
+      }
+      if (publicKey.length === 32) {
+        try {
+          const keys: any = await import('@libp2p/crypto/keys');
+          if (typeof keys.publicKeyFromRaw === 'function') {
+            const keyObj = keys.publicKeyFromRaw(publicKey);
+            const keyBytes =
+              keyObj?.bytes ??
+              (typeof keyObj?.marshal === 'function' ? keyObj.marshal() : null) ??
+              (typeof keyObj?.toBytes === 'function' ? keyObj.toBytes() : null);
+            if (keyBytes) {
+              const derived = await createFromPubKey(keyBytes);
+              return derived?.toString?.() === peerId;
+            }
+          }
+        } catch {
+          return false;
+        }
+      }
+    } catch {
+      return false;
+    }
+    return false;
   }
 }
 
@@ -656,4 +939,39 @@ function hasLeadingZeroBits(hashHex: string, difficulty: number): boolean {
     return remaining <= 0;
   }
   return remaining <= 0;
+}
+
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function parseTokenAmount(amount: string): { value: bigint; scale: number } | null {
+  if (!/^[0-9]+(\\.[0-9]+)?$/.test(amount)) {
+    return null;
+  }
+  const [whole, fraction = ''] = amount.split('.');
+  const scale = fraction.length;
+  const value = BigInt(`${whole}${fraction}`);
+  return { value, scale };
+}
+
+function compareTokenAmounts(a: string, b: string): number {
+  const left = parseTokenAmount(a);
+  const right = parseTokenAmount(b);
+  if (!left || !right) {
+    return -1;
+  }
+  const scale = Math.max(left.scale, right.scale);
+  const leftValue = left.value * 10n ** BigInt(scale - left.scale);
+  const rightValue = right.value * 10n ** BigInt(scale - right.scale);
+  if (leftValue === rightValue) return 0;
+  return leftValue > rightValue ? 1 : -1;
 }

@@ -21,6 +21,7 @@ export interface P2PEnvelope {
   contentType: string;
   payload: Uint8Array;
   sig: string;
+  rawBytes?: Uint8Array;
 }
 
 export interface RangeRequest {
@@ -78,10 +79,12 @@ export interface RequestMessage {
   powTicket?: PowTicket;
   stakeProof?: StakeProof;
   snapshotRequest?: SnapshotRequest;
+  rawBytes?: Uint8Array;
 }
 
 export interface ResponseMessage {
   type: ResponseType;
   rangeResponse?: RangeResponse;
   snapshotResponse?: SnapshotResponse;
+  rawBytes?: Uint8Array;
 }

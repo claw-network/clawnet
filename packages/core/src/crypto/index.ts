@@ -4,3 +4,6 @@ export * from './hash.js';
 export * from './hkdf.js';
 export * from './jcs.js';
 export * from './mnemonic.js';
+export * from './rotation.js';
+export * from './shamir.js';
+export * from './x25519.js';

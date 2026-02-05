@@ -22,12 +22,10 @@ describe('p2p node', () => {
     const nodeA = new P2PNode({
       listen: ['/ip4/127.0.0.1/tcp/0'],
       bootstrap: [],
-      enableDHT: false,
     });
     const nodeB = new P2PNode({
       listen: ['/ip4/127.0.0.1/tcp/0'],
       bootstrap: [],
-      enableDHT: false,
     });
 
     await nodeA.start();

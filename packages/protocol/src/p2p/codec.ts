@@ -4,6 +4,7 @@ import { signBase58, verifyBase58 } from '@clawtoken/core/crypto';
 import { concatBytes, utf8ToBytes } from '@clawtoken/core/utils';
 import {
   CONTENT_TYPE,
+  PeerRotate,
   P2PEnvelope,
   PowTicket,
   RequestMessage,
@@ -15,7 +16,9 @@ import {
   decodeRequestMessage,
   decodeResponseMessage,
   decodeStakeProof,
+  decodePeerRotate,
   encodeP2PEnvelope,
+  encodePeerRotate,
   encodePowTicket,
   encodeRequestMessage,
   encodeResponseMessage,
@@ -28,8 +31,15 @@ import {
 const P2P_DOMAIN = 'clawtoken:p2p:v1:';
 const POW_DOMAIN = 'clawtoken:pow:v1:';
 const STAKE_DOMAIN = 'clawtoken:stakeproof:v1:';
+const PEER_ROTATE_DOMAIN = 'clawtoken:peer-rotate:v1:';
 
-export function encodeRequestMessageBytes(message: RequestMessage): Uint8Array {
+export function encodeRequestMessageBytes(
+  message: RequestMessage,
+  options?: { preserveUnknown?: boolean },
+): Uint8Array {
+  if (options?.preserveUnknown && message.rawBytes) {
+    return message.rawBytes;
+  }
   const builder = new Builder(256);
   const root = encodeRequestMessage(builder, message);
   return finishBytes(builder, root);
@@ -38,10 +48,16 @@ export function encodeRequestMessageBytes(message: RequestMessage): Uint8Array {
 export function decodeRequestMessageBytes(bytes: Uint8Array): RequestMessage {
   const reader = new FlatBufferReader(bytes);
   const root = reader.rootTable();
-  return decodeRequestMessage(reader, root);
+  return { ...decodeRequestMessage(reader, root), rawBytes: bytes };
 }
 
-export function encodeResponseMessageBytes(message: ResponseMessage): Uint8Array {
+export function encodeResponseMessageBytes(
+  message: ResponseMessage,
+  options?: { preserveUnknown?: boolean },
+): Uint8Array {
+  if (options?.preserveUnknown && message.rawBytes) {
+    return message.rawBytes;
+  }
   const builder = new Builder(256);
   const root = encodeResponseMessage(builder, message);
   return finishBytes(builder, root);
@@ -50,10 +66,16 @@ export function encodeResponseMessageBytes(message: ResponseMessage): Uint8Array
 export function decodeResponseMessageBytes(bytes: Uint8Array): ResponseMessage {
   const reader = new FlatBufferReader(bytes);
   const root = reader.rootTable();
-  return decodeResponseMessage(reader, root);
+  return { ...decodeResponseMessage(reader, root), rawBytes: bytes };
 }
 
-export function encodeP2PEnvelopeBytes(envelope: P2PEnvelope): Uint8Array {
+export function encodeP2PEnvelopeBytes(
+  envelope: P2PEnvelope,
+  options?: { preserveUnknown?: boolean },
+): Uint8Array {
+  if (options?.preserveUnknown && envelope.rawBytes) {
+    return envelope.rawBytes;
+  }
   const builder = new Builder(512);
   const root = encodeP2PEnvelope(builder, envelope);
   return finishBytes(builder, root);
@@ -70,6 +92,7 @@ export function decodeP2PEnvelopeBytes(bytes: Uint8Array): P2PEnvelope {
     contentType: reader.readStringField(root, 4) ?? '',
     payload: reader.readByteVectorField(root, 5) ?? new Uint8Array(),
     sig: reader.readStringField(root, 6) ?? '',
+    rawBytes: bytes,
   };
 }
 
@@ -107,6 +130,55 @@ export function decodePowTicketBytes(bytes: Uint8Array): PowTicket {
   return decodePowTicket(reader, root);
 }
 
+export function encodePeerRotateBytes(rotate: PeerRotate): Uint8Array {
+  const builder = new Builder(256);
+  const root = encodePeerRotate(builder, rotate);
+  return finishBytes(builder, root);
+}
+
+export function decodePeerRotateBytes(bytes: Uint8Array): PeerRotate {
+  const reader = new FlatBufferReader(bytes);
+  const root = reader.rootTable();
+  return decodePeerRotate(reader, root);
+}
+
+export function peerRotateSigningBytes(rotate: PeerRotate): Uint8Array {
+  const unsigned = { ...rotate, sig: '', sigNew: '' };
+  const bytes = encodePeerRotateBytes(unsigned);
+  return prefixDomain(PEER_ROTATE_DOMAIN, bytes);
+}
+
+export async function signPeerRotateOld(
+  rotate: PeerRotate,
+  oldPrivateKey: Uint8Array,
+): Promise<PeerRotate> {
+  const unsigned = { ...rotate, sig: '' };
+  const sig = await signBase58(peerRotateSigningBytes(unsigned), oldPrivateKey);
+  return { ...unsigned, sig };
+}
+
+export async function signPeerRotateNew(
+  rotate: PeerRotate,
+  newPrivateKey: Uint8Array,
+): Promise<PeerRotate> {
+  const unsigned = { ...rotate, sigNew: '' };
+  const sigNew = await signBase58(peerRotateSigningBytes(unsigned), newPrivateKey);
+  return { ...unsigned, sigNew };
+}
+
+export async function verifyPeerRotateOldSignature(
+  rotate: PeerRotate,
+  oldPublicKey: Uint8Array,
+): Promise<boolean> {
+  return verifyBase58(rotate.sig, peerRotateSigningBytes(rotate), oldPublicKey);
+}
+
+export async function verifyPeerRotateNewSignature(
+  rotate: PeerRotate,
+  newPublicKey: Uint8Array,
+): Promise<boolean> {
+  return verifyBase58(rotate.sigNew, peerRotateSigningBytes(rotate), newPublicKey);
+}
 export function powTicketSigningBytes(ticket: PowTicket): Uint8Array {
   const unsigned = { ...ticket, sig: '' };
   const bytes = encodePowTicketBytes(unsigned);

@@ -97,10 +97,12 @@ export async function verifySnapshotSignatures(
 export class SnapshotStore {
   private readonly dir: string;
   private readonly latestFile: string;
+  private readonly latestMetaFile: string;
 
   constructor(paths: StoragePaths) {
     this.dir = paths.snapshots;
     this.latestFile = join(this.dir, 'latest');
+    this.latestMetaFile = join(this.dir, 'latest.meta.json');
   }
 
   async saveSnapshot(snapshot: SnapshotRecord): Promise<void> {
@@ -108,6 +110,11 @@ export class SnapshotStore {
     const path = this.snapshotPath(snapshot.hash);
     await writeFile(path, JSON.stringify(snapshot), 'utf8');
     await writeFile(this.latestFile, snapshot.hash, 'utf8');
+    const meta = {
+      hash: snapshot.hash,
+      createdAt: new Date().toISOString(),
+    };
+    await writeFile(this.latestMetaFile, JSON.stringify(meta), 'utf8');
   }
 
   async loadSnapshot(hash: string): Promise<SnapshotRecord | null> {
@@ -162,6 +169,30 @@ export class SnapshotStore {
       return null;
     }
     return { hash: fallback, bytes };
+  }
+
+  async loadLatestSnapshotMeta(): Promise<{ hash: string; createdAt: string } | null> {
+    try {
+      const raw = await readFile(this.latestMetaFile, 'utf8');
+      const parsed = JSON.parse(raw) as { hash?: string; createdAt?: string };
+      if (parsed.hash && parsed.createdAt) {
+        return { hash: parsed.hash, createdAt: parsed.createdAt };
+      }
+    } catch {
+      // ignore
+    }
+
+    const latest = await this.findLatestSnapshotFile();
+    if (!latest) {
+      return null;
+    }
+    try {
+      const path = this.snapshotPath(latest);
+      const stats = await stat(path);
+      return { hash: latest, createdAt: new Date(stats.mtimeMs).toISOString() };
+    } catch {
+      return null;
+    }
   }
 
   private snapshotPath(hash: string): string {

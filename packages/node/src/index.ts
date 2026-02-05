@@ -14,6 +14,11 @@ import {
 import {
   EventStore,
   SnapshotStore,
+  SnapshotScheduler,
+  DEFAULT_SNAPSHOT_POLICY,
+  SnapshotSchedulePolicy,
+  SnapshotRecord,
+  signSnapshot,
   ensureConfig,
   ensureStorageDirs,
   LevelStore,
@@ -29,7 +34,17 @@ export interface NodeRuntimeConfig {
     snapshotIntervalMs?: number;
     requestRangeOnStart?: boolean;
     requestSnapshotOnStart?: boolean;
+    validateSnapshotState?: (
+      snapshot: import('@clawtoken/core/storage').SnapshotRecord,
+      events: Uint8Array[],
+    ) => Promise<boolean> | boolean;
   };
+  snapshotBuilder?: (context: {
+    eventStore: EventStore;
+    snapshotStore: SnapshotStore;
+    lastSnapshot: SnapshotRecord | null;
+  }) => Promise<SnapshotRecord | null>;
+  snapshotPolicy?: Partial<SnapshotSchedulePolicy>;
   resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
 }
 
@@ -51,6 +66,7 @@ export class ClawTokenNode {
   private eventDb?: LevelStore;
   private eventStore?: EventStore;
   private snapshotStore?: SnapshotStore;
+  private snapshotScheduler?: SnapshotScheduler;
   private rangeTimer?: NodeJS.Timeout;
   private snapshotTimer?: NodeJS.Timeout;
   private peerId?: any;
@@ -90,6 +106,13 @@ export class ClawTokenNode {
     this.eventDb = new LevelStore({ path: paths.eventsDb });
     this.eventStore = new EventStore(this.eventDb);
     this.snapshotStore = new SnapshotStore(paths);
+    if (this.config.snapshotBuilder) {
+      this.snapshotScheduler = new SnapshotScheduler(
+        this.eventStore,
+        this.snapshotStore,
+        { ...DEFAULT_SNAPSHOT_POLICY, ...(this.config.snapshotPolicy ?? {}) },
+      );
+    }
 
     this.p2p = new P2PNode(p2pConfig, peerId);
     await this.p2p.start();
@@ -127,6 +150,7 @@ export class ClawTokenNode {
     this.eventDb = undefined;
     this.eventStore = undefined;
     this.snapshotStore = undefined;
+    this.snapshotScheduler = undefined;
   }
 
   getPeerId(): string | null {
@@ -192,6 +216,34 @@ export class ClawTokenNode {
     }
     const latest = await this.snapshotStore.loadLatestSnapshot();
     await this.sync.requestSnapshot(latest?.hash ?? '');
+    await this.maybeCreateSnapshot();
+  }
+
+  private async maybeCreateSnapshot(): Promise<void> {
+    if (!this.snapshotScheduler || !this.snapshotStore || !this.eventStore) {
+      return;
+    }
+    if (!this.config.snapshotBuilder) {
+      return;
+    }
+    const should = await this.snapshotScheduler.shouldSnapshot();
+    if (!should) {
+      return;
+    }
+    const lastSnapshot = await this.snapshotStore.loadLatestSnapshot();
+    const base = await this.config.snapshotBuilder({
+      eventStore: this.eventStore,
+      snapshotStore: this.snapshotStore,
+      lastSnapshot,
+    });
+    if (!base) {
+      return;
+    }
+    if (!this.peerPrivateKey || !this.peerId) {
+      return;
+    }
+    const signed = await signSnapshot(base, this.peerId.toString(), this.peerPrivateKey);
+    await this.snapshotStore.saveSnapshot(signed);
   }
 
   private async loadOrCreatePeerId(keysDir: string): Promise<any> {

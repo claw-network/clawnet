@@ -27,7 +27,7 @@ export function eventHashHex(envelope: EventEnvelope): string {
 export function eventSigningBytes(envelope: EventEnvelope): Uint8Array {
   const canonical = canonicalEventBytes(envelope);
   const prefix = utf8ToBytes(EVENT_DOMAIN_PREFIX);
-  return sha256Bytes(concatBytes(prefix, canonical));
+  return concatBytes(prefix, canonical);
 }
 
 export async function signEvent(envelope: EventEnvelope, privateKey: Uint8Array): Promise<string> {

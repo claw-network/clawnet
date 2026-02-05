@@ -35,6 +35,10 @@ export class P2PNode {
       return;
     }
 
+    if (this.config.enableDHT === false) {
+      throw new Error('DHT is required by spec and cannot be disabled');
+    }
+
     const pubsub = gossipsub({
       allowPublishToZeroTopicPeers: this.config.allowPublishToZeroPeers,
       msgIdFn: (message: { data: Uint8Array }) => sha256Bytes(message.data),
