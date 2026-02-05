@@ -10,6 +10,7 @@ import {
   DEFAULT_P2P_CONFIG,
   P2PConfig,
   P2PNode,
+  TOPIC_EVENTS,
 } from '@clawtoken/core/p2p';
 import {
   EventStore,
@@ -24,10 +25,15 @@ import {
   LevelStore,
   resolveStoragePaths,
 } from '@clawtoken/core/storage';
+import { canonicalizeBytes } from '@clawtoken/core/crypto';
+import { EventEnvelope, eventHashHex } from '@clawtoken/core/protocol';
+import { CONTENT_TYPE, encodeP2PEnvelopeBytes, signP2PEnvelope } from '@clawtoken/protocol/p2p';
 import { P2PSync, P2PSyncConfig } from './p2p/sync.js';
+import { ApiServer, ApiServerConfig } from './api/server.js';
 
 export interface NodeRuntimeConfig {
   dataDir?: string;
+  api?: Partial<ApiServerConfig> & { enabled?: boolean };
   p2p?: Partial<P2PConfig>;
   sync?: Partial<P2PSyncConfig> & {
     rangeIntervalMs?: number;
@@ -57,6 +63,7 @@ export const DEFAULT_SYNC_RUNTIME_CONFIG = {
 
 export const DEFAULT_NODE_RUNTIME_CONFIG: NodeRuntimeConfig = {
   sync: { ...DEFAULT_SYNC_RUNTIME_CONFIG },
+  api: { host: '127.0.0.1', port: 9528, enabled: true },
 };
 
 export class ClawTokenNode {
@@ -69,6 +76,7 @@ export class ClawTokenNode {
   private snapshotScheduler?: SnapshotScheduler;
   private rangeTimer?: NodeJS.Timeout;
   private snapshotTimer?: NodeJS.Timeout;
+  private apiServer?: ApiServer;
   private peerId?: any;
   private peerPrivateKey?: Uint8Array;
 
@@ -79,6 +87,10 @@ export class ClawTokenNode {
       sync: {
         ...DEFAULT_SYNC_RUNTIME_CONFIG,
         ...config.sync,
+      },
+      api: {
+        ...DEFAULT_NODE_RUNTIME_CONFIG.api,
+        ...config.api,
       },
     };
   }
@@ -138,10 +150,23 @@ export class ClawTokenNode {
     await this.sync.start();
 
     await this.startSyncLoops();
+
+    if (this.config.api?.enabled !== false) {
+      const apiConfig: ApiServerConfig = {
+        host: this.config.api?.host ?? '127.0.0.1',
+        port: this.config.api?.port ?? 9528,
+        dataDir: this.config.dataDir,
+      };
+      this.apiServer = new ApiServer(apiConfig, {
+        publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
+      });
+      await this.apiServer.start();
+    }
   }
 
   async stop(): Promise<void> {
     this.stopSyncLoops();
+    await this.apiServer?.stop();
     await this.sync?.stop();
     await this.p2p?.stop();
     await this.eventDb?.close();
@@ -158,6 +183,36 @@ export class ClawTokenNode {
       return null;
     }
     return this.peerId.toString();
+  }
+
+  async publishEvent(envelope: EventEnvelope): Promise<string> {
+    if (!this.p2p || !this.eventStore || !this.peerId || !this.peerPrivateKey) {
+      throw new Error('node not started');
+    }
+    if (!envelope.sig) {
+      throw new Error('event signature missing');
+    }
+    const hash =
+      typeof envelope.hash === 'string' && envelope.hash.length
+        ? envelope.hash
+        : eventHashHex(envelope);
+    const canonical = canonicalizeBytes(envelope);
+    await this.eventStore.appendEvent(hash, canonical);
+
+    const p2pEnvelope = await signP2PEnvelope(
+      {
+        v: 1,
+        topic: TOPIC_EVENTS,
+        sender: this.peerId.toString(),
+        ts: BigInt(Date.now()),
+        contentType: CONTENT_TYPE,
+        payload: canonical,
+      },
+      this.peerPrivateKey,
+    );
+    const bytes = encodeP2PEnvelopeBytes(p2pEnvelope);
+    await this.p2p.publish(TOPIC_EVENTS, bytes);
+    return hash;
   }
 
   private async startSyncLoops(): Promise<void> {

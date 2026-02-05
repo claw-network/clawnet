@@ -9,10 +9,9 @@ const GF_LOG = new Uint8Array(GF_SIZE);
   for (let i = 0; i < GF_SIZE - 1; i++) {
     GF_EXP[i] = x;
     GF_LOG[x] = i;
-    x <<= 1;
-    if (x & 0x100) {
-      x ^= 0x11b;
-    }
+    const x2 = x << 1;
+    const reduced = (x2 & 0x100) ? (x2 ^ 0x11b) : x2;
+    x = reduced ^ x;
   }
   for (let i = GF_SIZE - 1; i < GF_EXP.length; i++) {
     GF_EXP[i] = GF_EXP[i - (GF_SIZE - 1)];

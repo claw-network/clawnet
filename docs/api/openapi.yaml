@@ -255,20 +255,28 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name]
+              required: [did, nonce, passphrase, credential]
               properties:
-                name:
+                did:
                   type: string
-                  description: 能力名称
-                  example: "data-analysis"
-                description:
+                  description: 事件发行者 DID（需与 credentialSubject.id 一致）
+                  example: "did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+                nonce:
+                  type: integer
+                  description: 发行者单调递增 nonce
+                  minimum: 1
+                  example: 1
+                passphrase:
                   type: string
-                  example: "专业数据分析服务"
-                pricing:
-                  $ref: '#/components/schemas/Pricing'
-                proof:
+                  description: 本地密钥解锁口令
+                credential:
+                  $ref: '#/components/schemas/CapabilityCredential'
+                prev:
                   type: string
-                  description: 能力证明（可选）
+                  description: 上一条事件 hash（可选）
+                ts:
+                  type: integer
+                  description: 事件时间戳（毫秒）
       responses:
         '201':
           description: 注册成功
@@ -1856,6 +1864,57 @@ components:
           type: boolean
         registeredAt:
           type: integer
+
+    VerifiableCredentialProof:
+      type: object
+      required: [type, created, verificationMethod, proofPurpose, proofValue]
+      properties:
+        type:
+          type: string
+          example: "Ed25519Signature2020"
+        created:
+          type: string
+        verificationMethod:
+          type: string
+        proofPurpose:
+          type: string
+          example: "assertionMethod"
+        proofValue:
+          type: string
+
+    CapabilityCredentialSubject:
+      type: object
+      required: [id, name, pricing]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        pricing:
+          $ref: '#/components/schemas/Pricing'
+        description:
+          type: string
+
+    CapabilityCredential:
+      type: object
+      required: ['@context', type, issuer, issuanceDate, credentialSubject, proof]
+      properties:
+        '@context':
+          type: array
+          items:
+            type: string
+        type:
+          type: array
+          items:
+            type: string
+        issuer:
+          type: string
+        issuanceDate:
+          type: string
+        credentialSubject:
+          $ref: '#/components/schemas/CapabilityCredentialSubject'
+        proof:
+          $ref: '#/components/schemas/VerifiableCredentialProof'
 
     Pricing:
       type: object

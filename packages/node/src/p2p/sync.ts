@@ -535,6 +535,9 @@ export class P2PSync {
       }
     }
     if (this.config.verifyPeerId) {
+      if (!publicKey) {
+        return null;
+      }
       const okPeerId = await this.verifyPeerId(sender, publicKey);
       if (!okPeerId) {
         this.updatePeerScore(sender, -this.config.scoreDecrease);
@@ -542,6 +545,9 @@ export class P2PSync {
       }
     }
     if (this.config.verifySignatures) {
+      if (!publicKey) {
+        return null;
+      }
       const ok = await verifyP2PEnvelopeSignature(envelope, publicKey);
       if (!ok) {
         this.updatePeerScore(sender, -this.config.scoreDecrease);

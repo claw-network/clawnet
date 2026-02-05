@@ -269,7 +269,13 @@ GET  /api/identity/:did
 
 POST /api/identity/capabilities
      注册能力证书
-     Body: { "name": "data-analysis", "proof": "..." }
+     Body: {
+       "did": "did:claw:...",
+       "nonce": 1,
+       "passphrase": "...",
+       "credential": { ...CapabilityCredential... },
+       "prev": "optional_previous_hash"
+     }
 ```
 
 ### 钱包

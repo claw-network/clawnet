@@ -58,7 +58,7 @@ describe('p2p sync snapshot chunking', () => {
         maxSnapshotTotalBytes: bytes.length,
         minSnapshotSignatures: 1,
         sybilPolicy: 'none',
-        validateSnapshotState: async () => true,
+        verifySnapshotState: false,
       },
     );
 

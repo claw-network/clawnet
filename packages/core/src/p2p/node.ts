@@ -8,6 +8,7 @@ import { bootstrap } from '@libp2p/bootstrap';
 import { identify } from '@libp2p/identify';
 import { autoNAT } from '@libp2p/autonat';
 import { dcutr } from '@libp2p/dcutr';
+import { ping } from '@libp2p/ping';
 import { multiaddr } from '@multiformats/multiaddr';
 import { sha256Bytes } from '../crypto/hash.js';
 import { P2PConfig, DEFAULT_P2P_CONFIG } from './config.js';
@@ -53,6 +54,7 @@ export class P2PNode {
       services.dht = kadDHT({
         clientMode: false,
       });
+      services.ping = ping();
     }
 
     if (this.config.enableAutoNAT) {

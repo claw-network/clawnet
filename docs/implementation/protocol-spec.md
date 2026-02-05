@@ -89,6 +89,45 @@ Signature verification:
 - Extract pub key from envelope.pub (multibase).
 - Verify signature over canonical bytes with domain separation.
 
+## 5.1 Verifiable Credential Signing (Capability / Platform Link)
+
+Verifiable Credentials (VCs) are used for capability registration and platform link proofs.
+External issuers MUST follow the signing rules below for interoperability.
+
+Credential structure (minimum fields):
+
+```json
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "type": ["VerifiableCredential", "CapabilityCredential"],
+  "issuer": "did:claw:...",
+  "issuanceDate": "2026-02-01T00:00:00.000Z",
+  "credentialSubject": { /* type-specific */ },
+  "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2026-02-01T00:00:00.000Z",
+    "verificationMethod": "did:claw:...#key-1",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "<base58 signature>"
+  }
+}
+```
+
+Signing rules:
+
+- Canonical bytes = JCS(credential without the `proof` field).
+- Signing bytes = ASCII prefix `"clawtoken:vc:v1:"` + canonical bytes.
+- Signature algorithm = Ed25519 over signing bytes.
+- proof.proofValue MUST be base58btc encoded signature bytes.
+- issuer MUST be a did:claw DID (public key derived from DID).
+- proof.verificationMethod MUST start with `${issuer}#`.
+- proof.proofPurpose MUST equal `"assertionMethod"`.
+
+Capability credential subject requirements:
+
+- credentialSubject.id MUST be the subject DID.
+- credentialSubject.name and credentialSubject.pricing MUST be present.
+
 ## 6. Replay Protection
 
 - Each issuer maintains a monotonic nonce.

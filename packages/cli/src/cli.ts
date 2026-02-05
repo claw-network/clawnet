@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 
+import { readFile } from 'node:fs/promises';
+import { ClawTokenNode, DEFAULT_P2P_SYNC_CONFIG, DEFAULT_SYNC_RUNTIME_CONFIG } from '@clawtoken/node';
 import {
-  ClawTokenNode,
-  DEFAULT_P2P_SYNC_CONFIG,
-  DEFAULT_SYNC_RUNTIME_CONFIG,
-} from '@clawtoken/node';
+  decryptKeyRecord,
+  didFromPublicKey,
+  loadKeyRecord,
+  publicKeyFromPrivateKey,
+  resolveStoragePaths,
+  verifyCapabilityCredential,
+} from '@clawtoken/core';
+import { CapabilityCredential, createIdentityCapabilityRegisterEnvelope } from '@clawtoken/protocol';
 
 const args = process.argv.slice(2);
 
@@ -13,24 +19,83 @@ if (args.includes('--help') || args.includes('-h')) {
   process.exit(0);
 }
 
-const config = parseArgs(args);
-const node = new ClawTokenNode(config);
+const command = args[0];
+if (!command || command === 'daemon' || command.startsWith('-')) {
+  const node = new ClawTokenNode(parseDaemonArgs(args));
+  process.on('SIGINT', () => void shutdown(node, 'SIGINT'));
+  process.on('SIGTERM', () => void shutdown(node, 'SIGTERM'));
+  void node.start().catch((error) => {
+    console.error('[clawtoken] failed to start:', error);
+    process.exit(1);
+  });
+} else if (command === 'identity') {
+  const subcommand = args[1];
+  const subArgs = args.slice(2);
+  if (subcommand === 'capability-register') {
+    void runCapabilityRegister(subArgs).catch((error) => {
+      console.error('[clawtoken] capability register failed:', error);
+      process.exit(1);
+    });
+  } else {
+    fail(`unknown identity subcommand: ${subcommand ?? ''}`);
+  }
+} else {
+  fail(`unknown command: ${command}`);
+}
 
-process.on('SIGINT', () => void shutdown('SIGINT'));
-process.on('SIGTERM', () => void shutdown('SIGTERM'));
-
-void node.start().catch((error) => {
-  console.error('[clawtoken] failed to start:', error);
-  process.exit(1);
-});
-
-async function shutdown(signal: string): Promise<void> {
+async function shutdown(node: ClawTokenNode, signal: string): Promise<void> {
   console.log(`[clawtoken] received ${signal}, stopping...`);
   await node.stop();
   process.exit(0);
 }
 
-function parseArgs(rawArgs: string[]) {
+async function runCapabilityRegister(rawArgs: string[]): Promise<void> {
+  const parsed = parseCapabilityRegisterArgs(rawArgs);
+  const credentialRaw = await readFile(parsed.credentialPath, 'utf8');
+  const credential = JSON.parse(credentialRaw) as CapabilityCredential;
+  if (!credential?.credentialSubject) {
+    fail('invalid credential JSON');
+  }
+  if (!(await verifyCapabilityCredential(credential))) {
+    fail('credential proof or issuer invalid');
+  }
+
+  const subject = credential.credentialSubject;
+  if (!subject?.name || !subject?.pricing) {
+    fail('credential subject missing name or pricing');
+  }
+
+  const paths = resolveStoragePaths(parsed.dataDir);
+  const record = await loadKeyRecord(paths, parsed.keyId);
+  const privateKey = await decryptKeyRecord(record, parsed.passphrase);
+  const derivedDid = didFromPublicKey(await publicKeyFromPrivateKey(privateKey));
+  if (derivedDid !== parsed.did) {
+    fail('private key does not match did');
+  }
+
+  const envelope = await createIdentityCapabilityRegisterEnvelope({
+    did: parsed.did,
+    privateKey,
+    name: subject.name,
+    pricing: subject.pricing,
+    description: subject.description,
+    credential,
+    ts: parsed.ts ?? Date.now(),
+    nonce: parsed.nonce,
+    prev: parsed.prev,
+  });
+
+  const node = new ClawTokenNode(parsed.nodeConfig);
+  try {
+    await node.start();
+    const hash = await node.publishEvent(envelope);
+    console.log(`[clawtoken] published identity.capability.register ${hash}`);
+  } finally {
+    await node.stop();
+  }
+}
+
+function parseDaemonArgs(rawArgs: string[]) {
   const config: {
     dataDir?: string;
     p2p?: { listen?: string[]; bootstrap?: string[] };
@@ -149,25 +214,141 @@ function parseArgs(rawArgs: string[]) {
   return config;
 }
 
+function parseCapabilityRegisterArgs(rawArgs: string[]) {
+  const listen: string[] = [];
+  const bootstrap: string[] = [];
+  let dataDir: string | undefined;
+  let did: string | undefined;
+  let keyId: string | undefined;
+  let passphrase: string | undefined;
+  let credentialPath: string | undefined;
+  let nonce: number | undefined;
+  let prev: string | undefined;
+  let ts: number | undefined;
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
+    switch (arg) {
+      case '--data-dir': {
+        dataDir = rawArgs[++i];
+        break;
+      }
+      case '--listen': {
+        const value = rawArgs[++i];
+        if (value) {
+          listen.push(value);
+        }
+        break;
+      }
+      case '--bootstrap': {
+        const value = rawArgs[++i];
+        if (value) {
+          bootstrap.push(value);
+        }
+        break;
+      }
+      case '--did': {
+        did = rawArgs[++i];
+        break;
+      }
+      case '--key-id': {
+        keyId = rawArgs[++i];
+        break;
+      }
+      case '--passphrase': {
+        passphrase = rawArgs[++i];
+        break;
+      }
+      case '--credential': {
+        credentialPath = rawArgs[++i];
+        break;
+      }
+      case '--nonce': {
+        nonce = parsePositiveInt(rawArgs[++i], '--nonce');
+        break;
+      }
+      case '--prev': {
+        prev = rawArgs[++i];
+        break;
+      }
+      case '--ts': {
+        ts = parseNonNegativeInt(rawArgs[++i], '--ts');
+        break;
+      }
+      default: {
+        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        break;
+      }
+    }
+  }
+
+  if (!did) {
+    fail('missing --did');
+  }
+  if (!keyId) {
+    fail('missing --key-id');
+  }
+  if (!passphrase) {
+    fail('missing --passphrase');
+  }
+  if (!credentialPath) {
+    fail('missing --credential');
+  }
+  if (nonce === undefined) {
+    fail('missing --nonce');
+  }
+
+  const nodeConfig = parseDaemonArgs([
+    ...(dataDir ? ['--data-dir', dataDir] : []),
+    ...listen.flatMap((entry) => ['--listen', entry]),
+    ...bootstrap.flatMap((entry) => ['--bootstrap', entry]),
+  ]);
+
+  return {
+    did,
+    keyId,
+    passphrase,
+    credentialPath,
+    nonce,
+    prev,
+    ts,
+    dataDir,
+    nodeConfig,
+  };
+}
+
 function printHelp(): void {
   console.log(`
 clawtoken daemon [options]
+clawtoken identity capability-register [options]
 
-Options:
-  --data-dir <path>            Override storage root
-  --listen <multiaddr>         Add a libp2p listen multiaddr (repeatable)
-  --bootstrap <multiaddr>      Add a bootstrap peer multiaddr (repeatable)
-  --range-interval-ms <ms>     Range sync interval (default: ${DEFAULT_SYNC_RUNTIME_CONFIG.rangeIntervalMs})
-  --snapshot-interval-ms <ms>  Snapshot sync interval (default: ${DEFAULT_SYNC_RUNTIME_CONFIG.snapshotIntervalMs})
-  --no-range-on-start          Disable initial range sync request
-  --no-snapshot-on-start       Disable initial snapshot sync request
-  --sybil-policy <mode>        Sybil policy: none|allowlist|pow|stake (default: ${DEFAULT_P2P_SYNC_CONFIG.sybilPolicy})
-  --allowlist <peerId,...>     Comma-separated peerIds (repeatable)
-  --pow-ttl-ms <ms>            PoW ticket TTL (default: ${DEFAULT_P2P_SYNC_CONFIG.powTicketTtlMs})
-  --stake-ttl-ms <ms>          Stake proof TTL (default: ${DEFAULT_P2P_SYNC_CONFIG.stakeProofTtlMs})
-  --min-pow-difficulty <n>     Minimum PoW difficulty (default: ${DEFAULT_P2P_SYNC_CONFIG.minPowDifficulty})
-  --min-snapshot-signatures <n> Minimum eligible snapshot signatures (default: ${DEFAULT_P2P_SYNC_CONFIG.minSnapshotSignatures})
-  -h, --help                   Show help
+Daemon options:
+  --data-dir <path>              Override storage root
+  --listen <multiaddr>           Add a libp2p listen multiaddr (repeatable)
+  --bootstrap <multiaddr>        Add a bootstrap peer multiaddr (repeatable)
+  --range-interval-ms <ms>       Range sync interval (default: ${DEFAULT_SYNC_RUNTIME_CONFIG.rangeIntervalMs})
+  --snapshot-interval-ms <ms>    Snapshot sync interval (default: ${DEFAULT_SYNC_RUNTIME_CONFIG.snapshotIntervalMs})
+  --no-range-on-start            Disable initial range sync request
+  --no-snapshot-on-start         Disable initial snapshot sync request
+  --sybil-policy <mode>          Sybil policy: none|allowlist|pow|stake (default: ${DEFAULT_P2P_SYNC_CONFIG.sybilPolicy})
+  --allowlist <peerId,...>       Comma-separated peerIds (repeatable)
+  --pow-ttl-ms <ms>              PoW ticket TTL (default: ${DEFAULT_P2P_SYNC_CONFIG.powTicketTtlMs})
+  --stake-ttl-ms <ms>            Stake proof TTL (default: ${DEFAULT_P2P_SYNC_CONFIG.stakeProofTtlMs})
+  --min-pow-difficulty <n>       Minimum PoW difficulty (default: ${DEFAULT_P2P_SYNC_CONFIG.minPowDifficulty})
+  --min-snapshot-signatures <n>  Minimum eligible snapshot signatures (default: ${DEFAULT_P2P_SYNC_CONFIG.minSnapshotSignatures})
+
+Capability register options:
+  --did <did>                    Issuer DID for the capability
+  --key-id <id>                  Key record id in keystore
+  --passphrase <text>            Passphrase to decrypt key record
+  --credential <path>            JSON credential file (CapabilityCredential)
+  --nonce <n>                    Monotonic nonce for issuer
+  --prev <hash>                  Optional previous event hash
+  --ts <ms>                      Override timestamp (default: now)
+  --data-dir <path>              Override storage root
+  --listen <multiaddr>           Add a libp2p listen multiaddr (repeatable)
+  --bootstrap <multiaddr>        Add a bootstrap peer multiaddr (repeatable)
+  -h, --help                     Show help
 `);
 }
 

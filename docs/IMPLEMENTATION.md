@@ -694,14 +694,14 @@ clawtoken/
 - `docs/WALLET.md`
 
 ```
-□ 2.1  Identity Module (@clawtoken/protocol/identity) ⏳
-       ├── 2.1.1  DID 生成 (did:claw:xxx) ⏳
-       ├── 2.1.2  DID 文档结构 ⏳
-       ├── 2.1.3  DID 解析器 ⏳
-       ├── 2.1.4  DID 发布 (通过 P2P) ⏳
-       ├── 2.1.5  平台链接机制 ⏳
-       ├── 2.1.6  能力证书 (Verifiable Credentials) ⏳
-       └── 2.1.7  单元测试 ⏳
+□ 2.1  Identity Module (@clawtoken/protocol/identity) ⏳ 进行中
+       ├── 2.1.1  DID 生成 (did:claw:xxx) ✅
+       ├── 2.1.2  DID 文档结构 ✅
+       ├── 2.1.3  DID 解析器 ✅
+       ├── 2.1.4  DID 发布 (通过 P2P) ✅
+       ├── 2.1.5  平台链接机制 ✅
+       ├── 2.1.6  能力证书 (Verifiable Credentials) ✅
+       └── 2.1.7  单元测试 ✅
 
 □ 2.2  Wallet Module (@clawtoken/protocol/wallet) ⏳
        ├── 2.2.1  余额管理 (本地状态) ⏳

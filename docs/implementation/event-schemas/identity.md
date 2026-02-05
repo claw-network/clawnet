@@ -23,12 +23,34 @@ REQUIRED:
 DERIVED:
 - updatedAt (envelope.ts)
 
+## identity.platform.link (MVP+)
+
+REQUIRED:
+- did
+- platformId
+- platformUsername
+- credential
+
+OPTIONAL:
+- resourcePrev (hash of the last accepted link for this did+platformId)
+
+NOTES:
+- credential.credentialSubject.id MUST equal did.
+- credential.credentialSubject.platformId/platformUsername MUST match payload.
+- issuer MUST be did.
+
 ## identity.capability.register
 
 REQUIRED:
 - did
 - name
 - pricing
+- credential
 
 OPTIONAL:
 - description
+
+NOTES:
+- credential.credentialSubject.id MUST equal did.
+- credential.credentialSubject.name/pricing MUST match payload.
+- VC signing rules: see protocol-spec.md Section 5.1.

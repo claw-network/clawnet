@@ -10,7 +10,7 @@ export interface KeyRotationEventPayload {
   reason: KeyRotationReason;
 }
 
-export interface KeyRotationEventEnvelope {
+export interface KeyRotationEventEnvelope extends Record<string, unknown> {
   v: 1;
   type: 'crypto.key_rotate';
   issuer: string;

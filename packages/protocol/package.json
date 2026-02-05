@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
-    "./p2p": "./dist/p2p/index.js"
+    "./p2p": "./dist/p2p/index.js",
+    "./identity": "./dist/identity/index.js"
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
