@@ -880,7 +880,7 @@ async function readJsonBody(
     return null;
   }
   try {
-    return JSON.parse(raw) as T;
+    return JSON.parse(raw) as unknown;
   } catch {
     sendError(res, 400, 'INVALID_REQUEST', 'invalid json');
     return null;
@@ -994,7 +994,7 @@ function buildEscrowView(
   };
 }
 
-function sendJson(res: ServerResponse, status: number, body: Record<string, unknown>): void {
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;
   res.setHeader('content-type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(body));
@@ -1135,7 +1135,10 @@ async function buildIdentityView(
       }
       const type = envelope.type as string | undefined;
       const payload = envelope.payload as Record<string, unknown> | undefined;
-      const payloadDid = payload?.did as string | undefined;
+      if (!payload) {
+        continue;
+      }
+      const payloadDid = payload.did as string | undefined;
       const ts = typeof envelope.ts === 'number' ? envelope.ts : Date.now();
       if (type === 'identity.create' && payloadDid === did) {
         publicKey = (payload.publicKey as string | undefined) ?? publicKey;

@@ -2,7 +2,7 @@
 
 import { ClawTokenNode } from './index.js';
 import { createLogger } from './logger.js';
-import { loadConfig, resolveStoragePaths } from '@clawtoken/core/storage';
+import { loadConfig, resolveStoragePaths } from '@clawtoken/core';
 
 interface DaemonArgs {
   dataDir?: string;

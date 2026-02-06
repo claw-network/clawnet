@@ -7,31 +7,30 @@ import {
   exportToProtobuf,
 } from '@libp2p/peer-id-factory';
 import {
+  canonicalizeBytes,
   DEFAULT_P2P_CONFIG,
-  P2PConfig,
-  P2PNode,
-  TOPIC_EVENTS,
-} from '@clawtoken/core/p2p';
-import {
-  EventStore,
-  SnapshotStore,
-  SnapshotScheduler,
   DEFAULT_SNAPSHOT_POLICY,
-  SnapshotSchedulePolicy,
-  SnapshotRecord,
-  signSnapshot,
+  didFromPublicKey,
   ensureConfig,
   ensureStorageDirs,
+  EventEnvelope,
+  eventHashHex,
+  EventStore,
   LevelStore,
   listKeyRecords,
+  multibaseDecode,
   NodeConfig,
+  P2PConfig,
+  P2PNode,
   resolveStoragePaths,
-} from '@clawtoken/core/storage';
-import { canonicalizeBytes } from '@clawtoken/core/crypto';
-import { didFromPublicKey } from '@clawtoken/core/identity';
-import { multibaseDecode } from '@clawtoken/core/encoding';
-import { EventEnvelope, eventHashHex } from '@clawtoken/core/protocol';
-import { CONTENT_TYPE, encodeP2PEnvelopeBytes, signP2PEnvelope } from '@clawtoken/protocol/p2p';
+  signSnapshot,
+  SnapshotRecord,
+  SnapshotSchedulePolicy,
+  SnapshotScheduler,
+  SnapshotStore,
+  TOPIC_EVENTS,
+} from '@clawtoken/core';
+import { CONTENT_TYPE, encodeP2PEnvelopeBytes, signP2PEnvelope } from '@clawtoken/protocol';
 import { P2PSync, P2PSyncConfig } from './p2p/sync.js';
 import { ApiServer, ApiServerConfig } from './api/server.js';
 
@@ -45,7 +44,7 @@ export interface NodeRuntimeConfig {
     requestRangeOnStart?: boolean;
     requestSnapshotOnStart?: boolean;
     validateSnapshotState?: (
-      snapshot: import('@clawtoken/core/storage').SnapshotRecord,
+      snapshot: import('@clawtoken/core').SnapshotRecord,
       events: Uint8Array[],
     ) => Promise<boolean> | boolean;
   };

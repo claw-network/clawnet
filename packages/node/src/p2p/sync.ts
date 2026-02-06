@@ -1,14 +1,21 @@
-import { canonicalizeBytes } from '@clawtoken/core/crypto';
-import { bytesToUtf8, concatBytes, hexToBytes } from '@clawtoken/core/utils';
-import { eventHashHex, MAX_CLOCK_SKEW_MS } from '@clawtoken/core/protocol';
 import {
+  bytesToUtf8,
+  canonicalizeBytes,
+  concatBytes,
+  eventHashHex,
   EventStore,
+  hexToBytes,
+  MAX_CLOCK_SKEW_MS,
+  P2PNode,
+  PubsubMessage,
   SnapshotRecord,
   SnapshotStore,
+  TOPIC_EVENTS,
+  TOPIC_REQUESTS,
+  TOPIC_RESPONSES,
   verifySnapshotHash,
   verifySnapshotSignatures,
-} from '@clawtoken/core/storage';
-import { P2PNode, PubsubMessage, TOPIC_EVENTS, TOPIC_REQUESTS, TOPIC_RESPONSES } from '@clawtoken/core/p2p';
+} from '@clawtoken/core';
 import {
   CONTENT_TYPE,
   P2PEnvelope,
@@ -32,7 +39,7 @@ import {
   verifyP2PEnvelopeSignature,
   verifyStakeProofControllerSignature,
   verifyStakeProofPeerSignature,
-} from '@clawtoken/protocol/p2p';
+} from '@clawtoken/protocol';
 
 export type SybilPolicy = 'none' | 'allowlist' | 'pow' | 'stake';
 

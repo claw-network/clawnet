@@ -12,7 +12,7 @@ describe('binary packaging config', () => {
     };
     expect(json.bin?.clawtokend).toBeDefined();
     expect(json.pkg?.targets).toEqual(
-      expect.arrayContaining(['node20-macos-x64', 'node20-linux-x64', 'node20-win-x64']),
+      expect.arrayContaining(['node18-macos-x64', 'node18-linux-x64', 'node18-win-x64']),
     );
     expect(json.pkg?.outputPath).toBe('dist/pkg');
 
