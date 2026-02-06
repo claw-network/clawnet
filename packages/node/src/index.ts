@@ -23,9 +23,13 @@ import {
   ensureConfig,
   ensureStorageDirs,
   LevelStore,
+  listKeyRecords,
+  NodeConfig,
   resolveStoragePaths,
 } from '@clawtoken/core/storage';
 import { canonicalizeBytes } from '@clawtoken/core/crypto';
+import { didFromPublicKey } from '@clawtoken/core/identity';
+import { multibaseDecode } from '@clawtoken/core/encoding';
 import { EventEnvelope, eventHashHex } from '@clawtoken/core/protocol';
 import { CONTENT_TYPE, encodeP2PEnvelopeBytes, signP2PEnvelope } from '@clawtoken/protocol/p2p';
 import { P2PSync, P2PSyncConfig } from './p2p/sync.js';
@@ -79,6 +83,8 @@ export class ClawTokenNode {
   private apiServer?: ApiServer;
   private peerId?: any;
   private peerPrivateKey?: Uint8Array;
+  private startedAt?: number;
+  private persistedConfig?: NodeConfig;
 
   constructor(config: NodeRuntimeConfig = {}) {
     this.config = {
@@ -103,6 +109,7 @@ export class ClawTokenNode {
     const paths = resolveStoragePaths(this.config.dataDir);
     await ensureStorageDirs(paths);
     const persisted = await ensureConfig(paths);
+    this.persistedConfig = persisted;
 
     const peerId = await this.loadOrCreatePeerId(paths.keys);
     const privateKey = this.extractPeerPrivateKey(peerId);
@@ -131,6 +138,9 @@ export class ClawTokenNode {
 
     this.peerId = peerId;
     this.peerPrivateKey = privateKey;
+    if (!this.startedAt) {
+      this.startedAt = Date.now();
+    }
 
     const {
       rangeIntervalMs,
@@ -160,6 +170,9 @@ export class ClawTokenNode {
       this.apiServer = new ApiServer(apiConfig, {
         publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
         eventStore: this.eventStore,
+        getNodeStatus: () => this.buildNodeStatus(),
+        getNodePeers: () => this.buildNodePeers(),
+        getNodeConfig: () => this.buildNodeConfig(),
       });
       await this.apiServer.start();
     }
@@ -184,6 +197,46 @@ export class ClawTokenNode {
       return null;
     }
     return this.peerId.toString();
+  }
+
+  private async buildNodeStatus(): Promise<Record<string, unknown>> {
+    const did = await this.resolveLocalDid();
+    const blockHeight = this.eventStore ? await this.eventStore.getLogLength() : 0;
+    const peers = this.p2p?.getPeers().length ?? 0;
+    const network = this.resolveNetwork();
+    const uptime = this.startedAt ? Math.floor((Date.now() - this.startedAt) / 1000) : 0;
+    return {
+      did: did ?? '',
+      synced: Boolean(this.p2p),
+      blockHeight,
+      peers,
+      network,
+      version: process.env.CLAWTOKEN_VERSION ?? '0.0.0',
+      uptime,
+    };
+  }
+
+  private async buildNodePeers(): Promise<{ peers: Record<string, unknown>[]; total: number }> {
+    const peerIds = this.p2p?.getPeers() ?? [];
+    return {
+      peers: peerIds.map((peerId) => ({ peerId })),
+      total: peerIds.length,
+    };
+  }
+
+  private async buildNodeConfig(): Promise<Record<string, unknown>> {
+    const dataDir = resolveStoragePaths(this.config.dataDir).root;
+    const network = this.resolveNetwork();
+    const p2pPort = this.resolveP2PPort();
+    const apiPort = this.config.api?.port ?? 9528;
+    const apiEnabled = this.config.api?.enabled !== false;
+    return {
+      dataDir,
+      network,
+      p2pPort,
+      apiPort,
+      apiEnabled,
+    };
   }
 
   async publishEvent(envelope: EventEnvelope): Promise<string> {
@@ -214,6 +267,49 @@ export class ClawTokenNode {
     const bytes = encodeP2PEnvelopeBytes(p2pEnvelope);
     await this.p2p.publish(TOPIC_EVENTS, bytes);
     return hash;
+  }
+
+  private resolveNetwork(): string {
+    return this.persistedConfig?.network ?? 'devnet';
+  }
+
+  private resolveP2PPort(): number {
+    const listen =
+      this.config.p2p?.listen ??
+      this.persistedConfig?.p2p?.listen ??
+      DEFAULT_P2P_CONFIG.listen;
+    for (const addr of listen) {
+      const match = addr.match(/\/tcp\/(\d+)/);
+      if (match) {
+        return Number.parseInt(match[1], 10);
+      }
+    }
+    return 9527;
+  }
+
+  private async resolveLocalDid(): Promise<string | null> {
+    try {
+      const paths = resolveStoragePaths(this.config.dataDir);
+      const records = await listKeyRecords(paths);
+      if (!records.length) {
+        return null;
+      }
+      const sorted = records
+        .map((record) => ({ record, createdAt: Date.parse(record.createdAt ?? '') }))
+        .sort((a, b) => {
+          const left = Number.isFinite(a.createdAt) ? a.createdAt : Number.MAX_SAFE_INTEGER;
+          const right = Number.isFinite(b.createdAt) ? b.createdAt : Number.MAX_SAFE_INTEGER;
+          return left - right;
+        });
+      const primary = sorted[0]?.record;
+      if (!primary?.publicKey) {
+        return null;
+      }
+      const publicKeyBytes = multibaseDecode(primary.publicKey);
+      return didFromPublicKey(publicKeyBytes);
+    } catch {
+      return null;
+    }
   }
 
   private async startSyncLoops(): Promise<void> {

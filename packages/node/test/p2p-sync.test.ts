@@ -6,7 +6,7 @@ import { generateKeypair } from '@clawtoken/core/crypto';
 import { utf8ToBytes } from '@clawtoken/core/utils';
 import { EventStore, MemoryStore, SnapshotStore, signSnapshot } from '@clawtoken/core/storage';
 import { P2PSync } from '../src/p2p/sync.js';
-import { P2PNode } from '@clawtoken/core/p2p';
+import type { P2PNode } from '@clawtoken/core/p2p';
 
 describe('p2p sync snapshot chunking', () => {
   it('reassembles chunked snapshot responses', async () => {

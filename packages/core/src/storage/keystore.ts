@@ -1,5 +1,5 @@
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
-import { writeFile, readFile } from 'node:fs/promises';
+import { writeFile, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { argon2id } from '@noble/hashes/argon2';
 import { sha256Hex } from '../crypto/hash.js';
@@ -154,6 +154,32 @@ export async function loadKeyRecord(paths: StoragePaths, id: string): Promise<Ke
   const filename = join(paths.keys, `${id}.json`);
   const raw = await readFile(filename, 'utf8');
   return JSON.parse(raw) as KeyRecord;
+}
+
+export async function listKeyRecords(paths: StoragePaths): Promise<KeyRecord[]> {
+  await ensureStorageDirs(paths);
+  let entries: string[] = [];
+  try {
+    entries = await readdir(paths.keys);
+  } catch (error) {
+    if ((error as { code?: string }).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+  const records: KeyRecord[] = [];
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) {
+      continue;
+    }
+    try {
+      const raw = await readFile(join(paths.keys, entry), 'utf8');
+      records.push(JSON.parse(raw) as KeyRecord);
+    } catch {
+      continue;
+    }
+  }
+  return records;
 }
 
 export async function decryptKeyRecord(

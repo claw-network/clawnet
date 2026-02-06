@@ -86,6 +86,17 @@ describe('wallet api', () => {
     expect(published[0]?.type).toBe('wallet.transfer');
   });
 
+  it('rejects transfer with missing fields', async () => {
+    const res = await fetch(`${baseUrl}/api/wallet/transfer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ did }),
+    });
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: { code: string } };
+    expect(json.error.code).toBe('INVALID_REQUEST');
+  });
+
   it('publishes escrow create and fund events', async () => {
     const receiver = await generateKeypair();
     const receiverDid = didFromPublicKey(receiver.publicKey);
@@ -131,7 +142,7 @@ describe('wallet api', () => {
       body: JSON.stringify({ did, passphrase }),
     });
     expect(missingRes.status).toBe(400);
-    expect((await missingRes.json()).error).toBe('missing_required_fields');
+    expect((await missingRes.json()).error.code).toBe('INVALID_REQUEST');
     expect(published.length).toBe(0);
 
     const invalidNonceRes = await fetch(`${baseUrl}/api/wallet/escrow/escrow-1/fund`, {
@@ -146,7 +157,7 @@ describe('wallet api', () => {
       }),
     });
     expect(invalidNonceRes.status).toBe(400);
-    expect((await invalidNonceRes.json()).error).toBe('invalid_nonce');
+    expect((await invalidNonceRes.json()).error.code).toBe('INVALID_REQUEST');
     expect(published.length).toBe(0);
 
     const invalidAmountRes = await fetch(`${baseUrl}/api/wallet/escrow/escrow-1/fund`, {
@@ -161,7 +172,9 @@ describe('wallet api', () => {
       }),
     });
     expect(invalidAmountRes.status).toBe(400);
-    expect((await invalidAmountRes.json()).error).toBe('amount must be >= 1');
+    const invalidAmountJson = await invalidAmountRes.json();
+    expect(invalidAmountJson.error.code).toBe('INVALID_REQUEST');
+    expect(invalidAmountJson.error.message).toBe('amount must be >= 1');
     expect(published.length).toBe(0);
 
     const unknownKey = await generateKeypair();
@@ -178,7 +191,7 @@ describe('wallet api', () => {
       }),
     });
     expect(unknownKeyRes.status).toBe(400);
-    expect((await unknownKeyRes.json()).error).toBe('key_unavailable');
+    expect((await unknownKeyRes.json()).error.code).toBe('INVALID_REQUEST');
     expect(published.length).toBe(0);
   });
 

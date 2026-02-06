@@ -1,12 +1,16 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
+import { z } from 'zod';
 import {
   addressFromDid,
   bytesToUtf8,
+  didFromPublicKey,
   decryptKeyRecord,
   EventStore,
   keyIdFromPublicKey,
+  listKeyRecords,
   loadKeyRecord,
+  multibaseDecode,
   publicKeyFromDid,
   resolveStoragePaths,
   verifyCapabilityCredential,
@@ -26,6 +30,74 @@ import {
 } from '@clawtoken/protocol';
 
 const MAX_BODY_BYTES = 1_000_000;
+
+const AmountSchema = z.union([z.number(), z.string()]);
+
+const CapabilityRegisterSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    credential: z.unknown(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const WalletTransferSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    to: z.string().min(1),
+    amount: AmountSchema,
+    fee: AmountSchema.optional(),
+    memo: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const WalletEscrowCreateSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    escrowId: z.string().optional(),
+    beneficiary: z.string().min(1),
+    amount: AmountSchema,
+    releaseRules: z.array(z.record(z.unknown())).min(1),
+    resourcePrev: z.union([z.string(), z.null()]).optional(),
+    arbiter: z.string().optional(),
+    refundRules: z.array(z.record(z.unknown())).optional(),
+    expiresAt: z.number().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+    autoFund: z.boolean().optional(),
+  })
+  .passthrough();
+
+const WalletEscrowActionSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    amount: AmountSchema,
+    resourcePrev: z.string().min(1),
+    ruleId: z.string().optional(),
+    reason: z.string().optional(),
+    evidence: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const WalletQuerySchema = z
+  .object({
+    did: z.string().min(1).optional(),
+    address: z.string().min(1).optional(),
+  })
+  .refine((data) => data.did || data.address, { message: 'missing address' });
 
 export interface ApiServerConfig {
   host: string;
@@ -103,6 +175,9 @@ export class ApiServer {
     private readonly runtime: {
       publishEvent: (envelope: Record<string, unknown>) => Promise<string>;
       eventStore?: EventStore;
+      getNodeStatus?: () => Promise<Record<string, unknown>>;
+      getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
+      getNodeConfig?: () => Promise<Record<string, unknown>>;
     },
   ) {}
 
@@ -130,90 +205,248 @@ export class ApiServer {
   }
 
   private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const url = req.url ? new URL(req.url, `http://${this.config.host}`) : null;
-    const method = req.method ?? 'GET';
+    try {
+      const url = req.url ? new URL(req.url, `http://${this.config.host}`) : null;
+      const method = req.method ?? 'GET';
 
-    if (method === 'POST' && url?.pathname === '/api/identity/capabilities') {
-      await this.handleCapabilityRegister(req, res);
-      return;
-    }
-
-    if (method === 'GET' && url?.pathname === '/api/wallet/balance') {
-      await this.handleWalletBalance(req, res, url);
-      return;
-    }
-
-    if (method === 'GET' && url?.pathname === '/api/wallet/history') {
-      await this.handleWalletHistory(req, res, url);
-      return;
-    }
-
-    if (method === 'POST' && url?.pathname === '/api/wallet/transfer') {
-      await this.handleWalletTransfer(req, res);
-      return;
-    }
-
-    if (method === 'POST' && url?.pathname === '/api/wallet/escrow') {
-      await this.handleWalletEscrowCreate(req, res);
-      return;
-    }
-
-    if (url?.pathname?.startsWith('/api/wallet/escrow/')) {
-      const segments = url.pathname.split('/').filter(Boolean);
-      const escrowId = segments[3];
-      const action = segments[4];
-      if (segments.length === 4 && method === 'GET') {
-        await this.handleWalletEscrowGet(req, res, escrowId);
+      if (method === 'GET' && url?.pathname === '/api/node/status') {
+        await this.handleNodeStatus(req, res);
         return;
       }
-      if (segments.length === 5 && method === 'POST') {
-        if (action === 'fund') {
-          await this.handleWalletEscrowFund(req, res, escrowId);
-          return;
-        }
-        if (action === 'release') {
-          await this.handleWalletEscrowRelease(req, res, escrowId);
-          return;
-        }
-        if (action === 'refund') {
-          await this.handleWalletEscrowRefund(req, res, escrowId);
+
+      if (method === 'GET' && url?.pathname === '/api/node/peers') {
+        await this.handleNodePeers(req, res);
+        return;
+      }
+
+      if (method === 'GET' && url?.pathname === '/api/node/config') {
+        await this.handleNodeConfig(req, res);
+        return;
+      }
+
+      if (method === 'GET' && url?.pathname === '/api/identity') {
+        await this.handleIdentitySelf(req, res);
+        return;
+      }
+
+      if (method === 'GET' && url?.pathname === '/api/identity/capabilities') {
+        await this.handleIdentityCapabilities(req, res);
+        return;
+      }
+
+      if (method === 'GET' && url?.pathname?.startsWith('/api/identity/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length === 3) {
+          const did = decodeURIComponent(segments[2]);
+          await this.handleIdentityResolve(req, res, did);
           return;
         }
       }
-    }
 
-    sendJson(res, 404, { error: 'not_found' });
+      if (method === 'POST' && url?.pathname === '/api/identity/capabilities') {
+        await this.handleCapabilityRegister(req, res);
+        return;
+      }
+
+      if (method === 'GET' && url?.pathname === '/api/wallet/balance') {
+        await this.handleWalletBalance(req, res, url);
+        return;
+      }
+
+      if (method === 'GET' && url?.pathname === '/api/wallet/history') {
+        await this.handleWalletHistory(req, res, url);
+        return;
+      }
+
+      if (method === 'POST' && url?.pathname === '/api/wallet/transfer') {
+        await this.handleWalletTransfer(req, res);
+        return;
+      }
+
+      if (method === 'POST' && url?.pathname === '/api/wallet/escrow') {
+        await this.handleWalletEscrowCreate(req, res);
+        return;
+      }
+
+      if (url?.pathname?.startsWith('/api/wallet/escrow/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        const escrowId = segments[3];
+        const action = segments[4];
+        if (segments.length === 4 && method === 'GET') {
+          await this.handleWalletEscrowGet(req, res, escrowId);
+          return;
+        }
+        if (segments.length === 5 && method === 'POST') {
+          if (action === 'fund') {
+            await this.handleWalletEscrowFund(req, res, escrowId);
+            return;
+          }
+          if (action === 'release') {
+            await this.handleWalletEscrowRelease(req, res, escrowId);
+            return;
+          }
+          if (action === 'refund') {
+            await this.handleWalletEscrowRefund(req, res, escrowId);
+            return;
+          }
+        }
+      }
+
+      sendError(res, 404, 'NOT_FOUND', 'route not found');
+    } catch (error) {
+      if (!res.headersSent) {
+        sendError(res, 500, 'INTERNAL_ERROR', 'unexpected error');
+      }
+    }
+  }
+
+  private async handleNodeStatus(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.runtime.getNodeStatus) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'node status unavailable');
+      return;
+    }
+    try {
+      const status = await this.runtime.getNodeStatus();
+      sendJson(res, 200, status);
+    } catch (error) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'failed to read node status');
+    }
+  }
+
+  private async handleNodePeers(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.runtime.getNodePeers) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'node peers unavailable');
+      return;
+    }
+    try {
+      const peers = await this.runtime.getNodePeers();
+      sendJson(res, 200, peers);
+    } catch (error) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'failed to read node peers');
+    }
+  }
+
+  private async handleNodeConfig(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.runtime.getNodeConfig) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'node config unavailable');
+      return;
+    }
+    try {
+      const config = await this.runtime.getNodeConfig();
+      sendJson(res, 200, config);
+    } catch (error) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'failed to read node config');
+    }
+  }
+
+  private async handleIdentitySelf(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const identity = await resolveLocalIdentity(this.config.dataDir);
+    if (!identity) {
+      sendError(res, 404, 'DID_NOT_FOUND', 'local identity not initialized');
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendJson(res, 200, identity);
+      return;
+    }
+    const fromEvents = await buildIdentityView(eventStore, identity.did);
+    if (fromEvents) {
+      sendJson(res, 200, {
+        ...identity,
+        ...fromEvents,
+        did: identity.did,
+        publicKey: identity.publicKey,
+      });
+      return;
+    }
+    const capabilities = await buildIdentityCapabilities(eventStore, identity.did);
+    sendJson(res, 200, { ...identity, capabilities });
+  }
+
+  private async handleIdentityResolve(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    did: string,
+  ): Promise<void> {
+    try {
+      publicKeyFromDid(did);
+    } catch {
+      sendError(res, 400, 'DID_INVALID', 'invalid did');
+      return;
+    }
+    const local = await resolveLocalIdentity(this.config.dataDir);
+    if (local && local.did === did) {
+      const eventStore = this.runtime.eventStore;
+      if (!eventStore) {
+        sendJson(res, 200, local);
+        return;
+      }
+      const fromEvents = await buildIdentityView(eventStore, did);
+      if (fromEvents) {
+        sendJson(res, 200, {
+          ...local,
+          ...fromEvents,
+          did: local.did,
+          publicKey: local.publicKey,
+        });
+        return;
+      }
+      const capabilities = await buildIdentityCapabilities(eventStore, did);
+      sendJson(res, 200, { ...local, capabilities });
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 404, 'DID_NOT_FOUND', 'did not found');
+      return;
+    }
+    const resolved = await buildIdentityView(eventStore, did);
+    if (!resolved) {
+      sendError(res, 404, 'DID_NOT_FOUND', 'did not found');
+      return;
+    }
+    sendJson(res, 200, resolved);
+  }
+
+  private async handleIdentityCapabilities(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendJson(res, 200, { capabilities: [] });
+      return;
+    }
+    const capabilities = await buildIdentityCapabilities(eventStore);
+    sendJson(res, 200, { capabilities });
   }
 
   private async handleCapabilityRegister(
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    const body = await readJsonBody<CapabilityRegisterRequest>(req, res);
+    const body = await parseBody(req, res, CapabilityRegisterSchema);
     if (!body) {
       return;
     }
-    if (!body.did || !body.passphrase || !body.credential) {
-      sendJson(res, 400, { error: 'missing_required_fields' });
+    const credential = body.credential as CapabilityCredential | undefined;
+    if (!credential) {
+      sendError(res, 400, 'INVALID_REQUEST', 'missing credential');
       return;
     }
-    if (!Number.isInteger(body.nonce) || body.nonce < 1) {
-      sendJson(res, 400, { error: 'invalid_nonce' });
-      return;
-    }
-    const credential = body.credential;
     if (!(await verifyCapabilityCredential(credential))) {
-      sendJson(res, 400, { error: 'invalid_credential' });
+      sendError(res, 400, 'CAPABILITY_INVALID', 'invalid capability credential');
       return;
     }
     if (credential.credentialSubject?.id !== body.did) {
-      sendJson(res, 400, { error: 'credential_subject_mismatch' });
+      sendError(res, 400, 'CAPABILITY_INVALID', 'credential subject mismatch');
       return;
     }
 
     const subject = credential.credentialSubject;
     if (!subject?.name || !subject?.pricing) {
-      sendJson(res, 400, { error: 'credential_subject_incomplete' });
+      sendError(res, 400, 'CAPABILITY_INVALID', 'credential subject incomplete');
       return;
     }
 
@@ -225,7 +458,7 @@ export class ApiServer {
       const record = await loadKeyRecord(paths, keyId);
       privateKey = await decryptKeyRecord(record, body.passphrase);
     } catch (error) {
-      sendJson(res, 400, { error: 'key_unavailable' });
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
       return;
     }
 
@@ -255,7 +488,7 @@ export class ApiServer {
       }
       sendJson(res, 201, response);
     } catch (error) {
-      sendJson(res, 500, { error: 'publish_failed' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 
@@ -266,14 +499,16 @@ export class ApiServer {
   ): Promise<void> {
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
-      sendJson(res, 500, { error: 'event_store_unavailable' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const did = url.searchParams.get('did') ?? undefined;
-    const address = url.searchParams.get('address') ?? undefined;
-    const resolved = resolveAddressFromQuery({ did, address });
+    const query = parseWalletQuery(url, res);
+    if (!query) {
+      return;
+    }
+    const resolved = resolveAddressFromQuery(query);
     if (!resolved) {
-      sendJson(res, 400, { error: 'missing_address' });
+      sendError(res, 400, 'INVALID_REQUEST', 'missing address');
       return;
     }
     const state = await buildWalletState(eventStore);
@@ -298,14 +533,16 @@ export class ApiServer {
   ): Promise<void> {
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
-      sendJson(res, 500, { error: 'event_store_unavailable' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const did = url.searchParams.get('did') ?? undefined;
-    const address = url.searchParams.get('address') ?? undefined;
-    const resolved = resolveAddressFromQuery({ did, address });
+    const query = parseWalletQuery(url, res);
+    if (!query) {
+      return;
+    }
+    const resolved = resolveAddressFromQuery(query);
     if (!resolved) {
-      sendJson(res, 400, { error: 'missing_address' });
+      sendError(res, 400, 'INVALID_REQUEST', 'missing address');
       return;
     }
     const typeFilter = url.searchParams.get('type') ?? 'all';
@@ -329,27 +566,19 @@ export class ApiServer {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    const body = await readJsonBody<WalletTransferRequest>(req, res);
+    const body = await parseBody(req, res, WalletTransferSchema);
     if (!body) {
-      return;
-    }
-    if (!body.did || !body.passphrase || !body.to) {
-      sendJson(res, 400, { error: 'missing_required_fields' });
-      return;
-    }
-    if (!Number.isInteger(body.nonce) || body.nonce < 1) {
-      sendJson(res, 400, { error: 'invalid_nonce' });
       return;
     }
     const to = resolveAddress(body.to);
     if (!to) {
-      sendJson(res, 400, { error: 'invalid_to' });
+      sendError(res, 400, 'INVALID_REQUEST', 'invalid recipient');
       return;
     }
     const from = addressFromDid(body.did);
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
-      sendJson(res, 400, { error: 'key_unavailable' });
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
       return;
     }
 
@@ -368,7 +597,7 @@ export class ApiServer {
         prev: body.prev,
       });
     } catch (error) {
-      sendJson(res, 400, { error: (error as Error).message });
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
 
@@ -383,7 +612,7 @@ export class ApiServer {
         timestamp: body.ts ?? Date.now(),
       });
     } catch (error) {
-      sendJson(res, 500, { error: 'publish_failed' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 
@@ -391,31 +620,19 @@ export class ApiServer {
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    const body = await readJsonBody<WalletEscrowCreateRequest>(req, res);
+    const body = await parseBody(req, res, WalletEscrowCreateSchema);
     if (!body) {
-      return;
-    }
-    if (!body.did || !body.passphrase || !body.beneficiary || body.amount === undefined) {
-      sendJson(res, 400, { error: 'missing_required_fields' });
-      return;
-    }
-    if (!Number.isInteger(body.nonce) || body.nonce < 1) {
-      sendJson(res, 400, { error: 'invalid_nonce' });
-      return;
-    }
-    if (!body.releaseRules?.length) {
-      sendJson(res, 400, { error: 'release_rules_required' });
       return;
     }
     const beneficiary = resolveAddress(body.beneficiary);
     if (!beneficiary) {
-      sendJson(res, 400, { error: 'invalid_beneficiary' });
+      sendError(res, 400, 'INVALID_REQUEST', 'invalid beneficiary');
       return;
     }
     const depositor = addressFromDid(body.did);
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
-      sendJson(res, 400, { error: 'key_unavailable' });
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
       return;
     }
     const escrowId = body.escrowId ?? `escrow-${Date.now()}`;
@@ -439,7 +656,7 @@ export class ApiServer {
         prev: body.prev,
       });
     } catch (error) {
-      sendJson(res, 400, { error: (error as Error).message });
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
 
@@ -468,7 +685,7 @@ export class ApiServer {
         createdAt: body.ts ?? Date.now(),
       });
     } catch (error) {
-      sendJson(res, 500, { error: 'publish_failed' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 
@@ -479,13 +696,13 @@ export class ApiServer {
   ): Promise<void> {
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
-      sendJson(res, 500, { error: 'event_store_unavailable' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
     const state = await buildWalletState(eventStore);
     const escrow = state.escrows[escrowId];
     if (!escrow) {
-      sendJson(res, 404, { error: 'escrow_not_found' });
+      sendError(res, 404, 'ESCROW_NOT_FOUND', 'escrow not found');
       return;
     }
     sendJson(res, 200, {
@@ -503,21 +720,13 @@ export class ApiServer {
     res: ServerResponse,
     escrowId: string,
   ): Promise<void> {
-    const body = await readJsonBody<WalletEscrowActionRequest>(req, res);
+    const body = await parseBody(req, res, WalletEscrowActionSchema);
     if (!body) {
-      return;
-    }
-    if (!body.did || !body.passphrase || body.amount === undefined || !body.resourcePrev) {
-      sendJson(res, 400, { error: 'missing_required_fields' });
-      return;
-    }
-    if (!Number.isInteger(body.nonce) || body.nonce < 1) {
-      sendJson(res, 400, { error: 'invalid_nonce' });
       return;
     }
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
-      sendJson(res, 400, { error: 'key_unavailable' });
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
       return;
     }
     let envelope: Record<string, unknown>;
@@ -533,14 +742,14 @@ export class ApiServer {
         prev: body.prev,
       });
     } catch (error) {
-      sendJson(res, 400, { error: (error as Error).message });
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
     try {
       const hash = await this.runtime.publishEvent(envelope);
       sendJson(res, 200, { txHash: hash, status: 'broadcast' });
     } catch (error) {
-      sendJson(res, 500, { error: 'publish_failed' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 
@@ -549,25 +758,17 @@ export class ApiServer {
     res: ServerResponse,
     escrowId: string,
   ): Promise<void> {
-    const body = await readJsonBody<WalletEscrowActionRequest>(req, res);
+    const body = await parseBody(req, res, WalletEscrowActionSchema);
     if (!body) {
       return;
     }
-    if (!body.did || !body.passphrase || body.amount === undefined || !body.resourcePrev) {
-      sendJson(res, 400, { error: 'missing_required_fields' });
-      return;
-    }
     if (!body.ruleId) {
-      sendJson(res, 400, { error: 'missing_rule_id' });
-      return;
-    }
-    if (!Number.isInteger(body.nonce) || body.nonce < 1) {
-      sendJson(res, 400, { error: 'invalid_nonce' });
+      sendError(res, 400, 'INVALID_REQUEST', 'missing rule id');
       return;
     }
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
-      sendJson(res, 400, { error: 'key_unavailable' });
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
       return;
     }
     let envelope: Record<string, unknown>;
@@ -584,14 +785,14 @@ export class ApiServer {
         prev: body.prev,
       });
     } catch (error) {
-      sendJson(res, 400, { error: (error as Error).message });
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
     try {
       const hash = await this.runtime.publishEvent(envelope);
       sendJson(res, 200, { txHash: hash, status: 'broadcast' });
     } catch (error) {
-      sendJson(res, 500, { error: 'publish_failed' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 
@@ -600,25 +801,17 @@ export class ApiServer {
     res: ServerResponse,
     escrowId: string,
   ): Promise<void> {
-    const body = await readJsonBody<WalletEscrowActionRequest>(req, res);
+    const body = await parseBody(req, res, WalletEscrowActionSchema);
     if (!body) {
       return;
     }
-    if (!body.did || !body.passphrase || body.amount === undefined || !body.resourcePrev) {
-      sendJson(res, 400, { error: 'missing_required_fields' });
-      return;
-    }
     if (!body.reason) {
-      sendJson(res, 400, { error: 'missing_reason' });
-      return;
-    }
-    if (!Number.isInteger(body.nonce) || body.nonce < 1) {
-      sendJson(res, 400, { error: 'invalid_nonce' });
+      sendError(res, 400, 'INVALID_REQUEST', 'missing reason');
       return;
     }
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
-      sendJson(res, 400, { error: 'key_unavailable' });
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
       return;
     }
     let envelope: Record<string, unknown>;
@@ -636,50 +829,91 @@ export class ApiServer {
         prev: body.prev,
       });
     } catch (error) {
-      sendJson(res, 400, { error: (error as Error).message });
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
     try {
       const hash = await this.runtime.publishEvent(envelope);
       sendJson(res, 200, { txHash: hash, status: 'broadcast' });
     } catch (error) {
-      sendJson(res, 500, { error: 'publish_failed' });
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 }
 
-async function readJsonBody<T>(
+async function readJsonBody(
   req: IncomingMessage,
   res: ServerResponse,
-): Promise<T | null> {
+): Promise<unknown | null> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
     const buffer = Buffer.from(chunk as Buffer);
     total += buffer.length;
     if (total > MAX_BODY_BYTES) {
-      sendJson(res, 413, { error: 'payload_too_large' });
+      sendError(res, 413, 'INVALID_REQUEST', 'payload too large');
       return null;
     }
     chunks.push(buffer);
   }
   const raw = Buffer.concat(chunks).toString('utf8');
   if (!raw) {
-    sendJson(res, 400, { error: 'empty_body' });
+    sendError(res, 400, 'INVALID_REQUEST', 'empty body');
     return null;
   }
   try {
     return JSON.parse(raw) as T;
   } catch {
-    sendJson(res, 400, { error: 'invalid_json' });
+    sendError(res, 400, 'INVALID_REQUEST', 'invalid json');
     return null;
   }
+}
+
+async function parseBody<T>(
+  req: IncomingMessage,
+  res: ServerResponse,
+  schema: z.ZodType<T>,
+): Promise<T | null> {
+  const raw = await readJsonBody(req, res);
+  if (!raw) {
+    return null;
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? 'invalid request';
+    sendError(res, 400, 'INVALID_REQUEST', message);
+    return null;
+  }
+  return parsed.data;
+}
+
+function parseWalletQuery(url: URL, res: ServerResponse): WalletBalanceQuery | null {
+  const data = {
+    did: url.searchParams.get('did') ?? undefined,
+    address: url.searchParams.get('address') ?? undefined,
+  };
+  const parsed = WalletQuerySchema.safeParse(data);
+  if (!parsed.success) {
+    const message = parsed.error.issues[0]?.message ?? 'invalid request';
+    sendError(res, 400, 'INVALID_REQUEST', message);
+    return null;
+  }
+  return parsed.data;
 }
 
 function sendJson(res: ServerResponse, status: number, body: Record<string, unknown>): void {
   res.statusCode = status;
   res.setHeader('content-type', 'application/json; charset=utf-8');
   res.end(JSON.stringify(body));
+}
+
+function sendError(
+  res: ServerResponse,
+  status: number,
+  code: string,
+  message: string,
+): void {
+  sendJson(res, status, { error: { code, message } });
 }
 
 function resolveAddress(input: string): string | null {
@@ -731,6 +965,199 @@ function parsePagination(value: string | null, fallback: number, max: number): n
     return fallback;
   }
   return Math.min(parsed, max);
+}
+
+interface IdentityView {
+  did: string;
+  publicKey: string;
+  created: number;
+  updated: number;
+  displayName?: string;
+  avatar?: string;
+  bio?: string;
+  platformLinks: Array<Record<string, unknown>>;
+  capabilities: Array<Record<string, unknown>>;
+}
+
+async function resolveLocalIdentity(dataDir?: string): Promise<IdentityView | null> {
+  const paths = resolveStoragePaths(dataDir);
+  const records = await listKeyRecords(paths);
+  if (!records.length) {
+    return null;
+  }
+  const sorted = records
+    .map((record) => ({
+      record,
+      createdAt: Date.parse(record.createdAt ?? ''),
+    }))
+    .sort((a, b) => {
+      const left = Number.isFinite(a.createdAt) ? a.createdAt : Number.MAX_SAFE_INTEGER;
+      const right = Number.isFinite(b.createdAt) ? b.createdAt : Number.MAX_SAFE_INTEGER;
+      return left - right;
+    });
+  const primary = sorted[0]?.record;
+  if (!primary?.publicKey) {
+    return null;
+  }
+  let publicKeyBytes: Uint8Array;
+  try {
+    publicKeyBytes = multibaseDecode(primary.publicKey);
+  } catch {
+    return null;
+  }
+  const did = didFromPublicKey(publicKeyBytes);
+  const created = Number.isFinite(sorted[0]?.createdAt ?? NaN)
+    ? (sorted[0]?.createdAt as number)
+    : Date.now();
+  return {
+    did,
+    publicKey: primary.publicKey,
+    created,
+    updated: created,
+    platformLinks: [],
+    capabilities: [],
+  };
+}
+
+async function buildIdentityView(
+  eventStore: EventStore,
+  did: string,
+): Promise<IdentityView | null> {
+  let publicKey: string | null = null;
+  let createdAt: number | null = null;
+  let updatedAt: number | null = null;
+  const platformLinks: Array<Record<string, unknown>> = [];
+  const capabilities: Array<Record<string, unknown>> = [];
+
+  let cursor: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope) {
+        continue;
+      }
+      const type = envelope.type as string | undefined;
+      const payload = envelope.payload as Record<string, unknown> | undefined;
+      const payloadDid = payload?.did as string | undefined;
+      const ts = typeof envelope.ts === 'number' ? envelope.ts : Date.now();
+      if (type === 'identity.create' && payloadDid === did) {
+        publicKey = (payload.publicKey as string | undefined) ?? publicKey;
+        if (createdAt === null) {
+          createdAt = ts;
+        }
+        updatedAt = ts;
+        continue;
+      }
+      if (type === 'identity.update' && payloadDid === did) {
+        updatedAt = ts;
+        continue;
+      }
+      if (type === 'identity.platform.link' && payloadDid === did) {
+        const platform = payload.platformId as string | undefined;
+        const handle = payload.platformUsername as string | undefined;
+        if (platform && handle) {
+          platformLinks.push({
+            platform,
+            handle,
+            verified: false,
+            verifiedAt: ts,
+          });
+        }
+        continue;
+      }
+      if (type === 'identity.capability.register' && payloadDid === did) {
+        const name = payload.name as string | undefined;
+        const pricing = payload.pricing as Record<string, unknown> | undefined;
+        if (!name || !pricing) {
+          continue;
+        }
+        const capability: Record<string, unknown> = {
+          id: typeof envelope.hash === 'string' ? envelope.hash : `cap-${ts}`,
+          name,
+          pricing,
+          verified: false,
+          registeredAt: ts,
+        };
+        if (payload.description) {
+          capability.description = payload.description;
+        }
+        capabilities.push(capability);
+        continue;
+      }
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+
+  if (!publicKey) {
+    return null;
+  }
+  const created = createdAt ?? updatedAt ?? Date.now();
+  const updated = updatedAt ?? created;
+  return {
+    did,
+    publicKey,
+    created,
+    updated,
+    platformLinks,
+    capabilities,
+  };
+}
+
+async function buildIdentityCapabilities(
+  eventStore: EventStore,
+  did?: string,
+): Promise<Array<Record<string, unknown>>> {
+  const capabilities: Array<Record<string, unknown>> = [];
+  let cursor: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope || envelope.type !== 'identity.capability.register') {
+        continue;
+      }
+      const payload = envelope.payload as Record<string, unknown> | undefined;
+      if (!payload) {
+        continue;
+      }
+      const payloadDid = payload.did as string | undefined;
+      if (did && payloadDid !== did) {
+        continue;
+      }
+      const name = payload.name as string | undefined;
+      const pricing = payload.pricing as Record<string, unknown> | undefined;
+      if (!name || !pricing) {
+        continue;
+      }
+      const ts = typeof envelope.ts === 'number' ? envelope.ts : Date.now();
+      const capability: Record<string, unknown> = {
+        id: typeof envelope.hash === 'string' ? envelope.hash : `cap-${ts}`,
+        name,
+        pricing,
+        verified: false,
+        registeredAt: ts,
+      };
+      if (payload.description) {
+        capability.description = payload.description;
+      }
+      capabilities.push(capability);
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+  return capabilities;
 }
 
 async function buildWalletState(eventStore: EventStore): Promise<WalletState> {

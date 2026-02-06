@@ -6,15 +6,23 @@ import { ClawTokenNode, DEFAULT_P2P_SYNC_CONFIG, DEFAULT_SYNC_RUNTIME_CONFIG } f
 import {
   addressFromDid,
   bytesToUtf8,
+  createKeyRecord,
   decryptKeyRecord,
   didFromPublicKey,
+  ensureConfig,
   EventStore,
+  generateMnemonic,
+  hkdfSha256,
   keyIdFromPublicKey,
   loadKeyRecord,
   LevelStore,
+  mnemonicToSeedSync,
   publicKeyFromDid,
   publicKeyFromPrivateKey,
   resolveStoragePaths,
+  saveKeyRecord,
+  utf8ToBytes,
+  validateMnemonic,
   verifyCapabilityCredential,
 } from '@clawtoken/core';
 import {
@@ -45,6 +53,18 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
       console.error('[clawtoken] failed to start:', error);
       process.exit(1);
     });
+    return;
+  }
+  if (command === 'init') {
+    await runInit(argv.slice(1));
+    return;
+  }
+  if (command === 'status') {
+    await runStatus(argv.slice(1));
+    return;
+  }
+  if (command === 'peers') {
+    await runPeers(argv.slice(1));
     return;
   }
   if (command === 'identity') {
@@ -92,6 +112,54 @@ async function shutdown(node: ClawTokenNode, signal: string): Promise<void> {
   console.log(`[clawtoken] received ${signal}, stopping...`);
   await node.stop();
   process.exit(0);
+}
+
+async function runInit(rawArgs: string[]): Promise<void> {
+  const parsed = parseInitArgs(rawArgs);
+  const paths = resolveStoragePaths(parsed.dataDir);
+  await ensureConfig(paths);
+
+  const mnemonic =
+    parsed.mnemonic ??
+    generateMnemonic(parsed.strength ?? 256);
+  if (!validateMnemonic(mnemonic)) {
+    fail('invalid mnemonic');
+  }
+  const seed = mnemonicToSeedSync(mnemonic, parsed.mnemonicPassphrase ?? '');
+  const privateKey = hkdfSha256(seed, undefined, utf8ToBytes('clawtoken:master:v1'), 32);
+  const publicKey = await publicKeyFromPrivateKey(privateKey);
+  const did = didFromPublicKey(publicKey);
+
+  try {
+    const record = createKeyRecord(publicKey, privateKey, parsed.passphrase);
+    await saveKeyRecord(paths, record);
+  } catch (error) {
+    fail((error as Error).message);
+  }
+
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('ClawToken Node 初始化');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('✓ 生成密钥对');
+  console.log(`✓ 创建 DID: ${did}`);
+  console.log(`✓ 配置保存到 ${paths.configFile}`);
+  console.log(`✓ 私钥加密保存到 ${paths.keys}`);
+  console.log('');
+  console.log('⚠️  请备份助记词:');
+  console.log(`   ${mnemonic}`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+}
+
+async function runStatus(rawArgs: string[]): Promise<void> {
+  const parsed = parseApiArgs(rawArgs);
+  const data = await fetchApiJson(parsed.apiUrl, '/api/node/status', parsed.token);
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runPeers(rawArgs: string[]): Promise<void> {
+  const parsed = parseApiArgs(rawArgs);
+  const data = await fetchApiJson(parsed.apiUrl, '/api/node/peers', parsed.token);
+  console.log(JSON.stringify(data, null, 2));
 }
 
 async function runCapabilityRegister(rawArgs: string[]): Promise<void> {
@@ -179,6 +247,109 @@ type NodeFactory = (config: unknown) => {
 };
 
 const defaultNodeFactory: NodeFactory = (config) => new ClawTokenNode(config);
+
+interface InitArgs {
+  passphrase: string;
+  dataDir?: string;
+  mnemonic?: string;
+  mnemonicPassphrase?: string;
+  strength?: number;
+}
+
+interface ApiArgs {
+  apiUrl: string;
+  token?: string;
+}
+
+function parseInitArgs(rawArgs: string[]): InitArgs {
+  let passphrase = '';
+  let dataDir: string | undefined;
+  let mnemonic: string | undefined;
+  let mnemonicPassphrase: string | undefined;
+  let strength: number | undefined;
+
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--passphrase') {
+      passphrase = rawArgs[++i] ?? '';
+      continue;
+    }
+    if (arg === '--data-dir') {
+      dataDir = rawArgs[++i];
+      continue;
+    }
+    if (arg === '--mnemonic') {
+      mnemonic = rawArgs[++i];
+      continue;
+    }
+    if (arg === '--mnemonic-passphrase') {
+      mnemonicPassphrase = rawArgs[++i];
+      continue;
+    }
+    if (arg === '--strength') {
+      strength = parsePositiveInt(rawArgs[++i], '--strength');
+      continue;
+    }
+    fail(`unknown init option: ${arg}`);
+  }
+
+  if (!passphrase) {
+    fail('missing --passphrase');
+  }
+  return {
+    passphrase,
+    dataDir,
+    mnemonic,
+    mnemonicPassphrase,
+    strength,
+  };
+}
+
+function parseApiArgs(rawArgs: string[]): ApiArgs {
+  let apiUrl = 'http://127.0.0.1:9528';
+  let token: string | undefined;
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--api' || arg === '--api-url') {
+      apiUrl = rawArgs[++i] ?? apiUrl;
+      continue;
+    }
+    if (arg === '--token') {
+      token = rawArgs[++i];
+      continue;
+    }
+    fail(`unknown option: ${arg}`);
+  }
+  return { apiUrl, token };
+}
+
+async function fetchApiJson(
+  apiUrl: string,
+  path: string,
+  token?: string,
+): Promise<Record<string, unknown>> {
+  const headers: Record<string, string> = { accept: 'application/json' };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${apiUrl}${path}`, { headers });
+  const text = await res.text();
+  let payload: Record<string, unknown> = {};
+  if (text) {
+    try {
+      payload = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      payload = {};
+    }
+  }
+  if (!res.ok) {
+    const error = payload.error as { code?: string; message?: string } | undefined;
+    const code = error?.code ?? `HTTP_${res.status}`;
+    const message = error?.message ?? res.statusText;
+    fail(`API error ${code}: ${message}`);
+  }
+  return payload;
+}
 
 async function runTransfer(
   rawArgs: string[],
@@ -1081,6 +1252,9 @@ function parseEscrowActionArgs(rawArgs: string[]) {
 function printHelp(): void {
   console.log(`
 clawtoken daemon [options]
+clawtoken init [options]
+clawtoken status [options]
+clawtoken peers [options]
 clawtoken identity capability-register [options]
 clawtoken balance [options]
 clawtoken transfer [options]
@@ -1100,6 +1274,17 @@ Daemon options:
   --stake-ttl-ms <ms>            Stake proof TTL (default: ${DEFAULT_P2P_SYNC_CONFIG.stakeProofTtlMs})
   --min-pow-difficulty <n>       Minimum PoW difficulty (default: ${DEFAULT_P2P_SYNC_CONFIG.minPowDifficulty})
   --min-snapshot-signatures <n>  Minimum eligible snapshot signatures (default: ${DEFAULT_P2P_SYNC_CONFIG.minSnapshotSignatures})
+
+Init options:
+  --passphrase <text>            Passphrase to encrypt the key (min 12 chars)
+  --data-dir <path>              Override storage root
+  --mnemonic <words>             Provide existing mnemonic (optional)
+  --mnemonic-passphrase <text>   Mnemonic passphrase (optional)
+  --strength <bits>              Mnemonic strength bits (default: 256)
+
+Status/peers options:
+  --api <url>                    Node API base URL (default: http://127.0.0.1:9528)
+  --token <token>                API token (optional)
 
 Capability register options:
   --did <did>                    Issuer DID for the capability
@@ -1266,6 +1451,9 @@ if (entrypoint && import.meta.url === entrypoint) {
 
 export {
   main,
+  runInit,
+  runStatus,
+  runPeers,
   runBalance,
   runTransfer,
   runEscrowCreate,

@@ -17,6 +17,7 @@
     "@clawtoken/core": "workspace:*",
     "@clawtoken/protocol": "workspace:*",
     "@libp2p/crypto": "^5.1.13",
-    "@libp2p/peer-id-factory": "^4.2.4"
+    "@libp2p/peer-id-factory": "^4.2.4",
+    "zod": "^3.24.2"
   }
 }

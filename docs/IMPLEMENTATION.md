@@ -728,12 +728,12 @@ clawtoken/
 ```
 □ 3.1  HTTP API Server (@clawtoken/node/api) ⏳
        ├── 3.1.1  Fastify/Hono 服务器 ⏳
-       ├── 3.1.2  路由: /api/node/* ⏳
-       ├── 3.1.3  路由: /api/identity/* ⏳
+       ├── 3.1.2  路由: /api/node/* ✅
+       ├── 3.1.3  路由: /api/identity/* ✅
        ├── 3.1.4  路由: /api/wallet/* ⏳
-       ├── 3.1.5  错误处理中间件 ⏳
-       ├── 3.1.6  请求验证 (Zod) ⏳
-       └── 3.1.7  API 测试 ⏳
+       ├── 3.1.5  错误处理中间件 ✅
+       ├── 3.1.6  请求验证 (Zod) ✅
+       └── 3.1.7  API 测试 ✅
 
 □ 3.2  Node Daemon (@clawtoken/node) ⏳
        ├── 3.2.1  clawtokend 入口 ⏳
@@ -745,11 +745,11 @@ clawtoken/
        └── 3.2.7  集成测试 ⏳
 
 □ 3.3  CLI Tool (@clawtoken/cli) ⏳
-       ├── 3.3.1  clawtoken init ⏳
-       ├── 3.3.2  clawtoken status ⏳
+       ├── 3.3.1  clawtoken init ✅
+       ├── 3.3.2  clawtoken status ✅
        ├── 3.3.3  clawtoken balance ⏳
        ├── 3.3.4  clawtoken transfer ⏳
-       ├── 3.3.5  clawtoken peers ⏳
+       ├── 3.3.5  clawtoken peers ✅
        ├── 3.3.6  clawtoken logs ⏳
        └── 3.3.7  CLI 测试 ⏳
 
@@ -1026,4 +1026,4 @@ clawtoken/
 
 ---
 
-*最后更新: 2026年2月4日*
+*最后更新: 2026年2月6日*
