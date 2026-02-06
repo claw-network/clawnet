@@ -17,8 +17,11 @@ import {
 } from '@clawtoken/core';
 import {
   applyWalletEvent,
+  applyReputationEvent,
   CapabilityCredential,
+  buildReputationProfile,
   createIdentityCapabilityRegisterEnvelope,
+  createReputationState,
   createWalletEscrowCreateEnvelope,
   createWalletEscrowFundEnvelope,
   createWalletEscrowRefundEnvelope,
@@ -26,6 +29,10 @@ import {
   createWalletTransferEnvelope,
   createWalletState,
   getWalletBalance,
+  getReputationRecords,
+  ReputationLevel,
+  ReputationRecord,
+  ReputationState,
   WalletState,
 } from '@clawtoken/protocol';
 
@@ -246,6 +253,20 @@ export class ApiServer {
       if (method === 'POST' && url?.pathname === '/api/identity/capabilities') {
         await this.handleCapabilityRegister(req, res);
         return;
+      }
+
+      if (method === 'GET' && url?.pathname?.startsWith('/api/reputation/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length === 3) {
+          const did = decodeURIComponent(segments[2]);
+          await this.handleReputationProfile(req, res, did);
+          return;
+        }
+        if (segments.length === 4 && segments[3] === 'reviews') {
+          const did = decodeURIComponent(segments[2]);
+          await this.handleReputationReviews(req, res, did, url);
+          return;
+        }
       }
 
       if (method === 'GET' && url?.pathname === '/api/wallet/balance') {
@@ -490,6 +511,98 @@ export class ApiServer {
     } catch (error) {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
+  }
+
+  private async handleReputationProfile(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    did: string,
+  ): Promise<void> {
+    if (!isValidDid(did)) {
+      sendError(res, 400, 'DID_INVALID', 'invalid did');
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildReputationState(eventStore);
+    const records = getReputationRecords(state, did);
+    if (!records.length) {
+      sendError(res, 404, 'REPUTATION_NOT_FOUND', 'reputation not found');
+      return;
+    }
+    const profile = buildReputationProfile(state, did);
+    const qualityRecords = records.filter((record) => record.dimension === 'quality');
+    const averageRating = computeAverageRating(qualityRecords);
+    const levelInfo = mapReputationLevel(profile.level);
+    sendJson(res, 200, {
+      did,
+      score: profile.overallScore,
+      level: levelInfo.label,
+      levelNumber: levelInfo.levelNumber,
+      dimensions: {
+        transaction: profile.dimensions.transaction.score,
+        delivery: profile.dimensions.fulfillment.score,
+        quality: profile.dimensions.quality.score,
+        social: profile.dimensions.social.score,
+        behavior: profile.dimensions.behavior.score,
+      },
+      totalTransactions: profile.dimensions.transaction.recordCount,
+      successRate: 0,
+      averageRating,
+      badges: [],
+      updatedAt: profile.updatedAt ?? Date.now(),
+    });
+  }
+
+  private async handleReputationReviews(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    did: string,
+    url: URL,
+  ): Promise<void> {
+    if (!isValidDid(did)) {
+      sendError(res, 400, 'DID_INVALID', 'invalid did');
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const limit = parsePagination(url.searchParams.get('limit'), 20, 100);
+    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000);
+    const state = await buildReputationState(eventStore);
+    const allRecords = getReputationRecords(state, did);
+    if (!allRecords.length) {
+      sendError(res, 404, 'REPUTATION_NOT_FOUND', 'reputation not found');
+      return;
+    }
+    const records = allRecords.filter((record) => record.dimension === 'quality');
+    const sorted = [...records].sort((a, b) => b.ts - a.ts);
+    const sliced = sorted.slice(offset, offset + limit);
+    const reviews = sliced.map((record) => ({
+      id: record.hash,
+      contractId: record.ref,
+      reviewer: record.issuer,
+      reviewee: record.target,
+      rating: ratingFromScore(record.score),
+      createdAt: record.ts,
+    }));
+    const averageRating = computeAverageRating(records);
+    sendJson(res, 200, {
+      reviews,
+      total: records.length,
+      averageRating,
+      pagination: {
+        total: records.length,
+        limit,
+        offset,
+        hasMore: offset + limit < records.length,
+      },
+    });
   }
 
   private async handleWalletBalance(
@@ -1009,6 +1122,18 @@ function sendError(
   sendJson(res, status, { error: { code, message } });
 }
 
+function isValidDid(value: string): boolean {
+  if (!value) {
+    return false;
+  }
+  try {
+    publicKeyFromDid(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function resolveAddress(input: string): string | null {
   if (!input) {
     return null;
@@ -1279,12 +1404,72 @@ async function buildWalletState(eventStore: EventStore): Promise<WalletState> {
   return state;
 }
 
+async function buildReputationState(eventStore: EventStore): Promise<ReputationState> {
+  let state = createReputationState();
+  let cursor: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope) {
+        continue;
+      }
+      try {
+        state = applyReputationEvent(state, envelope);
+      } catch {
+        continue;
+      }
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+  return state;
+}
+
 function parseEvent(bytes: Uint8Array): Record<string, unknown> | null {
   try {
     return JSON.parse(bytesToUtf8(bytes)) as Record<string, unknown>;
   } catch {
     return null;
   }
+}
+
+function mapReputationLevel(level: ReputationLevel): { label: string; levelNumber: number } {
+  switch (level) {
+    case 'legend':
+      return { label: 'Legend', levelNumber: 7 };
+    case 'elite':
+      return { label: 'Master', levelNumber: 6 };
+    case 'expert':
+      return { label: 'Expert', levelNumber: 5 };
+    case 'trusted':
+      return { label: 'Advanced', levelNumber: 4 };
+    case 'newcomer':
+      return { label: 'Intermediate', levelNumber: 3 };
+    case 'observed':
+      return { label: 'Beginner', levelNumber: 2 };
+    case 'risky':
+    default:
+      return { label: 'Newcomer', levelNumber: 1 };
+  }
+}
+
+function ratingFromScore(score: number): number {
+  const rating = Math.round(score / 200);
+  return Math.max(1, Math.min(5, rating));
+}
+
+function computeAverageRating(records: ReputationRecord[]): number {
+  if (!records.length) {
+    return 0;
+  }
+  const total = records.reduce((sum, record) => sum + ratingFromScore(record.score), 0);
+  return Number((total / records.length).toFixed(2));
 }
 
 function buildWalletTransactions(
