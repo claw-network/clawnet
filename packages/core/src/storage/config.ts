@@ -11,6 +11,7 @@ export interface NodeConfig {
   };
   logging?: {
     level?: 'debug' | 'info' | 'warn' | 'error';
+    file?: string;
   };
   storage?: {
     root?: string;

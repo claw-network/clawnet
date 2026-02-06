@@ -8,6 +8,9 @@
   "exports": {
     ".": "./dist/index.js"
   },
+  "bin": {
+    "clawtokend": "./dist/daemon.js"
+  },
   "scripts": {
     "build": "tsc -b tsconfig.json",
     "test": "vitest run --passWithNoTests",

@@ -85,6 +85,8 @@ export class ClawTokenNode {
   private peerPrivateKey?: Uint8Array;
   private startedAt?: number;
   private persistedConfig?: NodeConfig;
+  private starting?: Promise<void>;
+  private stopping?: Promise<void>;
 
   constructor(config: NodeRuntimeConfig = {}) {
     this.config = {
@@ -102,10 +104,19 @@ export class ClawTokenNode {
   }
 
   async start(): Promise<void> {
+    if (this.starting) {
+      return this.starting;
+    }
+    this.starting = this.startInternal();
+    return this.starting;
+  }
+
+  private async startInternal(): Promise<void> {
     if (this.p2p) {
       return;
     }
 
+    // Init order: config -> storage -> p2p -> sync -> api
     const paths = resolveStoragePaths(this.config.dataDir);
     await ensureStorageDirs(paths);
     const persisted = await ensureConfig(paths);
@@ -122,74 +133,106 @@ export class ClawTokenNode {
         this.config.p2p?.bootstrap ?? persisted.p2p?.bootstrap ?? DEFAULT_P2P_CONFIG.bootstrap,
     };
 
-    this.eventDb = new LevelStore({ path: paths.eventsDb });
-    this.eventStore = new EventStore(this.eventDb);
-    this.snapshotStore = new SnapshotStore(paths);
-    if (this.config.snapshotBuilder) {
-      this.snapshotScheduler = new SnapshotScheduler(
-        this.eventStore,
-        this.snapshotStore,
-        { ...DEFAULT_SNAPSHOT_POLICY, ...(this.config.snapshotPolicy ?? {}) },
-      );
-    }
+    try {
+      this.eventDb = new LevelStore({ path: paths.eventsDb });
+      this.eventStore = new EventStore(this.eventDb);
+      this.snapshotStore = new SnapshotStore(paths);
+      if (this.config.snapshotBuilder) {
+        this.snapshotScheduler = new SnapshotScheduler(
+          this.eventStore,
+          this.snapshotStore,
+          { ...DEFAULT_SNAPSHOT_POLICY, ...(this.config.snapshotPolicy ?? {}) },
+        );
+      }
 
-    this.p2p = new P2PNode(p2pConfig, peerId);
-    await this.p2p.start();
+      this.p2p = new P2PNode(p2pConfig, peerId);
+      await this.p2p.start();
 
-    this.peerId = peerId;
-    this.peerPrivateKey = privateKey;
-    if (!this.startedAt) {
-      this.startedAt = Date.now();
-    }
+      this.peerId = peerId;
+      this.peerPrivateKey = privateKey;
+      if (!this.startedAt) {
+        this.startedAt = Date.now();
+      }
 
-    const {
-      rangeIntervalMs,
-      snapshotIntervalMs,
-      requestRangeOnStart,
-      requestSnapshotOnStart,
-      ...syncOptions
-    } = this.config.sync ?? {};
+      const {
+        rangeIntervalMs,
+        snapshotIntervalMs,
+        requestRangeOnStart,
+        requestSnapshotOnStart,
+        ...syncOptions
+      } = this.config.sync ?? {};
 
-    this.sync = new P2PSync(this.p2p, this.eventStore, this.snapshotStore, {
-      peerId: peerId.toString(),
-      peerPrivateKey: privateKey,
-      resolvePeerPublicKey: (id) => this.p2p?.getPeerPublicKey(id) ?? Promise.resolve(null),
-      resolveControllerPublicKey: this.config.resolveControllerPublicKey,
-      ...syncOptions,
-    });
-    await this.sync.start();
-
-    await this.startSyncLoops();
-
-    if (this.config.api?.enabled !== false) {
-      const apiConfig: ApiServerConfig = {
-        host: this.config.api?.host ?? '127.0.0.1',
-        port: this.config.api?.port ?? 9528,
-        dataDir: this.config.dataDir,
-      };
-      this.apiServer = new ApiServer(apiConfig, {
-        publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
-        eventStore: this.eventStore,
-        getNodeStatus: () => this.buildNodeStatus(),
-        getNodePeers: () => this.buildNodePeers(),
-        getNodeConfig: () => this.buildNodeConfig(),
+      this.sync = new P2PSync(this.p2p, this.eventStore, this.snapshotStore, {
+        peerId: peerId.toString(),
+        peerPrivateKey: privateKey,
+        resolvePeerPublicKey: (id) => this.p2p?.getPeerPublicKey(id) ?? Promise.resolve(null),
+        resolveControllerPublicKey: this.config.resolveControllerPublicKey,
+        ...syncOptions,
       });
-      await this.apiServer.start();
+      await this.sync.start();
+
+      await this.startSyncLoops();
+
+      if (this.config.api?.enabled !== false) {
+        const apiConfig: ApiServerConfig = {
+          host: this.config.api?.host ?? '127.0.0.1',
+          port: this.config.api?.port ?? 9528,
+          dataDir: this.config.dataDir,
+        };
+        this.apiServer = new ApiServer(apiConfig, {
+          publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
+          eventStore: this.eventStore,
+          getNodeStatus: () => this.buildNodeStatus(),
+          getNodePeers: () => this.buildNodePeers(),
+          getNodeConfig: () => this.buildNodeConfig(),
+        });
+        await this.apiServer.start();
+      }
+    } catch (error) {
+      await this.stop();
+      throw error;
+    } finally {
+      this.starting = undefined;
     }
   }
 
   async stop(): Promise<void> {
+    if (this.stopping) {
+      return this.stopping;
+    }
+    this.stopping = this.stopInternal();
+    return this.stopping;
+  }
+
+  private async stopInternal(): Promise<void> {
+    // Shutdown order: api -> sync -> p2p -> storage
     this.stopSyncLoops();
-    await this.apiServer?.stop();
-    await this.sync?.stop();
-    await this.p2p?.stop();
-    await this.eventDb?.close();
+
+    const tasks: Array<() => Promise<void>> = [
+      async () => this.apiServer?.stop(),
+      async () => this.sync?.stop(),
+      async () => this.p2p?.stop(),
+      async () => this.eventDb?.close(),
+    ];
+
+    for (const task of tasks) {
+      try {
+        await task();
+      } catch {
+        // Best-effort shutdown; keep going to release remaining resources.
+      }
+    }
+
+    this.apiServer = undefined;
     this.sync = undefined;
     this.p2p = undefined;
     this.eventDb = undefined;
     this.eventStore = undefined;
     this.snapshotStore = undefined;
     this.snapshotScheduler = undefined;
+    this.peerId = undefined;
+    this.peerPrivateKey = undefined;
+    this.stopping = undefined;
   }
 
   getPeerId(): string | null {
@@ -197,6 +240,16 @@ export class ClawTokenNode {
       return null;
     }
     return this.peerId.toString();
+  }
+
+  getHealth(): { ok: boolean; checks: { p2p: boolean; sync: boolean; eventStore: boolean; api: boolean } } {
+    const p2p = Boolean(this.p2p);
+    const sync = Boolean(this.sync);
+    const eventStore = Boolean(this.eventStore);
+    const apiExpected = this.config.api?.enabled !== false;
+    const api = apiExpected ? Boolean(this.apiServer) : true;
+    const ok = p2p && sync && eventStore && api;
+    return { ok, checks: { p2p, sync, eventStore, api } };
   }
 
   private async buildNodeStatus(): Promise<Record<string, unknown>> {

@@ -522,7 +522,7 @@ export class ApiServer {
       balance: Number(total),
       available: Number(balance.available),
       pending: Number(balance.pending),
-      locked: Number(balance.locked.escrow) + Number(balance.locked.governance),
+      locked: Number(balance.locked.escrow),
     });
   }
 
@@ -675,12 +675,13 @@ export class ApiServer {
         });
         await this.runtime.publishEvent(fundEnvelope);
       }
+      const total = Number(body.amount);
       sendJson(res, 201, {
         id: escrowId,
-        amount: Number(body.amount),
+        amount: total,
         released: 0,
-        remaining: Number(body.amount),
-        status: body.autoFund === false ? 'pending' : 'funded',
+        remaining: total,
+        status: mapEscrowStatus(body.autoFund === false ? 'pending' : 'funded'),
         releaseConditions: body.releaseRules,
         createdAt: body.ts ?? Date.now(),
       });
@@ -705,13 +706,15 @@ export class ApiServer {
       sendError(res, 404, 'ESCROW_NOT_FOUND', 'escrow not found');
       return;
     }
+    const escrowView = buildEscrowView(state, escrow);
     sendJson(res, 200, {
       id: escrow.escrowId,
-      amount: Number(escrow.balance),
-      released: 0,
-      remaining: Number(escrow.balance),
-      status: escrow.status,
-      createdAt: Date.now(),
+      amount: escrowView.amount,
+      released: escrowView.released,
+      remaining: escrowView.remaining,
+      status: escrowView.status,
+      releaseConditions: escrowView.releaseConditions,
+      createdAt: escrowView.createdAt,
     });
   }
 
@@ -747,7 +750,12 @@ export class ApiServer {
     }
     try {
       const hash = await this.runtime.publishEvent(envelope);
-      sendJson(res, 200, { txHash: hash, status: 'broadcast' });
+      sendJson(res, 200, {
+        txHash: hash,
+        amount: Number(body.amount),
+        status: 'broadcast',
+        timestamp: body.ts ?? Date.now(),
+      });
     } catch (error) {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
@@ -790,7 +798,12 @@ export class ApiServer {
     }
     try {
       const hash = await this.runtime.publishEvent(envelope);
-      sendJson(res, 200, { txHash: hash, status: 'broadcast' });
+      sendJson(res, 200, {
+        txHash: hash,
+        amount: Number(body.amount),
+        status: 'broadcast',
+        timestamp: body.ts ?? Date.now(),
+      });
     } catch (error) {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
@@ -834,7 +847,12 @@ export class ApiServer {
     }
     try {
       const hash = await this.runtime.publishEvent(envelope);
-      sendJson(res, 200, { txHash: hash, status: 'broadcast' });
+      sendJson(res, 200, {
+        txHash: hash,
+        amount: Number(body.amount),
+        status: 'broadcast',
+        timestamp: body.ts ?? Date.now(),
+      });
     } catch (error) {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
@@ -899,6 +917,81 @@ function parseWalletQuery(url: URL, res: ServerResponse): WalletBalanceQuery | n
     return null;
   }
   return parsed.data;
+}
+
+function mapEscrowStatus(
+  status: WalletState['escrows'][string]['status'],
+): 'active' | 'released' | 'refunded' | 'disputed' {
+  switch (status) {
+    case 'released':
+      return 'released';
+    case 'refunded':
+      return 'refunded';
+    case 'disputed':
+      return 'disputed';
+    case 'pending':
+    case 'funded':
+    case 'releasing':
+    default:
+      return 'active';
+  }
+}
+
+function parseBigInt(value: string | undefined): bigint {
+  if (!value) {
+    return 0n;
+  }
+  try {
+    return BigInt(value);
+  } catch {
+    return 0n;
+  }
+}
+
+function buildEscrowView(
+  state: WalletState,
+  escrow: WalletState['escrows'][string],
+): {
+  amount: number;
+  released: number;
+  remaining: number;
+  status: 'active' | 'released' | 'refunded' | 'disputed';
+  releaseConditions: Record<string, unknown>[];
+  createdAt: number;
+} {
+  let createdAt = Date.now();
+  let totalAmount: bigint | null = null;
+  let releaseConditions: Record<string, unknown>[] = [];
+
+  for (const entry of state.history) {
+    if (entry.type !== 'wallet.escrow.create') {
+      continue;
+    }
+    const payload = entry.payload as Record<string, unknown>;
+    if (payload.escrowId !== escrow.escrowId) {
+      continue;
+    }
+    createdAt = entry.ts;
+    totalAmount = parseBigInt(payload.amount as string | undefined);
+    const rules = payload.releaseRules as Record<string, unknown>[] | undefined;
+    if (Array.isArray(rules)) {
+      releaseConditions = rules;
+    }
+    break;
+  }
+
+  const remaining = parseBigInt(escrow.balance);
+  const total = totalAmount ?? remaining;
+  const released = total - remaining >= 0n ? total - remaining : 0n;
+
+  return {
+    amount: Number(total),
+    released: Number(released),
+    remaining: Number(remaining),
+    status: mapEscrowStatus(escrow.status),
+    releaseConditions,
+    createdAt,
+  };
 }
 
 function sendJson(res: ServerResponse, status: number, body: Record<string, unknown>): void {
@@ -1198,7 +1291,12 @@ function buildWalletTransactions(
   const transactions: Array<Record<string, unknown>> = [];
   for (const entry of state.history) {
     if (entry.type === 'wallet.transfer') {
-      const payload = entry.payload as { from: string; to: string; amount: string };
+      const payload = entry.payload as {
+        from: string;
+        to: string;
+        amount: string;
+        memo?: string;
+      };
       transactions.push({
         txHash: entry.hash,
         type: 'transfer',
@@ -1206,6 +1304,7 @@ function buildWalletTransactions(
         to: payload.to,
         amount: Number(payload.amount),
         status: 'confirmed',
+        memo: payload.memo,
         timestamp: entry.ts,
       });
       continue;

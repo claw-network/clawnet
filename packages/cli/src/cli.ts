@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClawTokenNode, DEFAULT_P2P_SYNC_CONFIG, DEFAULT_SYNC_RUNTIME_CONFIG } from '@clawtoken/node';
 import {
@@ -14,6 +15,7 @@ import {
   generateMnemonic,
   hkdfSha256,
   keyIdFromPublicKey,
+  loadConfig,
   loadKeyRecord,
   LevelStore,
   mnemonicToSeedSync,
@@ -82,6 +84,10 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   }
   if (command === 'transfer') {
     await runTransfer(argv.slice(1));
+    return;
+  }
+  if (command === 'logs') {
+    await runLogs(argv.slice(1));
     return;
   }
   if (command === 'escrow') {
@@ -240,6 +246,48 @@ async function runBalance(rawArgs: string[]): Promise<void> {
   }
 }
 
+async function runLogs(rawArgs: string[]): Promise<void> {
+  const parsed = parseLogsArgs(rawArgs);
+  const logFile = parsed.file ?? (await resolveLogFile(parsed.dataDir));
+  if (!logFile) {
+    fail('log file not configured');
+  }
+  const content = await readFile(logFile, 'utf8').catch((error) => {
+    fail(`failed to read log file: ${(error as Error).message}`);
+  });
+  process.stdout.write(content ?? '');
+  if (!parsed.follow) {
+    return;
+  }
+  let position = 0;
+  try {
+    const stats = await stat(logFile);
+    position = stats.size;
+  } catch {
+    position = 0;
+  }
+  const { watch } = await import('node:fs');
+  const watcher = watch(logFile, async (event) => {
+    if (event !== 'change') {
+      return;
+    }
+    try {
+      const stats = await stat(logFile);
+      if (stats.size <= position) {
+        return;
+      }
+      const data = await readFile(logFile, 'utf8');
+      const chunk = data.slice(position);
+      position = stats.size;
+      process.stdout.write(chunk);
+    } catch {
+      return;
+    }
+  });
+  process.on('SIGINT', () => watcher.close());
+  process.on('SIGTERM', () => watcher.close());
+}
+
 type NodeFactory = (config: unknown) => {
   start: () => Promise<void>;
   stop: () => Promise<void>;
@@ -259,6 +307,12 @@ interface InitArgs {
 interface ApiArgs {
   apiUrl: string;
   token?: string;
+}
+
+interface LogsArgs {
+  dataDir?: string;
+  file?: string;
+  follow: boolean;
 }
 
 function parseInitArgs(rawArgs: string[]): InitArgs {
@@ -323,6 +377,35 @@ function parseApiArgs(rawArgs: string[]): ApiArgs {
   return { apiUrl, token };
 }
 
+function parseLogsArgs(rawArgs: string[]): LogsArgs {
+  let dataDir: string | undefined;
+  let file: string | undefined;
+  let follow = false;
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    switch (arg) {
+      case '--data-dir': {
+        dataDir = rawArgs[++i];
+        break;
+      }
+      case '--file': {
+        file = rawArgs[++i];
+        break;
+      }
+      case '--follow':
+      case '-f': {
+        follow = true;
+        break;
+      }
+      default: {
+        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        break;
+      }
+    }
+  }
+  return { dataDir, file, follow };
+}
+
 async function fetchApiJson(
   apiUrl: string,
   path: string,
@@ -349,6 +432,19 @@ async function fetchApiJson(
     fail(`API error ${code}: ${message}`);
   }
   return payload;
+}
+
+async function resolveLogFile(dataDir?: string): Promise<string | null> {
+  const paths = resolveStoragePaths(dataDir);
+  try {
+    const config = await loadConfig(paths);
+    if (config.logging?.file) {
+      return config.logging.file;
+    }
+  } catch {
+    // ignore config load errors
+  }
+  return join(paths.logs, 'node.log');
 }
 
 async function runTransfer(
@@ -1258,6 +1354,7 @@ clawtoken peers [options]
 clawtoken identity capability-register [options]
 clawtoken balance [options]
 clawtoken transfer [options]
+clawtoken logs [options]
 clawtoken escrow create|fund|release|refund [options]
 
 Daemon options:
@@ -1317,6 +1414,11 @@ Transfer options:
   --data-dir <path>              Override storage root
   --listen <multiaddr>           Add a libp2p listen multiaddr (repeatable)
   --bootstrap <multiaddr>        Add a bootstrap peer multiaddr (repeatable)
+
+Logs options:
+  --data-dir <path>              Override storage root
+  --file <path>                  Override log file path
+  --follow, -f                   Follow log output
 
 Escrow create options:
   --did <did>                    Issuer DID (depositor)
@@ -1456,6 +1558,7 @@ export {
   runPeers,
   runBalance,
   runTransfer,
+  runLogs,
   runEscrowCreate,
   runEscrowFund,
   runEscrowRelease,
