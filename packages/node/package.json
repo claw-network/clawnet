@@ -13,8 +13,20 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
+    "package": "pnpm build && pkg . --out-path dist/pkg",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src --max-warnings=0"
+  },
+  "pkg": {
+    "scripts": [
+      "dist/daemon.js"
+    ],
+    "targets": [
+      "node20-macos-x64",
+      "node20-linux-x64",
+      "node20-win-x64"
+    ],
+    "outputPath": "dist/pkg"
   },
   "dependencies": {
     "@clawtoken/core": "workspace:*",
