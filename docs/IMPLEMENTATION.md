@@ -662,7 +662,7 @@ clawtoken/
        ├── 1.1.6  哈希函数 (SHA-256, BLAKE3) ✅
        └── 1.1.7  单元测试 ✅
 
-□ 1.2  Storage Engine (@clawtoken/core/storage)  ⏳ 进行中
+□ 1.2  Storage Engine (@clawtoken/core/storage)  ✅ 已完成
        ├── 1.2.1  LevelDB 封装 ✅
        ├── 1.2.2  加密存储 (用 Crypto Engine) ✅
        ├── 1.2.3  配置管理 (~/.clawtoken/config.yaml) ✅
@@ -694,7 +694,7 @@ clawtoken/
 - `docs/WALLET.md`
 
 ```
-□ 2.1  Identity Module (@clawtoken/protocol/identity) ⏳ 进行中
+□ 2.1  Identity Module (@clawtoken/protocol/identity) ✅ 已完成
        ├── 2.1.1  DID 生成 (did:claw:xxx) ✅
        ├── 2.1.2  DID 文档结构 ✅
        ├── 2.1.3  DID 解析器 ✅
@@ -703,7 +703,7 @@ clawtoken/
        ├── 2.1.6  能力证书 (Verifiable Credentials) ✅
        └── 2.1.7  单元测试 ✅
 
-□ 2.2  Wallet Module (@clawtoken/protocol/wallet) ✅
+□ 2.2  Wallet Module (@clawtoken/protocol/wallet) ✅ 已完成
        ├── 2.2.1  余额管理 (本地状态) ✅
        ├── 2.2.2  转账交易创建 ✅
        ├── 2.2.3  交易签名 ✅
@@ -735,7 +735,7 @@ clawtoken/
        ├── 3.1.6  请求验证 (Zod) ✅
        └── 3.1.7  API 测试 ✅
 
-□ 3.2  Node Daemon (@clawtoken/node) ⏳
+□ 3.2  Node Daemon (@clawtoken/node) ✅ 已完成
        ├── 3.2.1  clawtokend 入口 ✅
        ├── 3.2.2  配置加载 ✅
        ├── 3.2.3  模块初始化顺序 ✅
@@ -744,7 +744,7 @@ clawtoken/
        ├── 3.2.6  健康检查 ✅
        └── 3.2.7  集成测试 ✅
 
-□ 3.3  CLI Tool (@clawtoken/cli) ⏳
+□ 3.3  CLI Tool (@clawtoken/cli) ✅ 已完成
        ├── 3.3.1  clawtoken init ✅
        ├── 3.3.2  clawtoken status ✅
        ├── 3.3.3  clawtoken balance ✅
@@ -753,7 +753,7 @@ clawtoken/
        ├── 3.3.6  clawtoken logs ✅
        └── 3.3.7  CLI 测试 ✅
 
-□ 3.4  二进制打包 ✅
+□ 3.4  二进制打包 ✅ 已完成
        ├── 3.4.1  pkg 配置 ✅
        ├── 3.4.2  多平台构建 (macOS, Linux, Windows) ✅
        ├── 3.4.3  install.sh 脚本 ✅
