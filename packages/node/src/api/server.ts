@@ -765,7 +765,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch {
+    } catch (error) {
       sendError(res, 400, 'REPUTATION_INVALID', (error as Error).message);
       return;
     }
@@ -882,7 +882,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch {
+    } catch (error) {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -938,7 +938,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch {
+    } catch (error) {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -1027,7 +1027,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch {
+    } catch (error) {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -1075,7 +1075,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch {
+    } catch (error) {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -1124,7 +1124,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch {
+    } catch (error) {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
