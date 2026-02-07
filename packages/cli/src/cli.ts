@@ -8,6 +8,7 @@ import {
   DEFAULT_P2P_SYNC_CONFIG,
   DEFAULT_SYNC_RUNTIME_CONFIG,
 } from '@clawtoken/node';
+import type { NodeRuntimeConfig } from '@clawtoken/node';
 import {
   addressFromDid,
   bytesToUtf8,
@@ -524,7 +525,7 @@ async function runReputationRecord(
   }
 }
 
-type NodeFactory = (config: unknown) => {
+type NodeFactory = (config?: NodeRuntimeConfig) => {
   start: () => Promise<void>;
   stop: () => Promise<void>;
   publishEvent: (envelope: Record<string, unknown>) => Promise<string>;
@@ -578,7 +579,7 @@ interface ReputationRecordArgs {
   prev?: string;
   ts?: number;
   dataDir?: string;
-  nodeConfig: unknown;
+  nodeConfig: NodeRuntimeConfig;
 }
 
 function parseInitArgs(rawArgs: string[]): InitArgs {
@@ -1005,7 +1006,7 @@ async function runEscrowRefund(
   }
 }
 
-function parseDaemonArgs(rawArgs: string[]) {
+function parseDaemonArgs(rawArgs: string[]): NodeRuntimeConfig {
   const config: {
     dataDir?: string;
     p2p?: { listen?: string[]; bootstrap?: string[] };
