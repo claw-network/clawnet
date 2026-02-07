@@ -11,8 +11,7 @@ import { autoNAT } from '@libp2p/autonat';
 import { dcutr } from '@libp2p/dcutr';
 import { ping } from '@libp2p/ping';
 import { multiaddr } from '@multiformats/multiaddr';
-import type { PeerId } from '@libp2p/interface';
-import type { Libp2pOptions, ServiceFactoryMap } from 'libp2p';
+import type { Libp2pOptions } from 'libp2p';
 import { sha256Bytes } from '../crypto/hash.js';
 import { P2PConfig, DEFAULT_P2P_CONFIG } from './config.js';
 
@@ -23,6 +22,8 @@ export interface PubsubMessage {
 }
 
 export type MessageHandler = (message: PubsubMessage) => void | Promise<void>;
+
+type PeerIdLike = { toString: () => string };
 
 type PubsubPeer = { toString: () => string };
 
@@ -76,7 +77,7 @@ type Libp2pNode = {
   peerId?: { toString: () => string };
   stop: () => Promise<void>;
   getMultiaddrs?: () => Array<{ toString: () => string }>;
-  dial?: (address: unknown) => Promise<void>;
+  dial?: (address: unknown) => Promise<unknown>;
   services?: Libp2pNodeServices;
   peerStore?: PeerStoreLike;
 };
@@ -84,9 +85,9 @@ type Libp2pNode = {
 export class P2PNode {
   private node: Libp2pNode | null = null;
   private readonly config: P2PConfig;
-  private readonly peerIdOverride?: PeerId;
+  private readonly peerIdOverride?: PeerIdLike;
 
-  constructor(config: Partial<P2PConfig> = {}, peerId?: PeerId) {
+  constructor(config: Partial<P2PConfig> = {}, peerId?: PeerIdLike) {
     this.config = { ...DEFAULT_P2P_CONFIG, ...config };
     this.peerIdOverride = peerId;
   }
@@ -105,7 +106,7 @@ export class P2PNode {
       msgIdFn: (message: { data: Uint8Array }) => sha256Bytes(message.data),
     });
 
-    const services: ServiceFactoryMap = {
+    const services: Record<string, unknown> = {
       identify: identify(),
       pubsub,
     };
@@ -125,7 +126,7 @@ export class P2PNode {
       services.dcutr = dcutr();
     }
 
-    const options: Libp2pOptions & { peerId?: PeerId } = {
+    const options = {
       addresses: {
         listen: this.config.listen,
       },
@@ -147,10 +148,11 @@ export class P2PNode {
     };
 
     if (this.peerIdOverride) {
-      options.peerId = this.peerIdOverride;
+      (options as { peerId?: PeerIdLike }).peerId = this.peerIdOverride;
     }
 
-    this.node = (await createLibp2p(options)) as Libp2pNode;
+    const node = await createLibp2p(options as unknown as Libp2pOptions);
+    this.node = node as unknown as Libp2pNode;
   }
 
   async stop(): Promise<void> {
