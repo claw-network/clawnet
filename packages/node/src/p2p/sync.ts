@@ -899,7 +899,7 @@ export class P2PSync {
 
   private async verifyPeerId(peerId: string, publicKey: Uint8Array): Promise<boolean> {
     try {
-      const factory = (await import('@libp2p/peer-id-factory')) as {
+      const factory = (await import('@libp2p/peer-id-factory')) as unknown as {
         createFromPubKey?: (key: Uint8Array) => Promise<{ toString?: () => string }>;
         createFromPublicKey?: (key: Uint8Array) => Promise<{ toString?: () => string }>;
         createFromPubKeyBytes?: (key: Uint8Array) => Promise<{ toString?: () => string }>;

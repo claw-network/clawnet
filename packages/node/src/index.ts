@@ -1,7 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { privateKeyFromProtobuf } from '@libp2p/crypto/keys';
-import type { PeerId } from '@libp2p/interface';
 import { createEd25519PeerId, createFromProtobuf, exportToProtobuf } from '@libp2p/peer-id-factory';
 import {
   bytesToUtf8,
@@ -72,7 +71,8 @@ export const DEFAULT_NODE_RUNTIME_CONFIG: NodeRuntimeConfig = {
   api: { host: '127.0.0.1', port: 9528, enabled: true },
 };
 
-type PeerIdWithPrivateKey = PeerId & { privateKey?: Uint8Array };
+type PeerIdLike = { toString: () => string };
+type PeerIdWithPrivateKey = PeerIdLike & { privateKey?: Uint8Array };
 
 export class ClawTokenNode {
   private readonly config: NodeRuntimeConfig;
