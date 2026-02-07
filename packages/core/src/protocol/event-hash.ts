@@ -8,7 +8,9 @@ export const EVENT_DOMAIN_PREFIX = 'clawtoken:event:v1:';
 export type EventEnvelope = Record<string, unknown>;
 
 export function stripSigHash(envelope: EventEnvelope): EventEnvelope {
-  const { sig: _sig, hash: _hash, ...rest } = envelope as Record<string, unknown>;
+  const { sig, hash, ...rest } = envelope as Record<string, unknown>;
+  void sig;
+  void hash;
   return rest;
 }
 

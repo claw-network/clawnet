@@ -354,7 +354,7 @@ export class ApiServer {
       }
 
       sendError(res, 404, 'NOT_FOUND', 'route not found');
-    } catch (error) {
+    } catch {
       if (!res.headersSent) {
         sendError(res, 500, 'INTERNAL_ERROR', 'unexpected error');
       }
@@ -369,7 +369,7 @@ export class ApiServer {
     try {
       const status = await this.runtime.getNodeStatus();
       sendJson(res, 200, status);
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'failed to read node status');
     }
   }
@@ -382,7 +382,7 @@ export class ApiServer {
     try {
       const peers = await this.runtime.getNodePeers();
       sendJson(res, 200, peers);
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'failed to read node peers');
     }
   }
@@ -395,7 +395,7 @@ export class ApiServer {
     try {
       const config = await this.runtime.getNodeConfig();
       sendJson(res, 200, config);
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'failed to read node config');
     }
   }
@@ -483,10 +483,7 @@ export class ApiServer {
     sendJson(res, 200, { capabilities });
   }
 
-  private async handleCapabilityRegister(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  private async handleCapabilityRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await parseBody(req, res, CapabilityRegisterSchema);
     if (!body) {
       return;
@@ -518,7 +515,7 @@ export class ApiServer {
       const paths = resolveStoragePaths(this.config.dataDir);
       const record = await loadKeyRecord(paths, keyId);
       privateKey = await decryptKeyRecord(record, body.passphrase);
-    } catch (error) {
+    } catch {
       sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
       return;
     }
@@ -548,7 +545,7 @@ export class ApiServer {
         response.description = subject.description;
       }
       sendJson(res, 201, response);
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
@@ -734,10 +731,7 @@ export class ApiServer {
     });
   }
 
-  private async handleReputationRecord(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  private async handleReputationRecord(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await parseBody(req, res, ReputationRecordSchema);
     if (!body) {
       return;
@@ -749,8 +743,7 @@ export class ApiServer {
     }
     let envelope: Record<string, unknown>;
     try {
-      const scoreValue =
-        typeof body.score === 'string' ? Number(body.score) : body.score;
+      const scoreValue = typeof body.score === 'string' ? Number(body.score) : body.score;
       const aspects = body.aspects
         ? (Object.fromEntries(
             Object.entries(body.aspects).map(([key, value]) => [
@@ -772,7 +765,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch (error) {
+    } catch {
       sendError(res, 400, 'REPUTATION_INVALID', (error as Error).message);
       return;
     }
@@ -858,10 +851,7 @@ export class ApiServer {
     });
   }
 
-  private async handleWalletTransfer(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  private async handleWalletTransfer(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await parseBody(req, res, WalletTransferSchema);
     if (!body) {
       return;
@@ -892,7 +882,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch (error) {
+    } catch {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -907,15 +897,12 @@ export class ApiServer {
         status: 'broadcast',
         timestamp: body.ts ?? Date.now(),
       });
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 
-  private async handleWalletEscrowCreate(
-    req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
+  private async handleWalletEscrowCreate(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await parseBody(req, res, WalletEscrowCreateSchema);
     if (!body) {
       return;
@@ -951,7 +938,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch (error) {
+    } catch {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -981,7 +968,7 @@ export class ApiServer {
         releaseConditions: body.releaseRules,
         createdAt: body.ts ?? Date.now(),
       });
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
@@ -1040,7 +1027,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch (error) {
+    } catch {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -1052,7 +1039,7 @@ export class ApiServer {
         status: 'broadcast',
         timestamp: body.ts ?? Date.now(),
       });
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
@@ -1088,7 +1075,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch (error) {
+    } catch {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -1100,7 +1087,7 @@ export class ApiServer {
         status: 'broadcast',
         timestamp: body.ts ?? Date.now(),
       });
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
@@ -1137,7 +1124,7 @@ export class ApiServer {
         nonce: body.nonce,
         prev: body.prev,
       });
-    } catch (error) {
+    } catch {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
       return;
     }
@@ -1149,16 +1136,13 @@ export class ApiServer {
         status: 'broadcast',
         timestamp: body.ts ?? Date.now(),
       });
-    } catch (error) {
+    } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 }
 
-async function readJsonBody(
-  req: IncomingMessage,
-  res: ServerResponse,
-): Promise<unknown | null> {
+async function readJsonBody(req: IncomingMessage, res: ServerResponse): Promise<unknown | null> {
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
@@ -1296,12 +1280,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-function sendError(
-  res: ServerResponse,
-  status: number,
-  code: string,
-  message: string,
-): void {
+function sendError(res: ServerResponse, status: number, code: string, message: string): void {
   sendJson(res, status, { error: { code, message } });
 }
 
@@ -1370,9 +1349,7 @@ function parsePagination(value: string | null, fallback: number, max: number): n
 
 type ReputationSource = 'store' | 'log';
 
-function parseReputationSource(
-  value: string | null,
-): ReputationSource | null | 'invalid' {
+function parseReputationSource(value: string | null): ReputationSource | null | 'invalid' {
   if (!value) {
     return null;
   }
@@ -1737,12 +1714,14 @@ function buildWalletTransactions(
       continue;
     }
   }
-  return transactions.filter(
-    (tx) => tx.from === address || tx.to === address,
-  );
+  return transactions.filter((tx) => tx.from === address || tx.to === address);
 }
 
-function filterWalletTransaction(type: string, address: string, tx: Record<string, unknown>): boolean {
+function filterWalletTransaction(
+  type: string,
+  address: string,
+  tx: Record<string, unknown>,
+): boolean {
   if (type === 'all') {
     return true;
   }

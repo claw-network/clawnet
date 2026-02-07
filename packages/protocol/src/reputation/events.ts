@@ -49,7 +49,7 @@ function assertValidDid(value: string, field: string): void {
   requireNonEmpty(value, field);
   try {
     publicKeyFromDid(value);
-  } catch (error) {
+  } catch {
     throw new Error(`${field} must be a valid did:claw identifier`);
   }
 }
@@ -107,8 +107,7 @@ export function parseReputationRecordPayload(
         if (!isReputationAspectKey(key)) {
           throw new Error(`aspect ${key} is not supported`);
         }
-        const numeric =
-          typeof value === 'number' ? value : Number(value);
+        const numeric = typeof value === 'number' ? value : Number(value);
         if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {
           throw new Error(`aspect ${key} must be an integer`);
         }

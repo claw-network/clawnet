@@ -125,7 +125,7 @@ function assertValidAddress(value: string, field: string): void {
   requireNonEmpty(value, field);
   try {
     publicKeyFromAddress(value);
-  } catch (error) {
+  } catch {
     throw new Error(`${field} must be a valid claw address`);
   }
 }

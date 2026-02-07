@@ -899,7 +899,11 @@ export class P2PSync {
 
   private async verifyPeerId(peerId: string, publicKey: Uint8Array): Promise<boolean> {
     try {
-      const factory: any = await import('@libp2p/peer-id-factory');
+      const factory = (await import('@libp2p/peer-id-factory')) as {
+        createFromPubKey?: (key: Uint8Array) => Promise<{ toString?: () => string }>;
+        createFromPublicKey?: (key: Uint8Array) => Promise<{ toString?: () => string }>;
+        createFromPubKeyBytes?: (key: Uint8Array) => Promise<{ toString?: () => string }>;
+      };
       const createFromPubKey =
         factory.createFromPubKey ?? factory.createFromPublicKey ?? factory.createFromPubKeyBytes;
       if (typeof createFromPubKey !== 'function') {
@@ -915,7 +919,13 @@ export class P2PSync {
       }
       if (publicKey.length === 32) {
         try {
-          const keys: any = await import('@libp2p/crypto/keys');
+          const keys = (await import('@libp2p/crypto/keys')) as {
+            publicKeyFromRaw?: (raw: Uint8Array) => {
+              bytes?: Uint8Array;
+              marshal?: () => Uint8Array;
+              toBytes?: () => Uint8Array;
+            };
+          };
           if (typeof keys.publicKeyFromRaw === 'function') {
             const keyObj = keys.publicKeyFromRaw(publicKey);
             const keyBytes =

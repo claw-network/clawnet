@@ -10,6 +10,8 @@ import { autoNAT } from '@libp2p/autonat';
 import { dcutr } from '@libp2p/dcutr';
 import { ping } from '@libp2p/ping';
 import { multiaddr } from '@multiformats/multiaddr';
+import type { PeerId } from '@libp2p/interface';
+import type { Libp2pOptions, ServiceFactoryMap } from 'libp2p';
 import { sha256Bytes } from '../crypto/hash.js';
 import { P2PConfig, DEFAULT_P2P_CONFIG } from './config.js';
 
@@ -21,12 +23,69 @@ export interface PubsubMessage {
 
 export type MessageHandler = (message: PubsubMessage) => void | Promise<void>;
 
-export class P2PNode {
-  private node: any;
-  private readonly config: P2PConfig;
-  private readonly peerIdOverride?: unknown;
+type PubsubPeer = { toString: () => string };
 
-  constructor(config: Partial<P2PConfig> = {}, peerId?: unknown) {
+type PubsubEventDetail = {
+  topic: string;
+  data: Uint8Array;
+  from?: { toString?: () => string };
+};
+
+type PubsubEvent = {
+  detail?: PubsubEventDetail;
+};
+
+type PubsubListener = (event: PubsubEvent) => void;
+
+type PubsubPublishResult = {
+  recipients?: PubsubPeer[];
+};
+
+type PubsubService = {
+  publish: (topic: string, data: Uint8Array) => Promise<PubsubPublishResult | undefined>;
+  subscribe: (topic: string) => void;
+  unsubscribe: (topic: string) => void;
+  addEventListener: (type: 'message', listener: PubsubListener) => void;
+  removeEventListener: (type: 'message', listener: PubsubListener) => void;
+  getPeers?: () => PubsubPeer[];
+  getSubscribers?: (topic: string) => PubsubPeer[];
+};
+
+type PublicKeyLike = {
+  bytes?: Uint8Array;
+  raw?: Uint8Array;
+  marshal?: () => Uint8Array;
+  toBytes?: () => Uint8Array;
+};
+
+type PeerRecordLike = {
+  id?: { publicKey?: PublicKeyLike };
+  publicKey?: PublicKeyLike;
+};
+
+type PeerStoreLike = {
+  get: (peerId: string) => Promise<PeerRecordLike | undefined>;
+};
+
+type Libp2pNodeServices = {
+  pubsub?: PubsubService;
+} & Record<string, unknown>;
+
+type Libp2pNode = {
+  peerId?: { toString: () => string };
+  stop: () => Promise<void>;
+  getMultiaddrs?: () => Array<{ toString: () => string }>;
+  dial?: (address: unknown) => Promise<void>;
+  services?: Libp2pNodeServices;
+  peerStore?: PeerStoreLike;
+};
+
+export class P2PNode {
+  private node: Libp2pNode | null = null;
+  private readonly config: P2PConfig;
+  private readonly peerIdOverride?: PeerId;
+
+  constructor(config: Partial<P2PConfig> = {}, peerId?: PeerId) {
     this.config = { ...DEFAULT_P2P_CONFIG, ...config };
     this.peerIdOverride = peerId;
   }
@@ -45,7 +104,7 @@ export class P2PNode {
       msgIdFn: (message: { data: Uint8Array }) => sha256Bytes(message.data),
     });
 
-    const services: any = {
+    const services: ServiceFactoryMap = {
       identify: identify(),
       pubsub,
     };
@@ -65,7 +124,7 @@ export class P2PNode {
       services.dcutr = dcutr();
     }
 
-    const options: any = {
+    const options: Libp2pOptions & { peerId?: PeerId } = {
       addresses: {
         listen: this.config.listen,
       },
@@ -90,7 +149,7 @@ export class P2PNode {
       options.peerId = this.peerIdOverride;
     }
 
-    this.node = await createLibp2p(options);
+    this.node = (await createLibp2p(options)) as Libp2pNode;
   }
 
   async stop(): Promise<void> {
@@ -133,7 +192,7 @@ export class P2PNode {
 
   async subscribe(topic: string, handler: MessageHandler): Promise<() => void> {
     const pubsub = this.getPubsub();
-    const listener = (event: CustomEvent<any>) => {
+    const listener: PubsubListener = (event) => {
       const message = event.detail;
       if (!message || message.topic !== topic) {
         return;
@@ -178,16 +237,16 @@ export class P2PNode {
         return null;
       }
       if (publicKey.bytes) {
-        return publicKey.bytes as Uint8Array;
+        return publicKey.bytes;
       }
       if (publicKey.raw) {
-        return publicKey.raw as Uint8Array;
+        return publicKey.raw;
       }
       if (publicKey.marshal) {
-        return publicKey.marshal() as Uint8Array;
+        return publicKey.marshal();
       }
       if (publicKey.toBytes) {
-        return publicKey.toBytes() as Uint8Array;
+        return publicKey.toBytes();
       }
       return null;
     } catch {
@@ -195,10 +254,11 @@ export class P2PNode {
     }
   }
 
-  private getPubsub(): any {
-    if (!this.node?.services?.pubsub) {
+  private getPubsub(): PubsubService {
+    const pubsub = this.node?.services?.pubsub;
+    if (!pubsub) {
       throw new Error('pubsub service not initialized');
     }
-    return this.node.services.pubsub;
+    return pubsub;
   }
 }

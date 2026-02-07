@@ -1,11 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { privateKeyFromProtobuf } from '@libp2p/crypto/keys';
-import {
-  createEd25519PeerId,
-  createFromProtobuf,
-  exportToProtobuf,
-} from '@libp2p/peer-id-factory';
+import type { PeerId } from '@libp2p/interface';
+import { createEd25519PeerId, createFromProtobuf, exportToProtobuf } from '@libp2p/peer-id-factory';
 import {
   bytesToUtf8,
   canonicalizeBytes,
@@ -75,6 +72,8 @@ export const DEFAULT_NODE_RUNTIME_CONFIG: NodeRuntimeConfig = {
   api: { host: '127.0.0.1', port: 9528, enabled: true },
 };
 
+type PeerIdWithPrivateKey = PeerId & { privateKey?: Uint8Array };
+
 export class ClawTokenNode {
   private readonly config: NodeRuntimeConfig;
   private p2p?: P2PNode;
@@ -87,7 +86,7 @@ export class ClawTokenNode {
   private rangeTimer?: NodeJS.Timeout;
   private snapshotTimer?: NodeJS.Timeout;
   private apiServer?: ApiServer;
-  private peerId?: any;
+  private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
   private startedAt?: number;
   private persistedConfig?: NodeConfig;
@@ -145,11 +144,10 @@ export class ClawTokenNode {
       this.snapshotStore = new SnapshotStore(paths);
       await this.initReputationStore();
       if (this.config.snapshotBuilder) {
-        this.snapshotScheduler = new SnapshotScheduler(
-          this.eventStore,
-          this.snapshotStore,
-          { ...DEFAULT_SNAPSHOT_POLICY, ...(this.config.snapshotPolicy ?? {}) },
-        );
+        this.snapshotScheduler = new SnapshotScheduler(this.eventStore, this.snapshotStore, {
+          ...DEFAULT_SNAPSHOT_POLICY,
+          ...(this.config.snapshotPolicy ?? {}),
+        });
       }
 
       this.p2p = new P2PNode(p2pConfig, peerId);
@@ -161,13 +159,11 @@ export class ClawTokenNode {
         this.startedAt = Date.now();
       }
 
-      const {
-        rangeIntervalMs,
-        snapshotIntervalMs,
-        requestRangeOnStart,
-        requestSnapshotOnStart,
-        ...syncOptions
-      } = this.config.sync ?? {};
+      const syncOptions = { ...(this.config.sync ?? {}) };
+      delete syncOptions.rangeIntervalMs;
+      delete syncOptions.snapshotIntervalMs;
+      delete syncOptions.requestRangeOnStart;
+      delete syncOptions.requestSnapshotOnStart;
 
       this.sync = new P2PSync(this.p2p, this.eventStore, this.snapshotStore, {
         peerId: peerId.toString(),
@@ -252,7 +248,10 @@ export class ClawTokenNode {
     return this.peerId.toString();
   }
 
-  getHealth(): { ok: boolean; checks: { p2p: boolean; sync: boolean; eventStore: boolean; api: boolean } } {
+  getHealth(): {
+    ok: boolean;
+    checks: { p2p: boolean; sync: boolean; eventStore: boolean; api: boolean };
+  } {
     const p2p = Boolean(this.p2p);
     const sync = Boolean(this.sync);
     const eventStore = Boolean(this.eventStore);
@@ -388,9 +387,7 @@ export class ClawTokenNode {
 
   private resolveP2PPort(): number {
     const listen =
-      this.config.p2p?.listen ??
-      this.persistedConfig?.p2p?.listen ??
-      DEFAULT_P2P_CONFIG.listen;
+      this.config.p2p?.listen ?? this.persistedConfig?.p2p?.listen ?? DEFAULT_P2P_CONFIG.listen;
     for (const addr of listen) {
       const match = addr.match(/\/tcp\/(\d+)/);
       if (match) {
@@ -511,7 +508,7 @@ export class ClawTokenNode {
     await this.snapshotStore.saveSnapshot(signed);
   }
 
-  private async loadOrCreatePeerId(keysDir: string): Promise<any> {
+  private async loadOrCreatePeerId(keysDir: string): Promise<PeerIdWithPrivateKey> {
     const path = join(keysDir, 'peer-id.bin');
     try {
       const data = await readFile(path);
@@ -527,7 +524,7 @@ export class ClawTokenNode {
     return peerId;
   }
 
-  private extractPeerPrivateKey(peerId: any): Uint8Array {
+  private extractPeerPrivateKey(peerId: PeerIdWithPrivateKey): Uint8Array {
     if (!peerId?.privateKey) {
       throw new Error('PeerId missing private key');
     }

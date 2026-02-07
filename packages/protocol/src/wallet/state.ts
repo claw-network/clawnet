@@ -59,7 +59,10 @@ export function applyWalletEvent(state: WalletState, envelope: EventEnvelope): W
   const type = String(envelope.type ?? '');
   const payload = (envelope.payload ?? {}) as Record<string, unknown>;
   const ts = typeof envelope.ts === 'number' ? envelope.ts : Date.now();
-  const hash = typeof envelope.hash === 'string' && envelope.hash.length ? envelope.hash : eventHashHex(envelope);
+  const hash =
+    typeof envelope.hash === 'string' && envelope.hash.length
+      ? envelope.hash
+      : eventHashHex(envelope);
 
   switch (type) {
     case 'wallet.transfer': {
@@ -129,7 +132,7 @@ function parseAmount(value: string, field: string): bigint {
       throw new Error(`${field} must be >= 0`);
     }
     return parsed;
-  } catch (error) {
+  } catch {
     throw new Error(`${field} must be a valid integer string`);
   }
 }

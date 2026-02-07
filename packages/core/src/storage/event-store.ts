@@ -57,7 +57,10 @@ function extractHash(envelope: Record<string, unknown>): string | null {
   return typeof hash === 'string' && hash.length > 0 ? hash : null;
 }
 
-function validateEventBytes(hash: string, eventBytes: Uint8Array): {
+function validateEventBytes(
+  hash: string,
+  eventBytes: Uint8Array,
+): {
   envelope: Record<string, unknown>;
   canonical: Uint8Array;
 } {
@@ -239,7 +242,7 @@ export class EventStore {
 
   async verifyEventLog(): Promise<{ ok: boolean; errors: string[] }> {
     const errors: string[] = [];
-    for await (const { key, value } of this.store.iterator(PREFIX_LOG_SEQ)) {
+    for await (const { value } of this.store.iterator(PREFIX_LOG_SEQ)) {
       const hash = bytesToUtf8(value);
       const eventBytes = await this.getEvent(hash);
       if (!eventBytes) {
@@ -258,16 +261,18 @@ export class EventStore {
     return { ok: errors.length === 0, errors };
   }
 
-  async rebuildIndexes(options: {
-    rebuildIssuer?: boolean;
-    rebuildNonce?: boolean;
-    clearExisting?: boolean;
-    indexer?: (envelope: Record<string, unknown>) => {
-      issuer?: string;
-      nonce?: number;
-      addresses?: string[];
-    };
-  } = {}): Promise<void> {
+  async rebuildIndexes(
+    options: {
+      rebuildIssuer?: boolean;
+      rebuildNonce?: boolean;
+      clearExisting?: boolean;
+      indexer?: (envelope: Record<string, unknown>) => {
+        issuer?: string;
+        nonce?: number;
+        addresses?: string[];
+      };
+    } = {},
+  ): Promise<void> {
     const { rebuildIssuer = true, rebuildNonce = true, clearExisting = true, indexer } = options;
     if (clearExisting) {
       if (rebuildIssuer) {
@@ -318,13 +323,15 @@ export class EventStore {
     }
   }
 
-  async pruneEvents(options: {
-    minAgeMs?: number;
-    minEvents?: number;
-    snapshotAt?: string | null;
-    now?: number;
-    shouldKeep?: (envelope: Record<string, unknown>) => boolean;
-  } = {}): Promise<number> {
+  async pruneEvents(
+    options: {
+      minAgeMs?: number;
+      minEvents?: number;
+      snapshotAt?: string | null;
+      now?: number;
+      shouldKeep?: (envelope: Record<string, unknown>) => boolean;
+    } = {},
+  ): Promise<number> {
     const minAgeMs = options.minAgeMs ?? 30 * 24 * 60 * 60 * 1000;
     const minEvents = options.minEvents ?? 100_000;
     const now = options.now ?? Date.now();

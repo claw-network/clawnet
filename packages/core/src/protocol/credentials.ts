@@ -34,7 +34,8 @@ export type CapabilityCredential = VerifiableCredential<CapabilityCredentialSubj
 export function stripCredentialProof<TSubject>(
   credential: VerifiableCredential<TSubject>,
 ): Omit<VerifiableCredential<TSubject>, 'proof'> {
-  const { proof: _proof, ...rest } = credential;
+  const { proof, ...rest } = credential;
+  void proof;
   return rest;
 }
 

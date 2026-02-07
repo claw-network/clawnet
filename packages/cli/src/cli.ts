@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ClawTokenNode, DEFAULT_P2P_SYNC_CONFIG, DEFAULT_SYNC_RUNTIME_CONFIG } from '@clawtoken/node';
+import {
+  ClawTokenNode,
+  DEFAULT_P2P_SYNC_CONFIG,
+  DEFAULT_SYNC_RUNTIME_CONFIG,
+} from '@clawtoken/node';
 import {
   addressFromDid,
   bytesToUtf8,
@@ -152,9 +156,7 @@ async function runInit(rawArgs: string[]): Promise<void> {
   const paths = resolveStoragePaths(parsed.dataDir);
   await ensureConfig(paths);
 
-  const mnemonic =
-    parsed.mnemonic ??
-    generateMnemonic(parsed.strength ?? 256);
+  const mnemonic = parsed.mnemonic ?? generateMnemonic(parsed.strength ?? 256);
   if (!validateMnemonic(mnemonic)) {
     fail('invalid mnemonic');
   }
@@ -1070,7 +1072,12 @@ function parseDaemonArgs(rawArgs: string[]) {
       case '--allowlist': {
         const value = rawArgs[++i];
         if (value) {
-          allowlist.push(...value.split(',').map((entry) => entry.trim()).filter(Boolean));
+          allowlist.push(
+            ...value
+              .split(',')
+              .map((entry) => entry.trim())
+              .filter(Boolean),
+          );
         }
         break;
       }
@@ -2161,10 +2168,7 @@ function parseAspects(value: string | undefined, flag: string): Record<string, n
   if (!entries.length) {
     return undefined;
   }
-  const aspects: Record<ReputationAspectKey, number> = {} as Record<
-    ReputationAspectKey,
-    number
-  >;
+  const aspects: Record<ReputationAspectKey, number> = {} as Record<ReputationAspectKey, number>;
   for (const [key, raw] of entries) {
     if (!isReputationAspectKey(key)) {
       fail(`invalid ${flag}: unsupported aspect ${key}`);

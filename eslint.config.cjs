@@ -14,6 +14,12 @@ module.exports = [
         ecmaVersion: 2022,
         sourceType: 'module',
       },
+      globals: {
+        Buffer: 'readonly',
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
+        process: 'readonly',
+      },
     },
     plugins: {
       '@typescript-eslint': tseslint,
@@ -21,6 +27,7 @@ module.exports = [
     rules: {
       ...js.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
+      'no-undef': 'off',
     },
   },
 ];
