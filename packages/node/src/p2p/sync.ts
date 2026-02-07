@@ -122,7 +122,9 @@ interface SnapshotChunkState {
 export class P2PSync {
   private readonly config: P2PSyncConfig;
   private readonly resolvePeerPublicKey?: (peerId: string) => Promise<Uint8Array | null>;
-  private readonly resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
+  private readonly resolveControllerPublicKey?: (
+    controllerDid: string,
+  ) => Promise<Uint8Array | null>;
   private readonly onEventApplied?: (
     envelope: Record<string, unknown>,
     bytes: Uint8Array,
@@ -139,7 +141,10 @@ export class P2PSync {
   private readonly allowlist = new Set<string>();
   private readonly powTickets = new Map<string, { receivedAt: number }>();
   private readonly stakeProofs = new Map<string, { receivedAt: number }>();
-  private readonly peerStats = new Map<string, { windowStart: number; count: number; bytes: number }>();
+  private readonly peerStats = new Map<
+    string,
+    { windowStart: number; count: number; bytes: number }
+  >();
   private readonly peerScores = new Map<string, { score: number; updatedAt: number }>();
   private readonly peerRotations = new Map<string, { newPeer: string; ts: number }>();
 
@@ -162,14 +167,15 @@ export class P2PSync {
   }
 
   async start(): Promise<void> {
-    this.unsubscribeRequests = await this.node.subscribe(TOPIC_REQUESTS, (message) =>
+    this.unsubscribeRequests = await this.node.subscribe(TOPIC_REQUESTS, (message: PubsubMessage) =>
       this.handleRequest(message),
     );
-    this.unsubscribeResponses = await this.node.subscribe(TOPIC_RESPONSES, (message) =>
-      this.handleResponse(message),
+    this.unsubscribeResponses = await this.node.subscribe(
+      TOPIC_RESPONSES,
+      (message: PubsubMessage) => this.handleResponse(message),
     );
     if (this.config.subscribeEvents) {
-      this.unsubscribeEvents = await this.node.subscribe(TOPIC_EVENTS, (message) =>
+      this.unsubscribeEvents = await this.node.subscribe(TOPIC_EVENTS, (message: PubsubMessage) =>
         this.handleEventEnvelope(message),
       );
     }
@@ -303,19 +309,12 @@ export class P2PSync {
     if (!request.rangeRequest) {
       return;
     }
-    const limit = Math.min(
-      Math.max(request.rangeRequest.limit, 0),
-      this.config.maxRangeLimit,
-    );
+    const limit = Math.min(Math.max(request.rangeRequest.limit, 0), this.config.maxRangeLimit);
     if (limit <= 0) {
       return;
     }
     const from = request.rangeRequest.from || '';
-    const range = await this.eventStore.getEventLogRange(
-      from,
-      limit,
-      this.config.maxRangeBytes,
-    );
+    const range = await this.eventStore.getEventLogRange(from, limit, this.config.maxRangeBytes);
     const response: ResponseMessage = {
       type: ResponseType.RangeResponse,
       rangeResponse: range,
@@ -405,10 +404,10 @@ export class P2PSync {
     if (this.config.verifySnapshotSignatures) {
       const { validPeers } = await verifySnapshotSignatures(
         snapshot,
-        (peerId) => this.resolvePublicKey(peerId),
+        (peerId: string) => this.resolvePublicKey(peerId),
         { minSignatures: 1 },
       );
-      const eligiblePeers = validPeers.filter((peer) => this.isPeerEligible(peer));
+      const eligiblePeers = validPeers.filter((peer: string) => this.isPeerEligible(peer));
       if (eligiblePeers.length < this.config.minSnapshotSignatures) {
         return;
       }
@@ -751,7 +750,9 @@ export class P2PSync {
     const chunkCount = response.chunkCount ?? 0;
     const chunkIndex = response.chunkIndex ?? 0;
     const totalBytes =
-      response.totalBytes && response.totalBytes > 0 ? response.totalBytes : response.snapshot.length;
+      response.totalBytes && response.totalBytes > 0
+        ? response.totalBytes
+        : response.snapshot.length;
 
     if (totalBytes <= 0 || totalBytes > this.config.maxSnapshotTotalBytes) {
       return null;

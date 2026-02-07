@@ -6,14 +6,38 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./crypto": "./dist/crypto/index.js",
-    "./encoding": "./dist/encoding/index.js",
-    "./identity": "./dist/identity/index.js",
-    "./p2p": "./dist/p2p/index.js",
-    "./protocol": "./dist/protocol/index.js",
-    "./storage": "./dist/storage/index.js",
-    "./utils": "./dist/utils/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./crypto": {
+      "types": "./dist/crypto/index.d.ts",
+      "default": "./dist/crypto/index.js"
+    },
+    "./encoding": {
+      "types": "./dist/encoding/index.d.ts",
+      "default": "./dist/encoding/index.js"
+    },
+    "./identity": {
+      "types": "./dist/identity/index.d.ts",
+      "default": "./dist/identity/index.js"
+    },
+    "./p2p": {
+      "types": "./dist/p2p/index.d.ts",
+      "default": "./dist/p2p/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/index.d.ts",
+      "default": "./dist/protocol/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "default": "./dist/storage/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "default": "./dist/utils/index.js"
+    }
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",

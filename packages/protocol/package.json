@@ -6,9 +6,18 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./p2p": "./dist/p2p/index.js",
-    "./identity": "./dist/identity/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./p2p": {
+      "types": "./dist/p2p/index.d.ts",
+      "default": "./dist/p2p/index.js"
+    },
+    "./identity": {
+      "types": "./dist/identity/index.d.ts",
+      "default": "./dist/identity/index.js"
+    }
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
