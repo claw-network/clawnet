@@ -628,10 +628,10 @@ clawtoken/
        ├── .eslintrc.cjs ✅
        ├── .prettierrc.cjs ✅
        └── turbo.json (可选) ⏳
-□ 0.3  配置 CI/CD             ⏳ 部分完成（仅 ci.yml）
+□ 0.3  配置 CI/CD             ✅ 已完成
        ├── .github/workflows/ci.yml ✅
-       ├── .github/workflows/release.yml ⏳
-       └── .github/workflows/test.yml ⏳
+       ├── .github/workflows/release.yml ✅
+       └── .github/workflows/test.yml ✅
 □ 0.4  创建 packages 骨架     ✅ 已完成
        ├── packages/core/ ✅
        ├── packages/protocol/ ✅
@@ -726,8 +726,8 @@ clawtoken/
 - `docs/AGENT_RUNTIME.md`
 
 ```
-□ 3.1  HTTP API Server (@clawtoken/node/api) ⏳
-       ├── 3.1.1  Fastify/Hono 服务器 ⏳
+□ 3.1  HTTP API Server (@clawtoken/node/api) ✅ 已完成
+       ├── 3.1.1  HTTP 服务器 (node:http) ✅
        ├── 3.1.2  路由: /api/node/* ✅
        ├── 3.1.3  路由: /api/identity/* ✅
        ├── 3.1.4  路由: /api/wallet/* ✅
@@ -1005,11 +1005,11 @@ clawtoken/
 
 | Phase | 描述 | 预计周期 | 状态 |
 |-------|------|----------|------|
-| 0 | 基础设施 | Week 0 | ✅ 已完成（CI/CD 部分完成） |
-| 1 | Core Layer | Week 1-2 | ⏳ 进行中 |
-| 2 | Identity + Wallet | Week 3-4 | ⏳ |
-| 3 | Interface (MVP) | Week 5-6 | ⏳ |
-| 4 | Reputation | Week 7-8 | ⏳ |
+| 0 | 基础设施 | Week 0 | ✅ 已完成 |
+| 1 | Core Layer | Week 1-2 | ✅ 已完成 |
+| 2 | Identity + Wallet | Week 3-4 | ✅ 已完成 |
+| 3 | Interface (MVP) | Week 5-6 | ✅ 已完成 |
+| 4 | Reputation | Week 7-8 | ✅ 已完成 |
 | 5 | Markets | Week 9-12 | ⏳ |
 | 6 | Contracts | Week 13-16 | ⏳ |
 | 7 | SDK | Week 17-18 | ⏳ |
@@ -1026,4 +1026,4 @@ clawtoken/
 
 ---
 
-*最后更新: 2026年2月6日*
+*最后更新: 2026年2月7日*
