@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { ApiServer } from '../src/api/server.js';
-import { EventStore, MemoryStore } from '@clawtoken/core';
+import {
+  createKeyRecord,
+  EventStore,
+  MemoryStore,
+  resolveStoragePaths,
+  saveKeyRecord,
+} from '@clawtoken/core';
 import { canonicalizeBytes, generateKeypair } from '@clawtoken/core/crypto';
 import { didFromPublicKey } from '@clawtoken/core/identity';
 import { createReputationRecordEnvelope } from '@clawtoken/protocol';
@@ -10,13 +19,34 @@ describe('reputation api', () => {
   let api: ApiServer;
   let baseUrl: string;
   let eventStore: EventStore;
+  let tempDir: string;
+  let passphrase: string;
+  let issuerDid: string;
+  let published: Record<string, unknown>[];
 
   beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-reputation-api-'));
+    passphrase = 'test-passphrase-123';
+    const issuerKeys = await generateKeypair();
+    issuerDid = didFromPublicKey(issuerKeys.publicKey);
+    const record = createKeyRecord(issuerKeys.publicKey, issuerKeys.privateKey, passphrase, {
+      t: 1,
+      m: 1024,
+      p: 1,
+      dkLen: 32,
+    });
+    const paths = resolveStoragePaths(tempDir);
+    await saveKeyRecord(paths, record);
+
     eventStore = new EventStore(new MemoryStore());
+    published = [];
     api = new ApiServer(
-      { host: '127.0.0.1', port: 0 },
+      { host: '127.0.0.1', port: 0, dataDir: tempDir },
       {
-        publishEvent: async () => 'hash-1',
+        publishEvent: async (envelope) => {
+          published.push(envelope);
+          return `hash-${published.length}`;
+        },
         eventStore,
       },
     );
@@ -27,6 +57,7 @@ describe('reputation api', () => {
 
   afterEach(async () => {
     await api.stop();
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it('returns reputation profile for existing records', async () => {
@@ -77,6 +108,8 @@ describe('reputation api', () => {
       dimension: 'quality',
       score: 900,
       ref: 'contract-2',
+      comment: 'great',
+      aspects: { quality: 5, communication: 4 },
       ts: 2_000,
       nonce: 1,
     });
@@ -86,7 +119,13 @@ describe('reputation api', () => {
     const res = await fetch(`${baseUrl}/api/reputation/${encodeURIComponent(target)}/reviews`);
     expect(res.status).toBe(200);
     const json = (await res.json()) as {
-      reviews: Array<{ rating: number; reviewer: string; reviewee: string }>;
+      reviews: Array<{
+        rating: number;
+        reviewer: string;
+        reviewee: string;
+        comment?: string;
+        aspects?: Record<string, number>;
+      }>;
       averageRating: number;
       total: number;
     };
@@ -94,6 +133,8 @@ describe('reputation api', () => {
     expect(json.reviews[0]?.rating).toBe(5);
     expect(json.reviews[0]?.reviewer).toBe(issuer);
     expect(json.reviews[0]?.reviewee).toBe(target);
+    expect(json.reviews[0]?.comment).toBe('great');
+    expect(json.reviews[0]?.aspects?.quality).toBe(5);
     expect(json.averageRating).toBe(5);
   });
 
@@ -104,5 +145,27 @@ describe('reputation api', () => {
     expect(res.status).toBe(404);
     const json = (await res.json()) as { error: { code: string } };
     expect(json.error.code).toBe('REPUTATION_NOT_FOUND');
+  });
+
+  it('publishes reputation.record events', async () => {
+    const targetKeys = await generateKeypair();
+    const target = didFromPublicKey(targetKeys.publicKey);
+
+    const res = await fetch(`${baseUrl}/api/reputation/record`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        did: issuerDid,
+        passphrase,
+        target,
+        dimension: 'quality',
+        score: 750,
+        ref: 'contract-3',
+        nonce: 1,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(published[0]?.type).toBe('reputation.record');
   });
 });

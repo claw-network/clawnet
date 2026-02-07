@@ -21,6 +21,7 @@ import {
   CapabilityCredential,
   buildReputationProfile,
   createIdentityCapabilityRegisterEnvelope,
+  createReputationRecordEnvelope,
   createReputationState,
   createWalletEscrowCreateEnvelope,
   createWalletEscrowFundEnvelope,
@@ -30,8 +31,11 @@ import {
   createWalletState,
   getWalletBalance,
   getReputationRecords,
+  ReputationDimension,
+  ReputationAspectKey,
   ReputationLevel,
   ReputationRecord,
+  ReputationStore,
   ReputationState,
   WalletState,
 } from '@clawtoken/protocol';
@@ -93,6 +97,22 @@ const WalletEscrowActionSchema = z
     ruleId: z.string().optional(),
     reason: z.string().optional(),
     evidence: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const ReputationRecordSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    target: z.string().min(1),
+    dimension: z.string().min(1),
+    score: z.union([z.number(), z.string()]),
+    ref: z.string().min(1),
+    comment: z.string().optional(),
+    aspects: z.record(z.union([z.number(), z.string()])).optional(),
     nonce: z.number().int().positive(),
     prev: z.string().optional(),
     ts: z.number().optional(),
@@ -174,6 +194,20 @@ export interface WalletEscrowActionRequest {
   ts?: number;
 }
 
+export interface ReputationRecordRequest {
+  did: string;
+  passphrase: string;
+  target: string;
+  dimension: string;
+  score: number | string;
+  ref: string;
+  comment?: string;
+  aspects?: Record<ReputationAspectKey, number>;
+  nonce: number;
+  prev?: string;
+  ts?: number;
+}
+
 export class ApiServer {
   private server?: Server;
 
@@ -182,6 +216,7 @@ export class ApiServer {
     private readonly runtime: {
       publishEvent: (envelope: Record<string, unknown>) => Promise<string>;
       eventStore?: EventStore;
+      reputationStore?: ReputationStore;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
       getNodeConfig?: () => Promise<Record<string, unknown>>;
@@ -259,7 +294,7 @@ export class ApiServer {
         const segments = url.pathname.split('/').filter(Boolean);
         if (segments.length === 3) {
           const did = decodeURIComponent(segments[2]);
-          await this.handleReputationProfile(req, res, did);
+          await this.handleReputationProfile(req, res, did, url);
           return;
         }
         if (segments.length === 4 && segments[3] === 'reviews') {
@@ -267,6 +302,11 @@ export class ApiServer {
           await this.handleReputationReviews(req, res, did, url);
           return;
         }
+      }
+
+      if (method === 'POST' && url?.pathname === '/api/reputation/record') {
+        await this.handleReputationRecord(req, res);
+        return;
       }
 
       if (method === 'GET' && url?.pathname === '/api/wallet/balance') {
@@ -517,11 +557,53 @@ export class ApiServer {
     _req: IncomingMessage,
     res: ServerResponse,
     did: string,
+    url: URL,
   ): Promise<void> {
     if (!isValidDid(did)) {
       sendError(res, 400, 'DID_INVALID', 'invalid did');
       return;
     }
+    const source = parseReputationSource(url.searchParams.get('source'));
+    if (source === 'invalid') {
+      sendError(res, 400, 'INVALID_REQUEST', 'invalid source');
+      return;
+    }
+    const store = this.runtime.reputationStore;
+    if (source !== 'log' && store) {
+      const records = await store.getRecords(did);
+      if (!records.length) {
+        sendError(res, 404, 'REPUTATION_NOT_FOUND', 'reputation not found');
+        return;
+      }
+      const profile = await store.getProfile(did);
+      const qualityRecords = records.filter((record) => record.dimension === 'quality');
+      const averageRating = computeAverageRating(qualityRecords);
+      const levelInfo = mapReputationLevel(profile.level);
+      sendJson(res, 200, {
+        did,
+        score: profile.overallScore,
+        level: levelInfo.label,
+        levelNumber: levelInfo.levelNumber,
+        dimensions: {
+          transaction: profile.dimensions.transaction.score,
+          delivery: profile.dimensions.fulfillment.score,
+          quality: profile.dimensions.quality.score,
+          social: profile.dimensions.social.score,
+          behavior: profile.dimensions.behavior.score,
+        },
+        totalTransactions: profile.dimensions.transaction.recordCount,
+        successRate: 0,
+        averageRating,
+        badges: [],
+        updatedAt: profile.updatedAt ?? Date.now(),
+      });
+      return;
+    }
+    if (source === 'store' && !store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'reputation store unavailable');
+      return;
+    }
+
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -567,13 +649,58 @@ export class ApiServer {
       sendError(res, 400, 'DID_INVALID', 'invalid did');
       return;
     }
+    const source = parseReputationSource(url.searchParams.get('source'));
+    if (source === 'invalid') {
+      sendError(res, 400, 'INVALID_REQUEST', 'invalid source');
+      return;
+    }
+    const limit = parsePagination(url.searchParams.get('limit'), 20, 100);
+    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000);
+
+    const store = this.runtime.reputationStore;
+    if (source !== 'log' && store) {
+      const allRecords = await store.getRecords(did);
+      if (!allRecords.length) {
+        sendError(res, 404, 'REPUTATION_NOT_FOUND', 'reputation not found');
+        return;
+      }
+      const records = allRecords.filter((record) => record.dimension === 'quality');
+      const sorted = [...records].sort((a, b) => b.ts - a.ts);
+      const sliced = sorted.slice(offset, offset + limit);
+      const reviews = sliced.map((record) => ({
+        id: record.hash,
+        contractId: record.ref,
+        reviewer: record.issuer,
+        reviewee: record.target,
+        rating: ratingFromScore(record.score),
+        comment: record.comment,
+        aspects: record.aspects,
+        createdAt: record.ts,
+      }));
+      const averageRating = computeAverageRating(records);
+      sendJson(res, 200, {
+        reviews,
+        total: records.length,
+        averageRating,
+        pagination: {
+          total: records.length,
+          limit,
+          offset,
+          hasMore: offset + limit < records.length,
+        },
+      });
+      return;
+    }
+    if (source === 'store' && !store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'reputation store unavailable');
+      return;
+    }
+
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const limit = parsePagination(url.searchParams.get('limit'), 20, 100);
-    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000);
     const state = await buildReputationState(eventStore);
     const allRecords = getReputationRecords(state, did);
     if (!allRecords.length) {
@@ -589,6 +716,8 @@ export class ApiServer {
       reviewer: record.issuer,
       reviewee: record.target,
       rating: ratingFromScore(record.score),
+      comment: record.comment,
+      aspects: record.aspects,
       createdAt: record.ts,
     }));
     const averageRating = computeAverageRating(records);
@@ -603,6 +732,60 @@ export class ApiServer {
         hasMore: offset + limit < records.length,
       },
     });
+  }
+
+  private async handleReputationRecord(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ReputationRecordSchema);
+    if (!body) {
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'REPUTATION_INVALID', 'key unavailable');
+      return;
+    }
+    let envelope: Record<string, unknown>;
+    try {
+      const scoreValue =
+        typeof body.score === 'string' ? Number(body.score) : body.score;
+      const aspects = body.aspects
+        ? (Object.fromEntries(
+            Object.entries(body.aspects).map(([key, value]) => [
+              key,
+              typeof value === 'number' ? value : Number(value),
+            ]),
+          ) as Record<ReputationAspectKey, number>)
+        : undefined;
+      envelope = await createReputationRecordEnvelope({
+        issuer: body.did,
+        privateKey,
+        target: body.target,
+        dimension: body.dimension as ReputationDimension,
+        score: scoreValue,
+        ref: body.ref,
+        comment: body.comment,
+        aspects,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'REPUTATION_INVALID', (error as Error).message);
+      return;
+    }
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, {
+        txHash: hash,
+        status: 'broadcast',
+        timestamp: body.ts ?? Date.now(),
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
   }
 
   private async handleWalletBalance(
@@ -1183,6 +1366,20 @@ function parsePagination(value: string | null, fallback: number, max: number): n
     return fallback;
   }
   return Math.min(parsed, max);
+}
+
+type ReputationSource = 'store' | 'log';
+
+function parseReputationSource(
+  value: string | null,
+): ReputationSource | null | 'invalid' {
+  if (!value) {
+    return null;
+  }
+  if (value === 'store' || value === 'log') {
+    return value;
+  }
+  return 'invalid';
 }
 
 interface IdentityView {

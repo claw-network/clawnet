@@ -3,11 +3,26 @@ import { publicKeyFromDid } from '@clawtoken/core/identity';
 import { EventEnvelope, eventHashHex, signEvent } from '@clawtoken/core/protocol';
 import { isReputationDimension, normalizeScore, ReputationDimension } from './scoring.js';
 
+export const REPUTATION_ASPECT_KEYS = [
+  'communication',
+  'quality',
+  'timeliness',
+  'professionalism',
+] as const;
+
+export type ReputationAspectKey = (typeof REPUTATION_ASPECT_KEYS)[number];
+
+export function isReputationAspectKey(value: string): value is ReputationAspectKey {
+  return (REPUTATION_ASPECT_KEYS as readonly string[]).includes(value);
+}
+
 export interface ReputationRecordPayload extends Record<string, unknown> {
   target: string;
   dimension: ReputationDimension;
   score: number;
   ref: string;
+  comment?: string;
+  aspects?: Record<ReputationAspectKey, number>;
 }
 
 export interface ReputationRecordEventParams {
@@ -17,6 +32,8 @@ export interface ReputationRecordEventParams {
   dimension: ReputationDimension;
   score: number;
   ref: string;
+  comment?: string;
+  aspects?: Record<ReputationAspectKey, number>;
   ts: number;
   nonce: number;
   prev?: string;
@@ -54,6 +71,8 @@ export function parseReputationRecordPayload(
   const dimensionValue = String(payload.dimension ?? '');
   const ref = String(payload.ref ?? '');
   const rawScore = parseScore(payload.score);
+  const rawComment = payload.comment;
+  const rawAspects = payload.aspects;
 
   assertValidDid(target, 'target');
   if (!isReputationDimension(dimensionValue)) {
@@ -65,11 +84,49 @@ export function parseReputationRecordPayload(
   const score = normalizeScore(rawScore, 'score');
   requireNonEmpty(ref, 'ref');
 
+  let comment: string | undefined;
+  if (rawComment !== undefined && rawComment !== null) {
+    if (typeof rawComment !== 'string') {
+      throw new Error('comment must be a string');
+    }
+    const trimmed = rawComment.trim();
+    if (trimmed.length) {
+      comment = trimmed;
+    }
+  }
+
+  let aspects: Record<ReputationAspectKey, number> | undefined;
+  if (rawAspects !== undefined && rawAspects !== null) {
+    if (typeof rawAspects !== 'object' || Array.isArray(rawAspects)) {
+      throw new Error('aspects must be an object');
+    }
+    const entries = Object.entries(rawAspects as Record<string, unknown>);
+    if (entries.length) {
+      aspects = {} as Record<ReputationAspectKey, number>;
+      for (const [key, value] of entries) {
+        if (!isReputationAspectKey(key)) {
+          throw new Error(`aspect ${key} is not supported`);
+        }
+        const numeric =
+          typeof value === 'number' ? value : Number(value);
+        if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {
+          throw new Error(`aspect ${key} must be an integer`);
+        }
+        if (numeric < 1 || numeric > 5) {
+          throw new Error(`aspect ${key} must be between 1 and 5`);
+        }
+        aspects[key] = numeric;
+      }
+    }
+  }
+
   return {
     target,
     dimension: dimensionValue,
     score,
     ref,
+    comment,
+    aspects,
   };
 }
 
@@ -83,6 +140,8 @@ export async function createReputationRecordEnvelope(
     dimension: params.dimension,
     score: params.score,
     ref: params.ref,
+    comment: params.comment,
+    aspects: params.aspects,
   });
 
   const baseEnvelope: EventEnvelope = {

@@ -7,6 +7,7 @@ import {
   exportToProtobuf,
 } from '@libp2p/peer-id-factory';
 import {
+  bytesToUtf8,
   canonicalizeBytes,
   DEFAULT_P2P_CONFIG,
   DEFAULT_SNAPSHOT_POLICY,
@@ -30,7 +31,12 @@ import {
   SnapshotStore,
   TOPIC_EVENTS,
 } from '@clawtoken/core';
-import { CONTENT_TYPE, encodeP2PEnvelopeBytes, signP2PEnvelope } from '@clawtoken/protocol';
+import {
+  CONTENT_TYPE,
+  encodeP2PEnvelopeBytes,
+  MemoryReputationStore,
+  signP2PEnvelope,
+} from '@clawtoken/protocol';
 import { P2PSync, P2PSyncConfig } from './p2p/sync.js';
 import { ApiServer, ApiServerConfig } from './api/server.js';
 
@@ -77,6 +83,7 @@ export class ClawTokenNode {
   private eventStore?: EventStore;
   private snapshotStore?: SnapshotStore;
   private snapshotScheduler?: SnapshotScheduler;
+  private reputationStore?: MemoryReputationStore;
   private rangeTimer?: NodeJS.Timeout;
   private snapshotTimer?: NodeJS.Timeout;
   private apiServer?: ApiServer;
@@ -136,6 +143,7 @@ export class ClawTokenNode {
       this.eventDb = new LevelStore({ path: paths.eventsDb });
       this.eventStore = new EventStore(this.eventDb);
       this.snapshotStore = new SnapshotStore(paths);
+      await this.initReputationStore();
       if (this.config.snapshotBuilder) {
         this.snapshotScheduler = new SnapshotScheduler(
           this.eventStore,
@@ -166,6 +174,7 @@ export class ClawTokenNode {
         peerPrivateKey: privateKey,
         resolvePeerPublicKey: (id) => this.p2p?.getPeerPublicKey(id) ?? Promise.resolve(null),
         resolveControllerPublicKey: this.config.resolveControllerPublicKey,
+        onEventApplied: (envelope) => this.applyReputationEnvelope(envelope),
         ...syncOptions,
       });
       await this.sync.start();
@@ -181,6 +190,7 @@ export class ClawTokenNode {
         this.apiServer = new ApiServer(apiConfig, {
           publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
           eventStore: this.eventStore,
+          reputationStore: this.reputationStore,
           getNodeStatus: () => this.buildNodeStatus(),
           getNodePeers: () => this.buildNodePeers(),
           getNodeConfig: () => this.buildNodeConfig(),
@@ -229,6 +239,7 @@ export class ClawTokenNode {
     this.eventStore = undefined;
     this.snapshotStore = undefined;
     this.snapshotScheduler = undefined;
+    this.reputationStore = undefined;
     this.peerId = undefined;
     this.peerPrivateKey = undefined;
     this.stopping = undefined;
@@ -304,6 +315,7 @@ export class ClawTokenNode {
         : eventHashHex(envelope);
     const canonical = canonicalizeBytes(envelope);
     await this.eventStore.appendEvent(hash, canonical);
+    await this.applyReputationEnvelope(envelope);
 
     const p2pEnvelope = await signP2PEnvelope(
       {
@@ -319,6 +331,55 @@ export class ClawTokenNode {
     const bytes = encodeP2PEnvelopeBytes(p2pEnvelope);
     await this.p2p.publish(TOPIC_EVENTS, bytes);
     return hash;
+  }
+
+  private async initReputationStore(): Promise<void> {
+    if (!this.eventStore) {
+      return;
+    }
+    const store = new MemoryReputationStore();
+    let cursor: string | null = null;
+    while (true) {
+      const { events, cursor: next } = await this.eventStore.getEventLogRange(cursor, 200);
+      if (!events.length) {
+        break;
+      }
+      for (const bytes of events) {
+        const envelope = this.parseEventEnvelope(bytes);
+        if (!envelope) {
+          continue;
+        }
+        try {
+          await store.applyEvent(envelope as EventEnvelope);
+        } catch {
+          continue;
+        }
+      }
+      if (!next) {
+        break;
+      }
+      cursor = next;
+    }
+    this.reputationStore = store;
+  }
+
+  private async applyReputationEnvelope(envelope: Record<string, unknown>): Promise<void> {
+    if (!this.reputationStore) {
+      return;
+    }
+    try {
+      await this.reputationStore.applyEvent(envelope as EventEnvelope);
+    } catch {
+      return;
+    }
+  }
+
+  private parseEventEnvelope(bytes: Uint8Array): Record<string, unknown> | null {
+    try {
+      return JSON.parse(bytesToUtf8(bytes)) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
   }
 
   private resolveNetwork(): string {

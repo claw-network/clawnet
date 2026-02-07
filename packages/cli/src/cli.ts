@@ -12,6 +12,7 @@ import {
   didFromPublicKey,
   ensureConfig,
   EventStore,
+  EventEnvelope,
   generateMnemonic,
   hkdfSha256,
   keyIdFromPublicKey,
@@ -28,9 +29,13 @@ import {
   verifyCapabilityCredential,
 } from '@clawtoken/core';
 import {
+  applyReputationEvent,
   applyWalletEvent,
   CapabilityCredential,
+  buildReputationProfile,
   createIdentityCapabilityRegisterEnvelope,
+  createReputationRecordEnvelope,
+  createReputationState,
   createWalletEscrowCreateEnvelope,
   createWalletEscrowFundEnvelope,
   createWalletEscrowRefundEnvelope,
@@ -38,6 +43,14 @@ import {
   createWalletTransferEnvelope,
   createWalletState,
   getWalletBalance,
+  getReputationRecords,
+  isReputationAspectKey,
+  isReputationDimension,
+  MemoryReputationStore,
+  ReputationAspectKey,
+  ReputationDimension,
+  ReputationLevel,
+  ReputationRecord,
 } from '@clawtoken/protocol';
 
 async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
@@ -88,6 +101,20 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   }
   if (command === 'logs') {
     await runLogs(argv.slice(1));
+    return;
+  }
+  if (command === 'reputation') {
+    const subcommand = argv[1];
+    const subArgs = argv.slice(2);
+    if (subcommand === 'record') {
+      await runReputationRecord(subArgs);
+      return;
+    }
+    if (subcommand === 'reviews') {
+      await runReputationReviews(subArgs);
+      return;
+    }
+    await runReputation(argv.slice(1));
     return;
   }
   if (command === 'escrow') {
@@ -288,6 +315,213 @@ async function runLogs(rawArgs: string[]): Promise<void> {
   process.on('SIGTERM', () => watcher.close());
 }
 
+async function runReputation(rawArgs: string[]): Promise<void> {
+  const parsed = parseReputationArgs(rawArgs);
+  const paths = resolveStoragePaths(parsed.dataDir);
+  const store = new LevelStore({ path: paths.eventsDb });
+  const eventStore = new EventStore(store);
+  try {
+    if (parsed.source === 'store') {
+      const reputationStore = await buildReputationStore(eventStore);
+      const records = await reputationStore.getRecords(parsed.did);
+      if (!records.length) {
+        fail('reputation not found');
+      }
+      const profile = await reputationStore.getProfile(parsed.did);
+      const levelInfo = mapReputationLevel(profile.level);
+      const qualityRecords = records.filter((record) => record.dimension === 'quality');
+      const averageRating = computeAverageRating(qualityRecords);
+      console.log(
+        JSON.stringify(
+          {
+            did: parsed.did,
+            score: profile.overallScore,
+            level: levelInfo.label,
+            levelNumber: levelInfo.levelNumber,
+            dimensions: {
+              transaction: profile.dimensions.transaction.score,
+              delivery: profile.dimensions.fulfillment.score,
+              quality: profile.dimensions.quality.score,
+              social: profile.dimensions.social.score,
+              behavior: profile.dimensions.behavior.score,
+            },
+            totalTransactions: profile.dimensions.transaction.recordCount,
+            successRate: 0,
+            averageRating,
+            badges: [],
+            updatedAt: profile.updatedAt ?? Date.now(),
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
+    const state = await buildReputationState(eventStore);
+    const records = getReputationRecords(state, parsed.did);
+    if (!records.length) {
+      fail('reputation not found');
+    }
+    const profile = buildReputationProfile(state, parsed.did);
+    const levelInfo = mapReputationLevel(profile.level);
+    const qualityRecords = records.filter((record) => record.dimension === 'quality');
+    const averageRating = computeAverageRating(qualityRecords);
+    console.log(
+      JSON.stringify(
+        {
+          did: parsed.did,
+          score: profile.overallScore,
+          level: levelInfo.label,
+          levelNumber: levelInfo.levelNumber,
+          dimensions: {
+            transaction: profile.dimensions.transaction.score,
+            delivery: profile.dimensions.fulfillment.score,
+            quality: profile.dimensions.quality.score,
+            social: profile.dimensions.social.score,
+            behavior: profile.dimensions.behavior.score,
+          },
+          totalTransactions: profile.dimensions.transaction.recordCount,
+          successRate: 0,
+          averageRating,
+          badges: [],
+          updatedAt: profile.updatedAt ?? Date.now(),
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await store.close();
+  }
+}
+
+async function runReputationReviews(rawArgs: string[]): Promise<void> {
+  const parsed = parseReputationReviewsArgs(rawArgs);
+  const paths = resolveStoragePaths(parsed.dataDir);
+  const store = new LevelStore({ path: paths.eventsDb });
+  const eventStore = new EventStore(store);
+  try {
+    if (parsed.source === 'store') {
+      const reputationStore = await buildReputationStore(eventStore);
+      const allRecords = await reputationStore.getRecords(parsed.did);
+      if (!allRecords.length) {
+        fail('reputation not found');
+      }
+      const records = allRecords.filter((record) => record.dimension === 'quality');
+      const sorted = [...records].sort((a, b) => b.ts - a.ts);
+      const sliced = sorted.slice(parsed.offset, parsed.offset + parsed.limit);
+      const reviews = sliced.map((record) => ({
+        id: record.hash,
+        contractId: record.ref,
+        reviewer: record.issuer,
+        reviewee: record.target,
+        rating: ratingFromScore(record.score),
+        comment: record.comment,
+        aspects: record.aspects,
+        createdAt: record.ts,
+      }));
+      const averageRating = computeAverageRating(records);
+      console.log(
+        JSON.stringify(
+          {
+            reviews,
+            total: records.length,
+            averageRating,
+            pagination: {
+              total: records.length,
+              limit: parsed.limit,
+              offset: parsed.offset,
+              hasMore: parsed.offset + parsed.limit < records.length,
+            },
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
+    const state = await buildReputationState(eventStore);
+    const allRecords = getReputationRecords(state, parsed.did);
+    if (!allRecords.length) {
+      fail('reputation not found');
+    }
+    const records = allRecords.filter((record) => record.dimension === 'quality');
+    const sorted = [...records].sort((a, b) => b.ts - a.ts);
+    const sliced = sorted.slice(parsed.offset, parsed.offset + parsed.limit);
+    const reviews = sliced.map((record) => ({
+      id: record.hash,
+      contractId: record.ref,
+      reviewer: record.issuer,
+      reviewee: record.target,
+      rating: ratingFromScore(record.score),
+      comment: record.comment,
+      aspects: record.aspects,
+      createdAt: record.ts,
+    }));
+    const averageRating = computeAverageRating(records);
+    console.log(
+      JSON.stringify(
+        {
+          reviews,
+          total: records.length,
+          averageRating,
+          pagination: {
+            total: records.length,
+            limit: parsed.limit,
+            offset: parsed.offset,
+            hasMore: parsed.offset + parsed.limit < records.length,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await store.close();
+  }
+}
+
+async function runReputationRecord(
+  rawArgs: string[],
+  deps: { createNode?: NodeFactory } = {},
+): Promise<void> {
+  const parsed = parseReputationRecordArgs(rawArgs);
+  const keyId =
+    parsed.keyId && parsed.keyId.length > 0
+      ? parsed.keyId
+      : keyIdFromPublicKey(publicKeyFromDid(parsed.did));
+  const privateKey = await resolvePrivateKey(parsed.dataDir, keyId, parsed.passphrase);
+  const derivedDid = didFromPublicKey(await publicKeyFromPrivateKey(privateKey));
+  if (derivedDid !== parsed.did) {
+    fail('private key does not match did');
+  }
+
+  const envelope = await createReputationRecordEnvelope({
+    issuer: parsed.did,
+    privateKey,
+    target: parsed.target,
+    dimension: parsed.dimension,
+    score: parsed.score,
+    ref: parsed.ref,
+    comment: parsed.comment,
+    aspects: parsed.aspects,
+    ts: parsed.ts ?? Date.now(),
+    nonce: parsed.nonce,
+    prev: parsed.prev,
+  });
+
+  const node = (deps.createNode ?? defaultNodeFactory)(parsed.nodeConfig);
+  try {
+    await node.start();
+    const hash = await node.publishEvent(envelope);
+    console.log(`[clawtoken] published reputation.record ${hash}`);
+  } finally {
+    await node.stop();
+  }
+}
+
 type NodeFactory = (config: unknown) => {
   start: () => Promise<void>;
   stop: () => Promise<void>;
@@ -313,6 +547,36 @@ interface LogsArgs {
   dataDir?: string;
   file?: string;
   follow: boolean;
+}
+
+type ReputationSource = 'log' | 'store';
+
+interface ReputationArgs {
+  did: string;
+  dataDir?: string;
+  source: ReputationSource;
+}
+
+interface ReputationReviewsArgs extends ReputationArgs {
+  limit: number;
+  offset: number;
+}
+
+interface ReputationRecordArgs {
+  did: string;
+  passphrase: string;
+  keyId: string;
+  target: string;
+  dimension: ReputationDimension;
+  score: number;
+  ref: string;
+  comment?: string;
+  aspects?: Record<ReputationAspectKey, number>;
+  nonce: number;
+  prev?: string;
+  ts?: number;
+  dataDir?: string;
+  nodeConfig: unknown;
 }
 
 function parseInitArgs(rawArgs: string[]): InitArgs {
@@ -404,6 +668,92 @@ function parseLogsArgs(rawArgs: string[]): LogsArgs {
     }
   }
   return { dataDir, file, follow };
+}
+
+function parseReputationArgs(rawArgs: string[]): ReputationArgs {
+  let did: string | undefined;
+  let dataDir: string | undefined;
+  let source: ReputationSource = 'log';
+
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--did') {
+      did = rawArgs[++i];
+      continue;
+    }
+    if (arg === '--data-dir') {
+      dataDir = rawArgs[++i];
+      continue;
+    }
+    if (arg === '--source') {
+      const value = rawArgs[++i];
+      if (value === 'log' || value === 'store') {
+        source = value;
+      } else {
+        fail(`invalid --source: ${value ?? ''}`);
+      }
+      continue;
+    }
+    if (!arg.startsWith('-') && !did) {
+      did = arg;
+      continue;
+    }
+    console.warn(`[clawtoken] unknown argument: ${arg}`);
+  }
+
+  if (!did) {
+    fail('missing --did');
+  }
+
+  return { did, dataDir, source };
+}
+
+function parseReputationReviewsArgs(rawArgs: string[]): ReputationReviewsArgs {
+  let did: string | undefined;
+  let dataDir: string | undefined;
+  let limit = 20;
+  let offset = 0;
+  let source: ReputationSource = 'log';
+
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--did') {
+      did = rawArgs[++i];
+      continue;
+    }
+    if (arg === '--data-dir') {
+      dataDir = rawArgs[++i];
+      continue;
+    }
+    if (arg === '--source') {
+      const value = rawArgs[++i];
+      if (value === 'log' || value === 'store') {
+        source = value;
+      } else {
+        fail(`invalid --source: ${value ?? ''}`);
+      }
+      continue;
+    }
+    if (arg === '--limit') {
+      limit = parseNonNegativeInt(rawArgs[++i], '--limit');
+      continue;
+    }
+    if (arg === '--offset') {
+      offset = parseNonNegativeInt(rawArgs[++i], '--offset');
+      continue;
+    }
+    if (!arg.startsWith('-') && !did) {
+      did = arg;
+      continue;
+    }
+    console.warn(`[clawtoken] unknown argument: ${arg}`);
+  }
+
+  if (!did) {
+    fail('missing --did');
+  }
+
+  return { did, dataDir, limit, offset, source };
 }
 
 async function fetchApiJson(
@@ -1030,6 +1380,151 @@ function parseTransferArgs(rawArgs: string[]) {
   };
 }
 
+function parseReputationRecordArgs(rawArgs: string[]): ReputationRecordArgs {
+  let did: string | undefined;
+  let passphrase: string | undefined;
+  let keyId: string | undefined;
+  let target: string | undefined;
+  let dimension: ReputationDimension | undefined;
+  let score: number | undefined;
+  let ref: string | undefined;
+  let comment: string | undefined;
+  let aspects: Record<ReputationAspectKey, number> | undefined;
+  let nonce: number | undefined;
+  let prev: string | undefined;
+  let ts: number | undefined;
+  let dataDir: string | undefined;
+  const listen: string[] = [];
+  const bootstrap: string[] = [];
+
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    switch (arg) {
+      case '--did': {
+        did = rawArgs[++i];
+        break;
+      }
+      case '--passphrase': {
+        passphrase = rawArgs[++i];
+        break;
+      }
+      case '--key-id': {
+        keyId = rawArgs[++i];
+        break;
+      }
+      case '--target': {
+        target = rawArgs[++i];
+        break;
+      }
+      case '--dimension': {
+        const value = rawArgs[++i];
+        if (value && isReputationDimension(value)) {
+          dimension = value;
+        } else if (value) {
+          fail(`invalid --dimension: ${value}`);
+        }
+        break;
+      }
+      case '--score': {
+        score = parseScore(rawArgs[++i], '--score');
+        break;
+      }
+      case '--ref': {
+        ref = rawArgs[++i];
+        break;
+      }
+      case '--comment': {
+        comment = rawArgs[++i];
+        break;
+      }
+      case '--aspects': {
+        const raw = rawArgs[++i];
+        aspects = parseAspects(raw, '--aspects');
+        break;
+      }
+      case '--nonce': {
+        nonce = parsePositiveInt(rawArgs[++i], '--nonce');
+        break;
+      }
+      case '--prev': {
+        prev = rawArgs[++i];
+        break;
+      }
+      case '--ts': {
+        ts = parseNonNegativeInt(rawArgs[++i], '--ts');
+        break;
+      }
+      case '--data-dir': {
+        dataDir = rawArgs[++i];
+        break;
+      }
+      case '--listen': {
+        const value = rawArgs[++i];
+        if (value) {
+          listen.push(value);
+        }
+        break;
+      }
+      case '--bootstrap': {
+        const value = rawArgs[++i];
+        if (value) {
+          bootstrap.push(value);
+        }
+        break;
+      }
+      default: {
+        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        break;
+      }
+    }
+  }
+
+  if (!did) {
+    fail('missing --did');
+  }
+  if (!passphrase) {
+    fail('missing --passphrase');
+  }
+  if (!target) {
+    fail('missing --target');
+  }
+  if (!dimension) {
+    fail('missing --dimension');
+  }
+  if (score === undefined) {
+    fail('missing --score');
+  }
+  if (!ref) {
+    fail('missing --ref');
+  }
+  if (nonce === undefined) {
+    fail('missing --nonce');
+  }
+
+  const nodeConfig = parseDaemonArgs([
+    ...(dataDir ? ['--data-dir', dataDir] : []),
+    ...listen.flatMap((entry) => ['--listen', entry]),
+    ...bootstrap.flatMap((entry) => ['--bootstrap', entry]),
+  ]);
+
+  return {
+    did,
+    passphrase,
+    keyId: keyId ?? '',
+    target,
+    dimension,
+    score,
+    ref,
+    comment,
+    aspects,
+    nonce,
+    prev,
+    ts,
+    dataDir,
+    nodeConfig,
+  };
+}
+
 function parseEscrowCreateArgs(rawArgs: string[]) {
   let did: string | undefined;
   let passphrase: string | undefined;
@@ -1355,6 +1850,9 @@ clawtoken identity capability-register [options]
 clawtoken balance [options]
 clawtoken transfer [options]
 clawtoken logs [options]
+clawtoken reputation [options]
+clawtoken reputation reviews [options]
+clawtoken reputation record [options]
 clawtoken escrow create|fund|release|refund [options]
 
 Daemon options:
@@ -1419,6 +1917,35 @@ Logs options:
   --data-dir <path>              Override storage root
   --file <path>                  Override log file path
   --follow, -f                   Follow log output
+
+Reputation options:
+  --did <did>                    Target DID (or provide as positional)
+  --data-dir <path>              Override storage root
+  --source <log|store>           Data source (default: log)
+
+Reputation reviews options:
+  --did <did>                    Target DID (or provide as positional)
+  --limit <n>                    Max reviews to return (default 20)
+  --offset <n>                   Offset for pagination (default 0)
+  --data-dir <path>              Override storage root
+  --source <log|store>           Data source (default: log)
+
+Reputation record options:
+  --did <did>                    Issuer DID
+  --passphrase <text>            Passphrase to decrypt key record
+  --key-id <id>                  Key record id in keystore (optional)
+  --target <did>                 Reviewee DID
+  --dimension <value>            Dimension (transaction|fulfillment|quality|social|behavior)
+  --score <n>                    Score (0-1000 integer)
+  --ref <text>                   Reference id (contract/order/etc)
+  --comment <text>               Optional review comment
+  --aspects <json>               JSON object (communication|quality|timeliness|professionalism, 1-5)
+  --nonce <n>                    Monotonic nonce for issuer
+  --prev <hash>                  Optional previous event hash
+  --ts <ms>                      Override timestamp (default: now)
+  --data-dir <path>              Override storage root
+  --listen <multiaddr>           Add a libp2p listen multiaddr (repeatable)
+  --bootstrap <multiaddr>        Add a bootstrap peer multiaddr (repeatable)
 
 Escrow create options:
   --did <did>                    Issuer DID (depositor)
@@ -1507,6 +2034,60 @@ async function buildWalletState(eventStore: EventStore) {
   return state;
 }
 
+async function buildReputationState(eventStore: EventStore) {
+  let state = createReputationState();
+  let cursor: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope) {
+        continue;
+      }
+      try {
+        state = applyReputationEvent(state, envelope);
+      } catch {
+        continue;
+      }
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+  return state;
+}
+
+async function buildReputationStore(eventStore: EventStore): Promise<MemoryReputationStore> {
+  const store = new MemoryReputationStore();
+  let cursor: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope) {
+        continue;
+      }
+      try {
+        await store.applyEvent(envelope as EventEnvelope);
+      } catch {
+        continue;
+      }
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+  return store;
+}
+
 function parseEvent(bytes: Uint8Array): Record<string, unknown> | null {
   try {
     return JSON.parse(bytesToUtf8(bytes)) as Record<string, unknown>;
@@ -1515,8 +2096,89 @@ function parseEvent(bytes: Uint8Array): Record<string, unknown> | null {
   }
 }
 
+function mapReputationLevel(level: ReputationLevel): { label: string; levelNumber: number } {
+  switch (level) {
+    case 'legend':
+      return { label: 'Legend', levelNumber: 7 };
+    case 'elite':
+      return { label: 'Master', levelNumber: 6 };
+    case 'expert':
+      return { label: 'Expert', levelNumber: 5 };
+    case 'trusted':
+      return { label: 'Advanced', levelNumber: 4 };
+    case 'newcomer':
+      return { label: 'Intermediate', levelNumber: 3 };
+    case 'observed':
+      return { label: 'Beginner', levelNumber: 2 };
+    case 'risky':
+    default:
+      return { label: 'Newcomer', levelNumber: 1 };
+  }
+}
+
+function ratingFromScore(score: number): number {
+  const rating = Math.round(score / 200);
+  return Math.max(1, Math.min(5, rating));
+}
+
+function computeAverageRating(records: ReputationRecord[]): number {
+  if (!records.length) {
+    return 0;
+  }
+  const total = records.reduce((sum, record) => sum + ratingFromScore(record.score), 0);
+  return Number((total / records.length).toFixed(2));
+}
+
 function isSybilPolicy(value: string): value is 'none' | 'allowlist' | 'pow' | 'stake' {
   return value === 'none' || value === 'allowlist' || value === 'pow' || value === 'stake';
+}
+
+function parseScore(value: string | undefined, flag: string): number {
+  if (value === undefined) {
+    fail(`missing value for ${flag}`);
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 1000) {
+    fail(`invalid ${flag}: ${value}`);
+  }
+  return parsed;
+}
+
+function parseAspects(value: string | undefined, flag: string): Record<string, number> | undefined {
+  if (value === undefined) {
+    fail(`missing value for ${flag}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    fail(`invalid ${flag}: must be JSON object`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    fail(`invalid ${flag}: must be JSON object`);
+  }
+  const entries = Object.entries(parsed as Record<string, unknown>);
+  if (!entries.length) {
+    return undefined;
+  }
+  const aspects: Record<ReputationAspectKey, number> = {} as Record<
+    ReputationAspectKey,
+    number
+  >;
+  for (const [key, raw] of entries) {
+    if (!isReputationAspectKey(key)) {
+      fail(`invalid ${flag}: unsupported aspect ${key}`);
+    }
+    const num = typeof raw === 'number' ? raw : Number(raw);
+    if (!Number.isFinite(num) || !Number.isInteger(num)) {
+      fail(`invalid ${flag}: ${key} must be an integer`);
+    }
+    if (num < 1 || num > 5) {
+      fail(`invalid ${flag}: ${key} must be between 1 and 5`);
+    }
+    aspects[key] = num;
+  }
+  return aspects;
 }
 
 function parseNonNegativeInt(value: string | undefined, flag: string): number {
@@ -1559,6 +2221,9 @@ export {
   runBalance,
   runTransfer,
   runLogs,
+  runReputation,
+  runReputationReviews,
+  runReputationRecord,
   runEscrowCreate,
   runEscrowFund,
   runEscrowRelease,

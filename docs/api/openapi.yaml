@@ -188,6 +188,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [store, log]
+          description: 数据源（store 使用内存信誉库，log 重建事件日志）
           example: "did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
       responses:
         '200':
@@ -1822,6 +1828,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [store, log]
+          description: 数据源（store 使用内存信誉库，log 重建事件日志）
         - name: limit
           in: query
           schema:
@@ -1852,6 +1864,98 @@ paths:
                     $ref: '#/components/schemas/Pagination'
         '404':
           description: 信誉记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/reputation/record:
+    post:
+      tags: [Reputation]
+      summary: 记录信誉事件
+      operationId: recordReputation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [did, passphrase, target, dimension, score, ref, nonce]
+              properties:
+                did:
+                  type: string
+                  description: 发行者 DID（用于签名）
+                passphrase:
+                  type: string
+                  description: 本地密钥解锁口令
+                target:
+                  type: string
+                  description: 被评价对象 DID
+                dimension:
+                  type: string
+                  enum: [transaction, fulfillment, quality, social, behavior]
+                score:
+                  type: integer
+                  description: 评分（0-1000）
+                  minimum: 0
+                  maximum: 1000
+                ref:
+                  type: string
+                  description: 关联记录 id (合同/订单等)
+                comment:
+                  type: string
+                  description: 可选评价内容
+                aspects:
+                  type: object
+                  description: 可选维度评分
+                  additionalProperties:
+                    type: integer
+                    minimum: 1
+                    maximum: 5
+                  properties:
+                    communication:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                    quality:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                    timeliness:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                    professionalism:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                nonce:
+                  type: integer
+                  description: 发行者单调递增 nonce
+                  minimum: 1
+                prev:
+                  type: string
+                  description: 上一条事件 hash（可选）
+                ts:
+                  type: integer
+                  description: 事件时间戳（毫秒）
+      responses:
+        '200':
+          description: 记录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReputationRecordResult'
+        '400':
+          description: 信誉记录无效
           content:
             application/json:
               schema:
@@ -2547,13 +2651,32 @@ components:
           properties:
             communication:
               type: integer
+              minimum: 1
+              maximum: 5
             quality:
               type: integer
+              minimum: 1
+              maximum: 5
             timeliness:
               type: integer
+              minimum: 1
+              maximum: 5
             professionalism:
               type: integer
+              minimum: 1
+              maximum: 5
         createdAt:
+          type: integer
+
+    ReputationRecordResult:
+      type: object
+      properties:
+        txHash:
+          type: string
+        status:
+          type: string
+          enum: [broadcast, pending, confirmed, failed]
+        timestamp:
           type: integer
 
   # --------------------------------------------------------------------------

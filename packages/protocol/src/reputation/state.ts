@@ -1,5 +1,9 @@
 import { EventEnvelope, eventHashHex } from '@clawtoken/core/protocol';
-import { parseReputationRecordPayload, ReputationRecordPayload } from './events.js';
+import {
+  parseReputationRecordPayload,
+  ReputationAspectKey,
+  ReputationRecordPayload,
+} from './events.js';
 import {
   calculateDimensionScore,
   calculateOverallScore,
@@ -22,6 +26,8 @@ export interface ReputationRecord {
   dimension: ReputationDimension;
   score: number;
   ref: string;
+  comment?: string;
+  aspects?: Record<ReputationAspectKey, number>;
   ts: number;
 }
 
@@ -125,6 +131,8 @@ export function applyReputationEvent(
     dimension: payload.dimension,
     score: payload.score,
     ref: payload.ref,
+    comment: payload.comment,
+    aspects: payload.aspects,
     ts,
   };
   return addReputationRecord(state, record);
@@ -213,6 +221,8 @@ export function recordFromPayload(
     dimension: payload.dimension,
     score: payload.score,
     ref: payload.ref,
+    comment: payload.comment,
+    aspects: payload.aspects,
     ts,
   };
 }

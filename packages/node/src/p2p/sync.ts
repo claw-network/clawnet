@@ -76,6 +76,7 @@ export interface P2PSyncOptions extends Partial<P2PSyncConfig> {
   peerPrivateKey: Uint8Array;
   resolvePeerPublicKey?: (peerId: string) => Promise<Uint8Array | null>;
   resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
+  onEventApplied?: (envelope: Record<string, unknown>, bytes: Uint8Array) => Promise<void> | void;
   validateSnapshotState?: (
     snapshot: SnapshotRecord,
     events: Uint8Array[],
@@ -122,6 +123,10 @@ export class P2PSync {
   private readonly config: P2PSyncConfig;
   private readonly resolvePeerPublicKey?: (peerId: string) => Promise<Uint8Array | null>;
   private readonly resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
+  private readonly onEventApplied?: (
+    envelope: Record<string, unknown>,
+    bytes: Uint8Array,
+  ) => Promise<void> | void;
   private readonly validateSnapshotState?: (
     snapshot: SnapshotRecord,
     events: Uint8Array[],
@@ -147,6 +152,7 @@ export class P2PSync {
     this.config = { ...DEFAULT_P2P_SYNC_CONFIG, ...options };
     this.resolvePeerPublicKey = options.resolvePeerPublicKey;
     this.resolveControllerPublicKey = options.resolveControllerPublicKey;
+    this.onEventApplied = options.onEventApplied;
     this.validateSnapshotState = options.validateSnapshotState;
     for (const peer of this.config.allowlist ?? []) {
       if (peer) {
@@ -459,6 +465,13 @@ export class P2PSync {
       await this.eventStore.appendEvent(hash, eventBytes);
     } catch {
       return;
+    }
+    if (this.onEventApplied) {
+      try {
+        await this.onEventApplied(envelope, eventBytes);
+      } catch {
+        return;
+      }
     }
   }
 

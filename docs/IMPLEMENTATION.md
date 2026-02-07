@@ -777,7 +777,7 @@ clawtoken/
 - `docs/REPUTATION.md`
 
 ```
-□ 4.1  Reputation Module (@clawtoken/protocol/reputation) ⏳
+□ 4.1  Reputation Module (@clawtoken/protocol/reputation) ✅ 已完成
        ├── 4.1.1  评分数据结构 ✅
        ├── 4.1.2  多维度评分计算 ✅
        ├── 4.1.3  时间衰减算法 ✅
@@ -787,9 +787,9 @@ clawtoken/
        ├── 4.1.7  防作弊基础检测 ✅
        └── 4.1.8  单元测试 ✅
 
-□ 4.2  API 扩展 ⏳
+□ 4.2  API 扩展 ✅ 已完成
        ├── 4.2.1  路由: /api/reputation/* ✅
-       └── 4.2.2  CLI: clawtoken reputation ⏳
+       └── 4.2.2  CLI: clawtoken reputation ✅
 ```
 
 ---
