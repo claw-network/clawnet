@@ -744,6 +744,132 @@ paths:
                 $ref: '#/components/schemas/TransferResult'
 
   # --------------------------------------------------------------------------
+  # Markets - Search
+  # --------------------------------------------------------------------------
+  /api/markets/search:
+    get:
+      tags: [Markets]
+      summary: 搜索市场
+      operationId: searchMarkets
+      parameters:
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 关键词（标题/描述/标签）
+        - name: markets
+          in: query
+          schema:
+            type: string
+          description: 市场类型（逗号分隔，如 info,task,capability）
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: tags
+          in: query
+          schema:
+            type: string
+          description: 标签（逗号分隔）
+        - name: minPrice
+          in: query
+          schema:
+            type: integer
+          description: 最低价格（Token）
+        - name: maxPrice
+          in: query
+          schema:
+            type: integer
+          description: 最高价格（Token）
+        - name: minReputation
+          in: query
+          schema:
+            type: number
+          description: 最低信誉分
+        - name: minRating
+          in: query
+          schema:
+            type: number
+          description: 最低评分
+        - name: skills
+          in: query
+          schema:
+            type: string
+          description: 技能（逗号分隔，任务市场）
+        - name: capabilityType
+          in: query
+          schema:
+            type: string
+          description: 能力类型（能力市场）
+        - name: infoTypes
+          in: query
+          schema:
+            type: string
+          description: 信息类型（逗号分隔，信息市场）
+        - name: contentFormats
+          in: query
+          schema:
+            type: string
+          description: 内容格式（逗号分隔，信息市场）
+        - name: accessMethods
+          in: query
+          schema:
+            type: string
+          description: 访问方式（逗号分隔，信息市场）
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [relevance, newest, price_asc, price_desc, rating, popular, reputation]
+            default: relevance
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: includeFacets
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: statuses
+          in: query
+          schema:
+            type: string
+          description: 列表状态（逗号分隔）
+        - name: visibility
+          in: query
+          schema:
+            type: string
+          description: 可见性（逗号分隔）
+      responses:
+        '200':
+          description: 搜索结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketSearchResult'
+        '400':
+          description: 查询参数无效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # --------------------------------------------------------------------------
   # Markets - Info Market
   # --------------------------------------------------------------------------
   /api/markets/info:
@@ -2300,6 +2426,187 @@ components:
     # ------------------------------------------------------------------------
     # Markets
     # ------------------------------------------------------------------------
+    MarketSearchResult:
+      type: object
+      properties:
+        listings:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketListing'
+        facets:
+          $ref: '#/components/schemas/MarketSearchFacets'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    MarketSearchFacets:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketSearchFacetBucket'
+        markets:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketSearchFacetBucket'
+        ratings:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketSearchFacetBucket'
+
+    MarketSearchFacetBucket:
+      type: object
+      properties:
+        key:
+          type: string
+        count:
+          type: integer
+
+    MarketListing:
+      type: object
+      properties:
+        id:
+          type: string
+        marketType:
+          type: string
+          enum: [info, task, capability]
+        seller:
+          $ref: '#/components/schemas/MarketListingSeller'
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        pricing:
+          $ref: '#/components/schemas/MarketPricing'
+        status:
+          type: string
+          enum: [draft, active, paused, sold_out, expired, removed]
+        visibility:
+          type: string
+          enum: [public, private, unlisted]
+        restrictions:
+          type: object
+          additionalProperties: true
+        stats:
+          $ref: '#/components/schemas/MarketListingStats'
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+        expiresAt:
+          type: integer
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        marketData:
+          type: object
+          additionalProperties: true
+        score:
+          type: number
+
+    MarketListingSeller:
+      type: object
+      properties:
+        did:
+          type: string
+        name:
+          type: string
+        reputation:
+          type: number
+        verified:
+          type: boolean
+
+    MarketListingStats:
+      type: object
+      properties:
+        views:
+          type: integer
+        favorites:
+          type: integer
+        inquiries:
+          type: integer
+        orders:
+          type: integer
+        completedOrders:
+          type: integer
+        totalRevenue:
+          type: string
+        averageRating:
+          type: number
+        ratingCount:
+          type: integer
+
+    MarketPricing:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [fixed, range, usage, subscription, auction, negotiation]
+        fixedPrice:
+          type: string
+        priceRange:
+          type: object
+          properties:
+            min:
+              type: string
+            max:
+              type: string
+        usagePrice:
+          type: object
+          properties:
+            unit:
+              type: string
+            pricePerUnit:
+              type: string
+            minimumUnits:
+              type: integer
+            maximumUnits:
+              type: integer
+        subscriptionPrice:
+          type: object
+          properties:
+            period:
+              type: string
+              enum: [hourly, daily, weekly, monthly, yearly]
+            price:
+              type: string
+            trialPeriod:
+              type: integer
+        auction:
+          type: object
+          properties:
+            startingPrice:
+              type: string
+            reservePrice:
+              type: string
+            bidIncrement:
+              type: string
+            duration:
+              type: integer
+            endTime:
+              type: integer
+        negotiable:
+          type: boolean
+        currency:
+          type: string
+          default: TOKEN
+        discounts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
     InfoListing:
       type: object
       properties:

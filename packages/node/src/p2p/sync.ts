@@ -11,6 +11,7 @@ import {
   SnapshotRecord,
   SnapshotStore,
   TOPIC_EVENTS,
+  TOPIC_MARKETS,
   TOPIC_REQUESTS,
   TOPIC_RESPONSES,
   verifySnapshotHash,
@@ -136,6 +137,7 @@ export class P2PSync {
   private unsubscribeRequests?: () => void;
   private unsubscribeResponses?: () => void;
   private unsubscribeEvents?: () => void;
+  private unsubscribeMarketEvents?: () => void;
   private readonly snapshotChunks = new Map<string, SnapshotChunkState>();
   private readonly snapshotChunkTtlMs = 5 * 60 * 1000;
   private readonly allowlist = new Set<string>();
@@ -178,6 +180,10 @@ export class P2PSync {
       this.unsubscribeEvents = await this.node.subscribe(TOPIC_EVENTS, (message: PubsubMessage) =>
         this.handleEventEnvelope(message),
       );
+      this.unsubscribeMarketEvents = await this.node.subscribe(
+        TOPIC_MARKETS,
+        (message: PubsubMessage) => this.handleEventEnvelope(message),
+      );
     }
   }
 
@@ -185,9 +191,11 @@ export class P2PSync {
     this.unsubscribeRequests?.();
     this.unsubscribeResponses?.();
     this.unsubscribeEvents?.();
+    this.unsubscribeMarketEvents?.();
     this.unsubscribeRequests = undefined;
     this.unsubscribeResponses = undefined;
     this.unsubscribeEvents = undefined;
+    this.unsubscribeMarketEvents = undefined;
   }
 
   async requestRange(from: string, limit?: number): Promise<void> {
@@ -299,7 +307,7 @@ export class P2PSync {
     if (!envelope) {
       return;
     }
-    if (envelope.topic !== TOPIC_EVENTS) {
+    if (envelope.topic !== TOPIC_EVENTS && envelope.topic !== TOPIC_MARKETS) {
       return;
     }
     await this.applyEventBytes(envelope.payload);
@@ -460,9 +468,13 @@ export class P2PSync {
         return;
       }
     }
+    let appended = false;
     try {
-      await this.eventStore.appendEvent(hash, eventBytes);
+      appended = await this.eventStore.appendEvent(hash, eventBytes);
     } catch {
+      return;
+    }
+    if (!appended) {
       return;
     }
     if (this.onEventApplied) {

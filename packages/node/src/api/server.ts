@@ -31,12 +31,20 @@ import {
   createWalletState,
   getWalletBalance,
   getReputationRecords,
+  isAccessMethodType,
+  isContentFormat,
+  isInfoType,
+  isListingStatus,
+  isListingVisibility,
+  isMarketType,
   ReputationDimension,
   ReputationAspectKey,
   ReputationLevel,
   ReputationRecord,
   ReputationStore,
   ReputationState,
+  SearchQuery,
+  SearchResult,
   WalletState,
 } from '@clawtoken/protocol';
 
@@ -217,6 +225,7 @@ export class ApiServer {
       publishEvent: (envelope: Record<string, unknown>) => Promise<string>;
       eventStore?: EventStore;
       reputationStore?: ReputationStore;
+      searchMarkets?: (query: SearchQuery) => SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
       getNodeConfig?: () => Promise<Record<string, unknown>>;
@@ -351,6 +360,11 @@ export class ApiServer {
             return;
           }
         }
+      }
+
+      if (method === 'GET' && url?.pathname === '/api/markets/search') {
+        await this.handleMarketSearch(req, res, url);
+        return;
       }
 
       sendError(res, 404, 'NOT_FOUND', 'route not found');
@@ -1140,6 +1154,30 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
+
+  private async handleMarketSearch(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+  ): Promise<void> {
+    if (!this.runtime.searchMarkets) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market search unavailable');
+      return;
+    }
+    let query: SearchQuery;
+    try {
+      query = parseMarketSearchQuery(url.searchParams);
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      const result = this.runtime.searchMarkets(query);
+      sendJson(res, 200, result);
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'failed to search markets');
+    }
+  }
 }
 
 async function readJsonBody(req: IncomingMessage, res: ServerResponse): Promise<unknown | null> {
@@ -1345,6 +1383,136 @@ function parsePagination(value: string | null, fallback: number, max: number): n
     return fallback;
   }
   return Math.min(parsed, max);
+}
+
+function parseCsv(value: string | null): string[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const items = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  return items.length ? items : undefined;
+}
+
+function parseBoolean(value: string | null): boolean | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+    return true;
+  }
+  if (['0', 'false', 'no', 'off'].includes(normalized)) {
+    return false;
+  }
+  throw new Error('invalid boolean value');
+}
+
+function parseTokenParam(value: string | null, field: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!/^[0-9]+$/.test(trimmed)) {
+    throw new Error(`${field} must be an integer token amount`);
+  }
+  return trimmed;
+}
+
+function parseNumberParam(value: string | null, field: string): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${field} must be a number`);
+  }
+  return parsed;
+}
+
+function parseMarketSearchQuery(params: URLSearchParams): SearchQuery {
+  const markets = parseCsv(params.get('markets'));
+  const tags = parseCsv(params.get('tags'));
+  const skills = parseCsv(params.get('skills'));
+  const infoTypes = parseCsv(params.get('infoTypes') ?? params.get('infoType'));
+  const contentFormats = parseCsv(params.get('contentFormats') ?? params.get('contentFormat'));
+  const accessMethods = parseCsv(params.get('accessMethods') ?? params.get('accessMethod'));
+  const statuses = parseCsv(params.get('statuses') ?? params.get('status'));
+  const visibility = parseCsv(params.get('visibility'));
+
+  const marketTypes = markets?.map((entry) => {
+    if (!isMarketType(entry)) {
+      throw new Error(`unknown market type: ${entry}`);
+    }
+    return entry;
+  });
+  const listingStatuses = statuses?.map((entry) => {
+    if (!isListingStatus(entry)) {
+      throw new Error(`unknown listing status: ${entry}`);
+    }
+    return entry;
+  });
+  const listingVisibility = visibility?.map((entry) => {
+    if (!isListingVisibility(entry)) {
+      throw new Error(`unknown visibility: ${entry}`);
+    }
+    return entry;
+  });
+  const infoTypeValues = infoTypes?.map((entry) => {
+    if (!isInfoType(entry)) {
+      throw new Error(`unknown info type: ${entry}`);
+    }
+    return entry;
+  });
+  const contentFormatValues = contentFormats?.map((entry) => {
+    if (!isContentFormat(entry)) {
+      throw new Error(`unknown content format: ${entry}`);
+    }
+    return entry;
+  });
+  const accessMethodValues = accessMethods?.map((entry) => {
+    if (!isAccessMethodType(entry)) {
+      throw new Error(`unknown access method: ${entry}`);
+    }
+    return entry;
+  });
+
+  const page = parsePagination(params.get('page'), 1, 1_000_000);
+  const pageSize = parsePagination(params.get('pageSize'), 20, 1000);
+  const includeFacets = parseBoolean(params.get('includeFacets'));
+
+  const minPrice = parseTokenParam(params.get('minPrice') ?? params.get('priceMin'), 'minPrice');
+  const maxPrice = parseTokenParam(params.get('maxPrice') ?? params.get('priceMax'), 'maxPrice');
+
+  const minReputation = parseNumberParam(params.get('minReputation'), 'minReputation');
+  const minRating = parseNumberParam(params.get('minRating'), 'minRating');
+
+  const sort = params.get('sort') ?? undefined;
+
+  const query: SearchQuery = {
+    keyword: params.get('keyword') ?? undefined,
+    markets: marketTypes,
+    category: params.get('category') ?? undefined,
+    tags,
+    priceRange: minPrice || maxPrice ? { min: minPrice, max: maxPrice } : undefined,
+    minReputation,
+    minRating,
+    skills,
+    capabilityType: params.get('capabilityType') ?? undefined,
+    infoTypes: infoTypeValues,
+    contentFormats: contentFormatValues,
+    accessMethods: accessMethodValues,
+    sort: sort as SearchQuery['sort'],
+    page,
+    pageSize,
+    includeFacets,
+    statuses: listingStatuses,
+    visibility: listingVisibility,
+  };
+
+  return query;
 }
 
 type ReputationSource = 'store' | 'log';

@@ -26,10 +26,14 @@ import {
   SnapshotScheduler,
   SnapshotStore,
   TOPIC_EVENTS,
+  TOPIC_MARKETS,
 } from '@clawtoken/core';
 import {
   CONTENT_TYPE,
   encodeP2PEnvelopeBytes,
+  InfoContentStore,
+  isMarketEventEnvelope,
+  MarketSearchStore,
   MemoryReputationStore,
   signP2PEnvelope,
 } from '@clawtoken/protocol';
@@ -79,10 +83,13 @@ export class ClawTokenNode {
   private p2p?: P2PNode;
   private sync?: P2PSync;
   private eventDb?: LevelStore;
+  private stateDb?: LevelStore;
   private eventStore?: EventStore;
   private snapshotStore?: SnapshotStore;
   private snapshotScheduler?: SnapshotScheduler;
   private reputationStore?: MemoryReputationStore;
+  private marketSearchStore?: MarketSearchStore;
+  private infoContentStore?: InfoContentStore;
   private rangeTimer?: NodeJS.Timeout;
   private snapshotTimer?: NodeJS.Timeout;
   private apiServer?: ApiServer;
@@ -140,9 +147,12 @@ export class ClawTokenNode {
 
     try {
       this.eventDb = new LevelStore({ path: paths.eventsDb });
+      this.stateDb = new LevelStore({ path: paths.stateDb });
       this.eventStore = new EventStore(this.eventDb);
       this.snapshotStore = new SnapshotStore(paths);
       await this.initReputationStore();
+      await this.initMarketSearchStore();
+      await this.initInfoContentStore();
       if (this.config.snapshotBuilder) {
         this.snapshotScheduler = new SnapshotScheduler(this.eventStore, this.snapshotStore, {
           ...DEFAULT_SNAPSHOT_POLICY,
@@ -170,7 +180,7 @@ export class ClawTokenNode {
         peerPrivateKey: privateKey,
         resolvePeerPublicKey: (id) => this.p2p?.getPeerPublicKey(id) ?? Promise.resolve(null),
         resolveControllerPublicKey: this.config.resolveControllerPublicKey,
-        onEventApplied: (envelope) => this.applyReputationEnvelope(envelope),
+        onEventApplied: (envelope) => this.applyEventStores(envelope),
         ...syncOptions,
       });
       await this.sync.start();
@@ -187,6 +197,12 @@ export class ClawTokenNode {
           publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
           eventStore: this.eventStore,
           reputationStore: this.reputationStore,
+          searchMarkets: (query) => {
+            if (!this.marketSearchStore) {
+              throw new Error('market search unavailable');
+            }
+            return this.marketSearchStore.search(query);
+          },
           getNodeStatus: () => this.buildNodeStatus(),
           getNodePeers: () => this.buildNodePeers(),
           getNodeConfig: () => this.buildNodeConfig(),
@@ -218,6 +234,7 @@ export class ClawTokenNode {
       async () => this.sync?.stop(),
       async () => this.p2p?.stop(),
       async () => this.eventDb?.close(),
+      async () => this.stateDb?.close(),
     ];
 
     for (const task of tasks) {
@@ -232,10 +249,12 @@ export class ClawTokenNode {
     this.sync = undefined;
     this.p2p = undefined;
     this.eventDb = undefined;
+    this.stateDb = undefined;
     this.eventStore = undefined;
     this.snapshotStore = undefined;
     this.snapshotScheduler = undefined;
     this.reputationStore = undefined;
+    this.marketSearchStore = undefined;
     this.peerId = undefined;
     this.peerPrivateKey = undefined;
     this.stopping = undefined;
@@ -314,7 +333,7 @@ export class ClawTokenNode {
         : eventHashHex(envelope);
     const canonical = canonicalizeBytes(envelope);
     await this.eventStore.appendEvent(hash, canonical);
-    await this.applyReputationEnvelope(envelope);
+    await this.applyEventStores(envelope);
 
     const p2pEnvelope = await signP2PEnvelope(
       {
@@ -329,6 +348,21 @@ export class ClawTokenNode {
     );
     const bytes = encodeP2PEnvelopeBytes(p2pEnvelope);
     await this.p2p.publish(TOPIC_EVENTS, bytes);
+    if (isMarketEventEnvelope(envelope)) {
+      const marketEnvelope = await signP2PEnvelope(
+        {
+          v: 1,
+          topic: TOPIC_MARKETS,
+          sender: this.peerId.toString(),
+          ts: BigInt(Date.now()),
+          contentType: CONTENT_TYPE,
+          payload: canonical,
+        },
+        this.peerPrivateKey,
+      );
+      const marketBytes = encodeP2PEnvelopeBytes(marketEnvelope);
+      await this.p2p.publish(TOPIC_MARKETS, marketBytes);
+    }
     return hash;
   }
 
@@ -362,14 +396,55 @@ export class ClawTokenNode {
     this.reputationStore = store;
   }
 
-  private async applyReputationEnvelope(envelope: Record<string, unknown>): Promise<void> {
-    if (!this.reputationStore) {
+  private async initMarketSearchStore(): Promise<void> {
+    if (!this.eventStore || !this.stateDb) {
       return;
     }
+    const store = new MarketSearchStore(this.stateDb);
     try {
-      await this.reputationStore.applyEvent(envelope as EventEnvelope);
+      await store.loadFromStore();
+      await store.syncFromEventLog(this.eventStore);
     } catch {
+      await store.rebuildFromEventLog(this.eventStore);
+    }
+    this.marketSearchStore = store;
+  }
+
+  private async initInfoContentStore(): Promise<void> {
+    if (!this.eventStore || !this.stateDb) {
       return;
+    }
+    const store = new InfoContentStore(this.stateDb);
+    try {
+      await store.loadFromStore();
+      await store.syncFromEventLog(this.eventStore);
+    } catch {
+      await store.rebuildFromEventLog(this.eventStore);
+    }
+    this.infoContentStore = store;
+  }
+
+  private async applyEventStores(envelope: Record<string, unknown>): Promise<void> {
+    if (this.reputationStore) {
+      try {
+        await this.reputationStore.applyEvent(envelope as EventEnvelope);
+      } catch {
+        // Ignore malformed events for reputation aggregation.
+      }
+    }
+    if (this.marketSearchStore) {
+      try {
+        await this.marketSearchStore.applyEvent(envelope as EventEnvelope);
+      } catch {
+        // Ignore malformed events for market indexing.
+      }
+    }
+    if (this.infoContentStore) {
+      try {
+        await this.infoContentStore.applyEvent(envelope as EventEnvelope);
+      } catch {
+        // Ignore malformed events for info content linking.
+      }
     }
   }
 
