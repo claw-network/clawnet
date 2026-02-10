@@ -796,6 +796,11 @@ paths:
           schema:
             type: string
           description: 技能（逗号分隔，任务市场）
+        - name: taskTypes
+          in: query
+          schema:
+            type: string
+          description: 任务类型（逗号分隔，任务市场）
         - name: capabilityType
           in: query
           schema:
@@ -883,10 +888,20 @@ paths:
           schema:
             type: string
           example: "machine learning"
+        - name: markets
+          in: query
+          schema:
+            type: string
+          description: 市场类型（逗号分隔，默认 info）
         - name: category
           in: query
           schema:
             type: string
+        - name: tags
+          in: query
+          schema:
+            type: string
+          description: 标签（逗号分隔）
         - name: minPrice
           in: query
           schema:
@@ -895,12 +910,60 @@ paths:
           in: query
           schema:
             type: number
-        - name: sortBy
+        - name: minReputation
+          in: query
+          schema:
+            type: number
+        - name: minRating
+          in: query
+          schema:
+            type: number
+        - name: infoTypes
           in: query
           schema:
             type: string
-            enum: [relevance, price_asc, price_desc, rating, recent]
+          description: 信息类型（逗号分隔）
+        - name: contentFormats
+          in: query
+          schema:
+            type: string
+          description: 内容格式（逗号分隔）
+        - name: accessMethods
+          in: query
+          schema:
+            type: string
+          description: 访问方式（逗号分隔）
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [relevance, newest, price_asc, price_desc, rating, popular, reputation]
             default: relevance
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: includeFacets
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: statuses
+          in: query
+          schema:
+            type: string
+          description: 列表状态（逗号分隔）
+        - name: visibility
+          in: query
+          schema:
+            type: string
+          description: 可见性（逗号分隔）
         - name: limit
           in: query
           schema:
@@ -917,18 +980,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  listings:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/InfoListing'
-                  total:
-                    type: integer
-                  hasMore:
-                    type: boolean
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/InfoMarketSearchResult'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -947,49 +999,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [title, content, price]
-              properties:
-                title:
-                  type: string
-                  maxLength: 200
-                  example: "2025 AI Agent 市场分析报告"
-                description:
-                  type: string
-                  maxLength: 2000
-                preview:
-                  type: string
-                  description: 免费预览内容
-                  maxLength: 1000
-                content:
-                  type: string
-                  description: 付费内容（加密存储）
-                contentHash:
-                  type: string
-                  description: 内容哈希（用于验证）
-                price:
-                  type: number
-                  minimum: 0
-                  example: 50
-                category:
-                  type: string
-                  example: "research"
-                tags:
-                  type: array
-                  items:
-                    type: string
-                  example: ["AI", "market-analysis", "2025"]
-                licenseType:
-                  type: string
-                  enum: [single, unlimited, commercial]
-                  default: single
+              $ref: '#/components/schemas/InfoPublishRequest'
       responses:
         '201':
           description: 发布成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InfoListing'
+                $ref: '#/components/schemas/InfoPublishResponse'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -1032,6 +1049,39 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/markets/info/{listingId}/content:
+    get:
+      tags: [Markets]
+      summary: 获取加密内容
+      operationId: getInfoContent
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 加密内容
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EncryptedInfoContent'
+        '404':
+          description: 内容不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /api/markets/info/{listingId}/purchase:
     post:
       tags: [Markets]
@@ -1043,21 +1093,19 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InfoPurchaseRequest'
       responses:
-        '200':
+        '201':
           description: 购买成功
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  purchaseId:
-                    type: string
-                  content:
-                    type: string
-                    description: 解密后的完整内容
-                  txHash:
-                    type: string
+                $ref: '#/components/schemas/InfoPurchaseResponse'
         '402':
           description: 余额不足
           content:
@@ -1085,6 +1133,174 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/markets/info/{listingId}/deliver:
+    post:
+      tags: [Markets]
+      summary: 交付信息
+      operationId: deliverInfo
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InfoDeliverRequest'
+      responses:
+        '200':
+          description: 交付完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoDeliverResponse'
+        '404':
+          description: 订单或内容不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 订单状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/info/{listingId}/confirm:
+    post:
+      tags: [Markets]
+      summary: 确认收货并释放托管
+      operationId: confirmInfoDelivery
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InfoConfirmRequest'
+      responses:
+        '200':
+          description: 确认完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoConfirmResponse'
+        '404':
+          description: 订单不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 订单状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/info/{listingId}/review:
+    post:
+      tags: [Markets]
+      summary: 购买评价
+      operationId: reviewInfoOrder
+      parameters:
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InfoReviewRequest'
+      responses:
+        '200':
+          description: 评价提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoReviewResponse'
+        '404':
+          description: 订单不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 订单状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/info/orders/{orderId}/delivery:
+    get:
+      tags: [Markets]
+      summary: 获取交付信息
+      operationId: getInfoDelivery
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 交付信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoDeliveryRecord'
+        '404':
+          description: 交付不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   # --------------------------------------------------------------------------
   # Markets - Task Market
   # --------------------------------------------------------------------------
@@ -1098,24 +1314,72 @@ paths:
           in: query
           schema:
             type: string
-        - name: capability
+        - name: category
           in: query
           schema:
             type: string
-          description: 所需能力
-        - name: minBudget
-          in: query
-          schema:
-            type: number
-        - name: maxBudget
-          in: query
-          schema:
-            type: number
-        - name: status
+        - name: tags
           in: query
           schema:
             type: string
-            enum: [open, in_progress, completed, cancelled]
+          description: 标签（逗号分隔）
+        - name: skills
+          in: query
+          schema:
+            type: string
+          description: 技能（逗号分隔）
+        - name: taskTypes
+          in: query
+          schema:
+            type: string
+          description: 任务类型（逗号分隔）
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: minReputation
+          in: query
+          schema:
+            type: number
+        - name: minRating
+          in: query
+          schema:
+            type: number
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [relevance, newest, price_asc, price_desc, rating, popular, reputation]
+            default: relevance
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: includeFacets
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: statuses
+          in: query
+          schema:
+            type: string
+          description: 列表状态（逗号分隔）
+        - name: visibility
+          in: query
+          schema:
+            type: string
+          description: 可见性（逗号分隔）
         - name: limit
           in: query
           schema:
@@ -1132,16 +1396,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  tasks:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/TaskListing'
-                  total:
-                    type: integer
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/TaskMarketSearchResult'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -1160,46 +1415,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [title, description, budget]
-              properties:
-                title:
-                  type: string
-                  example: "分析 Q4 销售数据"
-                description:
-                  type: string
-                  example: "需要分析销售数据并生成可视化报告"
-                requirements:
-                  type: array
-                  items:
-                    type: string
-                  example: ["data-analysis", "visualization"]
-                budget:
-                  type: number
-                  example: 200
-                budgetType:
-                  type: string
-                  enum: [fixed, hourly, milestone]
-                  default: fixed
-                deadline:
-                  type: integer
-                  description: Unix timestamp
-                milestones:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/Milestone'
-                attachments:
-                  type: array
-                  items:
-                    type: string
-                    description: 附件 CID
+              $ref: '#/components/schemas/TaskPublishRequest'
       responses:
         '201':
           description: 发布成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskListing'
+                $ref: '#/components/schemas/TaskPublishResponse'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -1253,20 +1476,23 @@ paths:
           required: true
           schema:
             type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
       responses:
         '200':
           description: 竞标列表
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  bids:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Bid'
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/TaskBidListResult'
         '404':
           description: 任务不存在
           content:
@@ -1297,26 +1523,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [price]
-              properties:
-                price:
-                  type: number
-                  example: 180
-                proposal:
-                  type: string
-                  example: "我有5年数据分析经验，可在2天内完成"
-                estimatedDuration:
-                  type: integer
-                  description: 预计工时（小时）
-                  example: 8
+              $ref: '#/components/schemas/TaskBidRequest'
       responses:
         '201':
           description: 竞标成功
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Bid'
+                $ref: '#/components/schemas/TaskBidResponse'
         '404':
           description: 任务不存在
           content:
@@ -1336,7 +1550,7 @@ paths:
     post:
       tags: [Markets]
       summary: 接受竞标
-      description: 任务发布者接受某个竞标，创建合约
+      description: 任务发布者接受某个竞标，创建订单并托管资金
       operationId: acceptBid
       parameters:
         - name: taskId
@@ -1349,20 +1563,151 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [bidId]
-              properties:
-                bidId:
-                  type: string
+              $ref: '#/components/schemas/TaskBidAcceptRequest'
       responses:
         '200':
           description: 接受成功，合约已创建
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Contract'
+                $ref: '#/components/schemas/TaskBidAcceptResponse'
         '404':
           description: 任务或竞标不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/tasks/{taskId}/deliver:
+    post:
+      tags: [Markets]
+      summary: 提交任务交付
+      operationId: deliverTask
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskDeliverRequest'
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskDeliverResponse'
+        '404':
+          description: 订单不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 订单状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/tasks/{taskId}/confirm:
+    post:
+      tags: [Markets]
+      summary: 审核交付并释放托管
+      operationId: confirmTaskDelivery
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskConfirmRequest'
+      responses:
+        '200':
+          description: 审核完成
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskConfirmResponse'
+        '404':
+          description: 订单不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 订单状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/tasks/{taskId}/review:
+    post:
+      tags: [Markets]
+      summary: 任务评价
+      operationId: reviewTaskOrder
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskReviewRequest'
+      responses:
+        '200':
+          description: 评价提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskReviewResponse'
+        '404':
+          description: 订单不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 订单状态冲突
           content:
             application/json:
               schema:
@@ -1386,11 +1731,28 @@ paths:
       description: 搜索可租用的 Agent 能力/API
       operationId: searchCapabilityMarket
       parameters:
-        - name: capability
+        - name: keyword
           in: query
           schema:
             type: string
-          example: "text-generation"
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: tags
+          in: query
+          schema:
+            type: string
+          description: 标签（逗号分隔）
+        - name: capabilityType
+          in: query
+          schema:
+            type: string
+          description: 能力类型
+        - name: minPrice
+          in: query
+          schema:
+            type: number
         - name: maxPrice
           in: query
           schema:
@@ -1398,28 +1760,59 @@ paths:
         - name: minReputation
           in: query
           schema:
+            type: number
+        - name: minRating
+          in: query
+          schema:
+            type: number
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [relevance, newest, price_asc, price_desc, rating, popular, reputation]
+            default: relevance
+        - name: page
+          in: query
+          schema:
             type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: includeFacets
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: statuses
+          in: query
+          schema:
+            type: string
+          description: 列表状态（逗号分隔）
+        - name: visibility
+          in: query
+          schema:
+            type: string
+          description: 可见性（逗号分隔）
         - name: limit
           in: query
           schema:
             type: integer
             default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
       responses:
         '200':
           description: 搜索结果
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  providers:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/CapabilityProvider'
-                  total:
-                    type: integer
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
+                $ref: '#/components/schemas/CapabilityMarketSearchResult'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -1429,14 +1822,72 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/capabilities/{providerId}/invoke:
     post:
       tags: [Markets]
-      summary: 调用能力
-      description: 按次调用某个 Agent 的能力
-      operationId: invokeCapability
+      summary: 发布能力商品
+      operationId: publishCapability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapabilityPublishRequest'
+      responses:
+        '201':
+          description: 发布成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityPublishResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/capabilities/{listingId}:
+    get:
+      tags: [Markets]
+      summary: 获取能力详情
+      operationId: getCapabilityListing
       parameters:
-        - name: providerId
+        - name: listingId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 能力详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityListing'
+        '404':
+          description: 能力不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/capabilities/{listingId}/lease:
+    post:
+      tags: [Markets]
+      summary: 创建能力租约
+      operationId: leaseCapability
+      parameters:
+        - name: listingId
           in: path
           required: true
           schema:
@@ -1446,40 +1897,235 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [capability, input]
-              properties:
-                capability:
-                  type: string
-                  example: "text-generation"
-                input:
-                  type: object
-                  description: 能力特定的输入参数
-                maxCost:
-                  type: number
-                  description: 最大花费限制
+              $ref: '#/components/schemas/CapabilityLeaseRequest'
+      responses:
+        '201':
+          description: 租约创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityLeaseResponse'
+        '404':
+          description: 能力不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 能力不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/capabilities/leases/{leaseId}:
+    get:
+      tags: [Markets]
+      summary: 获取租约详情
+      operationId: getCapabilityLease
+      parameters:
+        - name: leaseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 租约详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityLeaseDetailResponse'
+        '404':
+          description: 租约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/capabilities/leases/{leaseId}/invoke:
+    post:
+      tags: [Markets]
+      summary: 调用能力并记录使用
+      operationId: invokeCapability
+      parameters:
+        - name: leaseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapabilityInvokeRequest'
       responses:
         '200':
           description: 调用成功
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  output:
-                    type: object
-                  cost:
-                    type: number
-                  txHash:
-                    type: string
-        '402':
-          description: 余额不足
+                $ref: '#/components/schemas/CapabilityInvokeResponse'
+        '404':
+          description: 租约不存在
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: 租约状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/capabilities/leases/{leaseId}/pause:
+    post:
+      tags: [Markets]
+      summary: 暂停租约
+      operationId: pauseCapabilityLease
+      parameters:
+        - name: leaseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapabilityLeaseActionRequest'
+      responses:
+        '200':
+          description: 暂停成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityLeaseActionResponse'
         '404':
-          description: 能力提供方不存在
+          description: 租约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 租约状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/capabilities/leases/{leaseId}/resume:
+    post:
+      tags: [Markets]
+      summary: 恢复租约
+      operationId: resumeCapabilityLease
+      parameters:
+        - name: leaseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapabilityLeaseActionRequest'
+      responses:
+        '200':
+          description: 恢复成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityLeaseActionResponse'
+        '404':
+          description: 租约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 租约状态冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/markets/capabilities/leases/{leaseId}/terminate:
+    post:
+      tags: [Markets]
+      summary: 终止租约
+      operationId: terminateCapabilityLease
+      parameters:
+        - name: leaseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapabilityLeaseActionRequest'
+      responses:
+        '200':
+          description: 终止成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapabilityLeaseActionResponse'
+        '404':
+          description: 租约不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 租约状态冲突
           content:
             application/json:
               schema:
@@ -2442,6 +3088,54 @@ components:
         pageSize:
           type: integer
 
+    InfoMarketSearchResult:
+      type: object
+      properties:
+        listings:
+          type: array
+          items:
+            $ref: '#/components/schemas/InfoListing'
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    TaskMarketSearchResult:
+      type: object
+      properties:
+        listings:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskListing'
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
+    CapabilityMarketSearchResult:
+      type: object
+      properties:
+        listings:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityListing'
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+        page:
+          type: integer
+        pageSize:
+          type: integer
+
     MarketSearchFacets:
       type: object
       properties:
@@ -2608,77 +3302,1097 @@ components:
             additionalProperties: true
 
     InfoListing:
+      allOf:
+        - $ref: '#/components/schemas/MarketListing'
+        - type: object
+          properties:
+            marketType:
+              type: string
+              enum: [info]
+            marketData:
+              $ref: '#/components/schemas/InfoMarketData'
+
+    InfoMarketData:
+      type: object
+      required: [infoType, content, accessMethod, license]
+      properties:
+        infoType:
+          type: string
+          enum:
+            [
+              knowledge,
+              experience,
+              model,
+              template,
+              dataset,
+              api,
+              stream,
+              snapshot,
+              intelligence,
+              signal,
+              prediction,
+              alert,
+              analysis,
+              research,
+              insight,
+              consultation,
+            ]
+        content:
+          $ref: '#/components/schemas/InfoContent'
+        quality:
+          $ref: '#/components/schemas/InfoQuality'
+        accessMethod:
+          $ref: '#/components/schemas/InfoAccessMethod'
+        license:
+          $ref: '#/components/schemas/InfoLicense'
+        usageRestrictions:
+          $ref: '#/components/schemas/InfoUsageRestrictions'
+      additionalProperties: true
+
+    InfoContent:
+      type: object
+      required: [format]
+      properties:
+        format:
+          type: string
+          enum: [text, json, csv, parquet, binary, image, video, audio, mixed]
+        size:
+          type: integer
+        hash:
+          type: string
+          description: 内容哈希（blake3 hex）
+        preview:
+          $ref: '#/components/schemas/InfoContentPreview'
+        sample:
+          $ref: '#/components/schemas/InfoContentSample'
+        schema:
+          $ref: '#/components/schemas/InfoContentSchema'
+      additionalProperties: true
+
+    InfoContentPublishInput:
+      allOf:
+        - $ref: '#/components/schemas/InfoContent'
+        - type: object
+          properties:
+            data:
+              type: string
+              description: 原始内容（可选，直接上传以加密存储）
+            encoding:
+              type: string
+              enum: [utf8, base64, hex]
+
+    InfoContentPreview:
       type: object
       properties:
-        id:
+        type:
           type: string
+          enum: [summary, sample, schema, stats]
+        content:
+          type: string
+        truncated:
+          type: boolean
+
+    InfoContentSample:
+      type: object
+      properties:
+        description:
+          type: string
+        data:
+          type: string
+        percentage:
+          type: number
+
+    InfoContentSchema:
+      type: object
+      properties:
+        name:
+          type: string
+        format:
+          type: string
+        version:
+          type: string
+
+    InfoAccessMethod:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [download, api, stream, query]
+        download:
+          $ref: '#/components/schemas/InfoAccessDownload'
+        api:
+          $ref: '#/components/schemas/InfoAccessApi'
+        stream:
+          $ref: '#/components/schemas/InfoAccessStream'
+        query:
+          $ref: '#/components/schemas/InfoAccessQuery'
+      additionalProperties: true
+
+    InfoAccessDownload:
+      type: object
+      properties:
+        formats:
+          type: array
+          items:
+            type: string
+        maxDownloads:
+          type: integer
+        expiresIn:
+          type: integer
+
+    InfoAccessApi:
+      type: object
+      properties:
+        endpoint:
+          type: string
+        authentication:
+          type: string
+          enum: [token, signature]
+        rateLimit:
+          type: object
+          properties:
+            requests:
+              type: integer
+            period:
+              type: integer
+        documentation:
+          type: string
+
+    InfoAccessStream:
+      type: object
+      properties:
+        protocol:
+          type: string
+          enum: [websocket, sse, grpc]
+        endpoint:
+          type: string
+        frequency:
+          type: integer
+
+    InfoAccessQuery:
+      type: object
+      properties:
+        language:
+          type: string
+          enum: [sql, graphql, natural]
+        endpoint:
+          type: string
+        schema:
+          type: string
+
+    InfoLicense:
+      type: object
+      required: [type, permissions, restrictions]
+      properties:
+        type:
+          type: string
+          enum: [exclusive, non_exclusive, limited, perpetual, subscription, custom]
+        permissions:
+          $ref: '#/components/schemas/InfoLicensePermissions'
+        restrictions:
+          $ref: '#/components/schemas/InfoLicenseRestrictions'
+        customTerms:
+          type: string
+
+    InfoLicensePermissions:
+      type: object
+      properties:
+        use:
+          type: boolean
+        modify:
+          type: boolean
+        distribute:
+          type: boolean
+        commercialize:
+          type: boolean
+        sublicense:
+          type: boolean
+
+    InfoLicenseRestrictions:
+      type: object
+      properties:
+        attribution:
+          type: boolean
+        shareAlike:
+          type: boolean
+        nonCompete:
+          type: boolean
+        confidential:
+          type: boolean
+        termLimit:
+          type: integer
+
+    InfoQuality:
+      type: object
+      properties:
+        accuracy:
+          type: number
+        freshness:
+          type: number
+        completeness:
+          type: number
+        source:
+          type: string
+        verifiedBy:
+          type: array
+          items:
+            type: string
+        lastUpdated:
+          type: integer
+
+    InfoUsageRestrictions:
+      type: object
+      properties:
+        maxUses:
+          type: integer
+        validityPeriod:
+          type: integer
+        maxConcurrent:
+          type: integer
+        derivativeWorks:
+          type: boolean
+        resale:
+          type: boolean
+        allowedPurposes:
+          type: array
+          items:
+            type: string
+        prohibitedPurposes:
+          type: array
+          items:
+            type: string
+
+    InfoPublishRequest:
+      type: object
+      required:
+        [
+          did,
+          passphrase,
+          title,
+          description,
+          category,
+          pricing,
+          infoType,
+          content,
+          accessMethod,
+          license,
+          nonce,
+        ]
+      properties:
+        did:
+          type: string
+          description: 发布者 DID
+        passphrase:
+          type: string
+          description: 本地密钥解锁口令
+        listingId:
+          type: string
+          description: 自定义 listingId（可选）
         title:
           type: string
         description:
           type: string
-        preview:
-          type: string
-        price:
-          type: number
-        seller:
-          type: string
-          description: 卖家 DID
-        sellerReputation:
-          type: number
         category:
           type: string
         tags:
           type: array
           items:
             type: string
-        licenseType:
+        pricing:
+          $ref: '#/components/schemas/MarketPricing'
+        visibility:
           type: string
-        salesCount:
+          enum: [public, private, unlisted]
+        infoType:
+          type: string
+        content:
+          $ref: '#/components/schemas/InfoContentPublishInput'
+        accessMethod:
+          $ref: '#/components/schemas/InfoAccessMethod'
+        license:
+          $ref: '#/components/schemas/InfoLicense'
+        quality:
+          $ref: '#/components/schemas/InfoQuality'
+        usageRestrictions:
+          $ref: '#/components/schemas/InfoUsageRestrictions'
+        restrictions:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        expiresAt:
           type: integer
+        status:
+          type: string
+          enum: [draft, active, paused, sold_out, expired, removed]
+        contentKeyHex:
+          type: string
+          description: 32-byte 内容密钥（hex）
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    InfoPublishResponse:
+      type: object
+      required: [listingId, txHash, contentHash]
+      properties:
+        listingId:
+          type: string
+        txHash:
+          type: string
+        contentHash:
+          type: string
+        contentKeyHex:
+          type: string
+
+    InfoPurchaseRequest:
+      type: object
+      required: [did, passphrase, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        orderId:
+          type: string
+        escrowId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        unitPrice:
+          oneOf:
+            - type: integer
+            - type: string
+        releaseRules:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    InfoPurchaseResponse:
+      type: object
+      required:
+        [orderId, escrowId, orderHash, escrowCreateHash, escrowFundHash, paymentHash]
+      properties:
+        orderId:
+          type: string
+        escrowId:
+          type: string
+        orderHash:
+          type: string
+        escrowCreateHash:
+          type: string
+        escrowFundHash:
+          type: string
+        paymentHash:
+          type: string
+
+    InfoDeliverRequest:
+      type: object
+      required: [did, passphrase, orderId, contentKeyHex, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        orderId:
+          type: string
+        deliveryId:
+          type: string
+        contentKeyHex:
+          type: string
+          description: 32-byte 内容密钥（hex）
+        buyerPublicKeyHex:
+          type: string
+          description: 32-byte 买家公钥（hex）
+        accessToken:
+          type: string
+        accessUrl:
+          type: string
+        expiresAt:
+          type: integer
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    InfoDeliverResponse:
+      type: object
+      properties:
+        delivery:
+          $ref: '#/components/schemas/InfoDeliveryRecord'
+        orderUpdateHash:
+          type: string
+
+    InfoConfirmRequest:
+      type: object
+      required: [did, passphrase, orderId, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        orderId:
+          type: string
+        escrowId:
+          type: string
+        ruleId:
+          type: string
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    InfoConfirmResponse:
+      type: object
+      required: [escrowReleaseHash, orderUpdateHash]
+      properties:
+        escrowReleaseHash:
+          type: string
+        orderUpdateHash:
+          type: string
+
+    InfoReviewRequest:
+      type: object
+      required: [did, passphrase, orderId, rating, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        orderId:
+          type: string
         rating:
-          type: number
+          oneOf:
+            - type: number
+            - type: string
+        comment:
+          type: string
+        detailedRatings:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: number
+              - type: string
+        by:
+          type: string
+          enum: [buyer, seller]
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    InfoReviewResponse:
+      type: object
+      properties:
+        orderUpdateHash:
+          type: string
+
+    EncryptedInfoContent:
+      type: object
+      properties:
+        hash:
+          type: string
+        listingId:
+          type: string
+        size:
+          type: integer
+        nonceHex:
+          type: string
+        ciphertextHex:
+          type: string
+        tagHex:
+          type: string
         createdAt:
           type: integer
-        updatedAt:
+
+    InfoKeyEnvelope:
+      type: object
+      properties:
+        algorithm:
+          type: string
+          enum: [x25519-aes-256-gcm]
+        senderPublicKeyHex:
+          type: string
+        nonceHex:
+          type: string
+        ciphertextHex:
+          type: string
+        tagHex:
+          type: string
+
+    InfoDeliveryRecord:
+      type: object
+      properties:
+        deliveryId:
+          type: string
+        orderId:
+          type: string
+        listingId:
+          type: string
+        contentHash:
+          type: string
+        keyEnvelope:
+          $ref: '#/components/schemas/InfoKeyEnvelope'
+        accessToken:
+          type: string
+        createdAt:
+          type: integer
+        expiresAt:
           type: integer
 
     TaskListing:
+      allOf:
+        - $ref: '#/components/schemas/MarketListing'
+        - type: object
+          properties:
+            marketType:
+              type: string
+              enum: [task]
+            marketData:
+              $ref: '#/components/schemas/TaskMarketData'
+
+    TaskMarketData:
       type: object
+      required: [taskType, task, timeline]
+      properties:
+        taskType:
+          type: string
+          enum: [one_time, project, ongoing, contest, bounty]
+        task:
+          $ref: '#/components/schemas/TaskDetail'
+        timeline:
+          $ref: '#/components/schemas/TaskTimeline'
+        workerRequirements:
+          $ref: '#/components/schemas/TaskWorkerRequirements'
+        bidding:
+          $ref: '#/components/schemas/TaskBiddingSettings'
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskMilestone'
+      additionalProperties: true
+
+    TaskDetail:
+      type: object
+      required: [requirements, deliverables, skills, complexity, estimatedDuration]
+      properties:
+        requirements:
+          type: string
+        deliverables:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskDeliverable'
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskSkill'
+        complexity:
+          type: string
+          enum: [simple, moderate, complex, expert]
+        estimatedDuration:
+          type: integer
+      additionalProperties: true
+
+    TaskDeliverable:
+      type: object
+      required: [name, type, required]
       properties:
         id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [file, code, data, report, service, result, other]
+        required:
+          type: boolean
+        acceptanceCriteria:
+          type: array
+          items:
+            type: string
+        format:
+          type: string
+
+    TaskSkill:
+      type: object
+      required: [name, level, required]
+      properties:
+        name:
+          type: string
+        level:
+          type: string
+          enum: [beginner, intermediate, advanced, expert]
+        required:
+          type: boolean
+
+    TaskTimeline:
+      type: object
+      required: [flexible]
+      properties:
+        startBy:
+          type: integer
+        deadline:
+          type: integer
+        flexible:
+          type: boolean
+
+    TaskWorkerRequirements:
+      type: object
+      properties:
+        minReputation:
+          type: number
+        requiredSkills:
+          type: array
+          items:
+            type: string
+        requiredVerifications:
+          type: array
+          items:
+            type: string
+        preferredWorkers:
+          type: array
+          items:
+            type: string
+        maxWorkers:
+          type: integer
+
+    TaskBiddingSettings:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [open, sealed, reverse]
+        open:
+          type: object
+          properties:
+            visibleBids:
+              type: boolean
+            allowCounterOffers:
+              type: boolean
+        sealed:
+          type: object
+          properties:
+            revealTime:
+              type: integer
+        reverse:
+          type: object
+          properties:
+            startingPrice:
+              type: string
+            minDecrement:
+              type: string
+        bidDeadline:
+          type: integer
+        autoSelect:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            criteria:
+              type: string
+              enum: [lowest, highest_rated, best_match]
+      additionalProperties: true
+
+    TaskMilestone:
+      type: object
+      required: [id, name, percentage]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        deliverables:
+          type: array
+          items:
+            type: string
+        percentage:
+          type: number
+        deadline:
+          type: integer
+        status:
+          type: string
+
+    CapabilityListing:
+      allOf:
+        - $ref: '#/components/schemas/MarketListing'
+        - type: object
+          properties:
+            marketType:
+              type: string
+              enum: [capability]
+            marketData:
+              $ref: '#/components/schemas/CapabilityMarketData'
+
+    CapabilityMarketData:
+      type: object
+      required: [capabilityType, capability, quota, access]
+      properties:
+        capabilityType:
+          type: string
+          enum:
+            [
+              rest_api,
+              graphql_api,
+              grpc_api,
+              websocket,
+              tool,
+              llm,
+              vision,
+              audio,
+              embedding,
+              classification,
+              compute,
+              storage,
+              bandwidth,
+              gpu,
+              translation,
+              analysis,
+              search,
+              verification,
+              custom,
+            ]
+        capability:
+          $ref: '#/components/schemas/CapabilityDetail'
+        performance:
+          type: object
+          additionalProperties: true
+        quota:
+          $ref: '#/components/schemas/CapabilityQuota'
+        access:
+          $ref: '#/components/schemas/CapabilityAccess'
+        sla:
+          $ref: '#/components/schemas/CapabilitySla'
+      additionalProperties: true
+
+    CapabilityDetail:
+      type: object
+      required: [name, version, interface]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        interface:
+          $ref: '#/components/schemas/CapabilityInterface'
+        documentation:
+          type: string
+        examples:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        limitations:
+          type: array
+          items:
+            type: string
+
+    CapabilityInterface:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [openapi, graphql, grpc, custom]
+        openapi:
+          type: object
+          properties:
+            spec:
+              type: string
+            baseUrl:
+              type: string
+            authentication:
+              $ref: '#/components/schemas/CapabilityAuthMethod'
+        graphql:
+          type: object
+          properties:
+            schema:
+              type: string
+            endpoint:
+              type: string
+            authentication:
+              $ref: '#/components/schemas/CapabilityAuthMethod'
+        grpc:
+          type: object
+          properties:
+            protoFile:
+              type: string
+            endpoint:
+              type: string
+            authentication:
+              $ref: '#/components/schemas/CapabilityAuthMethod'
+        custom:
+          type: object
+          properties:
+            protocol:
+              type: string
+            specification:
+              type: string
+            endpoint:
+              type: string
+
+    CapabilityAuthMethod:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [api_key, oauth, jwt, signature]
+        apiKey:
+          type: object
+          properties:
+            header:
+              type: string
+            query:
+              type: string
+            prefix:
+              type: string
+        oauth:
+          type: object
+          properties:
+            tokenUrl:
+              type: string
+            scopes:
+              type: array
+              items:
+                type: string
+        jwt:
+          type: object
+          properties:
+            issuer:
+              type: string
+            algorithm:
+              type: string
+        signature:
+          type: object
+          properties:
+            algorithm:
+              type: string
+            publicKey:
+              type: string
+
+    CapabilityQuota:
+      type: object
+      required: [type, rateLimits]
+      properties:
+        type:
+          type: string
+          enum: [unlimited, limited, tiered]
+        limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityQuotaLimit'
+        rateLimits:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityRateLimit'
+
+    CapabilityQuotaLimit:
+      type: object
+      required: [name, resource, limit]
+      properties:
+        name:
+          type: string
+        resource:
+          type: string
+        limit:
+          type: number
+        period:
+          type: integer
+
+    CapabilityRateLimit:
+      type: object
+      required: [requests, period]
+      properties:
+        requests:
+          type: integer
+        period:
+          type: integer
+        burst:
+          type: integer
+
+    CapabilityAccess:
+      type: object
+      required: [endpoint, authentication]
+      properties:
+        endpoint:
+          type: string
+        authentication:
+          $ref: '#/components/schemas/CapabilityAuthMethod'
+        sandbox:
+          type: object
+          properties:
+            endpoint:
+              type: string
+            limitations:
+              type: array
+              items:
+                type: string
+        sdks:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilitySdk'
+
+    CapabilitySdk:
+      type: object
+      required: [language, packageName, documentation]
+      properties:
+        language:
+          type: string
+        packageName:
+          type: string
+        documentation:
+          type: string
+
+    CapabilitySla:
+      type: object
+      properties:
+        availability:
+          type: object
+          properties:
+            target:
+              type: number
+            measurementPeriod:
+              type: string
+              enum: [daily, weekly, monthly]
+        responseTime:
+          type: object
+          properties:
+            p50Target:
+              type: number
+            p95Target:
+              type: number
+            p99Target:
+              type: number
+        support:
+          type: object
+          properties:
+            responseTime:
+              type: number
+            channels:
+              type: array
+              items:
+                type: string
+                enum: [ticket, chat, email]
+        compensation:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [credit, refund]
+            tiers:
+              type: array
+              items:
+                type: object
+                properties:
+                  availabilityThreshold:
+                    type: number
+                  compensationPercentage:
+                    type: number
+
+    TaskPublishRequest:
+      type: object
+      required:
+        [did, passphrase, title, description, category, pricing, taskType, task, timeline, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        listingId:
           type: string
         title:
           type: string
         description:
           type: string
-        requirements:
+        category:
+          type: string
+        tags:
           type: array
           items:
             type: string
-        budget:
-          type: number
-        budgetType:
+        pricing:
+          $ref: '#/components/schemas/MarketPricing'
+        visibility:
           type: string
-        deadline:
-          type: integer
-        client:
+          enum: [public, private, unlisted]
+        taskType:
           type: string
-          description: 发布者 DID
-        clientReputation:
-          type: number
-        status:
-          type: string
-          enum: [open, in_progress, completed, cancelled]
-        bidCount:
-          type: integer
+        task:
+          $ref: '#/components/schemas/TaskDetail'
+        timeline:
+          $ref: '#/components/schemas/TaskTimeline'
+        workerRequirements:
+          $ref: '#/components/schemas/TaskWorkerRequirements'
+        bidding:
+          $ref: '#/components/schemas/TaskBiddingSettings'
         milestones:
           type: array
           items:
-            $ref: '#/components/schemas/Milestone'
-        createdAt:
+            $ref: '#/components/schemas/TaskMilestone'
+        restrictions:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        expiresAt:
           type: integer
+        status:
+          type: string
+          enum: [draft, active, paused, sold_out, expired, removed]
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
 
-    Bid:
+    TaskPublishResponse:
+      type: object
+      required: [listingId, txHash]
+      properties:
+        listingId:
+          type: string
+        txHash:
+          type: string
+
+    TaskBid:
       type: object
       properties:
         id:
@@ -2686,21 +4400,531 @@ components:
         taskId:
           type: string
         bidder:
-          type: string
-          description: 竞标者 DID
-        bidderReputation:
-          type: number
-        price:
-          type: number
+          type: object
+          properties:
+            did:
+              type: string
+            name:
+              type: string
         proposal:
+          type: object
+          properties:
+            price:
+              type: string
+            timeline:
+              type: integer
+            approach:
+              type: string
+            milestones:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+        status:
           type: string
-        estimatedDuration:
+          enum: [submitted, shortlisted, accepted, rejected, withdrawn]
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+
+    TaskBidListResult:
+      type: object
+      properties:
+        bids:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskBid'
+        total:
+          type: integer
+        hasMore:
+          type: boolean
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    TaskBidRequest:
+      type: object
+      required: [did, passphrase, price, timeline, approach, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        bidId:
+          type: string
+        price:
+          oneOf:
+            - type: integer
+            - type: string
+        timeline:
+          type: integer
+        approach:
+          type: string
+        milestones:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    TaskBidResponse:
+      type: object
+      required: [bidId, txHash]
+      properties:
+        bidId:
+          type: string
+        txHash:
+          type: string
+
+    TaskBidAcceptRequest:
+      type: object
+      required: [did, passphrase, bidId, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        bidId:
+          type: string
+        orderId:
+          type: string
+        escrowId:
+          type: string
+        releaseRules:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    TaskBidAcceptResponse:
+      type: object
+      properties:
+        bidId:
+          type: string
+        orderId:
+          type: string
+        escrowId:
+          type: string
+        bidAcceptHash:
+          type: string
+        orderHash:
+          type: string
+        escrowCreateHash:
+          type: string
+        escrowFundHash:
+          type: string
+        paymentHash:
+          type: string
+
+    TaskDeliverRequest:
+      type: object
+      required: [did, passphrase, orderId, deliverables, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        orderId:
+          type: string
+        submissionId:
+          type: string
+        deliverables:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        notes:
+          type: string
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    TaskDeliverResponse:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        submissionHash:
+          type: string
+        orderUpdateHash:
+          type: string
+
+    TaskConfirmRequest:
+      type: object
+      required: [did, passphrase, orderId, submissionId, approved, feedback, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        orderId:
+          type: string
+        submissionId:
+          type: string
+        approved:
+          type: boolean
+        feedback:
+          type: string
+        rating:
+          oneOf:
+            - type: number
+            - type: string
+        revisionDeadline:
+          type: integer
+        escrowId:
+          type: string
+        ruleId:
+          type: string
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    TaskConfirmResponse:
+      type: object
+      properties:
+        submissionReviewHash:
+          type: string
+        escrowReleaseHash:
+          type: string
+        orderUpdateHash:
+          type: string
+
+    TaskReviewRequest:
+      type: object
+      required: [did, passphrase, orderId, rating, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        orderId:
+          type: string
+        rating:
+          oneOf:
+            - type: number
+            - type: string
+        comment:
+          type: string
+        detailedRatings:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: number
+              - type: string
+        by:
+          type: string
+          enum: [buyer, seller]
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    TaskReviewResponse:
+      type: object
+      properties:
+        orderUpdateHash:
+          type: string
+
+    CapabilityPublishRequest:
+      type: object
+      required:
+        [did, passphrase, title, description, category, pricing, capabilityType, capability, quota, access, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        listingId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        pricing:
+          $ref: '#/components/schemas/MarketPricing'
+        visibility:
+          type: string
+          enum: [public, private, unlisted]
+        capabilityType:
+          type: string
+        capability:
+          $ref: '#/components/schemas/CapabilityDetail'
+        performance:
+          type: object
+          additionalProperties: true
+        quota:
+          $ref: '#/components/schemas/CapabilityQuota'
+        access:
+          $ref: '#/components/schemas/CapabilityAccess'
+        sla:
+          $ref: '#/components/schemas/CapabilitySla'
+        restrictions:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        expiresAt:
           type: integer
         status:
           type: string
-          enum: [pending, accepted, rejected, withdrawn]
-        createdAt:
+          enum: [draft, active, paused, sold_out, expired, removed]
+        nonce:
           type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    CapabilityPublishResponse:
+      type: object
+      required: [listingId, txHash]
+      properties:
+        listingId:
+          type: string
+        txHash:
+          type: string
+
+    CapabilityLeasePlan:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [pay_per_use, time_based, subscription, credits]
+        details:
+          type: object
+          additionalProperties: true
+
+    CapabilityLease:
+      type: object
+      properties:
+        id:
+          type: string
+        listingId:
+          type: string
+        lessee:
+          type: string
+        lessor:
+          type: string
+        plan:
+          $ref: '#/components/schemas/CapabilityLeasePlan'
+        credentials:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [active, paused, exhausted, expired, cancelled, terminated]
+        startedAt:
+          type: integer
+        updatedAt:
+          type: integer
+        expiresAt:
+          type: integer
+        lastUsedAt:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties: true
+
+    CapabilityUsageRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        leaseId:
+          type: string
+        resource:
+          type: string
+        units:
+          type: integer
+        latency:
+          type: integer
+        success:
+          type: boolean
+        cost:
+          type: string
+        timestamp:
+          type: integer
+
+    CapabilityUsageStats:
+      type: object
+      properties:
+        totalCalls:
+          type: integer
+        successfulCalls:
+          type: integer
+        failedCalls:
+          type: integer
+        totalUnits:
+          type: integer
+        averageLatency:
+          type: number
+        p95Latency:
+          type: number
+        totalCost:
+          type: string
+
+    CapabilityLeaseRequest:
+      type: object
+      required: [did, passphrase, plan, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        leaseId:
+          type: string
+        plan:
+          $ref: '#/components/schemas/CapabilityLeasePlan'
+        credentials:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+        expiresAt:
+          type: integer
+        resourcePrev:
+          type: string
+          nullable: true
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    CapabilityLeaseResponse:
+      type: object
+      required: [leaseId, txHash]
+      properties:
+        leaseId:
+          type: string
+        txHash:
+          type: string
+        credentials:
+          type: object
+          additionalProperties: true
+
+    CapabilityLeaseDetailResponse:
+      type: object
+      properties:
+        lease:
+          $ref: '#/components/schemas/CapabilityLease'
+        usage:
+          type: array
+          items:
+            $ref: '#/components/schemas/CapabilityUsageRecord'
+        stats:
+          $ref: '#/components/schemas/CapabilityUsageStats'
+
+    CapabilityInvokeRequest:
+      type: object
+      required: [did, passphrase, resource, latency, success, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        resource:
+          type: string
+        units:
+          type: integer
+        latency:
+          type: integer
+        success:
+          type: boolean
+        cost:
+          oneOf:
+            - type: number
+            - type: string
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    CapabilityInvokeResponse:
+      type: object
+      properties:
+        leaseId:
+          type: string
+        txHash:
+          type: string
+        usage:
+          $ref: '#/components/schemas/CapabilityUsageRecord'
+
+    CapabilityLeaseActionRequest:
+      type: object
+      required: [did, passphrase, nonce]
+      properties:
+        did:
+          type: string
+        passphrase:
+          type: string
+        nonce:
+          type: integer
+          minimum: 1
+        prev:
+          type: string
+        ts:
+          type: integer
+      additionalProperties: true
+
+    CapabilityLeaseActionResponse:
+      type: object
+      properties:
+        leaseId:
+          type: string
+        txHash:
+          type: string
+        action:
+          type: string
 
     CapabilityProvider:
       type: object

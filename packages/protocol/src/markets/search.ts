@@ -22,6 +22,7 @@ export interface SearchQuery {
   minReputation?: number;
   minRating?: number;
   skills?: string[];
+  taskTypes?: string[];
   capabilityType?: string;
   infoTypes?: string[];
   contentFormats?: string[];
@@ -210,6 +211,18 @@ function extractSkills(listing: MarketListing): string[] {
   return result;
 }
 
+function extractTaskType(listing: MarketListing): string | null {
+  if (listing.marketType !== 'task') {
+    return null;
+  }
+  const marketData = listing.marketData ?? {};
+  const taskType = (marketData as Record<string, unknown>).taskType;
+  if (typeof taskType === 'string' && taskType.trim().length > 0) {
+    return taskType.toLowerCase();
+  }
+  return null;
+}
+
 function extractCapabilityType(listing: MarketListing): string | null {
   if (listing.marketType !== 'capability') {
     return null;
@@ -331,11 +344,13 @@ export class MarketSearchIndex {
   private readonly categoryIndex = new Map<string, Set<string>>();
   private readonly marketIndex = new Map<MarketType, Set<string>>();
   private readonly skillIndex = new Map<string, Set<string>>();
+  private readonly taskTypeIndex = new Map<string, Set<string>>();
   private readonly capabilityIndex = new Map<string, Set<string>>();
   private readonly infoTypeIndex = new Map<string, Set<string>>();
   private readonly contentFormatIndex = new Map<string, Set<string>>();
   private readonly accessMethodIndex = new Map<string, Set<string>>();
   private readonly skillByListing = new Map<string, string[]>();
+  private readonly taskTypeByListing = new Map<string, string | null>();
   private readonly capabilityByListing = new Map<string, string | null>();
   private readonly infoTypeByListing = new Map<string, string | null>();
   private readonly contentFormatByListing = new Map<string, string | null>();
@@ -378,6 +393,12 @@ export class MarketSearchIndex {
     this.skillByListing.set(listing.id, skills);
     for (const skill of skills) {
       addToIndex(this.skillIndex, skill, listing.id);
+    }
+
+    const taskType = extractTaskType(listing);
+    this.taskTypeByListing.set(listing.id, taskType);
+    if (taskType) {
+      addToIndex(this.taskTypeIndex, taskType, listing.id);
     }
 
     const capabilityType = extractCapabilityType(listing);
@@ -440,6 +461,12 @@ export class MarketSearchIndex {
       removeFromIndex(this.skillIndex, skill, listingId);
     }
     this.skillByListing.delete(listingId);
+
+    const taskType = this.taskTypeByListing.get(listingId) ?? extractTaskType(listing);
+    if (taskType) {
+      removeFromIndex(this.taskTypeIndex, taskType, listingId);
+    }
+    this.taskTypeByListing.delete(listingId);
 
     const capabilityType = this.capabilityByListing.get(listingId) ?? extractCapabilityType(listing);
     if (capabilityType) {
@@ -537,6 +564,19 @@ export class MarketSearchIndex {
         }
       }
       candidateIds = intersect(candidateIds, skillCandidates);
+    }
+
+    if (query.taskTypes && query.taskTypes.length > 0) {
+      const taskCandidates = new Set<string>();
+      for (const taskType of query.taskTypes) {
+        const set = this.taskTypeIndex.get(taskType.toLowerCase());
+        if (set) {
+          for (const id of set) {
+            taskCandidates.add(id);
+          }
+        }
+      }
+      candidateIds = intersect(candidateIds, taskCandidates);
     }
 
     if (query.capabilityType) {

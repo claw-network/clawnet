@@ -87,6 +87,134 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     await runPeers(argv.slice(1));
     return;
   }
+  if (command === 'market') {
+    const subcommand = argv[1];
+    const subArgs = argv.slice(2);
+    if (subcommand === 'info') {
+      const action = subArgs[0];
+      const actionArgs = subArgs.slice(1);
+      if (action === 'list') {
+        await runMarketInfoList(actionArgs);
+        return;
+      }
+      if (action === 'get') {
+        await runMarketInfoGet(actionArgs);
+        return;
+      }
+      if (action === 'publish') {
+        await runMarketInfoPublish(actionArgs);
+        return;
+      }
+      if (action === 'purchase') {
+        await runMarketInfoPurchase(actionArgs);
+        return;
+      }
+      if (action === 'deliver') {
+        await runMarketInfoDeliver(actionArgs);
+        return;
+      }
+      if (action === 'confirm') {
+        await runMarketInfoConfirm(actionArgs);
+        return;
+      }
+      if (action === 'review') {
+        await runMarketInfoReview(actionArgs);
+        return;
+      }
+      if (action === 'content') {
+        await runMarketInfoContent(actionArgs);
+        return;
+      }
+      if (action === 'delivery') {
+        await runMarketInfoDelivery(actionArgs);
+        return;
+      }
+      fail(`unknown market info command: ${action ?? ''}`);
+    }
+    if (subcommand === 'task') {
+      const action = subArgs[0];
+      const actionArgs = subArgs.slice(1);
+      if (action === 'list') {
+        await runMarketTaskList(actionArgs);
+        return;
+      }
+      if (action === 'get') {
+        await runMarketTaskGet(actionArgs);
+        return;
+      }
+      if (action === 'publish') {
+        await runMarketTaskPublish(actionArgs);
+        return;
+      }
+      if (action === 'bids') {
+        await runMarketTaskBids(actionArgs);
+        return;
+      }
+      if (action === 'bid') {
+        await runMarketTaskBid(actionArgs);
+        return;
+      }
+      if (action === 'accept') {
+        await runMarketTaskAccept(actionArgs);
+        return;
+      }
+      if (action === 'deliver') {
+        await runMarketTaskDeliver(actionArgs);
+        return;
+      }
+      if (action === 'confirm') {
+        await runMarketTaskConfirm(actionArgs);
+        return;
+      }
+      if (action === 'review') {
+        await runMarketTaskReview(actionArgs);
+        return;
+      }
+      fail(`unknown market task command: ${action ?? ''}`);
+    }
+    if (subcommand === 'capability') {
+      const action = subArgs[0];
+      const actionArgs = subArgs.slice(1);
+      if (action === 'list') {
+        await runMarketCapabilityList(actionArgs);
+        return;
+      }
+      if (action === 'get') {
+        await runMarketCapabilityGet(actionArgs);
+        return;
+      }
+      if (action === 'publish') {
+        await runMarketCapabilityPublish(actionArgs);
+        return;
+      }
+      if (action === 'lease') {
+        await runMarketCapabilityLease(actionArgs);
+        return;
+      }
+      if (action === 'lease-get') {
+        await runMarketCapabilityLeaseGet(actionArgs);
+        return;
+      }
+      if (action === 'invoke') {
+        await runMarketCapabilityInvoke(actionArgs);
+        return;
+      }
+      if (action === 'pause') {
+        await runMarketCapabilityPause(actionArgs);
+        return;
+      }
+      if (action === 'resume') {
+        await runMarketCapabilityResume(actionArgs);
+        return;
+      }
+      if (action === 'terminate') {
+        await runMarketCapabilityTerminate(actionArgs);
+        return;
+      }
+      fail(`unknown market capability command: ${action ?? ''}`);
+    }
+    fail(`unknown market subcommand: ${subcommand ?? ''}`);
+  }
   if (command === 'identity') {
     const subcommand = argv[1];
     const subArgs = argv.slice(2);
@@ -196,6 +324,381 @@ async function runPeers(rawArgs: string[]): Promise<void> {
   const parsed = parseApiArgs(rawArgs);
   const data = await fetchApiJson(parsed.apiUrl, '/api/node/peers', parsed.token);
   console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketInfoList(rawArgs: string[]): Promise<void> {
+  const parsed = parseApiArgsWithQuery(rawArgs);
+  const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
+  const data = await fetchApiJson(parsed.apiUrl, `/api/markets/info${query}`, parsed.token);
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketInfoGet(rawArgs: string[]): Promise<void> {
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const parsed = parseApiArgs(apiArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/markets/info/${encodeURIComponent(listingId)}`,
+    parsed.token,
+  );
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketInfoContent(rawArgs: string[]): Promise<void> {
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const parsed = parseApiArgs(apiArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/markets/info/${encodeURIComponent(listingId)}/content`,
+    parsed.token,
+  );
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketInfoDelivery(rawArgs: string[]): Promise<void> {
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const parsed = parseApiArgs(apiArgs);
+  const orderId = rest[0];
+  if (!orderId) {
+    fail('missing <orderId>');
+  }
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/markets/info/orders/${encodeURIComponent(orderId)}/delivery`,
+    parsed.token,
+  );
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketInfoPublish(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const response = await fetchApiJsonWithBody(apiUrl, '/api/markets/info', 'POST', data, token);
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketInfoPurchase(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/info/${encodeURIComponent(listingId)}/purchase`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketInfoDeliver(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/info/${encodeURIComponent(listingId)}/deliver`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketInfoConfirm(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/info/${encodeURIComponent(listingId)}/confirm`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketInfoReview(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/info/${encodeURIComponent(listingId)}/review`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketTaskList(rawArgs: string[]): Promise<void> {
+  const parsed = parseApiArgsWithQuery(rawArgs);
+  const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
+  const data = await fetchApiJson(parsed.apiUrl, `/api/markets/tasks${query}`, parsed.token);
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketTaskGet(rawArgs: string[]): Promise<void> {
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const parsed = parseApiArgs(apiArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}`,
+    parsed.token,
+  );
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketTaskBids(rawArgs: string[]): Promise<void> {
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const parsed = parseApiArgs(apiArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  let query = '';
+  if (rest[1] === '--query') {
+    query = rest[2] ?? '';
+  } else if (rest[1] && !rest[1].startsWith('-')) {
+    query = rest[1];
+  }
+  const suffix = query ? `?${query.replace(/^\\?/, '')}` : '';
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/bids${suffix}`,
+    parsed.token,
+  );
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketTaskPublish(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const response = await fetchApiJsonWithBody(apiUrl, '/api/markets/tasks', 'POST', data, token);
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketTaskBid(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/bids`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketTaskAccept(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/accept`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketTaskDeliver(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/deliver`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketTaskConfirm(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/confirm`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketTaskReview(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/review`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketCapabilityList(rawArgs: string[]): Promise<void> {
+  const parsed = parseApiArgsWithQuery(rawArgs);
+  const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
+  const data = await fetchApiJson(parsed.apiUrl, `/api/markets/capabilities${query}`, parsed.token);
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketCapabilityGet(rawArgs: string[]): Promise<void> {
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const parsed = parseApiArgs(apiArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/markets/capabilities/${encodeURIComponent(listingId)}`,
+    parsed.token,
+  );
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketCapabilityPublish(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const response = await fetchApiJsonWithBody(apiUrl, '/api/markets/capabilities', 'POST', data, token);
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketCapabilityLease(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/capabilities/${encodeURIComponent(listingId)}/lease`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketCapabilityLeaseGet(rawArgs: string[]): Promise<void> {
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const parsed = parseApiArgs(apiArgs);
+  const leaseId = rest[0];
+  if (!leaseId) {
+    fail('missing <leaseId>');
+  }
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}`,
+    parsed.token,
+  );
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketCapabilityInvoke(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const leaseId = rest[0];
+  if (!leaseId) {
+    fail('missing <leaseId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/invoke`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketCapabilityPause(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const leaseId = rest[0];
+  if (!leaseId) {
+    fail('missing <leaseId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/pause`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketCapabilityResume(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const leaseId = rest[0];
+  if (!leaseId) {
+    fail('missing <leaseId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/resume`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketCapabilityTerminate(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const leaseId = rest[0];
+  if (!leaseId) {
+    fail('missing <leaseId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/terminate`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
 }
 
 async function runCapabilityRegister(rawArgs: string[]): Promise<void> {
@@ -644,6 +1147,88 @@ function parseApiArgs(rawArgs: string[]): ApiArgs {
   return { apiUrl, token };
 }
 
+function splitApiArgs(rawArgs: string[]): { apiArgs: string[]; rest: string[] } {
+  const apiArgs: string[] = [];
+  const rest: string[] = [];
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--api' || arg === '--api-url' || arg === '--token') {
+      apiArgs.push(arg);
+      apiArgs.push(rawArgs[++i] ?? '');
+      continue;
+    }
+    rest.push(arg);
+  }
+  return { apiArgs, rest };
+}
+
+async function parseApiArgsWithData(
+  rawArgs: string[],
+): Promise<{ apiUrl: string; token?: string; data: Record<string, unknown>; rest: string[] }> {
+  const apiArgs: string[] = [];
+  const rest: string[] = [];
+  let dataRaw: string | undefined;
+  let dataFile: string | undefined;
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--api' || arg === '--api-url' || arg === '--token') {
+      apiArgs.push(arg);
+      apiArgs.push(rawArgs[++i] ?? '');
+      continue;
+    }
+    if (arg === '--data') {
+      dataRaw = rawArgs[++i];
+      continue;
+    }
+    if (arg === '--data-file') {
+      dataFile = rawArgs[++i];
+      continue;
+    }
+    rest.push(arg);
+  }
+  const { apiUrl, token } = parseApiArgs(apiArgs);
+  let payloadText: string | undefined = dataRaw;
+  if (!payloadText && dataFile) {
+    payloadText = await readFile(dataFile, 'utf8');
+  }
+  if (!payloadText) {
+    fail('missing --data or --data-file');
+  }
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(payloadText) as Record<string, unknown>;
+  } catch (error) {
+    fail(`invalid JSON payload: ${(error as Error).message}`);
+  }
+  return { apiUrl, token, data, rest };
+}
+
+function parseApiArgsWithQuery(
+  rawArgs: string[],
+): { apiUrl: string; token?: string; query: string } {
+  const apiArgs: string[] = [];
+  let query = '';
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--api' || arg === '--api-url' || arg === '--token') {
+      apiArgs.push(arg);
+      apiArgs.push(rawArgs[++i] ?? '');
+      continue;
+    }
+    if (arg === '--query') {
+      query = rawArgs[++i] ?? '';
+      continue;
+    }
+    if (!query && !arg.startsWith('-')) {
+      query = arg;
+      continue;
+    }
+    console.warn(`[clawtoken] unknown argument: ${arg}`);
+  }
+  const { apiUrl, token } = parseApiArgs(apiArgs);
+  return { apiUrl, token, query };
+}
+
 function parseLogsArgs(rawArgs: string[]): LogsArgs {
   let dataDir: string | undefined;
   let file: string | undefined;
@@ -769,6 +1354,43 @@ async function fetchApiJson(
     headers.authorization = `Bearer ${token}`;
   }
   const res = await fetch(`${apiUrl}${path}`, { headers });
+  const text = await res.text();
+  let payload: Record<string, unknown> = {};
+  if (text) {
+    try {
+      payload = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      payload = {};
+    }
+  }
+  if (!res.ok) {
+    const error = payload.error as { code?: string; message?: string } | undefined;
+    const code = error?.code ?? `HTTP_${res.status}`;
+    const message = error?.message ?? res.statusText;
+    fail(`API error ${code}: ${message}`);
+  }
+  return payload;
+}
+
+async function fetchApiJsonWithBody(
+  apiUrl: string,
+  path: string,
+  method: 'POST' | 'PUT',
+  body: Record<string, unknown>,
+  token?: string,
+): Promise<Record<string, unknown>> {
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+    'content-type': 'application/json',
+  };
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+  const res = await fetch(`${apiUrl}${path}`, {
+    method,
+    headers,
+    body: JSON.stringify(body),
+  });
   const text = await res.text();
   let payload: Record<string, unknown> = {};
   if (text) {
@@ -1862,6 +2484,9 @@ clawtoken reputation [options]
 clawtoken reputation reviews [options]
 clawtoken reputation record [options]
 clawtoken escrow create|fund|release|refund [options]
+clawtoken market info list|get|publish|purchase|deliver|confirm|review|content|delivery [options]
+clawtoken market task list|get|publish|bids|bid|accept|deliver|confirm|review [options]
+clawtoken market capability list|get|publish|lease|lease-get|invoke|pause|resume|terminate [options]
 
 Daemon options:
   --data-dir <path>              Override storage root
@@ -1991,6 +2616,13 @@ Escrow fund/release/refund options:
   --data-dir <path>              Override storage root
   --listen <multiaddr>           Add a libp2p listen multiaddr (repeatable)
   --bootstrap <multiaddr>        Add a bootstrap peer multiaddr (repeatable)
+
+Market info options:
+  --api <url>                    Node API base URL (default: http://127.0.0.1:9528)
+  --token <token>                API token (optional)
+  --query <qs>                   Query string for list (e.g. "keyword=ai&minPrice=10")
+  --data <json>                  Inline JSON payload for publish/purchase/deliver/confirm/review
+  --data-file <path>             JSON payload file for publish/purchase/deliver/confirm/review
   -h, --help                     Show help
 `);
 }

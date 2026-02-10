@@ -197,6 +197,8 @@ export class ClawTokenNode {
           publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
           eventStore: this.eventStore,
           reputationStore: this.reputationStore,
+          marketStore: this.marketSearchStore,
+          infoContentStore: this.infoContentStore,
           searchMarkets: (query) => {
             if (!this.marketSearchStore) {
               throw new Error('market search unavailable');

@@ -1,42 +1,76 @@
+import { randomUUID } from 'node:crypto';
 import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 import { URL } from 'node:url';
 import { z } from 'zod';
 import {
   addressFromDid,
+  base64ToBytes,
+  bytesToHex,
   bytesToUtf8,
   didFromPublicKey,
   decryptKeyRecord,
   EventStore,
+  eventHashHex,
+  hexToBytes,
   keyIdFromPublicKey,
   listKeyRecords,
   loadKeyRecord,
   multibaseDecode,
   publicKeyFromDid,
   resolveStoragePaths,
+  utf8ToBytes,
   verifyCapabilityCredential,
 } from '@clawtoken/core';
 import {
+  applyMarketEvent,
   applyWalletEvent,
   applyReputationEvent,
   CapabilityCredential,
   buildReputationProfile,
+  createCapabilityListingPublishEnvelope,
   createIdentityCapabilityRegisterEnvelope,
+  createMarketBidAcceptEnvelope,
+  createMarketBidSubmitEnvelope,
+  createMarketCapabilityInvokeEnvelope,
+  createMarketCapabilityLeasePauseEnvelope,
+  createMarketCapabilityLeaseResumeEnvelope,
+  createMarketCapabilityLeaseStartEnvelope,
+  createMarketCapabilityLeaseTerminateEnvelope,
+  createMarketOrderCreateEnvelope,
+  createMarketOrderUpdateEnvelope,
+  createInfoEscrowCreateEnvelope,
+  createInfoEscrowFundEnvelope,
+  createInfoEscrowReleaseEnvelope,
+  createInfoListingPublishEnvelope,
+  createInfoOrderCompletionEnvelope,
+  createInfoOrderCreateEnvelope,
+  createInfoOrderDeliveryEnvelope,
+  createInfoOrderPaymentEscrowedEnvelope,
+  createInfoOrderReviewEnvelope,
   createReputationRecordEnvelope,
   createReputationState,
+  createMarketState,
   createWalletEscrowCreateEnvelope,
   createWalletEscrowFundEnvelope,
   createWalletEscrowRefundEnvelope,
   createWalletEscrowReleaseEnvelope,
   createWalletTransferEnvelope,
   createWalletState,
+  generateInfoContentKey,
   getWalletBalance,
   getReputationRecords,
+  InfoContentStore,
   isAccessMethodType,
+  isCapabilityType,
   isContentFormat,
   isInfoType,
   isListingStatus,
   isListingVisibility,
   isMarketType,
+  isTaskType,
+  MarketListing,
+  MarketSearchStore,
+  OrderReview,
   ReputationDimension,
   ReputationAspectKey,
   ReputationLevel,
@@ -46,11 +80,16 @@ import {
   SearchQuery,
   SearchResult,
   WalletState,
+  createMarketSubmissionReviewEnvelope,
+  createMarketSubmissionSubmitEnvelope,
+  createTaskListingPublishEnvelope,
+  prepareInfoDeliveryRecord,
 } from '@clawtoken/protocol';
 
 const MAX_BODY_BYTES = 1_000_000;
 
 const AmountSchema = z.union([z.number(), z.string()]);
+const RatingSchema = z.union([z.number(), z.string()]);
 
 const CapabilityRegisterSchema = z
   .object({
@@ -216,6 +255,265 @@ export interface ReputationRecordRequest {
   ts?: number;
 }
 
+const InfoPublishSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    listingId: z.string().optional(),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    category: z.string().min(1),
+    tags: z.array(z.string()).optional(),
+    pricing: z.record(z.unknown()),
+    visibility: z.string().optional(),
+    infoType: z.string().min(1),
+    content: z.record(z.unknown()),
+    accessMethod: z.record(z.unknown()),
+    license: z.record(z.unknown()),
+    quality: z.record(z.unknown()).optional(),
+    usageRestrictions: z.record(z.unknown()).optional(),
+    restrictions: z.record(z.unknown()).optional(),
+    metadata: z.record(z.unknown()).optional(),
+    expiresAt: z.number().optional(),
+    status: z.string().optional(),
+    contentKeyHex: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const InfoPurchaseSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    orderId: z.string().optional(),
+    escrowId: z.string().optional(),
+    quantity: z.number().int().positive().optional(),
+    unitPrice: AmountSchema.optional(),
+    releaseRules: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const InfoDeliverSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    orderId: z.string().min(1),
+    deliveryId: z.string().optional(),
+    contentKeyHex: z.string().optional(),
+    buyerPublicKeyHex: z.string().optional(),
+    accessToken: z.string().optional(),
+    accessUrl: z.string().optional(),
+    expiresAt: z.number().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const InfoConfirmSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    orderId: z.string().min(1),
+    escrowId: z.string().optional(),
+    ruleId: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const InfoReviewSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    orderId: z.string().min(1),
+    rating: RatingSchema,
+    comment: z.string().optional(),
+    detailedRatings: z.record(RatingSchema).optional(),
+    by: z.enum(['buyer', 'seller']).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const TaskPublishSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    listingId: z.string().optional(),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    category: z.string().min(1),
+    tags: z.array(z.string()).optional(),
+    pricing: z.record(z.unknown()),
+    visibility: z.string().optional(),
+    taskType: z.string().min(1),
+    task: z.record(z.unknown()),
+    timeline: z.record(z.unknown()),
+    workerRequirements: z.record(z.unknown()).optional(),
+    bidding: z.record(z.unknown()).optional(),
+    milestones: z.array(z.record(z.unknown())).optional(),
+    restrictions: z.record(z.unknown()).optional(),
+    metadata: z.record(z.unknown()).optional(),
+    expiresAt: z.number().optional(),
+    status: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const TaskBidSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    bidId: z.string().optional(),
+    price: AmountSchema,
+    timeline: z.number(),
+    approach: z.string().min(1),
+    milestones: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const TaskAcceptSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    bidId: z.string().min(1),
+    orderId: z.string().optional(),
+    escrowId: z.string().optional(),
+    releaseRules: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const TaskDeliverSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    orderId: z.string().min(1),
+    submissionId: z.string().optional(),
+    deliverables: z.array(z.record(z.unknown())),
+    notes: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const TaskConfirmSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    orderId: z.string().min(1),
+    submissionId: z.string().min(1),
+    approved: z.boolean(),
+    feedback: z.string().min(1),
+    rating: RatingSchema.optional(),
+    revisionDeadline: z.number().optional(),
+    escrowId: z.string().optional(),
+    ruleId: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const TaskReviewSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    orderId: z.string().min(1),
+    rating: RatingSchema,
+    comment: z.string().optional(),
+    detailedRatings: z.record(RatingSchema).optional(),
+    by: z.enum(['buyer', 'seller']).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const CapabilityPublishSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    listingId: z.string().optional(),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    category: z.string().min(1),
+    tags: z.array(z.string()).optional(),
+    pricing: z.record(z.unknown()),
+    visibility: z.string().optional(),
+    capabilityType: z.string().min(1),
+    capability: z.record(z.unknown()),
+    performance: z.record(z.unknown()).optional(),
+    quota: z.record(z.unknown()),
+    access: z.record(z.unknown()),
+    sla: z.record(z.unknown()).optional(),
+    restrictions: z.record(z.unknown()).optional(),
+    metadata: z.record(z.unknown()).optional(),
+    expiresAt: z.number().optional(),
+    status: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const CapabilityLeaseSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    leaseId: z.string().optional(),
+    plan: z.record(z.unknown()),
+    credentials: z.record(z.unknown()).optional(),
+    metadata: z.record(z.unknown()).optional(),
+    expiresAt: z.number().optional(),
+    resourcePrev: z.union([z.string(), z.null()]).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const CapabilityLeaseActionSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const CapabilityInvokeSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    resource: z.string().min(1),
+    units: z.number().int().positive().optional(),
+    latency: z.number().nonnegative(),
+    success: z.boolean(),
+    cost: AmountSchema.optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
 export class ApiServer {
   private server?: Server;
 
@@ -225,6 +523,8 @@ export class ApiServer {
       publishEvent: (envelope: Record<string, unknown>) => Promise<string>;
       eventStore?: EventStore;
       reputationStore?: ReputationStore;
+      marketStore?: MarketSearchStore;
+      infoContentStore?: InfoContentStore;
       searchMarkets?: (query: SearchQuery) => SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
@@ -365,6 +665,159 @@ export class ApiServer {
       if (method === 'GET' && url?.pathname === '/api/markets/search') {
         await this.handleMarketSearch(req, res, url);
         return;
+      }
+
+      if (url?.pathname === '/api/markets/info') {
+        if (method === 'GET') {
+          await this.handleInfoMarketSearch(req, res, url);
+          return;
+        }
+        if (method === 'POST') {
+          await this.handleInfoMarketPublish(req, res);
+          return;
+        }
+      }
+
+      if (url?.pathname?.startsWith('/api/markets/info/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length >= 4 && segments[3] === 'orders' && segments.length === 6) {
+          const orderId = decodeURIComponent(segments[4] ?? '');
+          const action = segments[5];
+          if (method === 'GET' && action === 'delivery') {
+            await this.handleInfoMarketDelivery(req, res, orderId);
+            return;
+          }
+        }
+
+        if (segments.length >= 4) {
+          const listingId = decodeURIComponent(segments[3] ?? '');
+          const action = segments[4];
+          if (!action && method === 'GET') {
+            await this.handleInfoMarketGet(req, res, listingId);
+            return;
+          }
+          if (action === 'content' && method === 'GET') {
+            await this.handleInfoMarketContent(req, res, listingId);
+            return;
+          }
+          if (action === 'purchase' && method === 'POST') {
+            await this.handleInfoMarketPurchase(req, res, listingId);
+            return;
+          }
+          if (action === 'deliver' && method === 'POST') {
+            await this.handleInfoMarketDeliver(req, res, listingId);
+            return;
+          }
+          if (action === 'confirm' && method === 'POST') {
+            await this.handleInfoMarketConfirm(req, res, listingId);
+            return;
+          }
+          if (action === 'review' && method === 'POST') {
+            await this.handleInfoMarketReview(req, res, listingId);
+            return;
+          }
+        }
+      }
+
+      if (url?.pathname === '/api/markets/tasks') {
+        if (method === 'GET') {
+          await this.handleTaskMarketSearch(req, res, url);
+          return;
+        }
+        if (method === 'POST') {
+          await this.handleTaskMarketPublish(req, res);
+          return;
+        }
+      }
+
+      if (url?.pathname?.startsWith('/api/markets/tasks/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length >= 4) {
+          const taskId = decodeURIComponent(segments[3] ?? '');
+          const action = segments[4];
+          if (!action && method === 'GET') {
+            await this.handleTaskMarketGet(req, res, taskId);
+            return;
+          }
+          if (action === 'bids') {
+            if (method === 'GET') {
+              await this.handleTaskMarketBids(req, res, taskId, url);
+              return;
+            }
+            if (method === 'POST') {
+              await this.handleTaskMarketBidSubmit(req, res, taskId);
+              return;
+            }
+          }
+          if (action === 'accept' && method === 'POST') {
+            await this.handleTaskMarketAccept(req, res, taskId);
+            return;
+          }
+          if (action === 'deliver' && method === 'POST') {
+            await this.handleTaskMarketDeliver(req, res, taskId);
+            return;
+          }
+          if (action === 'confirm' && method === 'POST') {
+            await this.handleTaskMarketConfirm(req, res, taskId);
+            return;
+          }
+          if (action === 'review' && method === 'POST') {
+            await this.handleTaskMarketReview(req, res, taskId);
+            return;
+          }
+        }
+      }
+
+      if (url?.pathname === '/api/markets/capabilities') {
+        if (method === 'GET') {
+          await this.handleCapabilityMarketSearch(req, res, url);
+          return;
+        }
+        if (method === 'POST') {
+          await this.handleCapabilityMarketPublish(req, res);
+          return;
+        }
+      }
+
+      if (url?.pathname?.startsWith('/api/markets/capabilities/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length >= 4) {
+          if (segments[3] === 'leases') {
+            const leaseId = decodeURIComponent(segments[4] ?? '');
+            const action = segments[5];
+            if (segments.length === 5 && method === 'GET') {
+              await this.handleCapabilityMarketLeaseGet(req, res, leaseId);
+              return;
+            }
+            if (action === 'invoke' && method === 'POST') {
+              await this.handleCapabilityMarketInvoke(req, res, leaseId);
+              return;
+            }
+            if (action === 'pause' && method === 'POST') {
+              await this.handleCapabilityMarketLeasePause(req, res, leaseId);
+              return;
+            }
+            if (action === 'resume' && method === 'POST') {
+              await this.handleCapabilityMarketLeaseResume(req, res, leaseId);
+              return;
+            }
+            if (action === 'terminate' && method === 'POST') {
+              await this.handleCapabilityMarketLeaseTerminate(req, res, leaseId);
+              return;
+            }
+          } else {
+            const listingId = decodeURIComponent(segments[3] ?? '');
+            const action = segments[4];
+            if (!action && method === 'GET') {
+              await this.handleCapabilityMarketGet(req, res, listingId);
+              return;
+            }
+            if (action === 'lease' && method === 'POST') {
+              await this.handleCapabilityMarketLease(req, res, listingId);
+              return;
+            }
+          }
+        }
       }
 
       sendError(res, 404, 'NOT_FOUND', 'route not found');
@@ -1178,6 +1631,1678 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'failed to search markets');
     }
   }
+
+  private async handleInfoMarketSearch(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+  ): Promise<void> {
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    let query: SearchQuery;
+    try {
+      query = parseMarketSearchQuery(url.searchParams);
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    const limit = parsePagination(url.searchParams.get('limit'), 0, 1000);
+    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000_000);
+    if (limit > 0) {
+      query.pageSize = limit;
+      query.page = Math.floor(offset / limit) + 1;
+    }
+
+    query.markets = ['info'];
+    try {
+      const result = store.search(query);
+      sendJson(res, 200, {
+        listings: result.listings,
+        total: result.total,
+        hasMore: result.page * result.pageSize < result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'failed to search info market');
+    }
+  }
+
+  private async handleInfoMarketPublish(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await parseBody(req, res, InfoPublishSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.infoContentStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'info content store unavailable');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const listingId = body.listingId ?? `info-${randomUUID()}`;
+    const content = body.content as Record<string, unknown>;
+    let contentHash = typeof content.hash === 'string' ? content.hash : undefined;
+    let contentKeyHex: string | undefined;
+
+    let contentBytes: Uint8Array | null = null;
+    if (content.data !== undefined) {
+      const encoding = typeof content.encoding === 'string' ? content.encoding : 'utf8';
+      const raw = String(content.data ?? '');
+      try {
+        if (encoding === 'base64') {
+          contentBytes = base64ToBytes(raw);
+        } else if (encoding === 'hex') {
+          contentBytes = hexToBytes(raw);
+        } else if (encoding === 'utf8') {
+          contentBytes = utf8ToBytes(raw);
+        } else {
+          sendError(res, 400, 'INVALID_REQUEST', 'unsupported content encoding');
+          return;
+        }
+      } catch (error) {
+        sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+        return;
+      }
+    }
+
+    let contentKey: Uint8Array | null = null;
+    if (body.contentKeyHex) {
+      try {
+        contentKey = hexToBytes(body.contentKeyHex);
+      } catch (error) {
+        sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+        return;
+      }
+      if (contentKey.length !== 32) {
+        sendError(res, 400, 'INVALID_REQUEST', 'contentKeyHex must be 32 bytes');
+        return;
+      }
+      contentKeyHex = body.contentKeyHex.toLowerCase();
+    }
+
+    if (contentBytes) {
+      if (!contentKey) {
+        contentKey = generateInfoContentKey();
+        contentKeyHex = bytesToHex(contentKey);
+      }
+      const stored = await store.storeEncryptedContent(listingId, contentBytes, contentKey);
+      if (contentHash && contentHash !== stored.hash) {
+        sendError(res, 400, 'INVALID_REQUEST', 'content hash mismatch');
+        return;
+      }
+      contentHash = stored.hash;
+      if (content.size === undefined) {
+        content.size = contentBytes.length;
+      }
+    }
+
+    if (!contentHash) {
+      sendError(res, 400, 'INVALID_REQUEST', 'content data or hash required');
+      return;
+    }
+
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createInfoListingPublishEnvelope({
+        issuer: body.did,
+        privateKey,
+        listingId,
+        title: body.title,
+        description: body.description,
+        category: body.category,
+        tags: body.tags ?? [],
+        pricing: body.pricing as MarketListing['pricing'],
+        visibility: body.visibility ?? 'public',
+        marketData: {
+          infoType: body.infoType,
+          content: {
+            ...(content as Record<string, unknown>),
+            format: (content.format ?? '') as string,
+            size: content.size as number | undefined,
+            hash: contentHash,
+          },
+          quality: body.quality as Record<string, unknown> | undefined,
+          accessMethod: body.accessMethod as Record<string, unknown>,
+          license: body.license as Record<string, unknown>,
+          usageRestrictions: body.usageRestrictions as Record<string, unknown> | undefined,
+        },
+        restrictions: body.restrictions as Record<string, unknown> | undefined,
+        metadata: body.metadata as Record<string, unknown> | undefined,
+        expiresAt: body.expiresAt,
+        status: body.status as MarketListing['status'] | undefined,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 201, {
+        listingId,
+        txHash: hash,
+        contentHash,
+        contentKeyHex,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleInfoMarketGet(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    const listing = await store.getListing(listingId);
+    if (!listing || listing.marketType !== 'info') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+    sendJson(res, 200, listing);
+  }
+
+  private async handleInfoMarketContent(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const store = this.runtime.infoContentStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'info content store unavailable');
+      return;
+    }
+    const record = await store.getEncryptedContentForListing(listingId);
+    if (!record) {
+      sendError(res, 404, 'CONTENT_NOT_FOUND', 'content not found');
+      return;
+    }
+    sendJson(res, 200, record);
+  }
+
+  private async handleInfoMarketDelivery(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    orderId: string,
+  ): Promise<void> {
+    const store = this.runtime.infoContentStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'info content store unavailable');
+      return;
+    }
+    const record = await store.getDeliveryForOrder(orderId);
+    if (!record) {
+      sendError(res, 404, 'DELIVERY_NOT_FOUND', 'delivery not found');
+      return;
+    }
+    sendJson(res, 200, record);
+  }
+
+  private async handleInfoMarketPurchase(
+    req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, InfoPurchaseSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    const listing = await store.getListing(listingId);
+    if (!listing || listing.marketType !== 'info') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+    if (listing.status !== 'active') {
+      sendError(res, 409, 'LISTING_NOT_ACTIVE', 'listing not active');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const orderId = body.orderId ?? `order-${randomUUID()}`;
+    const escrowId = body.escrowId ?? `escrow-${randomUUID()}`;
+    const ts = body.ts ?? Date.now();
+
+    let orderEnvelope: Record<string, unknown>;
+    try {
+      orderEnvelope = await createInfoOrderCreateEnvelope({
+        issuer: body.did,
+        privateKey,
+        listing,
+        orderId,
+        quantity: body.quantity,
+        unitPrice: body.unitPrice,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    const pricing = (orderEnvelope.payload as Record<string, unknown>)?.pricing as
+      | { total?: string | number }
+      | undefined;
+    const total = pricing?.total ?? listing.pricing.fixedPrice ?? '0';
+
+    try {
+      const orderHash = await this.runtime.publishEvent(orderEnvelope);
+      const escrowCreate = await createInfoEscrowCreateEnvelope({
+        issuer: body.did,
+        privateKey,
+        escrowId,
+        buyerDid: body.did,
+        sellerDid: listing.seller.did,
+        amount: total,
+        releaseRules: body.releaseRules ?? [{ id: 'delivery_confirmed' }],
+        ts: ts + 1,
+        nonce: body.nonce + 1,
+        prev: orderHash,
+      });
+      const escrowCreateHash = await this.runtime.publishEvent(escrowCreate);
+      const escrowFund = await createInfoEscrowFundEnvelope({
+        issuer: body.did,
+        privateKey,
+        escrowId,
+        resourcePrev: escrowCreateHash,
+        amount: total,
+        ts: ts + 2,
+        nonce: body.nonce + 2,
+        prev: escrowCreateHash,
+      });
+      const escrowFundHash = await this.runtime.publishEvent(escrowFund);
+      const paymentUpdate = await createInfoOrderPaymentEscrowedEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId,
+        resourcePrev: orderHash,
+        escrowId,
+        ts: ts + 3,
+        nonce: body.nonce + 3,
+        prev: escrowFundHash,
+      });
+      const paymentHash = await this.runtime.publishEvent(paymentUpdate);
+      sendJson(res, 201, {
+        orderId,
+        escrowId,
+        orderHash,
+        escrowCreateHash,
+        escrowFundHash,
+        paymentHash,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleInfoMarketDeliver(
+    req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, InfoDeliverSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    const contentStore = this.runtime.infoContentStore;
+    const eventStore = this.runtime.eventStore;
+    if (!store || !contentStore || !eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'info market unavailable');
+      return;
+    }
+    const listing = await store.getListing(listingId);
+    if (!listing || listing.marketType !== 'info') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const order = marketState.orders[body.orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    if (order.listingId !== listingId) {
+      sendError(res, 409, 'ORDER_LISTING_MISMATCH', 'order listing mismatch');
+      return;
+    }
+    if (order.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_SELLER', 'not the seller');
+      return;
+    }
+
+    const contentHash =
+      (await contentStore.getListingContentHash(listingId)) ??
+      (listing.marketData as Record<string, unknown>)?.content?.['hash'] ??
+      null;
+    if (!contentHash || typeof contentHash !== 'string') {
+      sendError(res, 404, 'CONTENT_NOT_FOUND', 'content hash not found');
+      return;
+    }
+
+    if (!body.contentKeyHex) {
+      sendError(res, 400, 'INVALID_REQUEST', 'missing contentKeyHex');
+      return;
+    }
+    let contentKey: Uint8Array;
+    try {
+      contentKey = hexToBytes(body.contentKeyHex);
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    if (contentKey.length !== 32) {
+      sendError(res, 400, 'INVALID_REQUEST', 'contentKeyHex must be 32 bytes');
+      return;
+    }
+
+    let buyerPublicKey: Uint8Array | undefined;
+    if (body.buyerPublicKeyHex) {
+      try {
+        buyerPublicKey = hexToBytes(body.buyerPublicKeyHex);
+      } catch (error) {
+        sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+        return;
+      }
+      if (buyerPublicKey.length !== 32) {
+        sendError(res, 400, 'INVALID_REQUEST', 'buyerPublicKeyHex must be 32 bytes');
+        return;
+      }
+    }
+
+    const deliveryId = body.deliveryId ?? `delivery-${randomUUID()}`;
+    const record = await prepareInfoDeliveryRecord({
+      store: contentStore,
+      deliveryId,
+      orderId: body.orderId,
+      listingId,
+      contentHash,
+      buyerPublicKey,
+      contentKey,
+      accessToken: body.accessToken,
+      createdAt: body.ts ?? Date.now(),
+      expiresAt: body.expiresAt,
+    });
+
+    const resourcePrev = marketState.orderEvents[body.orderId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'ORDER_INVALID_STATE', 'order resource missing');
+      return;
+    }
+
+    let updateEnvelope: Record<string, unknown>;
+    try {
+      updateEnvelope = await createInfoOrderDeliveryEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId: body.orderId,
+        resourcePrev,
+        deliveryId,
+        method: (listing.marketData as Record<string, unknown>)?.accessMethod?.['type'] as string
+          ?? 'download',
+        accessUrl: body.accessUrl,
+        accessToken: body.accessToken,
+        expiresAt: body.expiresAt,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(updateEnvelope);
+      sendJson(res, 200, {
+        delivery: record,
+        orderUpdateHash: hash,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleInfoMarketConfirm(
+    req: IncomingMessage,
+    res: ServerResponse,
+    _listingId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, InfoConfirmSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const order = marketState.orders[body.orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    const orderPrev = marketState.orderEvents[body.orderId];
+    if (!orderPrev) {
+      sendError(res, 409, 'ORDER_INVALID_STATE', 'order resource missing');
+      return;
+    }
+    const escrowId = body.escrowId ?? order.payment.escrowId;
+    if (!escrowId) {
+      sendError(res, 409, 'ESCROW_NOT_FOUND', 'escrow id missing');
+      return;
+    }
+
+    const escrowPrev = await findLatestEscrowEventHash(eventStore, escrowId);
+    if (!escrowPrev) {
+      sendError(res, 409, 'ESCROW_NOT_FOUND', 'escrow resource missing');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    try {
+      const releaseEnvelope = await createInfoEscrowReleaseEnvelope({
+        issuer: body.did,
+        privateKey,
+        escrowId,
+        resourcePrev: escrowPrev,
+        amount: order.pricing.total,
+        ruleId: body.ruleId ?? 'delivery_confirmed',
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const releaseHash = await this.runtime.publishEvent(releaseEnvelope);
+      const orderUpdate = await createInfoOrderCompletionEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId: body.orderId,
+        resourcePrev: orderPrev,
+        ts: ts + 1,
+        nonce: body.nonce + 1,
+        prev: releaseHash,
+      });
+      const orderHash = await this.runtime.publishEvent(orderUpdate);
+      sendJson(res, 200, {
+        escrowReleaseHash: releaseHash,
+        orderUpdateHash: orderHash,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleInfoMarketReview(
+    req: IncomingMessage,
+    res: ServerResponse,
+    _listingId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, InfoReviewSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const order = marketState.orders[body.orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    const orderPrev = marketState.orderEvents[body.orderId];
+    if (!orderPrev) {
+      sendError(res, 409, 'ORDER_INVALID_STATE', 'order resource missing');
+      return;
+    }
+
+    const ratingValue = typeof body.rating === 'string' ? Number(body.rating) : body.rating;
+    if (!Number.isFinite(ratingValue)) {
+      sendError(res, 400, 'INVALID_REQUEST', 'rating must be a number');
+      return;
+    }
+
+    try {
+      const envelope = await createInfoOrderReviewEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId: body.orderId,
+        resourcePrev: orderPrev,
+        status: order.status,
+        review: {
+          rating: ratingValue,
+          comment: body.comment ?? '',
+          detailedRatings: body.detailedRatings as OrderReview['detailedRatings'] | undefined,
+          createdAt: body.ts ?? Date.now(),
+        },
+        by: body.by,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { orderUpdateHash: hash });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleTaskMarketSearch(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+  ): Promise<void> {
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    let query: SearchQuery;
+    try {
+      query = parseMarketSearchQuery(url.searchParams);
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    const limit = parsePagination(url.searchParams.get('limit'), 0, 1000);
+    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000_000);
+    if (limit > 0) {
+      query.pageSize = limit;
+      query.page = Math.floor(offset / limit) + 1;
+    }
+
+    query.markets = ['task'];
+    try {
+      const result = store.search(query);
+      sendJson(res, 200, {
+        listings: result.listings,
+        total: result.total,
+        hasMore: result.page * result.pageSize < result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'failed to search task market');
+    }
+  }
+
+  private async handleTaskMarketPublish(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await parseBody(req, res, TaskPublishSchema);
+    if (!body) {
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const listingId = body.listingId ?? `task-${randomUUID()}`;
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createTaskListingPublishEnvelope({
+        issuer: body.did,
+        privateKey,
+        listingId,
+        title: body.title,
+        description: body.description,
+        category: body.category,
+        tags: body.tags ?? [],
+        pricing: body.pricing as MarketListing['pricing'],
+        visibility: body.visibility ?? 'public',
+        marketData: {
+          taskType: body.taskType,
+          task: body.task as Record<string, unknown>,
+          timeline: body.timeline as Record<string, unknown>,
+          workerRequirements: body.workerRequirements as Record<string, unknown> | undefined,
+          bidding: body.bidding as Record<string, unknown> | undefined,
+          milestones: body.milestones as Record<string, unknown>[] | undefined,
+        },
+        restrictions: body.restrictions as Record<string, unknown> | undefined,
+        metadata: body.metadata as Record<string, unknown> | undefined,
+        expiresAt: body.expiresAt,
+        status: body.status as MarketListing['status'] | undefined,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 201, { listingId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleTaskMarketGet(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    const listing = await store.getListing(taskId);
+    if (!listing || listing.marketType !== 'task') {
+      sendError(res, 404, 'TASK_NOT_FOUND', 'task not found');
+      return;
+    }
+    sendJson(res, 200, listing);
+  }
+
+  private async handleTaskMarketBids(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+    url: URL,
+  ): Promise<void> {
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildMarketState(eventStore);
+    const all = Object.values(state.bids).filter((bid) => bid.taskId === taskId);
+    all.sort((a, b) => a.createdAt - b.createdAt);
+
+    const limit = parsePagination(url.searchParams.get('limit'), 20, 1000);
+    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000_000);
+    const sliced = all.slice(offset, offset + limit);
+
+    sendJson(res, 200, {
+      bids: sliced,
+      total: all.length,
+      hasMore: offset + limit < all.length,
+      limit,
+      offset,
+    });
+  }
+
+  private async handleTaskMarketBidSubmit(
+    req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, TaskBidSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    const listing = await store.getListing(taskId);
+    if (!listing || listing.marketType !== 'task') {
+      sendError(res, 404, 'TASK_NOT_FOUND', 'task not found');
+      return;
+    }
+    if (listing.status !== 'active') {
+      sendError(res, 409, 'TASK_NOT_ACTIVE', 'task not active');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const bidId = body.bidId ?? `bid-${randomUUID()}`;
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketBidSubmitEnvelope({
+        issuer: body.did,
+        privateKey,
+        bidId,
+        taskId,
+        proposal: {
+          price: body.price,
+          timeline: body.timeline,
+          approach: body.approach,
+          milestones: body.milestones as Record<string, unknown>[] | undefined,
+        },
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 201, { bidId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleTaskMarketAccept(
+    req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, TaskAcceptSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    const eventStore = this.runtime.eventStore;
+    if (!store || !eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'task market unavailable');
+      return;
+    }
+    const listing = await store.getListing(taskId);
+    if (!listing || listing.marketType !== 'task') {
+      sendError(res, 404, 'TASK_NOT_FOUND', 'task not found');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const bid = marketState.bids[body.bidId];
+    if (!bid || bid.taskId !== taskId) {
+      sendError(res, 404, 'BID_NOT_FOUND', 'bid not found');
+      return;
+    }
+    if (bid.status !== 'submitted') {
+      sendError(res, 409, 'BID_INVALID_STATE', 'bid not in submitted state');
+      return;
+    }
+    if (listing.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_TASK_OWNER', 'not the task owner');
+      return;
+    }
+
+    const bidPrev = marketState.bidEvents[body.bidId];
+    if (!bidPrev) {
+      sendError(res, 409, 'BID_INVALID_STATE', 'bid resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const orderId = body.orderId ?? `order-${randomUUID()}`;
+    const escrowId = body.escrowId ?? `escrow-${randomUUID()}`;
+    const ts = body.ts ?? Date.now();
+    const amount = bid.proposal.price;
+
+    try {
+      const bidAccept = await createMarketBidAcceptEnvelope({
+        issuer: body.did,
+        privateKey,
+        bidId: body.bidId,
+        resourcePrev: bidPrev,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const bidAcceptHash = await this.runtime.publishEvent(bidAccept);
+
+      const orderCreate = await createMarketOrderCreateEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId,
+        listingId: taskId,
+        marketType: 'task',
+        buyerDid: body.did,
+        sellerDid: bid.bidder.did,
+        sellerName: bid.bidder.name,
+        items: [
+          {
+            listingId: taskId,
+            quantity: 1,
+            unitPrice: amount,
+            itemData: {
+              taskType: (listing.marketData as Record<string, unknown>)?.taskType,
+            },
+          },
+        ],
+        pricing: {
+          subtotal: amount,
+          total: amount,
+        },
+        status: 'accepted',
+        ts: ts + 1,
+        nonce: body.nonce + 1,
+        prev: bidAcceptHash,
+      });
+      const orderHash = await this.runtime.publishEvent(orderCreate);
+
+      const escrowCreate = await createWalletEscrowCreateEnvelope({
+        issuer: body.did,
+        privateKey,
+        escrowId,
+        depositor: addressFromDid(body.did),
+        beneficiary: addressFromDid(bid.bidder.did),
+        amount,
+        releaseRules: body.releaseRules ?? [{ id: 'task_completed' }],
+        ts: ts + 2,
+        nonce: body.nonce + 2,
+        prev: orderHash,
+      });
+      const escrowCreateHash = await this.runtime.publishEvent(escrowCreate);
+
+      const escrowFund = await createWalletEscrowFundEnvelope({
+        issuer: body.did,
+        privateKey,
+        escrowId,
+        resourcePrev: escrowCreateHash,
+        amount,
+        ts: ts + 3,
+        nonce: body.nonce + 3,
+        prev: escrowCreateHash,
+      });
+      const escrowFundHash = await this.runtime.publishEvent(escrowFund);
+
+      const paymentUpdate = await createMarketOrderUpdateEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId,
+        resourcePrev: orderHash,
+        status: 'payment_pending',
+        payment: {
+          status: 'escrowed',
+          escrowId,
+        },
+        ts: ts + 4,
+        nonce: body.nonce + 4,
+        prev: escrowFundHash,
+      });
+      const paymentHash = await this.runtime.publishEvent(paymentUpdate);
+
+      sendJson(res, 200, {
+        bidId: body.bidId,
+        orderId,
+        escrowId,
+        bidAcceptHash,
+        orderHash,
+        escrowCreateHash,
+        escrowFundHash,
+        paymentHash,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleTaskMarketDeliver(
+    req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, TaskDeliverSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const order = marketState.orders[body.orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    if (order.listingId !== taskId) {
+      sendError(res, 409, 'ORDER_TASK_MISMATCH', 'order task mismatch');
+      return;
+    }
+    if (order.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_WORKER', 'not the worker');
+      return;
+    }
+    const orderPrev = marketState.orderEvents[body.orderId];
+    if (!orderPrev) {
+      sendError(res, 409, 'ORDER_INVALID_STATE', 'order resource missing');
+      return;
+    }
+
+    const submissionId = body.submissionId ?? `submission-${randomUUID()}`;
+    const ts = body.ts ?? Date.now();
+
+    try {
+      const submission = await createMarketSubmissionSubmitEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId: body.orderId,
+        submissionId,
+        deliverables: body.deliverables as Record<string, unknown>[],
+        notes: body.notes,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const submissionHash = await this.runtime.publishEvent(submission);
+
+      const orderUpdate = await createMarketOrderUpdateEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId: body.orderId,
+        resourcePrev: orderPrev,
+        status: 'delivered',
+        delivery: {
+          status: 'delivered',
+          method: 'submission',
+          tracking: {
+            deliveryId: submissionId,
+          },
+          deliveredAt: ts,
+        },
+        ts: ts + 1,
+        nonce: body.nonce + 1,
+        prev: submissionHash,
+      });
+      const orderUpdateHash = await this.runtime.publishEvent(orderUpdate);
+
+      sendJson(res, 200, {
+        submissionId,
+        submissionHash,
+        orderUpdateHash,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleTaskMarketConfirm(
+    req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, TaskConfirmSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const feedback = body.feedback?.trim();
+    if (!feedback) {
+      sendError(res, 400, 'INVALID_REQUEST', 'feedback is required');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const order = marketState.orders[body.orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    if (order.listingId !== taskId) {
+      sendError(res, 409, 'ORDER_TASK_MISMATCH', 'order task mismatch');
+      return;
+    }
+    if (order.buyer.did !== body.did) {
+      sendError(res, 403, 'NOT_TASK_OWNER', 'not the task owner');
+      return;
+    }
+
+    const submission = marketState.submissions[body.submissionId];
+    if (!submission || submission.orderId !== body.orderId) {
+      sendError(res, 404, 'SUBMISSION_NOT_FOUND', 'submission not found');
+      return;
+    }
+    const submissionPrev = marketState.submissionEvents[body.submissionId];
+    if (!submissionPrev) {
+      sendError(res, 409, 'SUBMISSION_INVALID_STATE', 'submission resource missing');
+      return;
+    }
+    const orderPrev = marketState.orderEvents[body.orderId];
+    if (!orderPrev) {
+      sendError(res, 409, 'ORDER_INVALID_STATE', 'order resource missing');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    const ratingValue = typeof body.rating === 'string' ? Number(body.rating) : body.rating;
+    if (body.rating !== undefined && !Number.isFinite(ratingValue)) {
+      sendError(res, 400, 'INVALID_REQUEST', 'rating must be a number');
+      return;
+    }
+
+    try {
+      const submissionReview = await createMarketSubmissionReviewEnvelope({
+        issuer: body.did,
+        privateKey,
+        submissionId: body.submissionId,
+        resourcePrev: submissionPrev,
+        approved: body.approved,
+        feedback,
+        rating: ratingValue,
+        revisionDeadline: body.revisionDeadline,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const submissionReviewHash = await this.runtime.publishEvent(submissionReview);
+
+      if (body.approved) {
+        const escrowId = body.escrowId ?? order.payment.escrowId;
+        if (!escrowId) {
+          sendError(res, 409, 'ESCROW_NOT_FOUND', 'escrow id missing');
+          return;
+        }
+        const escrowPrev = await findLatestEscrowEventHash(eventStore, escrowId);
+        if (!escrowPrev) {
+          sendError(res, 409, 'ESCROW_NOT_FOUND', 'escrow resource missing');
+          return;
+        }
+        const releaseEnvelope = await createInfoEscrowReleaseEnvelope({
+          issuer: body.did,
+          privateKey,
+          escrowId,
+          resourcePrev: escrowPrev,
+          amount: order.pricing.total,
+          ruleId: body.ruleId ?? 'task_completed',
+          ts: ts + 1,
+          nonce: body.nonce + 1,
+          prev: submissionReviewHash,
+        });
+        const releaseHash = await this.runtime.publishEvent(releaseEnvelope);
+        const orderUpdate = await createInfoOrderCompletionEnvelope({
+          issuer: body.did,
+          privateKey,
+          orderId: body.orderId,
+          resourcePrev: orderPrev,
+          ts: ts + 2,
+          nonce: body.nonce + 2,
+          prev: releaseHash,
+        });
+        const orderHash = await this.runtime.publishEvent(orderUpdate);
+        sendJson(res, 200, {
+          submissionReviewHash,
+          escrowReleaseHash: releaseHash,
+          orderUpdateHash: orderHash,
+        });
+        return;
+      }
+
+      const orderUpdate = await createMarketOrderUpdateEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId: body.orderId,
+        resourcePrev: orderPrev,
+        status: order.status,
+        delivery: {
+          status: body.revisionDeadline ? 'revision' : 'rejected',
+        },
+        ts: ts + 1,
+        nonce: body.nonce + 1,
+        prev: submissionReviewHash,
+      });
+      const orderHash = await this.runtime.publishEvent(orderUpdate);
+      sendJson(res, 200, {
+        submissionReviewHash,
+        orderUpdateHash: orderHash,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleTaskMarketReview(
+    req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, TaskReviewSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const order = marketState.orders[body.orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    if (order.listingId !== taskId) {
+      sendError(res, 409, 'ORDER_TASK_MISMATCH', 'order task mismatch');
+      return;
+    }
+    const orderPrev = marketState.orderEvents[body.orderId];
+    if (!orderPrev) {
+      sendError(res, 409, 'ORDER_INVALID_STATE', 'order resource missing');
+      return;
+    }
+
+    const ratingValue = typeof body.rating === 'string' ? Number(body.rating) : body.rating;
+    if (!Number.isFinite(ratingValue)) {
+      sendError(res, 400, 'INVALID_REQUEST', 'rating must be a number');
+      return;
+    }
+
+    try {
+      const envelope = await createInfoOrderReviewEnvelope({
+        issuer: body.did,
+        privateKey,
+        orderId: body.orderId,
+        resourcePrev: orderPrev,
+        status: order.status,
+        review: {
+          rating: ratingValue,
+          comment: body.comment ?? '',
+          detailedRatings: body.detailedRatings as OrderReview['detailedRatings'] | undefined,
+          createdAt: body.ts ?? Date.now(),
+        },
+        by: body.by,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { orderUpdateHash: hash });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleCapabilityMarketSearch(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+  ): Promise<void> {
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    let query: SearchQuery;
+    try {
+      query = parseMarketSearchQuery(url.searchParams);
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    const limit = parsePagination(url.searchParams.get('limit'), 0, 1000);
+    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000_000);
+    if (limit > 0) {
+      query.pageSize = limit;
+      query.page = Math.floor(offset / limit) + 1;
+    }
+
+    query.markets = ['capability'];
+    try {
+      const result = store.search(query);
+      sendJson(res, 200, {
+        listings: result.listings,
+        total: result.total,
+        hasMore: result.page * result.pageSize < result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'failed to search capability market');
+    }
+  }
+
+  private async handleCapabilityMarketPublish(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const body = await parseBody(req, res, CapabilityPublishSchema);
+    if (!body) {
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const listingId = body.listingId ?? `capability-${randomUUID()}`;
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createCapabilityListingPublishEnvelope({
+        issuer: body.did,
+        privateKey,
+        listingId,
+        title: body.title,
+        description: body.description,
+        category: body.category,
+        tags: body.tags ?? [],
+        pricing: body.pricing as MarketListing['pricing'],
+        visibility: body.visibility ?? 'public',
+        marketData: {
+          capabilityType: body.capabilityType,
+          capability: body.capability as Record<string, unknown>,
+          performance: body.performance as Record<string, unknown> | undefined,
+          quota: body.quota as Record<string, unknown>,
+          access: body.access as Record<string, unknown>,
+          sla: body.sla as Record<string, unknown> | undefined,
+        },
+        restrictions: body.restrictions as Record<string, unknown> | undefined,
+        metadata: body.metadata as Record<string, unknown> | undefined,
+        expiresAt: body.expiresAt,
+        status: body.status as MarketListing['status'] | undefined,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 201, { listingId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleCapabilityMarketGet(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    const listing = await store.getListing(listingId);
+    if (!listing || listing.marketType !== 'capability') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+    sendJson(res, 200, listing);
+  }
+
+  private async handleCapabilityMarketLease(
+    req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, CapabilityLeaseSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    const listing = await store.getListing(listingId);
+    if (!listing || listing.marketType !== 'capability') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+    if (listing.status !== 'active') {
+      sendError(res, 409, 'LISTING_NOT_ACTIVE', 'listing not active');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const leaseId = body.leaseId ?? `lease-${randomUUID()}`;
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketCapabilityLeaseStartEnvelope({
+        issuer: body.did,
+        privateKey,
+        listingId,
+        leaseId,
+        plan: body.plan as Record<string, unknown>,
+        credentials: body.credentials as Record<string, unknown> | undefined,
+        metadata: body.metadata as Record<string, unknown> | undefined,
+        expiresAt: body.expiresAt,
+        resourcePrev: body.resourcePrev ?? null,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 201, {
+        leaseId,
+        txHash: hash,
+        credentials: body.credentials ?? null,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleCapabilityMarketLeaseGet(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    leaseId: string,
+  ): Promise<void> {
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildMarketState(eventStore);
+    const lease = state.leases[leaseId];
+    if (!lease) {
+      sendError(res, 404, 'LEASE_NOT_FOUND', 'lease not found');
+      return;
+    }
+    const usageIds = state.usageByLease[leaseId] ?? [];
+    const records = usageIds
+      .map((id) => state.usageRecords[id])
+      .filter((entry) => entry);
+    const stats = buildCapabilityUsageStats(records);
+    sendJson(res, 200, {
+      lease,
+      usage: records,
+      stats,
+    });
+  }
+
+  private async handleCapabilityMarketInvoke(
+    req: IncomingMessage,
+    res: ServerResponse,
+    leaseId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, CapabilityInvokeSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const lease = marketState.leases[leaseId];
+    if (!lease) {
+      sendError(res, 404, 'LEASE_NOT_FOUND', 'lease not found');
+      return;
+    }
+    if (lease.status !== 'active') {
+      sendError(res, 409, 'LEASE_NOT_ACTIVE', 'lease not active');
+      return;
+    }
+    const ts = body.ts ?? Date.now();
+    if (lease.expiresAt !== undefined && ts > lease.expiresAt) {
+      sendError(res, 409, 'LEASE_EXPIRED', 'lease expired');
+      return;
+    }
+    if (lease.lessee !== body.did) {
+      sendError(res, 403, 'NOT_LEASE_OWNER', 'not the lease owner');
+      return;
+    }
+
+    const listing = marketState.listings[lease.listingId];
+    if (!listing || listing.marketType !== 'capability') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+
+    const units = body.units ?? 1;
+    let cost: string | undefined;
+    try {
+      if (body.cost !== undefined) {
+        cost = normalizeTokenAmountValue(body.cost, 'cost');
+      } else if (lease.plan.type === 'pay_per_use') {
+        cost = resolveUsageCost(listing.pricing, units);
+      } else {
+        cost = '0';
+      }
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketCapabilityInvokeEnvelope({
+        issuer: body.did,
+        privateKey,
+        leaseId,
+        resource: body.resource,
+        units,
+        latency: body.latency,
+        success: body.success,
+        cost,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, {
+        leaseId,
+        txHash: hash,
+        usage: {
+          leaseId,
+          resource: body.resource,
+          units,
+          latency: body.latency,
+          success: body.success,
+          cost,
+          timestamp: ts,
+        },
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleCapabilityMarketLeasePause(
+    req: IncomingMessage,
+    res: ServerResponse,
+    leaseId: string,
+  ): Promise<void> {
+    await this.handleCapabilityMarketLeaseUpdate(req, res, leaseId, 'pause');
+  }
+
+  private async handleCapabilityMarketLeaseResume(
+    req: IncomingMessage,
+    res: ServerResponse,
+    leaseId: string,
+  ): Promise<void> {
+    await this.handleCapabilityMarketLeaseUpdate(req, res, leaseId, 'resume');
+  }
+
+  private async handleCapabilityMarketLeaseTerminate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    leaseId: string,
+  ): Promise<void> {
+    await this.handleCapabilityMarketLeaseUpdate(req, res, leaseId, 'terminate');
+  }
+
+  private async handleCapabilityMarketLeaseUpdate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    leaseId: string,
+    action: 'pause' | 'resume' | 'terminate',
+  ): Promise<void> {
+    const body = await parseBody(req, res, CapabilityLeaseActionSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const lease = marketState.leases[leaseId];
+    if (!lease) {
+      sendError(res, 404, 'LEASE_NOT_FOUND', 'lease not found');
+      return;
+    }
+    if (lease.lessee !== body.did) {
+      sendError(res, 403, 'NOT_LEASE_OWNER', 'not the lease owner');
+      return;
+    }
+    if (action === 'resume' && lease.status !== 'paused') {
+      sendError(res, 409, 'LEASE_NOT_PAUSED', 'lease not paused');
+      return;
+    }
+    if (action === 'pause' && lease.status !== 'active') {
+      sendError(res, 409, 'LEASE_NOT_ACTIVE', 'lease not active');
+      return;
+    }
+
+    const resourcePrev = marketState.leaseEvents[leaseId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'LEASE_INVALID_STATE', 'lease resource missing');
+      return;
+    }
+
+    try {
+      let envelope: Record<string, unknown>;
+      if (action === 'pause') {
+        envelope = await createMarketCapabilityLeasePauseEnvelope({
+          issuer: body.did,
+          privateKey,
+          leaseId,
+          resourcePrev,
+          ts: body.ts ?? Date.now(),
+          nonce: body.nonce,
+          prev: body.prev,
+        });
+      } else if (action === 'resume') {
+        envelope = await createMarketCapabilityLeaseResumeEnvelope({
+          issuer: body.did,
+          privateKey,
+          leaseId,
+          resourcePrev,
+          ts: body.ts ?? Date.now(),
+          nonce: body.nonce,
+          prev: body.prev,
+        });
+      } else {
+        envelope = await createMarketCapabilityLeaseTerminateEnvelope({
+          issuer: body.did,
+          privateKey,
+          leaseId,
+          resourcePrev,
+          ts: body.ts ?? Date.now(),
+          nonce: body.nonce,
+          prev: body.prev,
+        });
+      }
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { leaseId, txHash: hash, action });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
 }
 
 async function readJsonBody(req: IncomingMessage, res: ServerResponse): Promise<unknown | null> {
@@ -1432,13 +3557,112 @@ function parseNumberParam(value: string | null, field: string): number | undefin
   return parsed;
 }
 
+function normalizeTokenAmountValue(value: string | number, field: string): string {
+  let parsed: bigint;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || !Number.isInteger(value)) {
+      throw new Error(`${field} must be an integer`);
+    }
+    parsed = BigInt(value);
+  } else {
+    const trimmed = value.trim();
+    if (!/^[0-9]+$/.test(trimmed)) {
+      throw new Error(`${field} must be an integer`);
+    }
+    parsed = BigInt(trimmed);
+  }
+  if (parsed < 0n) {
+    throw new Error(`${field} must be >= 0`);
+  }
+  return parsed.toString();
+}
+
+function resolveUsageCost(pricing: MarketListing['pricing'], units: number): string {
+  if (!Number.isInteger(units) || units <= 0) {
+    throw new Error('units must be a positive integer');
+  }
+  switch (pricing.type) {
+    case 'usage': {
+      const pricePerUnit = pricing.usagePrice?.pricePerUnit;
+      if (!pricePerUnit) {
+        break;
+      }
+      return (BigInt(pricePerUnit) * BigInt(units)).toString();
+    }
+    case 'fixed': {
+      const fixedPrice = pricing.fixedPrice;
+      if (!fixedPrice) {
+        break;
+      }
+      return (BigInt(fixedPrice) * BigInt(units)).toString();
+    }
+    default:
+      break;
+  }
+  throw new Error('pricing model does not support pay-per-use');
+}
+
+function buildCapabilityUsageStats(
+  records: Array<{ latency: number; success: boolean; units: number; cost?: string }>,
+): {
+  totalCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  totalUnits: number;
+  averageLatency: number;
+  p95Latency: number;
+  totalCost: string;
+} {
+  const totalCalls = records.length;
+  let successfulCalls = 0;
+  let totalUnits = 0;
+  let totalLatency = 0;
+  let totalCost = 0n;
+
+  const latencies: number[] = [];
+  for (const record of records) {
+    if (record.success) {
+      successfulCalls += 1;
+    }
+    totalUnits += record.units;
+    totalLatency += record.latency;
+    latencies.push(record.latency);
+    if (record.cost !== undefined) {
+      try {
+        totalCost += BigInt(record.cost);
+      } catch {
+        // Ignore invalid cost values.
+      }
+    }
+  }
+
+  latencies.sort((a, b) => a - b);
+  const p95Index = latencies.length
+    ? Math.min(latencies.length - 1, Math.floor(latencies.length * 0.95))
+    : 0;
+  const averageLatency = totalCalls ? totalLatency / totalCalls : 0;
+  const p95Latency = latencies.length ? latencies[p95Index] : 0;
+
+  return {
+    totalCalls,
+    successfulCalls,
+    failedCalls: totalCalls - successfulCalls,
+    totalUnits,
+    averageLatency,
+    p95Latency,
+    totalCost: totalCost.toString(),
+  };
+}
+
 function parseMarketSearchQuery(params: URLSearchParams): SearchQuery {
   const markets = parseCsv(params.get('markets'));
   const tags = parseCsv(params.get('tags'));
   const skills = parseCsv(params.get('skills'));
+  const taskTypes = parseCsv(params.get('taskTypes') ?? params.get('taskType'));
   const infoTypes = parseCsv(params.get('infoTypes') ?? params.get('infoType'));
   const contentFormats = parseCsv(params.get('contentFormats') ?? params.get('contentFormat'));
   const accessMethods = parseCsv(params.get('accessMethods') ?? params.get('accessMethod'));
+  const capabilityTypeParam = params.get('capabilityType');
   const statuses = parseCsv(params.get('statuses') ?? params.get('status'));
   const visibility = parseCsv(params.get('visibility'));
 
@@ -1460,6 +3684,12 @@ function parseMarketSearchQuery(params: URLSearchParams): SearchQuery {
     }
     return entry;
   });
+  const taskTypeValues = taskTypes?.map((entry) => {
+    if (!isTaskType(entry)) {
+      throw new Error(`unknown task type: ${entry}`);
+    }
+    return entry;
+  });
   const infoTypeValues = infoTypes?.map((entry) => {
     if (!isInfoType(entry)) {
       throw new Error(`unknown info type: ${entry}`);
@@ -1478,6 +3708,13 @@ function parseMarketSearchQuery(params: URLSearchParams): SearchQuery {
     }
     return entry;
   });
+  let capabilityType: string | undefined;
+  if (capabilityTypeParam) {
+    if (!isCapabilityType(capabilityTypeParam)) {
+      throw new Error(`unknown capability type: ${capabilityTypeParam}`);
+    }
+    capabilityType = capabilityTypeParam;
+  }
 
   const page = parsePagination(params.get('page'), 1, 1_000_000);
   const pageSize = parsePagination(params.get('pageSize'), 20, 1000);
@@ -1500,7 +3737,8 @@ function parseMarketSearchQuery(params: URLSearchParams): SearchQuery {
     minReputation,
     minRating,
     skills,
-    capabilityType: params.get('capabilityType') ?? undefined,
+    taskTypes: taskTypeValues,
+    capabilityType,
     infoTypes: infoTypeValues,
     contentFormats: contentFormatValues,
     accessMethods: accessMethodValues,
@@ -1771,6 +4009,73 @@ async function buildReputationState(eventStore: EventStore): Promise<ReputationS
     cursor = next;
   }
   return state;
+}
+
+async function buildMarketState(eventStore: EventStore): Promise<ReturnType<typeof createMarketState>> {
+  let state = createMarketState();
+  let cursor: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope) {
+        continue;
+      }
+      try {
+        state = applyMarketEvent(state, envelope);
+      } catch {
+        continue;
+      }
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+  return state;
+}
+
+async function findLatestEscrowEventHash(
+  eventStore: EventStore,
+  escrowId: string,
+): Promise<string | null> {
+  let cursor: string | null = null;
+  let last: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope) {
+        continue;
+      }
+      const type = String(envelope.type ?? '');
+      if (!type.startsWith('wallet.escrow.')) {
+        continue;
+      }
+      const payload = envelope.payload as Record<string, unknown> | undefined;
+      if (!payload) {
+        continue;
+      }
+      if (payload.escrowId !== escrowId) {
+        continue;
+      }
+      const hash = typeof envelope.hash === 'string' && envelope.hash.length
+        ? envelope.hash
+        : eventHashHex(envelope);
+      last = hash;
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+  return last;
 }
 
 function parseEvent(bytes: Uint8Array): Record<string, unknown> | null {

@@ -99,6 +99,7 @@ describe('markets search api', () => {
           currency: 'TOKEN',
         },
         marketData: {
+          taskType: 'one_time',
           task: {
             requirements: 'Translate to English',
             skills: [{ name: 'translation' }],
@@ -145,6 +146,11 @@ describe('markets search api', () => {
     expect(taskRes.status).toBe(200);
     const taskJson = (await taskRes.json()) as { listings: Array<{ id: string }> };
     expect(taskJson.listings.map((item) => item.id)).toEqual(['task-1']);
+
+    const taskTypeRes = await fetch(`${baseUrl}/api/markets/search?taskTypes=one_time`);
+    expect(taskTypeRes.status).toBe(200);
+    const taskTypeJson = (await taskTypeRes.json()) as { listings: Array<{ id: string }> };
+    expect(taskTypeJson.listings.map((item) => item.id)).toEqual(['task-1']);
 
     const infoRes = await fetch(
       `${baseUrl}/api/markets/search?infoTypes=dataset&contentFormats=csv&accessMethods=download`,

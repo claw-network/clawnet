@@ -7,3 +7,5 @@ export * from './store.js';
 export * from './info.js';
 export * from './info-store.js';
 export * from './info-flow.js';
+export * from './task.js';
+export * from './capability.js';

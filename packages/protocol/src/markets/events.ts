@@ -14,6 +14,7 @@ import {
   OrderStatus,
   PricingModel,
   TokenAmount,
+  CapabilityLeasePlan,
   isDeliveryStatus,
   isListingStatus,
   isListingVisibility,
@@ -61,6 +62,10 @@ export interface MarketOrderCreatePayload extends Record<string, unknown> {
     did: string;
     name?: string;
   };
+  seller?: {
+    did: string;
+    name?: string;
+  };
   items: OrderItem[];
   pricing: {
     subtotal: TokenAmount;
@@ -89,6 +94,70 @@ export interface MarketOrderUpdatePayload extends Record<string, unknown> {
     byBuyer?: OrderReview;
     bySeller?: OrderReview;
   };
+}
+
+export interface MarketBidSubmitPayload extends Record<string, unknown> {
+  bidId: string;
+  taskId: string;
+  bidder: {
+    did: string;
+    name?: string;
+  };
+  proposal: {
+    price: TokenAmount;
+    timeline: number;
+    approach: string;
+    milestones?: Record<string, unknown>[];
+  };
+  resourcePrev?: null;
+}
+
+export interface MarketBidUpdatePayload extends Record<string, unknown> {
+  bidId: string;
+  resourcePrev: string;
+}
+
+export interface MarketSubmissionSubmitPayload extends Record<string, unknown> {
+  orderId: string;
+  submissionId: string;
+  worker: string;
+  deliverables: Record<string, unknown>[];
+  notes?: string;
+  resourcePrev?: null;
+}
+
+export interface MarketSubmissionReviewPayload extends Record<string, unknown> {
+  submissionId: string;
+  resourcePrev: string;
+  approved: boolean;
+  feedback: string;
+  rating?: number;
+  revisionDeadline?: number;
+}
+
+export interface MarketCapabilityLeaseStartPayload extends Record<string, unknown> {
+  listingId: string;
+  leaseId: string;
+  lessee: string;
+  plan: CapabilityLeasePlan;
+  credentials?: Record<string, unknown>;
+  expiresAt?: number;
+  metadata?: Record<string, unknown>;
+  resourcePrev?: null;
+}
+
+export interface MarketCapabilityLeaseUpdatePayload extends Record<string, unknown> {
+  leaseId: string;
+  resourcePrev: string;
+}
+
+export interface MarketCapabilityInvokePayload extends Record<string, unknown> {
+  leaseId: string;
+  resource: string;
+  units: number;
+  latency: number;
+  success: boolean;
+  cost?: TokenAmount;
 }
 
 export interface MarketListingPublishEventParams {
@@ -135,6 +204,8 @@ export interface MarketOrderCreateEventParams {
   marketType: MarketType;
   buyerDid?: string;
   buyerName?: string;
+  sellerDid?: string;
+  sellerName?: string;
   items: OrderItemInput[];
   pricing: OrderPricingInput;
   payment?: Partial<OrderPayment>;
@@ -158,6 +229,103 @@ export interface MarketOrderUpdateEventParams {
     byBuyer?: OrderReview;
     bySeller?: OrderReview;
   };
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketBidSubmitEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  bidId: string;
+  taskId: string;
+  bidderDid?: string;
+  bidderName?: string;
+  proposal: {
+    price: TokenAmountLike;
+    timeline: number;
+    approach: string;
+    milestones?: Record<string, unknown>[];
+  };
+  resourcePrev?: null;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketBidUpdateEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  bidId: string;
+  resourcePrev: string;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketSubmissionSubmitEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  orderId: string;
+  submissionId: string;
+  workerDid?: string;
+  deliverables: Record<string, unknown>[];
+  notes?: string;
+  resourcePrev?: null;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketSubmissionReviewEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  submissionId: string;
+  resourcePrev: string;
+  approved: boolean;
+  feedback: string;
+  rating?: number;
+  revisionDeadline?: number;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketCapabilityLeaseStartEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  listingId: string;
+  leaseId: string;
+  lessee?: string;
+  plan: CapabilityLeasePlan | Record<string, unknown>;
+  credentials?: Record<string, unknown>;
+  expiresAt?: number;
+  metadata?: Record<string, unknown>;
+  resourcePrev?: null;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketCapabilityLeaseUpdateEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  leaseId: string;
+  resourcePrev: string;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketCapabilityInvokeEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  leaseId: string;
+  resource: string;
+  units: number;
+  latency: number;
+  success: boolean;
+  cost?: TokenAmountLike;
   ts: number;
   nonce: number;
   prev?: string;
@@ -249,6 +417,24 @@ function parseStringArray(value: unknown, field: string): string[] {
     throw new Error(`${field} must contain at least one tag`);
   }
   return result;
+}
+
+const CAPABILITY_PLAN_TYPES = ['pay_per_use', 'time_based', 'subscription', 'credits'] as const;
+
+function parseCapabilityLeasePlan(value: unknown): CapabilityLeasePlan {
+  const record = assertRecord(value, 'plan');
+  const typeValue = String(record.type ?? '');
+  if (!CAPABILITY_PLAN_TYPES.includes(typeValue as (typeof CAPABILITY_PLAN_TYPES)[number])) {
+    throw new Error('plan.type is invalid');
+  }
+  let details: Record<string, unknown> | undefined;
+  if (record.details !== undefined) {
+    details = assertRecord(record.details, 'plan.details');
+  }
+  return {
+    type: typeValue as CapabilityLeasePlan['type'],
+    details,
+  };
 }
 
 function parsePricingModel(value: unknown): PricingModel {
@@ -577,6 +763,13 @@ export function parseMarketOrderCreatePayload(
   const buyerRecord = assertRecord(payload.buyer, 'buyer');
   const buyerDid = String(buyerRecord.did ?? '');
   assertValidDid(buyerDid, 'buyer.did');
+  const sellerRecord = payload.seller !== undefined
+    ? assertRecord(payload.seller, 'seller')
+    : undefined;
+  if (sellerRecord) {
+    const sellerDid = String(sellerRecord.did ?? '');
+    assertValidDid(sellerDid, 'seller.did');
+  }
   const items = parseOrderItems(orderId, payload.items);
   const pricing = parseOrderPricing(payload.pricing);
   const payment = parseOrderPayment(payload.payment, 'payment', true);
@@ -597,6 +790,12 @@ export function parseMarketOrderCreatePayload(
       did: buyerDid,
       name: typeof buyerRecord.name === 'string' ? buyerRecord.name : undefined,
     },
+    seller: sellerRecord
+      ? {
+        did: String(sellerRecord.did ?? ''),
+        name: typeof sellerRecord.name === 'string' ? sellerRecord.name : undefined,
+      }
+      : undefined,
     items,
     pricing,
     payment,
@@ -634,6 +833,221 @@ export function parseMarketOrderUpdatePayload(
     payment,
     delivery,
     review,
+  };
+}
+
+function parseBidder(value: unknown): { did: string; name?: string } {
+  const bidder = assertRecord(value, 'bidder');
+  const bidderDid = String(bidder.did ?? '');
+  assertValidDid(bidderDid, 'bidder.did');
+  return {
+    did: bidderDid,
+    name: typeof bidder.name === 'string' ? bidder.name : undefined,
+  };
+}
+
+function parseBidProposal(value: unknown): MarketBidSubmitPayload['proposal'] {
+  const proposal = assertRecord(value, 'proposal');
+  const price = normalizeTokenAmount(proposal.price as TokenAmountLike, 'proposal.price');
+  const timeline = Number(proposal.timeline ?? NaN);
+  if (!Number.isFinite(timeline)) {
+    throw new Error('proposal.timeline must be a number');
+  }
+  const approach = String(proposal.approach ?? '').trim();
+  requireNonEmpty(approach, 'proposal.approach');
+  let milestones: Record<string, unknown>[] | undefined;
+  if (proposal.milestones !== undefined) {
+    if (!Array.isArray(proposal.milestones)) {
+      throw new Error('proposal.milestones must be an array');
+    }
+    milestones = proposal.milestones.map((entry, index) => {
+      return assertRecord(entry, `proposal.milestones[${index}]`);
+    });
+  }
+  return {
+    price,
+    timeline,
+    approach,
+    milestones,
+  };
+}
+
+function parseSubmissionDeliverables(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    throw new Error('deliverables must be an array');
+  }
+  return value.map((entry, index) => assertRecord(entry, `deliverables[${index}]`));
+}
+
+export function parseMarketBidSubmitPayload(
+  payload: Record<string, unknown>,
+): MarketBidSubmitPayload {
+  const bidId = String(payload.bidId ?? '');
+  requireNonEmpty(bidId, 'bidId');
+  const taskId = String(payload.taskId ?? '');
+  requireNonEmpty(taskId, 'taskId');
+  const bidder = parseBidder(payload.bidder);
+  const proposal = parseBidProposal(payload.proposal);
+  if (payload.resourcePrev !== undefined && payload.resourcePrev !== null) {
+    throw new Error('resourcePrev must be null for bid submit');
+  }
+  return {
+    bidId,
+    taskId,
+    bidder,
+    proposal,
+    resourcePrev: undefined,
+  };
+}
+
+export function parseMarketBidUpdatePayload(
+  payload: Record<string, unknown>,
+): MarketBidUpdatePayload {
+  const bidId = String(payload.bidId ?? '');
+  requireNonEmpty(bidId, 'bidId');
+  const resourcePrev = String(payload.resourcePrev ?? '');
+  requireNonEmpty(resourcePrev, 'resourcePrev');
+  return {
+    bidId,
+    resourcePrev,
+  };
+}
+
+export function parseMarketSubmissionSubmitPayload(
+  payload: Record<string, unknown>,
+): MarketSubmissionSubmitPayload {
+  const orderId = String(payload.orderId ?? '');
+  requireNonEmpty(orderId, 'orderId');
+  const submissionId = String(payload.submissionId ?? '');
+  requireNonEmpty(submissionId, 'submissionId');
+  const worker = String(payload.worker ?? '');
+  assertValidDid(worker, 'worker');
+  const deliverables = parseSubmissionDeliverables(payload.deliverables);
+  const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
+  if (payload.resourcePrev !== undefined && payload.resourcePrev !== null) {
+    throw new Error('resourcePrev must be null for submission submit');
+  }
+  return {
+    orderId,
+    submissionId,
+    worker,
+    deliverables,
+    notes,
+    resourcePrev: undefined,
+  };
+}
+
+export function parseMarketSubmissionReviewPayload(
+  payload: Record<string, unknown>,
+): MarketSubmissionReviewPayload {
+  const submissionId = String(payload.submissionId ?? '');
+  requireNonEmpty(submissionId, 'submissionId');
+  const resourcePrev = String(payload.resourcePrev ?? '');
+  requireNonEmpty(resourcePrev, 'resourcePrev');
+  const approved = payload.approved;
+  if (typeof approved !== 'boolean') {
+    throw new Error('approved must be a boolean');
+  }
+  const feedback = String(payload.feedback ?? '').trim();
+  requireNonEmpty(feedback, 'feedback');
+  const ratingValue = payload.rating;
+  if (ratingValue !== undefined && typeof ratingValue !== 'number') {
+    throw new Error('rating must be a number');
+  }
+  const revisionDeadline = payload.revisionDeadline;
+  if (revisionDeadline !== undefined && typeof revisionDeadline !== 'number') {
+    throw new Error('revisionDeadline must be a number');
+  }
+  return {
+    submissionId,
+    resourcePrev,
+    approved,
+    feedback,
+    rating: typeof ratingValue === 'number' ? ratingValue : undefined,
+    revisionDeadline: typeof revisionDeadline === 'number' ? revisionDeadline : undefined,
+  };
+}
+
+export function parseMarketCapabilityLeaseStartPayload(
+  payload: Record<string, unknown>,
+): MarketCapabilityLeaseStartPayload {
+  const listingId = String(payload.listingId ?? '');
+  requireNonEmpty(listingId, 'listingId');
+  const leaseId = String(payload.leaseId ?? '');
+  requireNonEmpty(leaseId, 'leaseId');
+  const lessee = String(payload.lessee ?? '');
+  assertValidDid(lessee, 'lessee');
+  const plan = parseCapabilityLeasePlan(payload.plan);
+  const credentials = payload.credentials
+    ? assertRecord(payload.credentials, 'credentials')
+    : undefined;
+  const metadata = payload.metadata
+    ? (assertRecord(payload.metadata, 'metadata') as Record<string, unknown>)
+    : undefined;
+  const expiresAt = payload.expiresAt;
+  if (expiresAt !== undefined && typeof expiresAt !== 'number') {
+    throw new Error('expiresAt must be a number');
+  }
+  if (payload.resourcePrev !== undefined && payload.resourcePrev !== null) {
+    throw new Error('resourcePrev must be null for lease start');
+  }
+
+  return {
+    listingId,
+    leaseId,
+    lessee,
+    plan,
+    credentials,
+    metadata,
+    expiresAt: typeof expiresAt === 'number' ? expiresAt : undefined,
+    resourcePrev: undefined,
+  };
+}
+
+export function parseMarketCapabilityLeaseUpdatePayload(
+  payload: Record<string, unknown>,
+): MarketCapabilityLeaseUpdatePayload {
+  const leaseId = String(payload.leaseId ?? '');
+  requireNonEmpty(leaseId, 'leaseId');
+  const resourcePrev = String(payload.resourcePrev ?? '');
+  requireNonEmpty(resourcePrev, 'resourcePrev');
+  return {
+    leaseId,
+    resourcePrev,
+  };
+}
+
+export function parseMarketCapabilityInvokePayload(
+  payload: Record<string, unknown>,
+): MarketCapabilityInvokePayload {
+  const leaseId = String(payload.leaseId ?? '');
+  requireNonEmpty(leaseId, 'leaseId');
+  const resource = String(payload.resource ?? '').trim();
+  requireNonEmpty(resource, 'resource');
+  const unitsValue = Number(payload.units ?? NaN);
+  if (!Number.isFinite(unitsValue) || !Number.isInteger(unitsValue) || unitsValue <= 0) {
+    throw new Error('units must be a positive integer');
+  }
+  const latencyValue = Number(payload.latency ?? NaN);
+  if (!Number.isFinite(latencyValue) || latencyValue < 0) {
+    throw new Error('latency must be a non-negative number');
+  }
+  const successValue = payload.success;
+  if (typeof successValue !== 'boolean') {
+    throw new Error('success must be a boolean');
+  }
+  let cost: string | undefined;
+  if (payload.cost !== undefined) {
+    cost = normalizeTokenAmount(payload.cost as TokenAmountLike, 'cost');
+  }
+
+  return {
+    leaseId,
+    resource,
+    units: unitsValue,
+    latency: latencyValue,
+    success: successValue,
+    cost,
   };
 }
 
@@ -715,6 +1129,7 @@ export async function createMarketOrderCreateEnvelope(
   if (buyerDid !== params.issuer) {
     throw new Error('issuer must match buyer.did');
   }
+  const sellerDid = params.sellerDid;
 
   const payload = parseMarketOrderCreatePayload({
     orderId: params.orderId,
@@ -724,6 +1139,12 @@ export async function createMarketOrderCreateEnvelope(
       did: buyerDid,
       name: params.buyerName,
     },
+    seller: sellerDid
+      ? {
+        did: sellerDid,
+        name: params.sellerName,
+      }
+      : undefined,
     items: params.items,
     pricing: params.pricing,
     payment: {
@@ -768,6 +1189,268 @@ export async function createMarketOrderUpdateEnvelope(
   const publicKey = publicKeyFromDid(params.issuer);
   const baseEnvelope = buildEnvelope(
     'market.order.update',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketBidSubmitEnvelope(
+  params: MarketBidSubmitEventParams,
+): Promise<EventEnvelope> {
+  const bidderDid = params.bidderDid ?? params.issuer;
+  assertValidDid(params.issuer, 'issuer');
+  if (bidderDid !== params.issuer) {
+    throw new Error('issuer must match bidder.did');
+  }
+  const payload = parseMarketBidSubmitPayload({
+    bidId: params.bidId,
+    taskId: params.taskId,
+    bidder: {
+      did: bidderDid,
+      name: params.bidderName,
+    },
+    proposal: params.proposal,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.bid.submit',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketBidAcceptEnvelope(
+  params: MarketBidUpdateEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketBidUpdatePayload({
+    bidId: params.bidId,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.bid.accept',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketBidRejectEnvelope(
+  params: MarketBidUpdateEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketBidUpdatePayload({
+    bidId: params.bidId,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.bid.reject',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketBidWithdrawEnvelope(
+  params: MarketBidUpdateEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketBidUpdatePayload({
+    bidId: params.bidId,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.bid.withdraw',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketSubmissionSubmitEnvelope(
+  params: MarketSubmissionSubmitEventParams,
+): Promise<EventEnvelope> {
+  const workerDid = params.workerDid ?? params.issuer;
+  assertValidDid(params.issuer, 'issuer');
+  if (workerDid !== params.issuer) {
+    throw new Error('issuer must match worker');
+  }
+  const payload = parseMarketSubmissionSubmitPayload({
+    orderId: params.orderId,
+    submissionId: params.submissionId,
+    worker: workerDid,
+    deliverables: params.deliverables,
+    notes: params.notes,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.submission.submit',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketSubmissionReviewEnvelope(
+  params: MarketSubmissionReviewEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketSubmissionReviewPayload({
+    submissionId: params.submissionId,
+    resourcePrev: params.resourcePrev,
+    approved: params.approved,
+    feedback: params.feedback,
+    rating: params.rating,
+    revisionDeadline: params.revisionDeadline,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.submission.review',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketCapabilityLeaseStartEnvelope(
+  params: MarketCapabilityLeaseStartEventParams,
+): Promise<EventEnvelope> {
+  const lessee = params.lessee ?? params.issuer;
+  assertValidDid(params.issuer, 'issuer');
+  if (lessee !== params.issuer) {
+    throw new Error('issuer must match lessee');
+  }
+  const payload = parseMarketCapabilityLeaseStartPayload({
+    listingId: params.listingId,
+    leaseId: params.leaseId,
+    lessee,
+    plan: params.plan,
+    credentials: params.credentials,
+    metadata: params.metadata,
+    expiresAt: params.expiresAt,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.capability.lease.start',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+async function createMarketCapabilityLeaseUpdateEnvelope(
+  type: string,
+  params: MarketCapabilityLeaseUpdateEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketCapabilityLeaseUpdatePayload({
+    leaseId: params.leaseId,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    type,
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketCapabilityLeasePauseEnvelope(
+  params: MarketCapabilityLeaseUpdateEventParams,
+): Promise<EventEnvelope> {
+  return createMarketCapabilityLeaseUpdateEnvelope('market.capability.lease.pause', params);
+}
+
+export async function createMarketCapabilityLeaseResumeEnvelope(
+  params: MarketCapabilityLeaseUpdateEventParams,
+): Promise<EventEnvelope> {
+  return createMarketCapabilityLeaseUpdateEnvelope('market.capability.lease.resume', params);
+}
+
+export async function createMarketCapabilityLeaseTerminateEnvelope(
+  params: MarketCapabilityLeaseUpdateEventParams,
+): Promise<EventEnvelope> {
+  return createMarketCapabilityLeaseUpdateEnvelope('market.capability.lease.terminate', params);
+}
+
+export async function createMarketCapabilityInvokeEnvelope(
+  params: MarketCapabilityInvokeEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketCapabilityInvokePayload({
+    leaseId: params.leaseId,
+    resource: params.resource,
+    units: params.units,
+    latency: params.latency,
+    success: params.success,
+    cost: params.cost,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.capability.invoke',
     params.issuer,
     publicKey,
     payload,

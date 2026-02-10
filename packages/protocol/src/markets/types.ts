@@ -319,3 +319,101 @@ export interface Order {
   messages: OrderMessage[];
   metadata: Record<string, unknown>;
 }
+
+export const BID_STATUSES = ['submitted', 'shortlisted', 'accepted', 'rejected', 'withdrawn'] as const;
+export type BidStatus = (typeof BID_STATUSES)[number];
+
+export function isBidStatus(value: string): value is BidStatus {
+  return (BID_STATUSES as readonly string[]).includes(value);
+}
+
+export interface TaskBid {
+  id: string;
+  taskId: string;
+  bidder: {
+    did: string;
+    name?: string;
+  };
+  proposal: {
+    price: TokenAmount;
+    timeline: number;
+    approach: string;
+    milestones?: Record<string, unknown>[];
+  };
+  status: BidStatus;
+  createdAt: number;
+  updatedAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+export const SUBMISSION_STATUSES = ['pending_review', 'approved', 'rejected', 'revision'] as const;
+export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
+
+export function isSubmissionStatus(value: string): value is SubmissionStatus {
+  return (SUBMISSION_STATUSES as readonly string[]).includes(value);
+}
+
+export interface TaskSubmission {
+  id: string;
+  orderId: string;
+  worker: string;
+  deliverables: Record<string, unknown>[];
+  notes?: string;
+  status: SubmissionStatus;
+  review?: {
+    approved: boolean;
+    feedback: string;
+    rating?: number;
+    reviewedAt?: number;
+    revisionDeadline?: number;
+  };
+  submittedAt: number;
+  updatedAt: number;
+}
+
+export const CAPABILITY_LEASE_STATUSES = [
+  'active',
+  'paused',
+  'exhausted',
+  'expired',
+  'cancelled',
+  'terminated',
+] as const;
+export type CapabilityLeaseStatus = (typeof CAPABILITY_LEASE_STATUSES)[number];
+
+export function isCapabilityLeaseStatus(value: string): value is CapabilityLeaseStatus {
+  return (CAPABILITY_LEASE_STATUSES as readonly string[]).includes(value);
+}
+
+export type CapabilityPlanType = 'pay_per_use' | 'time_based' | 'subscription' | 'credits';
+
+export interface CapabilityLeasePlan {
+  type: CapabilityPlanType;
+  details?: Record<string, unknown>;
+}
+
+export interface CapabilityLease {
+  id: string;
+  listingId: string;
+  lessee: string;
+  lessor: string;
+  plan: CapabilityLeasePlan;
+  credentials?: Record<string, unknown>;
+  status: CapabilityLeaseStatus;
+  startedAt: number;
+  updatedAt: number;
+  expiresAt?: number;
+  lastUsedAt?: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CapabilityUsageRecord {
+  id: string;
+  leaseId: string;
+  resource: string;
+  units: number;
+  latency: number;
+  success: boolean;
+  cost?: TokenAmount;
+  timestamp: number;
+}
