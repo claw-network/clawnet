@@ -277,6 +277,9 @@ function applyMilestoneReview(
   if (nextStatus === 'approved') {
     milestone.approvedAt = ts;
   }
+  if (nextStatus === 'rejected') {
+    milestone.rejectedAt = ts;
+  }
   const lastSubmission = milestone.submissions?.[milestone.submissions.length - 1];
   const review: ContractMilestoneReview = {
     id: `${payload.milestoneId}:${ts}`,
@@ -327,6 +330,9 @@ function applyContractDisputeOpen(
   if (!contract) {
     throw new Error('contract not found');
   }
+  if (actor !== contract.parties.client.did && actor !== contract.parties.provider.did) {
+    throw new Error('dispute not authorized');
+  }
   requireResourcePrev(state.contractEvents[payload.contractId], payload.resourcePrev, 'contract');
   if (contract.dispute && contract.dispute.status !== 'resolved') {
     throw new Error('contract already disputed');
@@ -351,10 +357,20 @@ function applyContractDisputeResolve(
   payload: ContractDisputeResolvePayload,
   hash: string,
   ts: number,
+  actor: string,
 ): void {
   const contract = state.contracts[payload.contractId];
   if (!contract) {
     throw new Error('contract not found');
+  }
+  const arbiters = contract.parties.arbiters ?? [];
+  const isArbiter = arbiters.some((arbiter) => arbiter.did === actor);
+  if (
+    actor !== contract.parties.client.did &&
+    actor !== contract.parties.provider.did &&
+    !isArbiter
+  ) {
+    throw new Error('dispute resolution not authorized');
   }
   requireResourcePrev(state.contractEvents[payload.contractId], payload.resourcePrev, 'contract');
   if (!contract.dispute || contract.dispute.status !== 'open') {
@@ -363,6 +379,7 @@ function applyContractDisputeResolve(
   contract.dispute.status = 'resolved';
   contract.dispute.resolution = payload.resolution;
   contract.dispute.notes = payload.notes;
+  contract.dispute.resolvedBy = actor;
   contract.dispute.resolvedAt = ts;
   contract.status = contract.dispute.prevStatus ?? contract.status;
   contract.updatedAt = ts;
@@ -491,7 +508,7 @@ export function applyContractEvent(state: ContractState, envelope: EventEnvelope
     }
     case 'contract.dispute.resolve': {
       const parsed = parseContractDisputeResolvePayload(payload);
-      applyContractDisputeResolve(next, parsed, hash, ts);
+      applyContractDisputeResolve(next, parsed, hash, ts, issuer);
       applied = true;
       break;
     }

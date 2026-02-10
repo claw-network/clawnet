@@ -29,6 +29,7 @@ import {
   applyReputationEvent,
   CapabilityCredential,
   ContractParties,
+  ContractStore,
   buildReputationProfile,
   createContractActivateEnvelope,
   createContractCreateEnvelope,
@@ -39,6 +40,7 @@ import {
   createContractMilestoneSubmitEnvelope,
   createContractSignEnvelope,
   createContractCompleteEnvelope,
+  createContractSettlementExecuteEnvelope,
   createCapabilityListingPublishEnvelope,
   createIdentityCapabilityRegisterEnvelope,
   createMarketBidAcceptEnvelope,
@@ -172,6 +174,20 @@ const WalletEscrowActionSchema = z
   })
   .passthrough();
 
+const WalletEscrowExpireSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    action: z.enum(['refund', 'release']).optional(),
+    ruleId: z.string().optional(),
+    reason: z.string().optional(),
+    evidence: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
 const ReputationRecordSchema = z
   .object({
     did: z.string().min(1),
@@ -255,6 +271,18 @@ export interface WalletEscrowActionRequest {
   passphrase: string;
   amount: string | number;
   resourcePrev: string;
+  ruleId?: string;
+  reason?: string;
+  evidence?: Record<string, unknown>[];
+  nonce: number;
+  prev?: string;
+  ts?: number;
+}
+
+export interface WalletEscrowExpireRequest {
+  did: string;
+  passphrase: string;
+  action?: 'refund' | 'release';
   ruleId?: string;
   reason?: string;
   evidence?: Record<string, unknown>[];
@@ -652,6 +680,18 @@ const ContractDisputeResolveSchema = z
   })
   .passthrough();
 
+const ContractSettlementSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    settlement: z.record(z.unknown()),
+    notes: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
 const CapabilityPublishSchema = z
   .object({
     did: z.string().min(1),
@@ -728,6 +768,7 @@ export class ApiServer {
     private readonly runtime: {
       publishEvent: (envelope: Record<string, unknown>) => Promise<string>;
       eventStore?: EventStore;
+      contractStore?: ContractStore;
       reputationStore?: ReputationStore;
       marketStore?: MarketSearchStore;
       infoContentStore?: InfoContentStore;
@@ -865,6 +906,10 @@ export class ApiServer {
             await this.handleWalletEscrowRefund(req, res, escrowId);
             return;
           }
+          if (action === 'expire') {
+            await this.handleWalletEscrowExpire(req, res, escrowId);
+            return;
+          }
         }
       }
 
@@ -897,6 +942,10 @@ export class ApiServer {
         }
         if (action === 'complete' && method === 'POST') {
           await this.handleContractComplete(req, res, contractId);
+          return;
+        }
+        if (action === 'settlement' && method === 'POST') {
+          await this.handleContractSettlementExecute(req, res, contractId);
           return;
         }
         if (action === 'dispute' && method === 'POST') {
@@ -1757,6 +1806,8 @@ export class ApiServer {
         status: mapEscrowStatus(body.autoFund === false ? 'pending' : 'funded'),
         releaseConditions: body.releaseRules,
         createdAt: body.ts ?? Date.now(),
+        expiresAt: body.expiresAt,
+        expired: body.expiresAt !== undefined ? (body.ts ?? Date.now()) > body.expiresAt : false,
       });
     } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
@@ -1773,12 +1824,17 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildWalletState(eventStore);
-    const escrow = state.escrows[escrowId];
+    const snapshot = await buildEscrowSnapshot(eventStore, escrowId);
+    const escrow = snapshot.escrow;
     if (!escrow) {
       sendError(res, 404, 'ESCROW_NOT_FOUND', 'escrow not found');
       return;
     }
+    const state: WalletState = {
+      balances: {},
+      escrows: { [escrowId]: escrow },
+      history: snapshot.history,
+    };
     const escrowView = buildEscrowView(state, escrow);
     sendJson(res, 200, {
       id: escrow.escrowId,
@@ -1788,6 +1844,8 @@ export class ApiServer {
       status: escrowView.status,
       releaseConditions: escrowView.releaseConditions,
       createdAt: escrowView.createdAt,
+      expiresAt: escrowView.expiresAt,
+      expired: escrowView.expired,
     });
   }
 
@@ -1931,6 +1989,109 @@ export class ApiServer {
     }
   }
 
+  private async handleWalletEscrowExpire(
+    req: IncomingMessage,
+    res: ServerResponse,
+    escrowId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, WalletEscrowExpireSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const snapshot = await buildEscrowSnapshot(eventStore, escrowId);
+    const escrow = snapshot.escrow;
+    if (!escrow) {
+      sendError(res, 404, 'ESCROW_NOT_FOUND', 'escrow not found');
+      return;
+    }
+    if (escrow.expiresAt === undefined) {
+      sendError(res, 409, 'ESCROW_NO_EXPIRY', 'escrow has no expiry');
+      return;
+    }
+    const ts = body.ts ?? Date.now();
+    if (ts < escrow.expiresAt) {
+      sendError(res, 409, 'ESCROW_NOT_EXPIRED', 'escrow has not expired');
+      return;
+    }
+    const remaining = parseBigInt(escrow.balance);
+    if (remaining <= 0n) {
+      sendError(res, 409, 'ESCROW_SETTLED', 'escrow has no remaining balance');
+      return;
+    }
+    const escrowPrev = snapshot.history[snapshot.history.length - 1]?.hash ?? null;
+    if (!escrowPrev) {
+      sendError(res, 409, 'ESCROW_NOT_FOUND', 'escrow resource missing');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const action = body.action ?? 'refund';
+    let envelope: Record<string, unknown>;
+    try {
+      if (action === 'release') {
+        envelope = await createWalletEscrowReleaseEnvelope({
+          issuer: body.did,
+          privateKey,
+          escrowId,
+          resourcePrev: escrowPrev,
+          amount: remaining.toString(),
+          ruleId: body.ruleId ?? 'expired',
+          ts,
+          nonce: body.nonce,
+          prev: body.prev,
+        });
+      } else {
+        envelope = await createWalletEscrowRefundEnvelope({
+          issuer: body.did,
+          privateKey,
+          escrowId,
+          resourcePrev: escrowPrev,
+          amount: remaining.toString(),
+          reason: body.reason ?? 'expired',
+          evidence: body.evidence,
+          ts,
+          nonce: body.nonce,
+          prev: body.prev,
+        });
+      }
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, {
+        txHash: hash,
+        amount: Number(remaining),
+        action,
+        status: 'broadcast',
+        timestamp: ts,
+        expiresAt: escrow.expiresAt,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async resolveContractState(
+    eventStore: EventStore,
+  ): Promise<ReturnType<typeof createContractState>> {
+    if (this.runtime.contractStore) {
+      return this.runtime.contractStore.getState();
+    }
+    return buildContractState(eventStore);
+  }
+
   private async handleContractsList(
     _req: IncomingMessage,
     res: ServerResponse,
@@ -1960,7 +2121,7 @@ export class ApiServer {
       localDid = identity.did;
     }
 
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     let contracts = Object.values(state.contracts);
     if (status) {
       contracts = contracts.filter((contract) => contract.status === status);
@@ -2006,7 +2167,7 @@ export class ApiServer {
       return;
     }
 
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contractId = body.contractId ?? `contract-${randomUUID()}`;
     if (state.contracts[contractId]) {
       sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract already exists');
@@ -2102,7 +2263,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2125,7 +2286,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2190,7 +2351,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2294,7 +2455,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2357,7 +2518,44 @@ export class ApiServer {
         sendJson(res, 200, milestone);
         return;
       }
-      sendJson(res, 200, updatedMilestone);
+      let releaseHash: string | null = null;
+      let releaseError: string | undefined;
+      if (updated.escrowId) {
+        const payout = resolveMilestonePaymentAmount(updated, updatedMilestone);
+        if (payout !== null && payout > 0n) {
+          try {
+            const walletState = await buildWalletState(eventStore);
+            const escrow = walletState.escrows[updated.escrowId];
+            if (escrow && parseBigInt(escrow.balance) >= payout) {
+              const escrowPrev = await findLatestEscrowEventHash(eventStore, updated.escrowId);
+              if (escrowPrev) {
+                const releaseEnvelope = await createWalletEscrowReleaseEnvelope({
+                  issuer: body.did,
+                  privateKey,
+                  escrowId: updated.escrowId,
+                  resourcePrev: escrowPrev,
+                  amount: payout.toString(),
+                  ruleId: 'milestone_approved',
+                  ts: ts + 1,
+                  nonce: body.nonce + 1,
+                  prev: envelope.hash as string,
+                });
+                releaseHash = await this.runtime.publishEvent(releaseEnvelope);
+              }
+            }
+          } catch (error) {
+            releaseError = (error as Error).message;
+          }
+        }
+      }
+      const response = { ...(updatedMilestone as Record<string, unknown>) };
+      if (releaseHash) {
+        response.escrowReleaseHash = releaseHash;
+      }
+      if (releaseError) {
+        response.escrowReleaseError = releaseError;
+      }
+      sendJson(res, 200, response);
     } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
@@ -2378,7 +2576,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2461,7 +2659,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2543,7 +2741,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2607,7 +2805,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2698,7 +2896,7 @@ export class ApiServer {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
-    const state = await buildContractState(eventStore);
+    const state = await this.resolveContractState(eventStore);
     const contract = state.contracts[contractId];
     if (!contract) {
       sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
@@ -2765,6 +2963,72 @@ export class ApiServer {
           : undefined,
         createdAt: dispute.openedAt,
       });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractSettlementExecute(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractSettlementSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await this.resolveContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    const arbiters = contract.parties.arbiters ?? [];
+    const isArbiter = arbiters.some((arbiter) => arbiter.did === body.did);
+    const isParty =
+      body.did === contract.parties.client.did || body.did === contract.parties.provider.did;
+    if (!isParty && !isArbiter) {
+      sendError(res, 403, 'FORBIDDEN', 'not authorized to settle contract');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractSettlementExecuteEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        settlement: body.settlement,
+        notes: body.notes,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const updated = nextState.contracts[contractId] ?? contract;
+      sendJson(res, 200, buildContractView(updated));
     } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
@@ -5227,6 +5491,86 @@ function parseBigInt(value: string | undefined): bigint {
   }
 }
 
+function parseAmountLike(value: unknown): bigint | null {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || !Number.isInteger(value)) {
+      return null;
+    }
+    return BigInt(value);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    try {
+      return BigInt(trimmed);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value === 'bigint') {
+    return value;
+  }
+  return null;
+}
+
+function resolveMilestonePaymentAmount(
+  contract: ServiceContract,
+  milestone: Record<string, unknown>,
+): bigint | null {
+  const milestoneAmount = parseAmountLike(milestone.amount);
+  if (milestoneAmount !== null) {
+    return milestoneAmount;
+  }
+  if (milestone.payment && typeof milestone.payment === 'object') {
+    const paymentAmount = parseAmountLike(
+      (milestone.payment as Record<string, unknown>).amount,
+    );
+    if (paymentAmount !== null) {
+      return paymentAmount;
+    }
+  }
+
+  const payment = contract.payment as Record<string, unknown>;
+  const schedule =
+    (payment?.paymentSchedule as Record<string, unknown>[] | undefined) ??
+    (payment?.schedule as Record<string, unknown>[] | undefined) ??
+    (payment?.milestones as Record<string, unknown>[] | undefined);
+  if (Array.isArray(schedule)) {
+    for (const entry of schedule) {
+      if (!entry || typeof entry !== 'object') {
+        continue;
+      }
+      const record = entry as Record<string, unknown>;
+      const entryId = record.milestoneId ?? record.id;
+      if (entryId !== milestone.id) {
+        continue;
+      }
+      const scheduledAmount = parseAmountLike(record.amount);
+      if (scheduledAmount !== null) {
+        return scheduledAmount;
+      }
+      const percent = parseAmountLike(record.percentage);
+      const total = parseAmountLike(
+        payment?.totalAmount ?? payment?.total ?? payment?.amount,
+      );
+      if (percent !== null && total !== null && percent > 0n) {
+        return (total * percent) / 100n;
+      }
+    }
+  }
+
+  const total = parseAmountLike(
+    payment?.totalAmount ?? payment?.total ?? payment?.amount,
+  );
+  const percent = parseAmountLike(milestone.percentage);
+  if (total !== null && percent !== null && percent > 0n) {
+    return (total * percent) / 100n;
+  }
+  return null;
+}
+
 function buildEscrowView(
   state: WalletState,
   escrow: WalletState['escrows'][string],
@@ -5237,10 +5581,16 @@ function buildEscrowView(
   status: 'active' | 'released' | 'refunded' | 'disputed';
   releaseConditions: Record<string, unknown>[];
   createdAt: number;
+  expiresAt?: number;
+  expired: boolean;
 } {
   let createdAt = Date.now();
   let totalAmount: bigint | null = null;
   let releaseConditions: Record<string, unknown>[] = [];
+  let expiresAt =
+    typeof escrow.expiresAt === 'number' && Number.isFinite(escrow.expiresAt)
+      ? escrow.expiresAt
+      : undefined;
 
   for (const entry of state.history) {
     if (entry.type !== 'wallet.escrow.create') {
@@ -5256,12 +5606,16 @@ function buildEscrowView(
     if (Array.isArray(rules)) {
       releaseConditions = rules;
     }
+    if (expiresAt === undefined && typeof payload.expiresAt === 'number') {
+      expiresAt = payload.expiresAt;
+    }
     break;
   }
 
   const remaining = parseBigInt(escrow.balance);
   const total = totalAmount ?? remaining;
   const released = total - remaining >= 0n ? total - remaining : 0n;
+  const expired = expiresAt !== undefined ? Date.now() > expiresAt : false;
 
   return {
     amount: Number(total),
@@ -5270,6 +5624,8 @@ function buildEscrowView(
     status: mapEscrowStatus(escrow.status),
     releaseConditions,
     createdAt,
+    expiresAt,
+    expired,
   };
 }
 
@@ -5833,6 +6189,88 @@ async function buildWalletState(eventStore: EventStore): Promise<WalletState> {
     cursor = next;
   }
   return state;
+}
+
+async function buildEscrowSnapshot(
+  eventStore: EventStore,
+  escrowId: string,
+): Promise<{
+  escrow: WalletState['escrows'][string] | null;
+  history: WalletState['history'];
+}> {
+  let escrow: WalletState['escrows'][string] | null = null;
+  const history: WalletState['history'] = [];
+  let cursor: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope) {
+        continue;
+      }
+      const type = String(envelope.type ?? '');
+      if (!type.startsWith('wallet.escrow.')) {
+        continue;
+      }
+      const payload = envelope.payload as Record<string, unknown> | undefined;
+      if (!payload || payload.escrowId !== escrowId) {
+        continue;
+      }
+      const ts = typeof envelope.ts === 'number' ? envelope.ts : Date.now();
+      const hash =
+        typeof envelope.hash === 'string' && envelope.hash.length
+          ? envelope.hash
+          : eventHashHex(envelope as EventEnvelope);
+      history.push({ hash, type, ts, payload });
+
+      if (type === 'wallet.escrow.create') {
+        if (!escrow) {
+          escrow = {
+            escrowId,
+            depositor: String(payload.depositor ?? ''),
+            beneficiary: String(payload.beneficiary ?? ''),
+            balance: '0',
+            status: 'pending',
+            expiresAt:
+              typeof payload.expiresAt === 'number' && Number.isFinite(payload.expiresAt)
+                ? payload.expiresAt
+                : undefined,
+          };
+        }
+        continue;
+      }
+      if (!escrow) {
+        continue;
+      }
+      const amount = parseAmountLike(payload.amount);
+      if (amount === null) {
+        continue;
+      }
+      const current = parseBigInt(escrow.balance);
+      const delta =
+        type === 'wallet.escrow.release' || type === 'wallet.escrow.refund' ? -amount : amount;
+      const nextBalance = current + delta;
+      if (nextBalance < 0n) {
+        continue;
+      }
+      escrow.balance = nextBalance.toString();
+      if (type === 'wallet.escrow.fund') {
+        escrow.status = 'funded';
+      } else if (type === 'wallet.escrow.release') {
+        escrow.status = nextBalance === 0n ? 'released' : 'releasing';
+      } else if (type === 'wallet.escrow.refund') {
+        escrow.status = nextBalance === 0n ? 'refunded' : escrow.status;
+      }
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+  return { escrow, history };
 }
 
 async function buildReputationState(eventStore: EventStore): Promise<ReputationState> {

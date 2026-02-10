@@ -56,6 +56,7 @@ import {
   ReputationDimension,
   ReputationLevel,
   ReputationRecord,
+  WalletState,
 } from '@clawtoken/protocol';
 
 async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
@@ -307,6 +308,10 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
       await runContractDisputeResolve(subArgs);
       return;
     }
+    if (subcommand === 'settlement') {
+      await runContractSettlementExecute(subArgs);
+      return;
+    }
     fail(`unknown contract subcommand: ${subcommand ?? ''}`);
   }
   if (command === 'identity') {
@@ -361,6 +366,10 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     }
     if (subcommand === 'refund') {
       await runEscrowRefund(subArgs);
+      return;
+    }
+    if (subcommand === 'expire') {
+      await runEscrowExpire(subArgs);
       return;
     }
     fail(`unknown escrow subcommand: ${subcommand ?? ''}`);
@@ -1107,6 +1116,22 @@ async function runContractDisputeResolve(rawArgs: string[]): Promise<void> {
   const response = await fetchApiJsonWithBody(
     apiUrl,
     `/api/contracts/${encodeURIComponent(contractId)}/dispute/resolve`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractSettlementExecute(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  if (!contractId) {
+    fail('missing <contractId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/settlement`,
     'POST',
     data,
     token,
@@ -2041,6 +2066,91 @@ async function runEscrowRefund(
   }
 }
 
+async function runEscrowExpire(
+  rawArgs: string[],
+  deps: { createNode?: NodeFactory } = {},
+): Promise<void> {
+  const parsed = parseEscrowExpireArgs(rawArgs);
+  const keyId =
+    parsed.keyId && parsed.keyId.length > 0
+      ? parsed.keyId
+      : keyIdFromPublicKey(publicKeyFromDid(parsed.did));
+  const privateKey = await resolvePrivateKey(parsed.dataDir, keyId, parsed.passphrase);
+
+  const paths = resolveStoragePaths(parsed.dataDir);
+  const store = new LevelStore({ path: paths.eventsDb });
+  const eventStore = new EventStore(store);
+  let state: WalletState;
+  try {
+    state = await buildWalletState(eventStore);
+  } finally {
+    await store.close();
+  }
+
+  const escrow = state.escrows[parsed.escrowId];
+  if (!escrow) {
+    fail('escrow not found');
+  }
+  if (escrow.expiresAt === undefined) {
+    fail('escrow has no expiry');
+  }
+  const ts = parsed.ts ?? Date.now();
+  if (ts < escrow.expiresAt) {
+    fail('escrow has not expired');
+  }
+  let remaining: bigint;
+  try {
+    remaining = BigInt(escrow.balance);
+  } catch {
+    fail('escrow balance invalid');
+  }
+  if (remaining <= 0n) {
+    fail('escrow has no remaining balance');
+  }
+
+  const resourcePrev = findLatestEscrowHistoryHash(state, parsed.escrowId);
+  if (!resourcePrev) {
+    fail('escrow resource missing');
+  }
+
+  let envelope: EventEnvelope;
+  if (parsed.action === 'release') {
+    envelope = await createWalletEscrowReleaseEnvelope({
+      issuer: parsed.did,
+      privateKey,
+      escrowId: parsed.escrowId,
+      resourcePrev,
+      amount: remaining.toString(),
+      ruleId: parsed.ruleId ?? 'expired',
+      ts,
+      nonce: parsed.nonce,
+      prev: parsed.prev,
+    });
+  } else {
+    envelope = await createWalletEscrowRefundEnvelope({
+      issuer: parsed.did,
+      privateKey,
+      escrowId: parsed.escrowId,
+      resourcePrev,
+      amount: remaining.toString(),
+      reason: parsed.reason ?? 'expired',
+      evidence: parsed.evidence,
+      ts,
+      nonce: parsed.nonce,
+      prev: parsed.prev,
+    });
+  }
+
+  const node = (deps.createNode ?? defaultNodeFactory)(parsed.nodeConfig);
+  try {
+    await node.start();
+    const hash = await node.publishEvent(envelope);
+    console.log(`[clawtoken] published wallet.escrow.${parsed.action ?? 'refund'} ${hash}`);
+  } finally {
+    await node.stop();
+  }
+}
+
 function parseDaemonArgs(rawArgs: string[]): NodeRuntimeConfig {
   const config: {
     dataDir?: string;
@@ -2883,6 +2993,144 @@ function parseEscrowActionArgs(rawArgs: string[]) {
   };
 }
 
+function parseEscrowExpireArgs(rawArgs: string[]) {
+  let did: string | undefined;
+  let passphrase: string | undefined;
+  let keyId: string | undefined;
+  let escrowId: string | undefined;
+  let action: 'refund' | 'release' | undefined;
+  let ruleId: string | undefined;
+  let reason: string | undefined;
+  let evidenceRaw: string | undefined;
+  let nonce: number | undefined;
+  let prev: string | undefined;
+  let ts: number | undefined;
+  let dataDir: string | undefined;
+  const listen: string[] = [];
+  const bootstrap: string[] = [];
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
+    switch (arg) {
+      case '--did': {
+        did = rawArgs[++i];
+        break;
+      }
+      case '--passphrase': {
+        passphrase = rawArgs[++i];
+        break;
+      }
+      case '--key-id': {
+        keyId = rawArgs[++i];
+        break;
+      }
+      case '--escrow-id': {
+        escrowId = rawArgs[++i];
+        break;
+      }
+      case '--action': {
+        const value = rawArgs[++i];
+        if (value === 'refund' || value === 'release') {
+          action = value;
+        } else {
+          fail('invalid --action (use refund or release)');
+        }
+        break;
+      }
+      case '--rule-id': {
+        ruleId = rawArgs[++i];
+        break;
+      }
+      case '--reason': {
+        reason = rawArgs[++i];
+        break;
+      }
+      case '--evidence': {
+        evidenceRaw = rawArgs[++i];
+        break;
+      }
+      case '--nonce': {
+        nonce = parsePositiveInt(rawArgs[++i], '--nonce');
+        break;
+      }
+      case '--prev': {
+        prev = rawArgs[++i];
+        break;
+      }
+      case '--ts': {
+        ts = parseNonNegativeInt(rawArgs[++i], '--ts');
+        break;
+      }
+      case '--data-dir': {
+        dataDir = rawArgs[++i];
+        break;
+      }
+      case '--listen': {
+        const value = rawArgs[++i];
+        if (value) {
+          listen.push(value);
+        }
+        break;
+      }
+      case '--bootstrap': {
+        const value = rawArgs[++i];
+        if (value) {
+          bootstrap.push(value);
+        }
+        break;
+      }
+      default: {
+        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        break;
+      }
+    }
+  }
+
+  if (!did) {
+    fail('missing --did');
+  }
+  if (!passphrase) {
+    fail('missing --passphrase');
+  }
+  if (!escrowId) {
+    fail('missing --escrow-id');
+  }
+  if (nonce === undefined) {
+    fail('missing --nonce');
+  }
+
+  let evidence: Record<string, unknown>[] | undefined;
+  if (evidenceRaw) {
+    try {
+      evidence = JSON.parse(evidenceRaw) as Record<string, unknown>[];
+    } catch {
+      fail('invalid --evidence (must be JSON array)');
+    }
+  }
+
+  const nodeConfig = parseDaemonArgs([
+    ...(dataDir ? ['--data-dir', dataDir] : []),
+    ...listen.flatMap((entry) => ['--listen', entry]),
+    ...bootstrap.flatMap((entry) => ['--bootstrap', entry]),
+  ]);
+
+  return {
+    did,
+    passphrase,
+    keyId: keyId ?? '',
+    escrowId,
+    action,
+    ruleId,
+    reason,
+    evidence,
+    nonce,
+    prev,
+    ts,
+    dataDir,
+    nodeConfig,
+  };
+}
+
 function printHelp(): void {
   console.log(`
 clawtoken daemon [options]
@@ -2896,12 +3144,12 @@ clawtoken logs [options]
 clawtoken reputation [options]
 clawtoken reputation reviews [options]
 clawtoken reputation record [options]
-clawtoken escrow create|fund|release|refund [options]
+clawtoken escrow create|fund|release|refund|expire [options]
 clawtoken market info list|get|publish|purchase|subscribe|unsubscribe|deliver|confirm|review|remove|content|delivery [options]
 clawtoken market task list|get|publish|bids|bid|accept|reject|withdraw|deliver|confirm|review|remove [options]
 clawtoken market capability list|get|publish|lease|lease-get|invoke|pause|resume|terminate|remove [options]
 clawtoken market dispute open|respond|resolve [options]
-clawtoken contract list|get|create|sign|fund|complete|milestone-complete|milestone-approve|milestone-reject|dispute|dispute-resolve [options]
+clawtoken contract list|get|create|sign|fund|complete|milestone-complete|milestone-approve|milestone-reject|dispute|dispute-resolve|settlement [options]
 
 Daemon options:
   --data-dir <path>              Override storage root
@@ -3032,6 +3280,22 @@ Escrow fund/release/refund options:
   --listen <multiaddr>           Add a libp2p listen multiaddr (repeatable)
   --bootstrap <multiaddr>        Add a bootstrap peer multiaddr (repeatable)
 
+Escrow expire options:
+  --did <did>                    Issuer DID
+  --passphrase <text>            Passphrase to decrypt key record
+  --key-id <id>                  Key record id in keystore (optional)
+  --escrow-id <id>               Escrow id
+  --action <refund|release>      Expiry action (default: refund)
+  --rule-id <id>                 Release rule id (release only)
+  --reason <text>                Refund reason (refund only)
+  --evidence <json>              JSON array of evidence (refund only)
+  --nonce <n>                    Monotonic nonce for issuer
+  --prev <hash>                  Optional previous event hash
+  --ts <ms>                      Override timestamp (default: now)
+  --data-dir <path>              Override storage root
+  --listen <multiaddr>           Add a libp2p listen multiaddr (repeatable)
+  --bootstrap <multiaddr>        Add a bootstrap peer multiaddr (repeatable)
+
 Market info options:
   --api <url>                    Node API base URL (default: http://127.0.0.1:9528)
   --token <token>                API token (optional)
@@ -3087,6 +3351,26 @@ async function buildWalletState(eventStore: EventStore) {
     cursor = next;
   }
   return state;
+}
+
+function findLatestEscrowHistoryHash(
+  state: WalletState,
+  escrowId: string,
+): string | null {
+  for (let i = state.history.length - 1; i >= 0; i -= 1) {
+    const entry = state.history[i];
+    if (!entry || !entry.payload) {
+      continue;
+    }
+    if (!entry.type.startsWith('wallet.escrow.')) {
+      continue;
+    }
+    if (entry.payload.escrowId !== escrowId) {
+      continue;
+    }
+    return entry.hash;
+  }
+  return null;
 }
 
 async function buildReputationState(eventStore: EventStore) {
@@ -3280,4 +3564,5 @@ export {
   runEscrowFund,
   runEscrowRelease,
   runEscrowRefund,
+  runEscrowExpire,
 };

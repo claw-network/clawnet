@@ -22,6 +22,7 @@ export interface EscrowState {
   beneficiary: string;
   balance: string;
   status: 'pending' | 'funded' | 'releasing' | 'released' | 'refunded' | 'disputed';
+  expiresAt?: number;
 }
 
 export interface WalletHistoryEntry {
@@ -159,12 +160,17 @@ function applyTransfer(state: WalletState, payload: WalletTransferPayload): void
 
 function applyEscrowCreate(state: WalletState, payload: WalletEscrowCreatePayload): void {
   if (!state.escrows[payload.escrowId]) {
+    const expiresAt =
+      typeof payload.expiresAt === 'number' && Number.isFinite(payload.expiresAt)
+        ? payload.expiresAt
+        : undefined;
     state.escrows[payload.escrowId] = {
       escrowId: payload.escrowId,
       depositor: payload.depositor,
       beneficiary: payload.beneficiary,
       balance: '0',
       status: 'pending',
+      expiresAt,
     };
   }
 }

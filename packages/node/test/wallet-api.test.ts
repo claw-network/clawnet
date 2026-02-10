@@ -5,7 +5,10 @@ import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { ApiServer } from '../src/api/server.js';
 import {
+  canonicalizeBytes,
   createKeyRecord,
+  EventEnvelope,
+  eventHashHex,
   EventStore,
   MemoryStore,
   resolveStoragePaths,
@@ -21,6 +24,20 @@ describe('wallet api', () => {
   let did: string;
   let passphrase: string;
   let published: Record<string, unknown>[];
+  let eventStore: EventStore;
+
+  const appendEnvelope = async (envelope: EventEnvelope): Promise<string> => {
+    const hash =
+      typeof envelope.hash === 'string' && envelope.hash.length > 0
+        ? envelope.hash
+        : eventHashHex(envelope);
+    if (!envelope.hash) {
+      envelope.hash = hash;
+    }
+    const bytes = canonicalizeBytes(envelope);
+    await eventStore.appendEvent(hash, bytes);
+    return hash;
+  };
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-wallet-api-'));
@@ -37,13 +54,14 @@ describe('wallet api', () => {
     await saveKeyRecord(paths, record);
 
     published = [];
-    const eventStore = new EventStore(new MemoryStore());
+    eventStore = new EventStore(new MemoryStore());
     api = new ApiServer(
       { host: '127.0.0.1', port: 0, dataDir: tempDir },
       {
         publishEvent: async (envelope) => {
+          const hash = await appendEnvelope(envelope as EventEnvelope);
           published.push(envelope);
-          return `hash-${published.length}`;
+          return hash;
         },
         eventStore,
       },
@@ -225,5 +243,40 @@ describe('wallet api', () => {
     });
     expect(refundRes.status).toBe(200);
     expect(published[1]?.type).toBe('wallet.escrow.refund');
+  });
+
+  it('expires escrows and publishes refund events', async () => {
+    const receiver = await generateKeypair();
+    const receiverDid = didFromPublicKey(receiver.publicKey);
+    const beneficiary = addressFromDid(receiverDid);
+    const expiresAt = Date.now() - 60_000;
+
+    const createRes = await fetch(`${baseUrl}/api/wallet/escrow`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        did,
+        passphrase,
+        beneficiary,
+        amount: 2,
+        releaseRules: [{ id: 'rule-1' }],
+        escrowId: 'escrow-expire',
+        expiresAt,
+        nonce: 6,
+      }),
+    });
+    expect(createRes.status).toBe(201);
+
+    const expireRes = await fetch(`${baseUrl}/api/wallet/escrow/escrow-expire/expire`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        did,
+        passphrase,
+        nonce: 8,
+      }),
+    });
+    expect(expireRes.status).toBe(200);
+    expect(published[published.length - 1]?.type).toBe('wallet.escrow.refund');
   });
 });

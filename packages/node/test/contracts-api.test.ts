@@ -315,4 +315,29 @@ describe('contracts api', () => {
     const resolved = (await resolveRes.json()) as { status?: string };
     expect(resolved.status).toBe('resolved');
   });
+
+  it('executes settlements', async () => {
+    const { contractId } = await createContractViaApi();
+
+    const settleRes = await fetch(`${baseUrl}/api/contracts/${contractId}/settlement`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        did: clientDid,
+        passphrase,
+        settlement: {
+          type: 'settlement',
+          amount: 5,
+        },
+        notes: 'agreed',
+        nonce: 11,
+      }),
+    });
+    expect(settleRes.status).toBe(200);
+    const settled = (await settleRes.json()) as { metadata?: Record<string, unknown> };
+    expect(settled.metadata?.settlement).toEqual({
+      type: 'settlement',
+      amount: 5,
+    });
+  });
 });

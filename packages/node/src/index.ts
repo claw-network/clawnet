@@ -34,6 +34,7 @@ import {
   InfoContentStore,
   isMarketEventEnvelope,
   MarketSearchStore,
+  MemoryContractStore,
   MemoryReputationStore,
   signP2PEnvelope,
 } from '@clawtoken/protocol';
@@ -87,6 +88,7 @@ export class ClawTokenNode {
   private eventStore?: EventStore;
   private snapshotStore?: SnapshotStore;
   private snapshotScheduler?: SnapshotScheduler;
+  private contractStore?: MemoryContractStore;
   private reputationStore?: MemoryReputationStore;
   private marketSearchStore?: MarketSearchStore;
   private infoContentStore?: InfoContentStore;
@@ -150,6 +152,7 @@ export class ClawTokenNode {
       this.stateDb = new LevelStore({ path: paths.stateDb });
       this.eventStore = new EventStore(this.eventDb);
       this.snapshotStore = new SnapshotStore(paths);
+      await this.initContractStore();
       await this.initReputationStore();
       await this.initMarketSearchStore();
       await this.initInfoContentStore();
@@ -196,6 +199,7 @@ export class ClawTokenNode {
         this.apiServer = new ApiServer(apiConfig, {
           publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
           eventStore: this.eventStore,
+          contractStore: this.contractStore,
           reputationStore: this.reputationStore,
           marketStore: this.marketSearchStore,
           infoContentStore: this.infoContentStore,
@@ -398,6 +402,36 @@ export class ClawTokenNode {
     this.reputationStore = store;
   }
 
+  private async initContractStore(): Promise<void> {
+    if (!this.eventStore) {
+      return;
+    }
+    const store = new MemoryContractStore();
+    let cursor: string | null = null;
+    while (true) {
+      const { events, cursor: next } = await this.eventStore.getEventLogRange(cursor, 200);
+      if (!events.length) {
+        break;
+      }
+      for (const bytes of events) {
+        const envelope = this.parseEventEnvelope(bytes);
+        if (!envelope) {
+          continue;
+        }
+        try {
+          await store.applyEvent(envelope as EventEnvelope);
+        } catch {
+          continue;
+        }
+      }
+      if (!next) {
+        break;
+      }
+      cursor = next;
+    }
+    this.contractStore = store;
+  }
+
   private async initMarketSearchStore(): Promise<void> {
     if (!this.eventStore || !this.stateDb) {
       return;
@@ -427,6 +461,13 @@ export class ClawTokenNode {
   }
 
   private async applyEventStores(envelope: Record<string, unknown>): Promise<void> {
+    if (this.contractStore) {
+      try {
+        await this.contractStore.applyEvent(envelope as EventEnvelope);
+      } catch {
+        // Ignore malformed events for contract aggregation.
+      }
+    }
     if (this.reputationStore) {
       try {
         await this.reputationStore.applyEvent(envelope as EventEnvelope);

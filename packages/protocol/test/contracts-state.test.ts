@@ -9,6 +9,7 @@ import {
   createContractDisputeResolveEnvelope,
   createContractMilestoneApproveEnvelope,
   createContractMilestoneSubmitEnvelope,
+  createContractSettlementExecuteEnvelope,
   createContractSignEnvelope,
   createContractState,
 } from '../src/contracts/index.js';
@@ -125,6 +126,7 @@ describe('contract state', () => {
       resourcePrev: milestoneApprove.hash as string,
       reason: 'issue',
       description: 'mismatch',
+      evidence: [{ type: 'log', ref: 'cid-1' }],
       ts: Date.now(),
       nonce: 5,
     });
@@ -133,6 +135,7 @@ describe('contract state', () => {
     expect(state.contracts['contract-1'].status).toBe('disputed');
     expect(state.contracts['contract-1'].dispute?.status).toBe('open');
     expect(state.contracts['contract-1'].dispute?.initiator).toBe(clientDid);
+    expect(state.contracts['contract-1'].dispute?.evidence?.length).toBe(1);
 
     const disputeResolve = await createContractDisputeResolveEnvelope({
       issuer: providerDid,
@@ -148,6 +151,22 @@ describe('contract state', () => {
     state = applyContractEvent(state, disputeResolve);
     expect(state.contracts['contract-1'].status).toBe('completed');
     expect(state.contracts['contract-1'].dispute?.status).toBe('resolved');
+    expect(state.contracts['contract-1'].dispute?.resolvedBy).toBe(providerDid);
+
+    const settlementEnvelope = await createContractSettlementExecuteEnvelope({
+      issuer: clientDid,
+      privateKey: clientKeys.privateKey,
+      contractId: 'contract-1',
+      resourcePrev: disputeResolve.hash as string,
+      settlement: { decision: 'split', clientRefund: '1', providerPayment: '9' },
+      notes: 'mutual settlement',
+      ts: Date.now(),
+      nonce: 6,
+    });
+
+    state = applyContractEvent(state, settlementEnvelope);
+    const metadata = state.contracts['contract-1'].metadata as Record<string, unknown>;
+    expect(metadata?.settlement).toBeTruthy();
   });
 
   it('rejects events with mismatched resourcePrev', async () => {

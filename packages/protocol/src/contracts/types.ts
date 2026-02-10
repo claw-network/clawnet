@@ -62,6 +62,7 @@ export interface ContractMilestone extends Record<string, unknown> {
   reviews?: ContractMilestoneReview[];
   submittedAt?: number;
   approvedAt?: number;
+  rejectedAt?: number;
 }
 
 export interface ContractSignature {
@@ -76,6 +77,7 @@ export interface ContractDispute {
   evidence?: Record<string, unknown>[];
   status: 'open' | 'resolved';
   initiator?: string;
+  resolvedBy?: string;
   resolution?: string;
   notes?: string;
   openedAt: number;
