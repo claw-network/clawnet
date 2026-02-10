@@ -109,6 +109,14 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
         await runMarketInfoPurchase(actionArgs);
         return;
       }
+      if (action === 'subscribe') {
+        await runMarketInfoSubscribe(actionArgs);
+        return;
+      }
+      if (action === 'unsubscribe') {
+        await runMarketInfoUnsubscribe(actionArgs);
+        return;
+      }
       if (action === 'deliver') {
         await runMarketInfoDeliver(actionArgs);
         return;
@@ -119,6 +127,10 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
       }
       if (action === 'review') {
         await runMarketInfoReview(actionArgs);
+        return;
+      }
+      if (action === 'remove') {
+        await runMarketInfoRemove(actionArgs);
         return;
       }
       if (action === 'content') {
@@ -158,6 +170,14 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
         await runMarketTaskAccept(actionArgs);
         return;
       }
+      if (action === 'reject') {
+        await runMarketTaskReject(actionArgs);
+        return;
+      }
+      if (action === 'withdraw') {
+        await runMarketTaskWithdraw(actionArgs);
+        return;
+      }
       if (action === 'deliver') {
         await runMarketTaskDeliver(actionArgs);
         return;
@@ -168,6 +188,10 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
       }
       if (action === 'review') {
         await runMarketTaskReview(actionArgs);
+        return;
+      }
+      if (action === 'remove') {
+        await runMarketTaskRemove(actionArgs);
         return;
       }
       fail(`unknown market task command: ${action ?? ''}`);
@@ -211,7 +235,28 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
         await runMarketCapabilityTerminate(actionArgs);
         return;
       }
+      if (action === 'remove') {
+        await runMarketCapabilityRemove(actionArgs);
+        return;
+      }
       fail(`unknown market capability command: ${action ?? ''}`);
+    }
+    if (subcommand === 'dispute') {
+      const action = subArgs[0];
+      const actionArgs = subArgs.slice(1);
+      if (action === 'open') {
+        await runMarketDisputeOpen(actionArgs);
+        return;
+      }
+      if (action === 'respond') {
+        await runMarketDisputeRespond(actionArgs);
+        return;
+      }
+      if (action === 'resolve') {
+        await runMarketDisputeResolve(actionArgs);
+        return;
+      }
+      fail(`unknown market dispute command: ${action ?? ''}`);
     }
     fail(`unknown market subcommand: ${subcommand ?? ''}`);
   }
@@ -400,6 +445,38 @@ async function runMarketInfoPurchase(rawArgs: string[]): Promise<void> {
   console.log(JSON.stringify(response, null, 2));
 }
 
+async function runMarketInfoSubscribe(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/info/${encodeURIComponent(listingId)}/subscribe`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketInfoUnsubscribe(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const subscriptionId = rest[0];
+  if (!subscriptionId) {
+    fail('missing <subscriptionId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/info/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
 async function runMarketInfoDeliver(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
   const listingId = rest[0];
@@ -441,6 +518,22 @@ async function runMarketInfoReview(rawArgs: string[]): Promise<void> {
   const response = await fetchApiJsonWithBody(
     apiUrl,
     `/api/markets/info/${encodeURIComponent(listingId)}/review`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketInfoRemove(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/info/${encodeURIComponent(listingId)}/remove`,
     'POST',
     data,
     token,
@@ -530,6 +623,38 @@ async function runMarketTaskAccept(rawArgs: string[]): Promise<void> {
   console.log(JSON.stringify(response, null, 2));
 }
 
+async function runMarketTaskReject(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/reject`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketTaskWithdraw(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/withdraw`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
 async function runMarketTaskDeliver(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
   const taskId = rest[0];
@@ -578,6 +703,22 @@ async function runMarketTaskReview(rawArgs: string[]): Promise<void> {
   console.log(JSON.stringify(response, null, 2));
 }
 
+async function runMarketTaskRemove(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const taskId = rest[0];
+  if (!taskId) {
+    fail('missing <taskId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/tasks/${encodeURIComponent(taskId)}/remove`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
 async function runMarketCapabilityList(rawArgs: string[]): Promise<void> {
   const parsed = parseApiArgsWithQuery(rawArgs);
   const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
@@ -598,6 +739,22 @@ async function runMarketCapabilityGet(rawArgs: string[]): Promise<void> {
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
+}
+
+async function runMarketCapabilityRemove(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const listingId = rest[0];
+  if (!listingId) {
+    fail('missing <listingId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/capabilities/${encodeURIComponent(listingId)}/remove`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
 }
 
 async function runMarketCapabilityPublish(rawArgs: string[]): Promise<void> {
@@ -694,6 +851,54 @@ async function runMarketCapabilityTerminate(rawArgs: string[]): Promise<void> {
   const response = await fetchApiJsonWithBody(
     apiUrl,
     `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/terminate`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketDisputeOpen(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const orderId = rest[0];
+  if (!orderId) {
+    fail('missing <orderId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/orders/${encodeURIComponent(orderId)}/dispute`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketDisputeRespond(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const disputeId = rest[0];
+  if (!disputeId) {
+    fail('missing <disputeId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/disputes/${encodeURIComponent(disputeId)}/respond`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runMarketDisputeResolve(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const disputeId = rest[0];
+  if (!disputeId) {
+    fail('missing <disputeId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/markets/disputes/${encodeURIComponent(disputeId)}/resolve`,
     'POST',
     data,
     token,
@@ -2484,9 +2689,10 @@ clawtoken reputation [options]
 clawtoken reputation reviews [options]
 clawtoken reputation record [options]
 clawtoken escrow create|fund|release|refund [options]
-clawtoken market info list|get|publish|purchase|deliver|confirm|review|content|delivery [options]
-clawtoken market task list|get|publish|bids|bid|accept|deliver|confirm|review [options]
-clawtoken market capability list|get|publish|lease|lease-get|invoke|pause|resume|terminate [options]
+clawtoken market info list|get|publish|purchase|subscribe|unsubscribe|deliver|confirm|review|remove|content|delivery [options]
+clawtoken market task list|get|publish|bids|bid|accept|reject|withdraw|deliver|confirm|review|remove [options]
+clawtoken market capability list|get|publish|lease|lease-get|invoke|pause|resume|terminate|remove [options]
+clawtoken market dispute open|respond|resolve [options]
 
 Daemon options:
   --data-dir <path>              Override storage root

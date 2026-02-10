@@ -30,14 +30,22 @@ import {
   createCapabilityListingPublishEnvelope,
   createIdentityCapabilityRegisterEnvelope,
   createMarketBidAcceptEnvelope,
+  createMarketBidRejectEnvelope,
   createMarketBidSubmitEnvelope,
+  createMarketBidWithdrawEnvelope,
   createMarketCapabilityInvokeEnvelope,
   createMarketCapabilityLeasePauseEnvelope,
   createMarketCapabilityLeaseResumeEnvelope,
   createMarketCapabilityLeaseStartEnvelope,
   createMarketCapabilityLeaseTerminateEnvelope,
+  createMarketDisputeOpenEnvelope,
+  createMarketDisputeResponseEnvelope,
+  createMarketDisputeResolveEnvelope,
+  createMarketListingRemoveEnvelope,
   createMarketOrderCreateEnvelope,
   createMarketOrderUpdateEnvelope,
+  createMarketSubscriptionCancelEnvelope,
+  createMarketSubscriptionStartEnvelope,
   createInfoEscrowCreateEnvelope,
   createInfoEscrowFundEnvelope,
   createInfoEscrowReleaseEnvelope,
@@ -343,6 +351,37 @@ const InfoReviewSchema = z
   })
   .passthrough();
 
+const ListingRemoveSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const InfoSubscriptionSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    subscriptionId: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const InfoSubscriptionCancelSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
 const TaskPublishSchema = z
   .object({
     did: z.string().min(1),
@@ -379,6 +418,17 @@ const TaskBidSchema = z
     timeline: z.number(),
     approach: z.string().min(1),
     milestones: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const TaskBidActionSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    bidId: z.string().min(1),
     nonce: z.number().int().positive(),
     prev: z.string().optional(),
     ts: z.number().optional(),
@@ -440,6 +490,44 @@ const TaskReviewSchema = z
     comment: z.string().optional(),
     detailedRatings: z.record(RatingSchema).optional(),
     by: z.enum(['buyer', 'seller']).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DisputeOpenSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    disputeId: z.string().optional(),
+    type: z.string().min(1),
+    description: z.string().min(1),
+    claimAmount: AmountSchema.optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DisputeResponseSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    response: z.string().min(1),
+    evidence: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DisputeResolveSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    resolution: z.string().min(1),
+    notes: z.string().optional(),
     nonce: z.number().int().positive(),
     prev: z.string().optional(),
     ts: z.number().optional(),
@@ -667,6 +755,31 @@ export class ApiServer {
         return;
       }
 
+      if (url?.pathname?.startsWith('/api/markets/orders/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length === 5 && segments[4] === 'dispute' && method === 'POST') {
+          const orderId = decodeURIComponent(segments[3] ?? '');
+          await this.handleMarketDisputeOpen(req, res, orderId);
+          return;
+        }
+      }
+
+      if (url?.pathname?.startsWith('/api/markets/disputes/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length === 5 && method === 'POST') {
+          const disputeId = decodeURIComponent(segments[3] ?? '');
+          const action = segments[4];
+          if (action === 'respond') {
+            await this.handleMarketDisputeResponse(req, res, disputeId);
+            return;
+          }
+          if (action === 'resolve') {
+            await this.handleMarketDisputeResolve(req, res, disputeId);
+            return;
+          }
+        }
+      }
+
       if (url?.pathname === '/api/markets/info') {
         if (method === 'GET') {
           await this.handleInfoMarketSearch(req, res, url);
@@ -689,6 +802,15 @@ export class ApiServer {
           }
         }
 
+        if (segments.length >= 6 && segments[3] === 'subscriptions') {
+          const subscriptionId = decodeURIComponent(segments[4] ?? '');
+          const action = segments[5];
+          if (action === 'cancel' && method === 'POST') {
+            await this.handleInfoMarketSubscriptionCancel(req, res, subscriptionId);
+            return;
+          }
+        }
+
         if (segments.length >= 4) {
           const listingId = decodeURIComponent(segments[3] ?? '');
           const action = segments[4];
@@ -704,6 +826,10 @@ export class ApiServer {
             await this.handleInfoMarketPurchase(req, res, listingId);
             return;
           }
+          if (action === 'subscribe' && method === 'POST') {
+            await this.handleInfoMarketSubscribe(req, res, listingId);
+            return;
+          }
           if (action === 'deliver' && method === 'POST') {
             await this.handleInfoMarketDeliver(req, res, listingId);
             return;
@@ -714,6 +840,10 @@ export class ApiServer {
           }
           if (action === 'review' && method === 'POST') {
             await this.handleInfoMarketReview(req, res, listingId);
+            return;
+          }
+          if (action === 'remove' && method === 'POST') {
+            await this.handleInfoMarketRemove(req, res, listingId);
             return;
           }
         }
@@ -753,6 +883,14 @@ export class ApiServer {
             await this.handleTaskMarketAccept(req, res, taskId);
             return;
           }
+          if (action === 'reject' && method === 'POST') {
+            await this.handleTaskMarketReject(req, res, taskId);
+            return;
+          }
+          if (action === 'withdraw' && method === 'POST') {
+            await this.handleTaskMarketWithdraw(req, res, taskId);
+            return;
+          }
           if (action === 'deliver' && method === 'POST') {
             await this.handleTaskMarketDeliver(req, res, taskId);
             return;
@@ -763,6 +901,10 @@ export class ApiServer {
           }
           if (action === 'review' && method === 'POST') {
             await this.handleTaskMarketReview(req, res, taskId);
+            return;
+          }
+          if (action === 'remove' && method === 'POST') {
+            await this.handleTaskMarketRemove(req, res, taskId);
             return;
           }
         }
@@ -814,6 +956,10 @@ export class ApiServer {
             }
             if (action === 'lease' && method === 'POST') {
               await this.handleCapabilityMarketLease(req, res, listingId);
+              return;
+            }
+            if (action === 'remove' && method === 'POST') {
+              await this.handleCapabilityMarketRemove(req, res, listingId);
               return;
             }
           }
@@ -1632,6 +1778,216 @@ export class ApiServer {
     }
   }
 
+  private async handleMarketDisputeOpen(
+    req: IncomingMessage,
+    res: ServerResponse,
+    orderId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, DisputeOpenSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const marketState = await buildMarketState(eventStore);
+    const order = marketState.orders[orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    if (order.buyer.did !== body.did && order.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_ORDER_PARTY', 'not a party to the order');
+      return;
+    }
+    if (order.dispute && order.dispute.status !== 'resolved') {
+      sendError(res, 409, 'DISPUTE_ALREADY_OPEN', 'order already has a dispute');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const disputeId = body.disputeId ?? `dispute-${randomUUID()}`;
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketDisputeOpenEnvelope({
+        issuer: body.did,
+        privateKey,
+        disputeId,
+        orderId,
+        type: body.type,
+        description: body.description,
+        claimAmount: body.claimAmount,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 201, { disputeId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleMarketDisputeResponse(
+    req: IncomingMessage,
+    res: ServerResponse,
+    disputeId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, DisputeResponseSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const marketState = await buildMarketState(eventStore);
+    const dispute = marketState.disputes[disputeId];
+    if (!dispute) {
+      sendError(res, 404, 'DISPUTE_NOT_FOUND', 'dispute not found');
+      return;
+    }
+    if (dispute.status !== 'open') {
+      sendError(res, 409, 'DISPUTE_INVALID_STATE', 'dispute not open');
+      return;
+    }
+    const order = marketState.orders[dispute.orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    if (order.buyer.did !== body.did && order.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_ORDER_PARTY', 'not a party to the order');
+      return;
+    }
+
+    const resourcePrev = marketState.disputeEvents[disputeId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'DISPUTE_INVALID_STATE', 'dispute resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketDisputeResponseEnvelope({
+        issuer: body.did,
+        privateKey,
+        disputeId,
+        resourcePrev,
+        response: body.response,
+        evidence: body.evidence as Record<string, unknown>[] | undefined,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { disputeId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleMarketDisputeResolve(
+    req: IncomingMessage,
+    res: ServerResponse,
+    disputeId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, DisputeResolveSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const marketState = await buildMarketState(eventStore);
+    const dispute = marketState.disputes[disputeId];
+    if (!dispute) {
+      sendError(res, 404, 'DISPUTE_NOT_FOUND', 'dispute not found');
+      return;
+    }
+    if (dispute.status === 'resolved') {
+      sendError(res, 409, 'DISPUTE_INVALID_STATE', 'dispute already resolved');
+      return;
+    }
+    const order = marketState.orders[dispute.orderId];
+    if (!order) {
+      sendError(res, 404, 'ORDER_NOT_FOUND', 'order not found');
+      return;
+    }
+    if (order.buyer.did !== body.did && order.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_ORDER_PARTY', 'not a party to the order');
+      return;
+    }
+
+    const resourcePrev = marketState.disputeEvents[disputeId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'DISPUTE_INVALID_STATE', 'dispute resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketDisputeResolveEnvelope({
+        issuer: body.did,
+        privateKey,
+        disputeId,
+        resourcePrev,
+        resolution: body.resolution,
+        notes: body.notes,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { disputeId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
   private async handleInfoMarketSearch(
     _req: IncomingMessage,
     res: ServerResponse,
@@ -1963,6 +2319,133 @@ export class ApiServer {
     }
   }
 
+  private async handleInfoMarketSubscribe(
+    req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, InfoSubscriptionSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    if (!store) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    const listing = await store.getListing(listingId);
+    if (!listing || listing.marketType !== 'info') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+    if (listing.status !== 'active') {
+      sendError(res, 409, 'LISTING_NOT_ACTIVE', 'listing not active');
+      return;
+    }
+    if (listing.pricing.type !== 'subscription') {
+      sendError(res, 409, 'LISTING_NOT_SUBSCRIPTION', 'listing does not support subscription');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const subscriptionId = body.subscriptionId ?? `subscription-${randomUUID()}`;
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketSubscriptionStartEnvelope({
+        issuer: body.did,
+        privateKey,
+        subscriptionId,
+        listingId,
+        buyerDid: body.did,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 201, { subscriptionId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleInfoMarketSubscriptionCancel(
+    req: IncomingMessage,
+    res: ServerResponse,
+    subscriptionId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, InfoSubscriptionCancelSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const subscription = marketState.subscriptions[subscriptionId];
+    if (!subscription) {
+      sendError(res, 404, 'SUBSCRIPTION_NOT_FOUND', 'subscription not found');
+      return;
+    }
+    if (subscription.buyer.did !== body.did) {
+      sendError(res, 403, 'NOT_SUBSCRIBER', 'not the subscriber');
+      return;
+    }
+    if (subscription.status !== 'active') {
+      sendError(res, 409, 'SUBSCRIPTION_NOT_ACTIVE', 'subscription not active');
+      return;
+    }
+    const resourcePrev = marketState.subscriptionEvents[subscriptionId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'SUBSCRIPTION_INVALID_STATE', 'subscription resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketSubscriptionCancelEnvelope({
+        issuer: body.did,
+        privateKey,
+        subscriptionId,
+        resourcePrev,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { subscriptionId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
   private async handleInfoMarketDeliver(
     req: IncomingMessage,
     res: ServerResponse,
@@ -2234,6 +2717,70 @@ export class ApiServer {
       sendJson(res, 200, { orderUpdateHash: hash });
     } catch (error) {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleInfoMarketRemove(
+    req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ListingRemoveSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    const eventStore = this.runtime.eventStore;
+    if (!store || !eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+
+    const listing = await store.getListing(listingId);
+    if (!listing || listing.marketType !== 'info') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+    if (listing.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_SELLER', 'not the seller');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const resourcePrev = marketState.listingEvents[listingId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'LISTING_INVALID_STATE', 'listing resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketListingRemoveEnvelope({
+        issuer: body.did,
+        privateKey,
+        listingId,
+        resourcePrev,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { listingId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 
@@ -2587,6 +3134,216 @@ export class ApiServer {
       });
     } catch (error) {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleTaskMarketReject(
+    req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, TaskBidActionSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    const eventStore = this.runtime.eventStore;
+    if (!store || !eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'task market unavailable');
+      return;
+    }
+    const listing = await store.getListing(taskId);
+    if (!listing || listing.marketType !== 'task') {
+      sendError(res, 404, 'TASK_NOT_FOUND', 'task not found');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const bid = marketState.bids[body.bidId];
+    if (!bid || bid.taskId !== taskId) {
+      sendError(res, 404, 'BID_NOT_FOUND', 'bid not found');
+      return;
+    }
+    if (bid.status !== 'submitted') {
+      sendError(res, 409, 'BID_INVALID_STATE', 'bid not in submitted state');
+      return;
+    }
+    if (listing.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_TASK_OWNER', 'not the task owner');
+      return;
+    }
+
+    const bidPrev = marketState.bidEvents[body.bidId];
+    if (!bidPrev) {
+      sendError(res, 409, 'BID_INVALID_STATE', 'bid resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketBidRejectEnvelope({
+        issuer: body.did,
+        privateKey,
+        bidId: body.bidId,
+        resourcePrev: bidPrev,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { bidId: body.bidId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleTaskMarketWithdraw(
+    req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, TaskBidActionSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    const eventStore = this.runtime.eventStore;
+    if (!store || !eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'task market unavailable');
+      return;
+    }
+    const listing = await store.getListing(taskId);
+    if (!listing || listing.marketType !== 'task') {
+      sendError(res, 404, 'TASK_NOT_FOUND', 'task not found');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const bid = marketState.bids[body.bidId];
+    if (!bid || bid.taskId !== taskId) {
+      sendError(res, 404, 'BID_NOT_FOUND', 'bid not found');
+      return;
+    }
+    if (bid.status !== 'submitted') {
+      sendError(res, 409, 'BID_INVALID_STATE', 'bid not in submitted state');
+      return;
+    }
+    if (bid.bidder.did !== body.did) {
+      sendError(res, 403, 'NOT_BIDDER', 'not the bid owner');
+      return;
+    }
+
+    const bidPrev = marketState.bidEvents[body.bidId];
+    if (!bidPrev) {
+      sendError(res, 409, 'BID_INVALID_STATE', 'bid resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketBidWithdrawEnvelope({
+        issuer: body.did,
+        privateKey,
+        bidId: body.bidId,
+        resourcePrev: bidPrev,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { bidId: body.bidId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleTaskMarketRemove(
+    req: IncomingMessage,
+    res: ServerResponse,
+    taskId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ListingRemoveSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    const eventStore = this.runtime.eventStore;
+    if (!store || !eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+
+    const listing = await store.getListing(taskId);
+    if (!listing || listing.marketType !== 'task') {
+      sendError(res, 404, 'TASK_NOT_FOUND', 'task not found');
+      return;
+    }
+    if (listing.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_TASK_OWNER', 'not the task owner');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const resourcePrev = marketState.listingEvents[taskId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'LISTING_INVALID_STATE', 'listing resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketListingRemoveEnvelope({
+        issuer: body.did,
+        privateKey,
+        listingId: taskId,
+        resourcePrev,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { listingId: taskId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
     }
   }
 
@@ -2999,6 +3756,69 @@ export class ApiServer {
       return;
     }
     sendJson(res, 200, listing);
+  }
+
+  private async handleCapabilityMarketRemove(
+    req: IncomingMessage,
+    res: ServerResponse,
+    listingId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ListingRemoveSchema);
+    if (!body) {
+      return;
+    }
+    const store = this.runtime.marketStore;
+    const eventStore = this.runtime.eventStore;
+    if (!store || !eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'market store unavailable');
+      return;
+    }
+    const listing = await store.getListing(listingId);
+    if (!listing || listing.marketType !== 'capability') {
+      sendError(res, 404, 'LISTING_NOT_FOUND', 'listing not found');
+      return;
+    }
+    if (listing.seller.did !== body.did) {
+      sendError(res, 403, 'NOT_SELLER', 'not the seller');
+      return;
+    }
+
+    const marketState = await buildMarketState(eventStore);
+    const resourcePrev = marketState.listingEvents[listingId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'LISTING_INVALID_STATE', 'listing resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createMarketListingRemoveEnvelope({
+        issuer: body.did,
+        privateKey,
+        listingId,
+        resourcePrev,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { listingId, txHash: hash });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
   }
 
   private async handleCapabilityMarketLease(

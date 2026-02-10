@@ -54,6 +54,11 @@ export interface MarketListingUpdatePayload extends Record<string, unknown> {
   metadata?: Record<string, unknown>;
 }
 
+export interface MarketListingRemovePayload extends Record<string, unknown> {
+  listingId: string;
+  resourcePrev: string;
+}
+
 export interface MarketOrderCreatePayload extends Record<string, unknown> {
   orderId: string;
   listingId: string;
@@ -135,6 +140,44 @@ export interface MarketSubmissionReviewPayload extends Record<string, unknown> {
   revisionDeadline?: number;
 }
 
+export interface MarketSubscriptionStartPayload extends Record<string, unknown> {
+  subscriptionId: string;
+  listingId: string;
+  buyer: {
+    did: string;
+    name?: string;
+  };
+  resourcePrev?: null;
+}
+
+export interface MarketSubscriptionCancelPayload extends Record<string, unknown> {
+  subscriptionId: string;
+  resourcePrev: string;
+}
+
+export interface MarketDisputeOpenPayload extends Record<string, unknown> {
+  disputeId: string;
+  orderId: string;
+  type: string;
+  description: string;
+  claimAmount?: TokenAmount;
+  resourcePrev?: null;
+}
+
+export interface MarketDisputeResponsePayload extends Record<string, unknown> {
+  disputeId: string;
+  resourcePrev: string;
+  response: string;
+  evidence?: Record<string, unknown>[];
+}
+
+export interface MarketDisputeResolvePayload extends Record<string, unknown> {
+  disputeId: string;
+  resourcePrev: string;
+  resolution: string;
+  notes?: string;
+}
+
 export interface MarketCapabilityLeaseStartPayload extends Record<string, unknown> {
   listingId: string;
   leaseId: string;
@@ -191,6 +234,16 @@ export interface MarketListingUpdateEventParams {
   resourcePrev: string;
   status: ListingStatus;
   metadata?: Record<string, unknown>;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketListingRemoveEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  listingId: string;
+  resourcePrev: string;
   ts: number;
   nonce: number;
   prev?: string;
@@ -286,6 +339,67 @@ export interface MarketSubmissionReviewEventParams {
   feedback: string;
   rating?: number;
   revisionDeadline?: number;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketSubscriptionStartEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  subscriptionId: string;
+  listingId: string;
+  buyerDid?: string;
+  buyerName?: string;
+  resourcePrev?: null;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketSubscriptionCancelEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  subscriptionId: string;
+  resourcePrev: string;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketDisputeOpenEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  disputeId: string;
+  orderId: string;
+  type: string;
+  description: string;
+  claimAmount?: TokenAmountLike;
+  resourcePrev?: null;
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketDisputeResponseEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  disputeId: string;
+  resourcePrev: string;
+  response: string;
+  evidence?: Record<string, unknown>[];
+  ts: number;
+  nonce: number;
+  prev?: string;
+}
+
+export interface MarketDisputeResolveEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  disputeId: string;
+  resourcePrev: string;
+  resolution: string;
+  notes?: string;
   ts: number;
   nonce: number;
   prev?: string;
@@ -749,6 +863,19 @@ export function parseMarketListingUpdatePayload(
   };
 }
 
+export function parseMarketListingRemovePayload(
+  payload: Record<string, unknown>,
+): MarketListingRemovePayload {
+  const listingId = String(payload.listingId ?? '');
+  requireNonEmpty(listingId, 'listingId');
+  const resourcePrev = String(payload.resourcePrev ?? '');
+  requireNonEmpty(resourcePrev, 'resourcePrev');
+  return {
+    listingId,
+    resourcePrev,
+  };
+}
+
 export function parseMarketOrderCreatePayload(
   payload: Record<string, unknown>,
 ): MarketOrderCreatePayload {
@@ -968,6 +1095,113 @@ export function parseMarketSubmissionReviewPayload(
   };
 }
 
+export function parseMarketSubscriptionStartPayload(
+  payload: Record<string, unknown>,
+): MarketSubscriptionStartPayload {
+  const subscriptionId = String(payload.subscriptionId ?? '');
+  requireNonEmpty(subscriptionId, 'subscriptionId');
+  const listingId = String(payload.listingId ?? '');
+  requireNonEmpty(listingId, 'listingId');
+  const buyerRecord = assertRecord(payload.buyer, 'buyer');
+  const buyerDid = String(buyerRecord.did ?? '');
+  assertValidDid(buyerDid, 'buyer.did');
+  if (payload.resourcePrev !== undefined && payload.resourcePrev !== null) {
+    throw new Error('resourcePrev must be null for subscription start');
+  }
+  return {
+    subscriptionId,
+    listingId,
+    buyer: {
+      did: buyerDid,
+      name: typeof buyerRecord.name === 'string' ? buyerRecord.name : undefined,
+    },
+    resourcePrev: undefined,
+  };
+}
+
+export function parseMarketSubscriptionCancelPayload(
+  payload: Record<string, unknown>,
+): MarketSubscriptionCancelPayload {
+  const subscriptionId = String(payload.subscriptionId ?? '');
+  requireNonEmpty(subscriptionId, 'subscriptionId');
+  const resourcePrev = String(payload.resourcePrev ?? '');
+  requireNonEmpty(resourcePrev, 'resourcePrev');
+  return {
+    subscriptionId,
+    resourcePrev,
+  };
+}
+
+export function parseMarketDisputeOpenPayload(
+  payload: Record<string, unknown>,
+): MarketDisputeOpenPayload {
+  const disputeId = String(payload.disputeId ?? '');
+  requireNonEmpty(disputeId, 'disputeId');
+  const orderId = String(payload.orderId ?? '');
+  requireNonEmpty(orderId, 'orderId');
+  const type = String(payload.type ?? '').trim();
+  requireNonEmpty(type, 'type');
+  const description = String(payload.description ?? '').trim();
+  requireNonEmpty(description, 'description');
+  let claimAmount: string | undefined;
+  if (payload.claimAmount !== undefined) {
+    claimAmount = normalizeTokenAmount(payload.claimAmount as TokenAmountLike, 'claimAmount');
+  }
+  if (payload.resourcePrev !== undefined && payload.resourcePrev !== null) {
+    throw new Error('resourcePrev must be null for dispute open');
+  }
+  return {
+    disputeId,
+    orderId,
+    type,
+    description,
+    claimAmount,
+    resourcePrev: undefined,
+  };
+}
+
+export function parseMarketDisputeResponsePayload(
+  payload: Record<string, unknown>,
+): MarketDisputeResponsePayload {
+  const disputeId = String(payload.disputeId ?? '');
+  requireNonEmpty(disputeId, 'disputeId');
+  const resourcePrev = String(payload.resourcePrev ?? '');
+  requireNonEmpty(resourcePrev, 'resourcePrev');
+  const response = String(payload.response ?? '').trim();
+  requireNonEmpty(response, 'response');
+  let evidence: Record<string, unknown>[] | undefined;
+  if (payload.evidence !== undefined) {
+    if (!Array.isArray(payload.evidence)) {
+      throw new Error('evidence must be an array');
+    }
+    evidence = payload.evidence.map((entry, index) => assertRecord(entry, `evidence[${index}]`));
+  }
+  return {
+    disputeId,
+    resourcePrev,
+    response,
+    evidence,
+  };
+}
+
+export function parseMarketDisputeResolvePayload(
+  payload: Record<string, unknown>,
+): MarketDisputeResolvePayload {
+  const disputeId = String(payload.disputeId ?? '');
+  requireNonEmpty(disputeId, 'disputeId');
+  const resourcePrev = String(payload.resourcePrev ?? '');
+  requireNonEmpty(resourcePrev, 'resourcePrev');
+  const resolution = String(payload.resolution ?? '').trim();
+  requireNonEmpty(resolution, 'resolution');
+  const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
+  return {
+    disputeId,
+    resourcePrev,
+    resolution,
+    notes,
+  };
+}
+
 export function parseMarketCapabilityLeaseStartPayload(
   payload: Record<string, unknown>,
 ): MarketCapabilityLeaseStartPayload {
@@ -1109,6 +1343,29 @@ export async function createMarketListingUpdateEnvelope(
   const publicKey = publicKeyFromDid(params.issuer);
   const baseEnvelope = buildEnvelope(
     'market.listing.update',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketListingRemoveEnvelope(
+  params: MarketListingRemoveEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketListingRemovePayload({
+    listingId: params.listingId,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.listing.remove',
     params.issuer,
     publicKey,
     payload,
@@ -1349,6 +1606,138 @@ export async function createMarketSubmissionReviewEnvelope(
   const publicKey = publicKeyFromDid(params.issuer);
   const baseEnvelope = buildEnvelope(
     'market.submission.review',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketSubscriptionStartEnvelope(
+  params: MarketSubscriptionStartEventParams,
+): Promise<EventEnvelope> {
+  const buyerDid = params.buyerDid ?? params.issuer;
+  assertValidDid(params.issuer, 'issuer');
+  if (buyerDid !== params.issuer) {
+    throw new Error('issuer must match buyer.did');
+  }
+  const payload = parseMarketSubscriptionStartPayload({
+    subscriptionId: params.subscriptionId,
+    listingId: params.listingId,
+    buyer: {
+      did: buyerDid,
+      name: params.buyerName,
+    },
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.subscription.start',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketSubscriptionCancelEnvelope(
+  params: MarketSubscriptionCancelEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketSubscriptionCancelPayload({
+    subscriptionId: params.subscriptionId,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.subscription.cancel',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketDisputeOpenEnvelope(
+  params: MarketDisputeOpenEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketDisputeOpenPayload({
+    disputeId: params.disputeId,
+    orderId: params.orderId,
+    type: params.type,
+    description: params.description,
+    claimAmount: params.claimAmount,
+    resourcePrev: params.resourcePrev,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.dispute.open',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketDisputeResponseEnvelope(
+  params: MarketDisputeResponseEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketDisputeResponsePayload({
+    disputeId: params.disputeId,
+    resourcePrev: params.resourcePrev,
+    response: params.response,
+    evidence: params.evidence,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.dispute.response',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
+}
+
+export async function createMarketDisputeResolveEnvelope(
+  params: MarketDisputeResolveEventParams,
+): Promise<EventEnvelope> {
+  assertValidDid(params.issuer, 'issuer');
+  const payload = parseMarketDisputeResolvePayload({
+    disputeId: params.disputeId,
+    resourcePrev: params.resourcePrev,
+    resolution: params.resolution,
+    notes: params.notes,
+  });
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'market.dispute.resolve',
     params.issuer,
     publicKey,
     payload,

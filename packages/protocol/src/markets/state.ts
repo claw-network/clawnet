@@ -8,27 +8,41 @@ import {
   TaskSubmission,
   CapabilityLease,
   CapabilityUsageRecord,
+  MarketSubscription,
+  MarketDispute,
 } from './types.js';
 import {
   MarketListingPublishPayload,
   MarketListingUpdatePayload,
+  MarketListingRemovePayload,
   MarketOrderCreatePayload,
   MarketOrderUpdatePayload,
   MarketBidSubmitPayload,
   MarketBidUpdatePayload,
   MarketSubmissionSubmitPayload,
   MarketSubmissionReviewPayload,
+  MarketSubscriptionStartPayload,
+  MarketSubscriptionCancelPayload,
+  MarketDisputeOpenPayload,
+  MarketDisputeResponsePayload,
+  MarketDisputeResolvePayload,
   MarketCapabilityLeaseStartPayload,
   MarketCapabilityLeaseUpdatePayload,
   MarketCapabilityInvokePayload,
   parseMarketListingPublishPayload,
   parseMarketListingUpdatePayload,
+  parseMarketListingRemovePayload,
   parseMarketOrderCreatePayload,
   parseMarketOrderUpdatePayload,
   parseMarketBidSubmitPayload,
   parseMarketBidUpdatePayload,
   parseMarketSubmissionSubmitPayload,
   parseMarketSubmissionReviewPayload,
+  parseMarketSubscriptionStartPayload,
+  parseMarketSubscriptionCancelPayload,
+  parseMarketDisputeOpenPayload,
+  parseMarketDisputeResponsePayload,
+  parseMarketDisputeResolvePayload,
   parseMarketCapabilityLeaseStartPayload,
   parseMarketCapabilityLeaseUpdatePayload,
   parseMarketCapabilityInvokePayload,
@@ -50,6 +64,10 @@ export interface MarketState {
   bidEvents: Record<string, string>;
   submissions: Record<string, TaskSubmission>;
   submissionEvents: Record<string, string>;
+  subscriptions: Record<string, MarketSubscription>;
+  subscriptionEvents: Record<string, string>;
+  disputes: Record<string, MarketDispute>;
+  disputeEvents: Record<string, string>;
   leases: Record<string, CapabilityLease>;
   leaseEvents: Record<string, string>;
   usageRecords: Record<string, CapabilityUsageRecord>;
@@ -80,6 +98,10 @@ export function createMarketState(): MarketState {
     bidEvents: {},
     submissions: {},
     submissionEvents: {},
+    subscriptions: {},
+    subscriptionEvents: {},
+    disputes: {},
+    disputeEvents: {},
     leases: {},
     leaseEvents: {},
     usageRecords: {},
@@ -98,6 +120,10 @@ function cloneState(state: MarketState): MarketState {
     bidEvents: { ...state.bidEvents },
     submissions: { ...state.submissions },
     submissionEvents: { ...state.submissionEvents },
+    subscriptions: { ...state.subscriptions },
+    subscriptionEvents: { ...state.subscriptionEvents },
+    disputes: { ...state.disputes },
+    disputeEvents: { ...state.disputeEvents },
     leases: { ...state.leases },
     leaseEvents: { ...state.leaseEvents },
     usageRecords: { ...state.usageRecords },
@@ -205,6 +231,22 @@ function applyListingUpdate(
   state.listingEvents[payload.listingId] = hash;
 }
 
+function applyListingRemove(
+  state: MarketState,
+  payload: MarketListingRemovePayload,
+  hash: string,
+  ts: number,
+): void {
+  const listing = state.listings[payload.listingId];
+  if (!listing) {
+    throw new Error('listing not found');
+  }
+  requireResourcePrev(state.listingEvents[payload.listingId], payload.resourcePrev, 'listing');
+  listing.status = 'removed';
+  listing.updatedAt = ts;
+  state.listingEvents[payload.listingId] = hash;
+}
+
 function applyOrderCreate(
   state: MarketState,
   payload: MarketOrderCreatePayload,
@@ -260,6 +302,9 @@ function applyOrderUpdate(
   const order = state.orders[payload.orderId];
   if (!order) {
     throw new Error('order not found');
+  }
+  if (order.dispute && order.dispute.status !== 'resolved') {
+    throw new Error('order already disputed');
   }
   requireResourcePrev(state.orderEvents[payload.orderId], payload.resourcePrev, 'order');
   if (!isForwardOrderTransition(order.status, payload.status)) {
@@ -371,6 +416,156 @@ function applySubmissionReview(
   };
   submission.updatedAt = ts;
   state.submissionEvents[payload.submissionId] = hash;
+}
+
+function applySubscriptionStart(
+  state: MarketState,
+  payload: MarketSubscriptionStartPayload,
+  hash: string,
+  ts: number,
+): void {
+  if (state.subscriptions[payload.subscriptionId]) {
+    throw new Error('subscription already exists');
+  }
+  const listing = state.listings[payload.listingId];
+  if (!listing) {
+    throw new Error('listing not found');
+  }
+  if (listing.marketType !== 'info') {
+    throw new Error('listing marketType mismatch');
+  }
+  if (listing.pricing.type !== 'subscription') {
+    throw new Error('listing does not support subscription');
+  }
+  const subscription: MarketSubscription = {
+    id: payload.subscriptionId,
+    listingId: payload.listingId,
+    buyer: payload.buyer,
+    status: 'active',
+    createdAt: ts,
+    updatedAt: ts,
+  };
+  state.subscriptions[payload.subscriptionId] = subscription;
+  state.subscriptionEvents[payload.subscriptionId] = hash;
+}
+
+function applySubscriptionCancel(
+  state: MarketState,
+  payload: MarketSubscriptionCancelPayload,
+  hash: string,
+  ts: number,
+): void {
+  const subscription = state.subscriptions[payload.subscriptionId];
+  if (!subscription) {
+    throw new Error('subscription not found');
+  }
+  if (subscription.status !== 'active') {
+    throw new Error('subscription not active');
+  }
+  requireResourcePrev(
+    state.subscriptionEvents[payload.subscriptionId],
+    payload.resourcePrev,
+    'subscription',
+  );
+  subscription.status = 'cancelled';
+  subscription.updatedAt = ts;
+  state.subscriptionEvents[payload.subscriptionId] = hash;
+}
+
+function applyDisputeOpen(
+  state: MarketState,
+  payload: MarketDisputeOpenPayload,
+  hash: string,
+  ts: number,
+): void {
+  if (state.disputes[payload.disputeId]) {
+    throw new Error('dispute already exists');
+  }
+  const order = state.orders[payload.orderId];
+  if (!order) {
+    throw new Error('order not found');
+  }
+  const dispute: MarketDispute = {
+    id: payload.disputeId,
+    orderId: payload.orderId,
+    type: payload.type,
+    description: payload.description,
+    claimAmount: payload.claimAmount,
+    status: 'open',
+    createdAt: ts,
+    updatedAt: ts,
+  };
+  state.disputes[payload.disputeId] = dispute;
+  state.disputeEvents[payload.disputeId] = hash;
+  order.status = 'disputed';
+  order.updatedAt = ts;
+  order.dispute = { disputeId: payload.disputeId, status: dispute.status };
+}
+
+function applyDisputeResponse(
+  state: MarketState,
+  payload: MarketDisputeResponsePayload,
+  hash: string,
+  ts: number,
+): void {
+  const dispute = state.disputes[payload.disputeId];
+  if (!dispute) {
+    throw new Error('dispute not found');
+  }
+  if (dispute.status !== 'open') {
+    throw new Error('dispute not open');
+  }
+  requireResourcePrev(
+    state.disputeEvents[payload.disputeId],
+    payload.resourcePrev,
+    'dispute',
+  );
+  dispute.status = 'responded';
+  dispute.response = {
+    text: payload.response,
+    evidence: payload.evidence,
+  };
+  dispute.updatedAt = ts;
+  state.disputeEvents[payload.disputeId] = hash;
+
+  const order = state.orders[dispute.orderId];
+  if (order) {
+    order.dispute = { disputeId: dispute.id, status: dispute.status };
+    order.updatedAt = ts;
+  }
+}
+
+function applyDisputeResolve(
+  state: MarketState,
+  payload: MarketDisputeResolvePayload,
+  hash: string,
+  ts: number,
+): void {
+  const dispute = state.disputes[payload.disputeId];
+  if (!dispute) {
+    throw new Error('dispute not found');
+  }
+  if (dispute.status === 'resolved') {
+    throw new Error('dispute already resolved');
+  }
+  requireResourcePrev(
+    state.disputeEvents[payload.disputeId],
+    payload.resourcePrev,
+    'dispute',
+  );
+  dispute.status = 'resolved';
+  dispute.resolution = {
+    outcome: payload.resolution,
+    notes: payload.notes,
+  };
+  dispute.updatedAt = ts;
+  state.disputeEvents[payload.disputeId] = hash;
+
+  const order = state.orders[dispute.orderId];
+  if (order) {
+    order.dispute = { disputeId: dispute.id, status: dispute.status };
+    order.updatedAt = ts;
+  }
 }
 
 function applyCapabilityLeaseStart(
@@ -485,6 +680,12 @@ export function applyMarketEvent(state: MarketState, envelope: EventEnvelope): M
       applied = true;
       break;
     }
+    case 'market.listing.remove': {
+      const parsed = parseMarketListingRemovePayload(payload);
+      applyListingRemove(next, parsed, hash, ts);
+      applied = true;
+      break;
+    }
     case 'market.order.create': {
       const parsed = parseMarketOrderCreatePayload(payload);
       applyOrderCreate(next, parsed, hash, ts);
@@ -530,6 +731,36 @@ export function applyMarketEvent(state: MarketState, envelope: EventEnvelope): M
     case 'market.submission.review': {
       const parsed = parseMarketSubmissionReviewPayload(payload);
       applySubmissionReview(next, parsed, hash, ts);
+      applied = true;
+      break;
+    }
+    case 'market.subscription.start': {
+      const parsed = parseMarketSubscriptionStartPayload(payload);
+      applySubscriptionStart(next, parsed, hash, ts);
+      applied = true;
+      break;
+    }
+    case 'market.subscription.cancel': {
+      const parsed = parseMarketSubscriptionCancelPayload(payload);
+      applySubscriptionCancel(next, parsed, hash, ts);
+      applied = true;
+      break;
+    }
+    case 'market.dispute.open': {
+      const parsed = parseMarketDisputeOpenPayload(payload);
+      applyDisputeOpen(next, parsed, hash, ts);
+      applied = true;
+      break;
+    }
+    case 'market.dispute.response': {
+      const parsed = parseMarketDisputeResponsePayload(payload);
+      applyDisputeResponse(next, parsed, hash, ts);
+      applied = true;
+      break;
+    }
+    case 'market.dispute.resolve': {
+      const parsed = parseMarketDisputeResolvePayload(payload);
+      applyDisputeResolve(next, parsed, hash, ts);
       applied = true;
       break;
     }

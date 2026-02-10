@@ -320,6 +320,38 @@ export interface Order {
   metadata: Record<string, unknown>;
 }
 
+export interface MarketSubscription {
+  id: string;
+  listingId: string;
+  buyer: {
+    did: string;
+    name?: string;
+  };
+  status: 'active' | 'cancelled';
+  createdAt: number;
+  updatedAt: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface MarketDispute {
+  id: string;
+  orderId: string;
+  type: string;
+  description: string;
+  claimAmount?: TokenAmount;
+  status: 'open' | 'responded' | 'resolved';
+  response?: {
+    text: string;
+    evidence?: Record<string, unknown>[];
+  };
+  resolution?: {
+    outcome: string;
+    notes?: string;
+  };
+  createdAt: number;
+  updatedAt: number;
+}
+
 export const BID_STATUSES = ['submitted', 'shortlisted', 'accepted', 'rejected', 'withdrawn'] as const;
 export type BidStatus = (typeof BID_STATUSES)[number];
 
