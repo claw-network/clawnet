@@ -9,6 +9,7 @@ import {
   bytesToUtf8,
   didFromPublicKey,
   decryptKeyRecord,
+  EventEnvelope,
   EventStore,
   eventHashHex,
   hexToBytes,
@@ -22,11 +23,22 @@ import {
   verifyCapabilityCredential,
 } from '@clawtoken/core';
 import {
+  applyContractEvent,
   applyMarketEvent,
   applyWalletEvent,
   applyReputationEvent,
   CapabilityCredential,
+  ContractParties,
   buildReputationProfile,
+  createContractActivateEnvelope,
+  createContractCreateEnvelope,
+  createContractDisputeOpenEnvelope,
+  createContractDisputeResolveEnvelope,
+  createContractMilestoneApproveEnvelope,
+  createContractMilestoneRejectEnvelope,
+  createContractMilestoneSubmitEnvelope,
+  createContractSignEnvelope,
+  createContractCompleteEnvelope,
   createCapabilityListingPublishEnvelope,
   createIdentityCapabilityRegisterEnvelope,
   createMarketBidAcceptEnvelope,
@@ -57,6 +69,7 @@ import {
   createInfoOrderReviewEnvelope,
   createReputationRecordEnvelope,
   createReputationState,
+  createContractState,
   createMarketState,
   createWalletEscrowCreateEnvelope,
   createWalletEscrowFundEnvelope,
@@ -87,6 +100,7 @@ import {
   ReputationState,
   SearchQuery,
   SearchResult,
+  ServiceContract,
   WalletState,
   createMarketSubmissionReviewEnvelope,
   createMarketSubmissionSubmitEnvelope,
@@ -534,6 +548,110 @@ const DisputeResolveSchema = z
   })
   .passthrough();
 
+const ContractCreateSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    contractId: z.string().optional(),
+    provider: z.string().min(1),
+    parties: z.record(z.unknown()).optional(),
+    service: z.record(z.unknown()).optional(),
+    terms: z.record(z.unknown()),
+    payment: z.record(z.unknown()).optional(),
+    timeline: z.record(z.unknown()).optional(),
+    milestones: z.array(z.record(z.unknown())).optional(),
+    attachments: z.array(z.record(z.unknown())).optional(),
+    metadata: z.record(z.unknown()).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const ContractSignSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const ContractFundSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    escrowId: z.string().optional(),
+    amount: AmountSchema,
+    releaseRules: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const ContractMilestoneSubmitSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    submissionId: z.string().optional(),
+    deliverables: z.array(z.record(z.unknown())).optional(),
+    notes: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const ContractMilestoneReviewSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    notes: z.string().optional(),
+    rating: RatingSchema.optional(),
+    feedback: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const ContractCompleteSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const ContractDisputeSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    reason: z.string().min(1),
+    description: z.string().optional(),
+    evidence: z.array(z.record(z.unknown())).optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const ContractDisputeResolveSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    resolution: z.string().min(1),
+    notes: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
 const CapabilityPublishSchema = z
   .object({
     did: z.string().min(1),
@@ -745,6 +863,65 @@ export class ApiServer {
           }
           if (action === 'refund') {
             await this.handleWalletEscrowRefund(req, res, escrowId);
+            return;
+          }
+        }
+      }
+
+      if (url?.pathname === '/api/contracts') {
+        if (method === 'GET') {
+          await this.handleContractsList(req, res, url);
+          return;
+        }
+        if (method === 'POST') {
+          await this.handleContractCreate(req, res);
+          return;
+        }
+      }
+
+      if (url?.pathname?.startsWith('/api/contracts/')) {
+        const segments = url.pathname.split('/').filter(Boolean);
+        const contractId = decodeURIComponent(segments[2] ?? '');
+        const action = segments[3];
+        if (segments.length === 3 && method === 'GET') {
+          await this.handleContractGet(req, res, contractId);
+          return;
+        }
+        if (action === 'sign' && method === 'POST') {
+          await this.handleContractSign(req, res, contractId);
+          return;
+        }
+        if (action === 'fund' && method === 'POST') {
+          await this.handleContractFund(req, res, contractId);
+          return;
+        }
+        if (action === 'complete' && method === 'POST') {
+          await this.handleContractComplete(req, res, contractId);
+          return;
+        }
+        if (action === 'dispute' && method === 'POST') {
+          if (segments.length === 4) {
+            await this.handleContractDisputeOpen(req, res, contractId);
+            return;
+          }
+          if (segments.length === 5 && segments[4] === 'resolve') {
+            await this.handleContractDisputeResolve(req, res, contractId);
+            return;
+          }
+        }
+        if (action === 'milestones' && segments.length >= 6) {
+          const milestoneId = decodeURIComponent(segments[4] ?? '');
+          const milestoneAction = segments[5];
+          if (milestoneAction === 'complete' && method === 'POST') {
+            await this.handleContractMilestoneSubmit(req, res, contractId, milestoneId);
+            return;
+          }
+          if (milestoneAction === 'approve' && method === 'POST') {
+            await this.handleContractMilestoneApprove(req, res, contractId, milestoneId);
+            return;
+          }
+          if (milestoneAction === 'reject' && method === 'POST') {
+            await this.handleContractMilestoneReject(req, res, contractId, milestoneId);
             return;
           }
         }
@@ -1748,6 +1925,845 @@ export class ApiServer {
         amount: Number(body.amount),
         status: 'broadcast',
         timestamp: body.ts ?? Date.now(),
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractsList(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+  ): Promise<void> {
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const role = url.searchParams.get('role') ?? 'all';
+    if (role !== 'all' && role !== 'client' && role !== 'provider') {
+      sendError(res, 400, 'INVALID_REQUEST', 'invalid role');
+      return;
+    }
+    const status = url.searchParams.get('status') ?? undefined;
+    const limit = parsePagination(url.searchParams.get('limit'), 20, 100);
+    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000);
+
+    let localDid: string | undefined;
+    if (role !== 'all') {
+      const identity = await resolveLocalIdentity(this.config.dataDir);
+      if (!identity) {
+        sendError(res, 404, 'DID_NOT_FOUND', 'local identity not initialized');
+        return;
+      }
+      localDid = identity.did;
+    }
+
+    const state = await buildContractState(eventStore);
+    let contracts = Object.values(state.contracts);
+    if (status) {
+      contracts = contracts.filter((contract) => contract.status === status);
+    }
+    if (role === 'client' && localDid) {
+      contracts = contracts.filter((contract) => contract.parties.client.did === localDid);
+    }
+    if (role === 'provider' && localDid) {
+      contracts = contracts.filter((contract) => contract.parties.provider.did === localDid);
+    }
+
+    const sorted = [...contracts].sort((a, b) => b.updatedAt - a.updatedAt);
+    const sliced = sorted.slice(offset, offset + limit);
+    const views = sliced.map((contract) => buildContractView(contract));
+    sendJson(res, 200, {
+      contracts: views,
+      total: contracts.length,
+      pagination: {
+        total: contracts.length,
+        limit,
+        offset,
+        hasMore: offset + limit < contracts.length,
+      },
+    });
+  }
+
+  private async handleContractCreate(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await parseBody(req, res, ContractCreateSchema);
+    if (!body) {
+      return;
+    }
+    if (!isValidDid(body.did)) {
+      sendError(res, 400, 'DID_INVALID', 'invalid did');
+      return;
+    }
+    if (!isValidDid(body.provider)) {
+      sendError(res, 400, 'DID_INVALID', 'invalid provider did');
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+
+    const state = await buildContractState(eventStore);
+    const contractId = body.contractId ?? `contract-${randomUUID()}`;
+    if (state.contracts[contractId]) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract already exists');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const partiesRecord =
+      body.parties && typeof body.parties === 'object' && !Array.isArray(body.parties)
+        ? (body.parties as Record<string, unknown>)
+        : {};
+    const clientRecord =
+      partiesRecord.client && typeof partiesRecord.client === 'object' && !Array.isArray(partiesRecord.client)
+        ? { ...(partiesRecord.client as Record<string, unknown>) }
+        : {};
+    clientRecord.did = body.did;
+    const providerRecord =
+      partiesRecord.provider && typeof partiesRecord.provider === 'object' && !Array.isArray(partiesRecord.provider)
+        ? { ...(partiesRecord.provider as Record<string, unknown>) }
+        : {};
+    providerRecord.did = body.provider;
+    const parties = {
+      ...partiesRecord,
+      client: clientRecord,
+      provider: providerRecord,
+    };
+
+    const milestones = Array.isArray(body.milestones)
+      ? body.milestones.map((entry, index) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+          return entry;
+        }
+        const record = entry as Record<string, unknown>;
+        const id =
+          typeof record.id === 'string' && record.id.trim().length > 0
+            ? record.id
+            : `milestone-${index + 1}`;
+        return { ...record, id };
+      })
+      : undefined;
+
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractCreateEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        parties: parties as ContractParties,
+        service: (body.service ?? {}) as Record<string, unknown>,
+        terms: body.terms as Record<string, unknown>,
+        payment: (body.payment ?? { escrowRequired: true }) as Record<string, unknown>,
+        timeline: (body.timeline ?? {}) as Record<string, unknown>,
+        milestones,
+        attachments: body.attachments as Record<string, unknown>[] | undefined,
+        metadata: body.metadata as Record<string, unknown> | undefined,
+        resourcePrev: null,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const contract = nextState.contracts[contractId];
+      if (!contract) {
+        sendJson(res, 201, { id: contractId, status: 'draft' });
+        return;
+      }
+      sendJson(res, 201, buildContractView(contract));
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractGet(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+  ): Promise<void> {
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    sendJson(res, 200, buildContractView(contract));
+  }
+
+  private async handleContractSign(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractSignSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    if (body.did !== contract.parties.client.did && body.did !== contract.parties.provider.did) {
+      sendError(res, 403, 'FORBIDDEN', 'not a party to the contract');
+      return;
+    }
+    if (!['draft', 'negotiating', 'pending_signature'].includes(contract.status)) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract not signable');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractSignEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        signer: body.did,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const updated = nextState.contracts[contractId] ?? contract;
+      sendJson(res, 200, buildContractView(updated));
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractFund(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractFundSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    if (contract.status !== 'pending_funding') {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract not ready for funding');
+      return;
+    }
+    if (body.did !== contract.parties.client.did) {
+      sendError(res, 403, 'FORBIDDEN', 'only client can fund the contract');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+
+    const amountValue = parseBigInt(String(body.amount));
+    if (amountValue <= 0n) {
+      sendError(res, 400, 'INVALID_REQUEST', 'amount must be positive');
+      return;
+    }
+
+    const walletState = await buildWalletState(eventStore);
+    const balance = getWalletBalance(walletState, addressFromDid(body.did));
+    const available = parseBigInt(balance.available);
+    if (amountValue > available) {
+      sendError(res, 402, 'INSUFFICIENT_BALANCE', 'insufficient balance');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+
+    const escrowId = body.escrowId ?? contract.escrowId ?? `escrow-${randomUUID()}`;
+    const releaseRules = body.releaseRules ?? [{ id: 'milestone_approved' }];
+    const ts = body.ts ?? Date.now();
+
+    try {
+      const createEnvelope = await createWalletEscrowCreateEnvelope({
+        issuer: body.did,
+        privateKey,
+        escrowId,
+        depositor: addressFromDid(body.did),
+        beneficiary: addressFromDid(contract.parties.provider.did),
+        amount: body.amount,
+        releaseRules,
+        resourcePrev: undefined,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const createHash = await this.runtime.publishEvent(createEnvelope);
+      const fundEnvelope = await createWalletEscrowFundEnvelope({
+        issuer: body.did,
+        privateKey,
+        escrowId,
+        resourcePrev: createHash,
+        amount: body.amount,
+        ts: ts + 1,
+        nonce: body.nonce + 1,
+        prev: createHash,
+      });
+      const fundHash = await this.runtime.publishEvent(fundEnvelope);
+      const activateEnvelope = await createContractActivateEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        escrowId,
+        ts: ts + 2,
+        nonce: body.nonce + 2,
+        prev: fundHash,
+      });
+      await this.runtime.publishEvent(activateEnvelope);
+      const nextState = applyContractEvent(state, activateEnvelope as EventEnvelope);
+      const updated = nextState.contracts[contractId] ?? contract;
+      sendJson(res, 200, buildContractView(updated));
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+    }
+  }
+
+  private async handleContractMilestoneSubmit(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+    milestoneId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractMilestoneSubmitSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    if (contract.status !== 'active') {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract not active');
+      return;
+    }
+    if (body.did !== contract.parties.provider.did) {
+      sendError(res, 403, 'FORBIDDEN', 'only provider can submit milestones');
+      return;
+    }
+    const milestone = contract.milestones.find((entry) => entry.id === milestoneId);
+    if (!milestone) {
+      sendError(res, 400, 'CONTRACT_MILESTONE_INVALID', 'milestone not found');
+      return;
+    }
+    if (milestone.status === 'approved') {
+      sendError(res, 400, 'CONTRACT_MILESTONE_INVALID', 'milestone already approved');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const submissionId = body.submissionId ?? `submission-${randomUUID()}`;
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractMilestoneSubmitEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        milestoneId,
+        submissionId,
+        notes: body.notes,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const updated = nextState.contracts[contractId];
+      const updatedMilestone = updated?.milestones.find((entry) => entry.id === milestoneId);
+      if (!updated || !updatedMilestone) {
+        sendJson(res, 200, milestone);
+        return;
+      }
+      sendJson(res, 200, updatedMilestone);
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractMilestoneApprove(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+    milestoneId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractMilestoneReviewSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    if (contract.status !== 'active') {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract not active');
+      return;
+    }
+    if (body.did !== contract.parties.client.did) {
+      sendError(res, 403, 'FORBIDDEN', 'only client can approve milestones');
+      return;
+    }
+    const milestone = contract.milestones.find((entry) => entry.id === milestoneId);
+    if (!milestone) {
+      sendError(res, 400, 'CONTRACT_MILESTONE_INVALID', 'milestone not found');
+      return;
+    }
+    if (milestone.status !== 'submitted') {
+      sendError(res, 400, 'CONTRACT_MILESTONE_INVALID', 'milestone not submitted');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const notes = body.notes ?? body.feedback;
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractMilestoneApproveEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        milestoneId,
+        notes,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const updated = nextState.contracts[contractId];
+      const updatedMilestone = updated?.milestones.find((entry) => entry.id === milestoneId);
+      if (!updated || !updatedMilestone) {
+        sendJson(res, 200, milestone);
+        return;
+      }
+      sendJson(res, 200, updatedMilestone);
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractMilestoneReject(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+    milestoneId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractMilestoneReviewSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    if (contract.status !== 'active') {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract not active');
+      return;
+    }
+    if (body.did !== contract.parties.client.did) {
+      sendError(res, 403, 'FORBIDDEN', 'only client can reject milestones');
+      return;
+    }
+    const milestone = contract.milestones.find((entry) => entry.id === milestoneId);
+    if (!milestone) {
+      sendError(res, 400, 'CONTRACT_MILESTONE_INVALID', 'milestone not found');
+      return;
+    }
+    if (milestone.status !== 'submitted') {
+      sendError(res, 400, 'CONTRACT_MILESTONE_INVALID', 'milestone not submitted');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const notes = body.notes ?? body.feedback;
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractMilestoneRejectEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        milestoneId,
+        notes,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const updated = nextState.contracts[contractId];
+      const updatedMilestone = updated?.milestones.find((entry) => entry.id === milestoneId);
+      if (!updated || !updatedMilestone) {
+        sendJson(res, 200, milestone);
+        return;
+      }
+      sendJson(res, 200, updatedMilestone);
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractComplete(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractCompleteSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    if (contract.status !== 'active') {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract not active');
+      return;
+    }
+    if (body.did !== contract.parties.client.did) {
+      sendError(res, 403, 'FORBIDDEN', 'only client can complete contract');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractCompleteEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const updated = nextState.contracts[contractId] ?? contract;
+      sendJson(res, 200, buildContractView(updated));
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractDisputeOpen(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractDisputeSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    if (body.did !== contract.parties.client.did && body.did !== contract.parties.provider.did) {
+      sendError(res, 403, 'FORBIDDEN', 'not a party to the contract');
+      return;
+    }
+    if (!['active', 'completed'].includes(contract.status)) {
+      sendError(res, 409, 'DISPUTE_NOT_ALLOWED', 'contract not disputable');
+      return;
+    }
+    if (contract.dispute && contract.dispute.status !== 'resolved') {
+      sendError(res, 409, 'DISPUTE_NOT_ALLOWED', 'dispute already open');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractDisputeOpenEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        reason: body.reason,
+        description: body.description,
+        evidence: body.evidence as Record<string, unknown>[] | undefined,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const updated = nextState.contracts[contractId] ?? contract;
+      const dispute = updated.dispute;
+      if (!dispute) {
+        sendJson(res, 200, { contractId });
+        return;
+      }
+      sendJson(res, 200, {
+        id: `dispute-${contractId}`,
+        contractId,
+        initiator: dispute.initiator ?? body.did,
+        reason: dispute.reason,
+        description: dispute.description,
+        evidence: dispute.evidence,
+        status: dispute.status === 'open' ? 'open' : 'resolved',
+        resolution: dispute.resolution
+          ? {
+            decision: dispute.resolution,
+            resolvedAt: dispute.resolvedAt,
+          }
+          : undefined,
+        createdAt: dispute.openedAt,
+      });
+    } catch {
+      sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  private async handleContractDisputeResolve(
+    req: IncomingMessage,
+    res: ServerResponse,
+    contractId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, ContractDisputeResolveSchema);
+    if (!body) {
+      return;
+    }
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
+    const state = await buildContractState(eventStore);
+    const contract = state.contracts[contractId];
+    if (!contract) {
+      sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+      return;
+    }
+    if (body.did !== contract.parties.client.did && body.did !== contract.parties.provider.did) {
+      sendError(res, 403, 'FORBIDDEN', 'not a party to the contract');
+      return;
+    }
+    if (!contract.dispute || contract.dispute.status !== 'open') {
+      sendError(res, 409, 'DISPUTE_NOT_ALLOWED', 'dispute not open');
+      return;
+    }
+    const resourcePrev = state.contractEvents[contractId];
+    if (!resourcePrev) {
+      sendError(res, 409, 'CONTRACT_INVALID_STATE', 'contract resource missing');
+      return;
+    }
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
+      return;
+    }
+    const ts = body.ts ?? Date.now();
+    let envelope: Record<string, unknown>;
+    try {
+      envelope = await createContractDisputeResolveEnvelope({
+        issuer: body.did,
+        privateKey,
+        contractId,
+        resourcePrev,
+        resolution: body.resolution,
+        notes: body.notes,
+        ts,
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+    } catch (error) {
+      sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
+      return;
+    }
+    try {
+      await this.runtime.publishEvent(envelope);
+      const nextState = applyContractEvent(state, envelope as EventEnvelope);
+      const updated = nextState.contracts[contractId] ?? contract;
+      const dispute = updated.dispute;
+      if (!dispute) {
+        sendJson(res, 200, { contractId });
+        return;
+      }
+      sendJson(res, 200, {
+        id: `dispute-${contractId}`,
+        contractId,
+        initiator: dispute.initiator,
+        reason: dispute.reason,
+        description: dispute.description,
+        evidence: dispute.evidence,
+        status: dispute.status === 'open' ? 'open' : 'resolved',
+        resolution: dispute.resolution
+          ? {
+            decision: dispute.resolution,
+            resolvedAt: dispute.resolvedAt,
+          }
+          : undefined,
+        createdAt: dispute.openedAt,
       });
     } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
@@ -4257,6 +5273,21 @@ function buildEscrowView(
   };
 }
 
+function buildContractView(contract: ServiceContract): Record<string, unknown> {
+  const clientDid = contract.parties.client.did;
+  const providerDid = contract.parties.provider.did;
+  const clientSignedAt = contract.signatures.find((sig) => sig.signer === clientDid)?.signedAt;
+  const providerSignedAt = contract.signatures.find((sig) => sig.signer === providerDid)?.signedAt;
+  const signedAt =
+    clientSignedAt && providerSignedAt ? Math.max(clientSignedAt, providerSignedAt) : undefined;
+  return {
+    ...contract,
+    client: clientDid,
+    provider: providerDid,
+    signedAt,
+  };
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;
   res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -4819,6 +5850,35 @@ async function buildReputationState(eventStore: EventStore): Promise<ReputationS
       }
       try {
         state = applyReputationEvent(state, envelope);
+      } catch {
+        continue;
+      }
+    }
+    if (!next) {
+      break;
+    }
+    cursor = next;
+  }
+  return state;
+}
+
+async function buildContractState(
+  eventStore: EventStore,
+): Promise<ReturnType<typeof createContractState>> {
+  let state = createContractState();
+  let cursor: string | null = null;
+  while (true) {
+    const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
+    if (!events.length) {
+      break;
+    }
+    for (const bytes of events) {
+      const envelope = parseEvent(bytes);
+      if (!envelope) {
+        continue;
+      }
+      try {
+        state = applyContractEvent(state, envelope as EventEnvelope);
       } catch {
         continue;
       }

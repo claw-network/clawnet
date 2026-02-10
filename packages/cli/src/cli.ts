@@ -260,6 +260,55 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     }
     fail(`unknown market subcommand: ${subcommand ?? ''}`);
   }
+  if (command === 'contract') {
+    const subcommand = argv[1];
+    const subArgs = argv.slice(2);
+    if (subcommand === 'list') {
+      await runContractList(subArgs);
+      return;
+    }
+    if (subcommand === 'get') {
+      await runContractGet(subArgs);
+      return;
+    }
+    if (subcommand === 'create') {
+      await runContractCreate(subArgs);
+      return;
+    }
+    if (subcommand === 'sign') {
+      await runContractSign(subArgs);
+      return;
+    }
+    if (subcommand === 'fund') {
+      await runContractFund(subArgs);
+      return;
+    }
+    if (subcommand === 'complete') {
+      await runContractComplete(subArgs);
+      return;
+    }
+    if (subcommand === 'milestone-complete') {
+      await runContractMilestoneComplete(subArgs);
+      return;
+    }
+    if (subcommand === 'milestone-approve') {
+      await runContractMilestoneApprove(subArgs);
+      return;
+    }
+    if (subcommand === 'milestone-reject') {
+      await runContractMilestoneReject(subArgs);
+      return;
+    }
+    if (subcommand === 'dispute') {
+      await runContractDisputeOpen(subArgs);
+      return;
+    }
+    if (subcommand === 'dispute-resolve') {
+      await runContractDisputeResolve(subArgs);
+      return;
+    }
+    fail(`unknown contract subcommand: ${subcommand ?? ''}`);
+  }
   if (command === 'identity') {
     const subcommand = argv[1];
     const subArgs = argv.slice(2);
@@ -899,6 +948,165 @@ async function runMarketDisputeResolve(rawArgs: string[]): Promise<void> {
   const response = await fetchApiJsonWithBody(
     apiUrl,
     `/api/markets/disputes/${encodeURIComponent(disputeId)}/resolve`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractList(rawArgs: string[]): Promise<void> {
+  const parsed = parseApiArgsWithQuery(rawArgs);
+  const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
+  const data = await fetchApiJson(parsed.apiUrl, `/api/contracts${query}`, parsed.token);
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runContractGet(rawArgs: string[]): Promise<void> {
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const parsed = parseApiArgs(apiArgs);
+  const contractId = rest[0];
+  if (!contractId) {
+    fail('missing <contractId>');
+  }
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}`,
+    parsed.token,
+  );
+  console.log(JSON.stringify(data, null, 2));
+}
+
+async function runContractCreate(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const response = await fetchApiJsonWithBody(apiUrl, '/api/contracts', 'POST', data, token);
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractSign(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  if (!contractId) {
+    fail('missing <contractId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/sign`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractFund(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  if (!contractId) {
+    fail('missing <contractId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/fund`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractComplete(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  if (!contractId) {
+    fail('missing <contractId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/complete`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractMilestoneComplete(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  const milestoneId = rest[1];
+  if (!contractId || !milestoneId) {
+    fail('missing <contractId> <milestoneId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/complete`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractMilestoneApprove(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  const milestoneId = rest[1];
+  if (!contractId || !milestoneId) {
+    fail('missing <contractId> <milestoneId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/approve`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractMilestoneReject(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  const milestoneId = rest[1];
+  if (!contractId || !milestoneId) {
+    fail('missing <contractId> <milestoneId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/reject`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractDisputeOpen(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  if (!contractId) {
+    fail('missing <contractId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/dispute`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(response, null, 2));
+}
+
+async function runContractDisputeResolve(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const contractId = rest[0];
+  if (!contractId) {
+    fail('missing <contractId>');
+  }
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/contracts/${encodeURIComponent(contractId)}/dispute/resolve`,
     'POST',
     data,
     token,
@@ -2693,6 +2901,7 @@ clawtoken market info list|get|publish|purchase|subscribe|unsubscribe|deliver|co
 clawtoken market task list|get|publish|bids|bid|accept|reject|withdraw|deliver|confirm|review|remove [options]
 clawtoken market capability list|get|publish|lease|lease-get|invoke|pause|resume|terminate|remove [options]
 clawtoken market dispute open|respond|resolve [options]
+clawtoken contract list|get|create|sign|fund|complete|milestone-complete|milestone-approve|milestone-reject|dispute|dispute-resolve [options]
 
 Daemon options:
   --data-dir <path>              Override storage root
