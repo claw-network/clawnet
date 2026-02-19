@@ -869,7 +869,7 @@ clawtoken/
        ├── 6.1.5  合约存储 (P2P) ✅
        └── 6.1.6  单元测试 ✅
 
-□ 6.2  Escrow (托管) ⏳
+□ 6.2  Escrow (托管) ✅
        ├── 6.2.1  托管账户创建 ✅
        ├── 6.2.2  资金锁定 ✅
        ├── 6.2.3  条件释放 ✅
@@ -1010,8 +1010,8 @@ clawtoken/
 | 2 | Identity + Wallet | Week 3-4 | ✅ 已完成 |
 | 3 | Interface (MVP) | Week 5-6 | ✅ 已完成 |
 | 4 | Reputation | Week 7-8 | ✅ 已完成 |
-| 5 | Markets | Week 9-12 | ⏳ |
-| 6 | Contracts | Week 13-16 | ⏳ |
+| 5 | Markets | Week 9-12 | ✅ 已完成 |
+| 6 | Contracts | Week 13-16 | ✅ 已完成 |
 | 7 | SDK | Week 17-18 | ⏳ |
 | 8 | 文档与发布 | Week 19-20 | ⏳ |
 | 9 | DAO | Week 21+ | ⏳ |
@@ -1026,4 +1026,4 @@ clawtoken/
 
 ---
 
-*最后更新: 2026年2月8日*
+*最后更新: 2026年2月19日*
