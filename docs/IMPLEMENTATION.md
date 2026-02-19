@@ -913,16 +913,16 @@ clawtoken/
 - `docs/implementation/tasks/api-errors.md`
 
 ```
-□ 7.1  TypeScript SDK (@clawtoken/sdk) ⏳
-       ├── 7.1.1  HTTP Client 封装 ⏳
-       ├── 7.1.2  类型定义 (从 OpenAPI 生成) ⏳
-       ├── 7.1.3  Wallet 模块 ⏳
-       ├── 7.1.4  Identity 模块 ⏳
-       ├── 7.1.5  Markets 模块 ⏳
-       ├── 7.1.6  Contracts 模块 ⏳
-       ├── 7.1.7  Reputation 模块 ⏳
-       ├── 7.1.8  便利方法 (waitForSync 等) ⏳
-       └── 7.1.9  SDK 测试 ⏳
+✅ 7.1  TypeScript SDK (@clawtoken/sdk) ✅
+       ├── 7.1.1  HTTP Client 封装 ✅
+       ├── 7.1.2  类型定义 (从 OpenAPI 生成) ✅
+       ├── 7.1.3  Wallet 模块 ✅
+       ├── 7.1.4  Identity 模块 ✅
+       ├── 7.1.5  Markets 模块 ✅
+       ├── 7.1.6  Contracts 模块 ✅
+       ├── 7.1.7  Reputation 模块 ✅
+       ├── 7.1.8  便利方法 (waitForSync 等) ✅
+       └── 7.1.9  SDK 测试 ✅  (61 tests, 7 files)
 
 □ 7.2  Python SDK (clawtoken-sdk) ⏳
        ├── 7.2.1  HTTP Client 封装 ⏳
@@ -932,8 +932,8 @@ clawtoken/
 
 □ 7.3  示例代码 ⏳
        ├── 7.3.1  examples/python-agent/ ⏳
-       ├── 7.3.2  examples/nodejs-agent/ ⏳
-       └── 7.3.3  examples/shell-scripts/ ⏳
+       ├── 7.3.2  examples/nodejs-agent/ ✅
+       └── 7.3.3  examples/shell-scripts/ ✅
 ```
 
 ---
