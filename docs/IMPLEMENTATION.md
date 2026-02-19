@@ -924,14 +924,14 @@ clawtoken/
        ├── 7.1.8  便利方法 (waitForSync 等) ✅
        └── 7.1.9  SDK 测试 ✅  (61 tests, 7 files)
 
-□ 7.2  Python SDK (clawtoken-sdk) ⏳
-       ├── 7.2.1  HTTP Client 封装 ⏳
-       ├── 7.2.2  类型定义 (dataclass) ⏳
-       ├── 7.2.3  各模块封装 ⏳
-       └── 7.2.4  SDK 测试 ⏳
+✅ 7.2  Python SDK (clawtoken) ✅
+       ├── 7.2.1  HTTP Client 封装 (sync + async, httpx) ✅
+       ├── 7.2.2  类型定义 (TypedDict) ✅
+       ├── 7.2.3  各模块封装 (6 modules) ✅
+       └── 7.2.4  SDK 测试 ✅  (51 tests, 7 files)
 
-□ 7.3  示例代码 ⏳
-       ├── 7.3.1  examples/python-agent/ ⏳
+✅ 7.3  示例代码 ✅
+       ├── 7.3.1  examples/python-agent/ ✅
        ├── 7.3.2  examples/nodejs-agent/ ✅
        └── 7.3.3  examples/shell-scripts/ ✅
 ```
@@ -1012,7 +1012,7 @@ clawtoken/
 | 4 | Reputation | Week 7-8 | ✅ 已完成 |
 | 5 | Markets | Week 9-12 | ✅ 已完成 |
 | 6 | Contracts | Week 13-16 | ✅ 已完成 |
-| 7 | SDK | Week 17-18 | ⏳ |
+| 7 | SDK | Week 17-18 | ✅ 已完成 (TS 61 tests + Python 51 tests) |
 | 8 | 文档与发布 | Week 19-20 | ⏳ |
 | 9 | DAO | Week 21+ | ⏳ |
 
