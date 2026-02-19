@@ -78,6 +78,7 @@ import {
   createWalletEscrowRefundEnvelope,
   createWalletEscrowReleaseEnvelope,
   createWalletTransferEnvelope,
+  createWalletMintEnvelope,
   createWalletState,
   generateInfoContentKey,
   getWalletBalance,
@@ -1394,6 +1395,14 @@ export class ApiServer {
         // GET /api/dao/params
         if (segments.length === 3 && segments[2] === 'params' && method === 'GET') {
           await this.handleDaoGetParams(req, res);
+          return;
+        }
+      }
+
+      // ── Dev / Testnet Routes (development only) ────────────────────────
+      if (process.env.NODE_ENV === 'development') {
+        if (method === 'POST' && url?.pathname === '/api/dev/faucet') {
+          await this.handleDevFaucet(req, res);
           return;
         }
       }
@@ -5944,6 +5953,67 @@ export class ApiServer {
     sendJson(res, 200, {
       thresholds: PROPOSAL_THRESHOLDS,
     });
+  }
+
+  // ── Dev / Testnet Faucet ────────────────────────────────────────────
+  private async handleDevFaucet(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const FaucetSchema = z.object({
+      did: z.string().min(1),
+      amount: z.union([z.number(), z.string()]),
+    }).passthrough();
+
+    const parsed = await parseBody(req, res, FaucetSchema);
+    if (!parsed) return;
+    const { did, amount } = parsed;
+
+    try {
+      const eventStore = this.runtime.eventStore;
+      if (!eventStore) {
+        sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+        return;
+      }
+      // Resolve local identity to sign the mint event
+      const paths = resolveStoragePaths(this.config.dataDir);
+      const records = await listKeyRecords(paths);
+      if (!records.length) {
+        sendError(res, 500, 'INTERNAL_ERROR', 'no local identity');
+        return;
+      }
+      const localRecord = records[0];
+      if (!localRecord?.publicKey) {
+        sendError(res, 500, 'INTERNAL_ERROR', 'no local key');
+        return;
+      }
+      const localPubBytes = multibaseDecode(localRecord.publicKey);
+      const localDid = didFromPublicKey(localPubBytes);
+      // Need passphrase from env
+      const passphrase = process.env.CLAW_PASSPHRASE;
+      if (!passphrase) {
+        sendError(res, 500, 'INTERNAL_ERROR', 'CLAW_PASSPHRASE not set');
+        return;
+      }
+      const privateKey = await resolvePrivateKey(this.config.dataDir, localDid, passphrase);
+      if (!privateKey) {
+        sendError(res, 500, 'INTERNAL_ERROR', 'cannot decrypt local key');
+        return;
+      }
+      const toAddress = addressFromDid(did);
+      const ts = Date.now();
+      const nonce = Math.floor(ts / 1000);
+      const envelope = await createWalletMintEnvelope({
+        issuer: localDid,
+        privateKey,
+        to: toAddress,
+        amount,
+        reason: 'dev-faucet',
+        ts,
+        nonce,
+      });
+      const txHash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { txHash, did, amount: String(amount), status: 'minted' });
+    } catch (err) {
+      sendError(res, 400, 'INVALID_REQUEST', (err as Error).message ?? 'faucet error');
+    }
   }
 }
 

@@ -4,6 +4,7 @@ import type {
   WalletEscrowFundPayload,
   WalletEscrowRefundPayload,
   WalletEscrowReleasePayload,
+  WalletMintPayload,
   WalletTransferPayload,
 } from './events.js';
 
@@ -66,6 +67,10 @@ export function applyWalletEvent(state: WalletState, envelope: EventEnvelope): W
       : eventHashHex(envelope);
 
   switch (type) {
+    case 'wallet.mint': {
+      applyMint(next, payload as unknown as WalletMintPayload);
+      break;
+    }
     case 'wallet.transfer': {
       applyTransfer(next, payload as unknown as WalletTransferPayload);
       break;
@@ -145,6 +150,12 @@ function addAmount(current: string, delta: bigint, field: string): string {
     throw new Error(`${field} would be negative`);
   }
   return next.toString();
+}
+
+function applyMint(state: WalletState, payload: WalletMintPayload): void {
+  const amount = parseAmount(payload.amount, 'amount');
+  const toBalance = ensureBalance(state, payload.to);
+  toBalance.available = addAmount(toBalance.available, amount, 'available');
 }
 
 function applyTransfer(state: WalletState, payload: WalletTransferPayload): void {

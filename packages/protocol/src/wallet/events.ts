@@ -16,6 +16,12 @@ export interface WalletTransferPayload extends Record<string, unknown> {
   memo?: string;
 }
 
+export interface WalletMintPayload extends Record<string, unknown> {
+  to: string;
+  amount: string;
+  reason?: string;
+}
+
 export interface WalletEscrowCreatePayload extends Record<string, unknown> {
   escrowId: string;
   depositor: string;
@@ -47,6 +53,17 @@ export interface WalletEscrowRefundPayload extends Record<string, unknown> {
   amount: string;
   reason: string;
   evidence?: Record<string, unknown>[];
+}
+
+export interface WalletMintEventParams {
+  issuer: string;
+  privateKey: Uint8Array;
+  to: string;
+  amount: AmountLike;
+  reason?: string;
+  ts: number;
+  nonce: number;
+  prev?: string;
 }
 
 export interface WalletTransferEventParams {
@@ -180,6 +197,31 @@ function buildEnvelope(
     pub: multibaseEncode(publicKey),
     hash: '',
   };
+}
+
+export async function createWalletMintEnvelope(
+  params: WalletMintEventParams,
+): Promise<EventEnvelope> {
+  assertValidAddress(params.to, 'to');
+  const amount = assertMinAmount(params.amount, 1n, 'amount');
+  const payload: WalletMintPayload = {
+    to: params.to,
+    amount,
+    reason: params.reason,
+  };
+  const publicKey = publicKeyFromDid(params.issuer);
+  const baseEnvelope = buildEnvelope(
+    'wallet.mint',
+    params.issuer,
+    publicKey,
+    payload,
+    params.ts,
+    params.nonce,
+    params.prev,
+  );
+  const hash = eventHashHex(baseEnvelope);
+  const sig = await signEvent(baseEnvelope, params.privateKey);
+  return { ...baseEnvelope, hash, sig };
 }
 
 export async function createWalletTransferEnvelope(
