@@ -30,6 +30,7 @@ services:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=testnet-dev-passphrase
       - NODE_ENV=development
     command: >
       node packages/node/dist/daemon.js
@@ -40,7 +41,7 @@ services:
         --health-interval-ms 10000
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -62,21 +63,22 @@ services:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=testnet-dev-passphrase
       - NODE_ENV=development
     command: >
-      node packages/node/dist/daemon.js
+      entrypoint-peer.sh
+        --bootstrap-api http://bootstrap:9528
         --data-dir /data
         --api-host 0.0.0.0
         --api-port 9528
         --listen /ip4/0.0.0.0/tcp/9527
-        --bootstrap /dns4/bootstrap/tcp/9527
         --health-interval-ms 10000
     depends_on:
       bootstrap:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -98,21 +100,22 @@ services:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=testnet-dev-passphrase
       - NODE_ENV=development
     command: >
-      node packages/node/dist/daemon.js
+      entrypoint-peer.sh
+        --bootstrap-api http://bootstrap:9528
         --data-dir /data
         --api-host 0.0.0.0
         --api-port 9528
         --listen /ip4/0.0.0.0/tcp/9527
-        --bootstrap /dns4/bootstrap/tcp/9527
         --health-interval-ms 10000
     depends_on:
       bootstrap:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
       interval: 10s
       timeout: 5s
       retries: 5

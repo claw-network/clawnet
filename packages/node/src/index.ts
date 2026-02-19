@@ -5,6 +5,7 @@ import { createEd25519PeerId, createFromProtobuf, exportToProtobuf } from '@libp
 import {
   bytesToUtf8,
   canonicalizeBytes,
+  createKeyRecord,
   DEFAULT_P2P_CONFIG,
   DEFAULT_SNAPSHOT_POLICY,
   didFromPublicKey,
@@ -20,11 +21,13 @@ import {
   P2PConfig,
   P2PNode,
   resolveStoragePaths,
+  saveKeyRecord,
   signSnapshot,
   SnapshotRecord,
   SnapshotSchedulePolicy,
   SnapshotScheduler,
   SnapshotStore,
+  StoragePaths,
   TOPIC_EVENTS,
   TOPIC_MARKETS,
 } from '@clawtoken/core';
@@ -44,6 +47,7 @@ import { ApiServer, ApiServerConfig } from './api/server.js';
 
 export interface NodeRuntimeConfig {
   dataDir?: string;
+  passphrase?: string;
   api?: Partial<ApiServerConfig> & { enabled?: boolean };
   p2p?: Partial<P2PConfig>;
   sync?: Partial<P2PSyncConfig> & {
@@ -141,6 +145,14 @@ export class ClawTokenNode {
     const peerId = await this.loadOrCreatePeerId(paths.keys);
     const privateKey = this.extractPeerPrivateKey(peerId);
 
+    // Auto-create identity key record if none exists and passphrase is available
+    await this.ensureIdentityKeyRecord(paths, peerId);
+
+    // Convert PeerId's protobuf private key to PrivateKey object for libp2p v3
+    const libp2pPrivateKey = peerId.privateKey
+      ? privateKeyFromProtobuf(peerId.privateKey)
+      : undefined;
+
     const p2pConfig: Partial<P2PConfig> = {
       ...DEFAULT_P2P_CONFIG,
       ...this.config.p2p,
@@ -166,7 +178,7 @@ export class ClawTokenNode {
         });
       }
 
-      this.p2p = new P2PNode(p2pConfig, peerId);
+      this.p2p = new P2PNode(p2pConfig, libp2pPrivateKey, peerId);
       await this.p2p.start();
 
       this.peerId = peerId;
@@ -294,13 +306,16 @@ export class ClawTokenNode {
     const did = await this.resolveLocalDid();
     const blockHeight = this.eventStore ? await this.eventStore.getLogLength() : 0;
     const peers = this.p2p?.getPeers().length ?? 0;
+    const connections = this.p2p?.getConnections().length ?? 0;
     const network = this.resolveNetwork();
     const uptime = this.startedAt ? Math.floor((Date.now() - this.startedAt) / 1000) : 0;
     return {
       did: did ?? '',
+      peerId: this.p2p?.getPeerId() ?? this.peerId?.toString() ?? '',
       synced: Boolean(this.p2p),
       blockHeight,
       peers,
+      connections,
       network,
       version: process.env.CLAWTOKEN_VERSION ?? '0.0.0',
       uptime,
@@ -309,9 +324,15 @@ export class ClawTokenNode {
 
   private async buildNodePeers(): Promise<{ peers: Record<string, unknown>[]; total: number }> {
     const peerIds = this.p2p?.getPeers() ?? [];
+    const connectionPeerIds = this.p2p?.getConnections() ?? [];
+    const allPeerIds = [...new Set([...peerIds, ...connectionPeerIds])];
     return {
-      peers: peerIds.map((peerId) => ({ peerId })),
-      total: peerIds.length,
+      peers: allPeerIds.map((peerId) => ({
+        peerId,
+        pubsub: peerIds.includes(peerId),
+        connected: connectionPeerIds.includes(peerId),
+      })),
+      total: allPeerIds.length,
     };
   }
 
@@ -681,6 +702,29 @@ export class ClawTokenNode {
     const protobuf = exportToProtobuf(peerId);
     await writeFile(path, protobuf);
     return peerId;
+  }
+
+  private async ensureIdentityKeyRecord(
+    paths: StoragePaths,
+    peerId: PeerIdWithPrivateKey,
+  ): Promise<void> {
+    const passphrase = this.config.passphrase;
+    if (!passphrase) {
+      return; // No passphrase configured, skip auto-identity creation
+    }
+    const existing = await listKeyRecords(paths);
+    if (existing.length > 0) {
+      return; // Identity already exists
+    }
+    if (!peerId.privateKey) {
+      return;
+    }
+    // Extract Ed25519 key pair from PeerId
+    const libp2pKey = privateKeyFromProtobuf(peerId.privateKey);
+    const privKeyRaw = libp2pKey.raw.length >= 32 ? libp2pKey.raw.slice(0, 32) : libp2pKey.raw;
+    const pubKeyRaw = (libp2pKey.publicKey as { raw: Uint8Array }).raw;
+    const record = createKeyRecord(pubKeyRaw, privKeyRaw, passphrase);
+    await saveKeyRecord(paths, record);
   }
 
   private extractPeerPrivateKey(peerId: PeerIdWithPrivateKey): Uint8Array {

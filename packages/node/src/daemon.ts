@@ -12,6 +12,7 @@ interface DaemonArgs {
   listen: string[];
   bootstrap: string[];
   healthIntervalMs: number;
+  passphrase?: string;
 }
 
 function parseArgs(argv: string[]): DaemonArgs {
@@ -22,6 +23,7 @@ function parseArgs(argv: string[]): DaemonArgs {
   const listen: string[] = [];
   const bootstrap: string[] = [];
   let healthIntervalMs = 30_000;
+  let passphrase: string | undefined;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -59,6 +61,10 @@ function parseArgs(argv: string[]): DaemonArgs {
       healthIntervalMs = Number.parseInt(argv[++i] ?? '', 10);
       continue;
     }
+    if (arg === '--passphrase') {
+      passphrase = argv[++i];
+      continue;
+    }
     if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -80,6 +86,7 @@ function parseArgs(argv: string[]): DaemonArgs {
     listen,
     bootstrap,
     healthIntervalMs,
+    passphrase: passphrase ?? process.env.CLAW_PASSPHRASE,
   };
 }
 
@@ -105,6 +112,7 @@ export async function startDaemon(
 
   const node = new ClawTokenNode({
     dataDir: args.dataDir,
+    passphrase: args.passphrase,
     api: {
       enabled: args.noApi ? false : true,
       host: args.apiHost,
@@ -180,6 +188,7 @@ Options:
   --listen <multiaddr>       Add libp2p listen multiaddr (repeatable)
   --bootstrap <multiaddr>    Add bootstrap peer multiaddr (repeatable)
   --health-interval-ms <ms>  Health check interval (default: 30000, 0 to disable)
+  --passphrase <str>         Passphrase for auto-creating node identity (env: CLAW_PASSPHRASE)
   -h, --help                 Show help
 `);
 }

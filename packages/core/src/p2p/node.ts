@@ -25,6 +25,8 @@ export type MessageHandler = (message: PubsubMessage) => void | Promise<void>;
 
 type PeerIdLike = { toString: () => string };
 
+type PrivateKeyLike = { raw: Uint8Array; type: string; publicKey: unknown };
+
 type PubsubPeer = { toString: () => string };
 
 type PubsubEventDetail = {
@@ -77,7 +79,9 @@ type Libp2pNode = {
   peerId?: { toString: () => string };
   stop: () => Promise<void>;
   getMultiaddrs?: () => Array<{ toString: () => string }>;
+  getConnections?: () => Array<{ remotePeer?: { toString: () => string }; status?: string }>;
   dial?: (address: unknown) => Promise<unknown>;
+  addEventListener?: (type: string, listener: (event: unknown) => void) => void;
   services?: Libp2pNodeServices;
   peerStore?: PeerStoreLike;
 };
@@ -85,10 +89,12 @@ type Libp2pNode = {
 export class P2PNode {
   private node: Libp2pNode | null = null;
   private readonly config: P2PConfig;
+  private readonly privateKeyOverride?: PrivateKeyLike;
   private readonly peerIdOverride?: PeerIdLike;
 
-  constructor(config: Partial<P2PConfig> = {}, peerId?: PeerIdLike) {
+  constructor(config: Partial<P2PConfig> = {}, privateKey?: PrivateKeyLike, peerId?: PeerIdLike) {
     this.config = { ...DEFAULT_P2P_CONFIG, ...config };
+    this.privateKeyOverride = privateKey;
     this.peerIdOverride = peerId;
   }
 
@@ -126,11 +132,12 @@ export class P2PNode {
       services.dcutr = dcutr();
     }
 
-    const options = {
+    const options: Record<string, unknown> = {
       addresses: {
         listen: this.config.listen,
       },
       connectionManager: {
+        minConnections: this.config.connectionManager?.minConnections ?? 1,
         maxConnections: this.config.connectionManager?.maxConnections ?? 100,
       },
       transports: [tcp()],
@@ -147,12 +154,30 @@ export class P2PNode {
       services,
     };
 
-    if (this.peerIdOverride) {
-      (options as { peerId?: PeerIdLike }).peerId = this.peerIdOverride;
+    // libp2p v3: pass privateKey (not peerId) for identity
+    if (this.privateKeyOverride) {
+      options.privateKey = this.privateKeyOverride;
+    } else if (this.peerIdOverride) {
+      // Fallback for older code paths
+      options.peerId = this.peerIdOverride;
     }
 
     const node = await createLibp2p(options as unknown as Libp2pOptions);
     this.node = node as unknown as Libp2pNode;
+
+    // Log connection events for debugging
+    this.node.addEventListener?.('peer:connect', (event: unknown) => {
+      const detail = (event as { detail?: { toString?: () => string } })?.detail;
+      console.log(`[p2p] peer:connect ${detail?.toString?.() ?? 'unknown'}`);
+    });
+    this.node.addEventListener?.('peer:disconnect', (event: unknown) => {
+      const detail = (event as { detail?: { toString?: () => string } })?.detail;
+      console.log(`[p2p] peer:disconnect ${detail?.toString?.() ?? 'unknown'}`);
+    });
+    this.node.addEventListener?.('peer:discovery', (event: unknown) => {
+      const detail = (event as { detail?: { id?: { toString?: () => string } } })?.detail;
+      console.log(`[p2p] peer:discovery ${detail?.id?.toString?.() ?? 'unknown'}`);
+    });
   }
 
   async stop(): Promise<void> {
@@ -219,6 +244,15 @@ export class P2PNode {
   getPeers(): string[] {
     const pubsub = this.getPubsub();
     return pubsub.getPeers?.().map((peer: { toString: () => string }) => peer.toString()) ?? [];
+  }
+
+  getConnections(): string[] {
+    if (!this.node?.getConnections) {
+      return [];
+    }
+    return this.node.getConnections()
+      .map((c) => c.remotePeer?.toString() ?? '')
+      .filter(Boolean);
   }
 
   getSubscribers(topic: string): string[] {
