@@ -3201,7 +3201,8 @@ function parseEscrowExpireArgs(rawArgs: string[]) {
 // ---------------------------------------------------------------------------
 
 async function runDaoProposals(rawArgs: string[]): Promise<void> {
-  const { apiUrl, token, rest } = splitApiArgs(rawArgs);
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const { apiUrl, token } = parseApiArgs(apiArgs);
   const status = rest.find((a) => !a.startsWith('-')) ?? undefined;
   const path = status
     ? `/api/dao/proposals?status=${encodeURIComponent(status)}`
@@ -3211,7 +3212,8 @@ async function runDaoProposals(rawArgs: string[]): Promise<void> {
 }
 
 async function runDaoProposal(rawArgs: string[]): Promise<void> {
-  const { apiUrl, token, rest } = splitApiArgs(rawArgs);
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const { apiUrl, token } = parseApiArgs(apiArgs);
   const proposalId = rest[0];
   if (!proposalId) fail('missing proposal id');
   const result = await fetchApiJson(
@@ -3249,7 +3251,8 @@ async function runDaoVote(rawArgs: string[]): Promise<void> {
 }
 
 async function runDaoVotes(rawArgs: string[]): Promise<void> {
-  const { apiUrl, token, rest } = splitApiArgs(rawArgs);
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const { apiUrl, token } = parseApiArgs(apiArgs);
   const proposalId = rest[0];
   if (!proposalId) fail('missing proposal id');
   const result = await fetchApiJson(
@@ -3279,7 +3282,8 @@ async function runDaoRevokeDelegation(rawArgs: string[]): Promise<void> {
 }
 
 async function runDaoDelegations(rawArgs: string[]): Promise<void> {
-  const { apiUrl, token, rest } = splitApiArgs(rawArgs);
+  const { apiArgs, rest } = splitApiArgs(rawArgs);
+  const { apiUrl, token } = parseApiArgs(apiArgs);
   const did = rest[0];
   if (!did) fail('missing DID');
   const result = await fetchApiJson(

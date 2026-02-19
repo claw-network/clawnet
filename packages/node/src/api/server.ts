@@ -2427,12 +2427,12 @@ export class ApiServer {
         issuer: body.did,
         privateKey,
         contractId,
-        parties: parties as ContractParties,
+        parties: parties as unknown as ContractParties,
         service: (body.service ?? {}) as Record<string, unknown>,
         terms: body.terms as Record<string, unknown>,
         payment: (body.payment ?? { escrowRequired: true }) as Record<string, unknown>,
         timeline: (body.timeline ?? {}) as Record<string, unknown>,
-        milestones,
+        milestones: milestones as any,
         attachments: body.attachments as Record<string, unknown>[] | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
         resourcePrev: null,
@@ -3603,8 +3603,8 @@ export class ApiServer {
         description: body.description,
         category: body.category,
         tags: body.tags ?? [],
-        pricing: body.pricing as MarketListing['pricing'],
-        visibility: body.visibility ?? 'public',
+        pricing: body.pricing as unknown as MarketListing['pricing'],
+        visibility: (body.visibility ?? 'public') as MarketListing['visibility'],
         marketData: {
           infoType: body.infoType,
           content: {
@@ -3617,7 +3617,7 @@ export class ApiServer {
           accessMethod: body.accessMethod as Record<string, unknown>,
           license: body.license as Record<string, unknown>,
           usageRestrictions: body.usageRestrictions as Record<string, unknown> | undefined,
-        },
+        } as any,
         restrictions: body.restrictions as Record<string, unknown> | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
         expiresAt: body.expiresAt,
@@ -3977,7 +3977,7 @@ export class ApiServer {
 
     const contentHash =
       (await contentStore.getListingContentHash(listingId)) ??
-      (listing.marketData as Record<string, unknown>)?.content?.['hash'] ??
+      ((listing.marketData as Record<string, unknown>)?.content as Record<string, unknown> | undefined)?.['hash'] ??
       null;
     if (!contentHash || typeof contentHash !== 'string') {
       sendError(res, 404, 'CONTENT_NOT_FOUND', 'content hash not found');
@@ -4042,7 +4042,7 @@ export class ApiServer {
         orderId: body.orderId,
         resourcePrev,
         deliveryId,
-        method: (listing.marketData as Record<string, unknown>)?.accessMethod?.['type'] as string
+        method: ((listing.marketData as Record<string, unknown>)?.accessMethod as Record<string, unknown> | undefined)?.['type'] as string
           ?? 'download',
         accessUrl: body.accessUrl,
         accessToken: body.accessToken,
@@ -4332,8 +4332,8 @@ export class ApiServer {
         description: body.description,
         category: body.category,
         tags: body.tags ?? [],
-        pricing: body.pricing as MarketListing['pricing'],
-        visibility: body.visibility ?? 'public',
+        pricing: body.pricing as unknown as MarketListing['pricing'],
+        visibility: (body.visibility ?? 'public') as MarketListing['visibility'],
         marketData: {
           taskType: body.taskType,
           task: body.task as Record<string, unknown>,
@@ -4341,7 +4341,7 @@ export class ApiServer {
           workerRequirements: body.workerRequirements as Record<string, unknown> | undefined,
           bidding: body.bidding as Record<string, unknown> | undefined,
           milestones: body.milestones as Record<string, unknown>[] | undefined,
-        },
+        } as any,
         restrictions: body.restrictions as Record<string, unknown> | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
         expiresAt: body.expiresAt,
@@ -5195,8 +5195,8 @@ export class ApiServer {
         description: body.description,
         category: body.category,
         tags: body.tags ?? [],
-        pricing: body.pricing as MarketListing['pricing'],
-        visibility: body.visibility ?? 'public',
+        pricing: body.pricing as unknown as MarketListing['pricing'],
+        visibility: (body.visibility ?? 'public') as MarketListing['visibility'],
         marketData: {
           capabilityType: body.capabilityType,
           capability: body.capability as Record<string, unknown>,
@@ -5204,7 +5204,7 @@ export class ApiServer {
           quota: body.quota as Record<string, unknown>,
           access: body.access as Record<string, unknown>,
           sla: body.sla as Record<string, unknown> | undefined,
-        },
+        } as any,
         restrictions: body.restrictions as Record<string, unknown> | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
         expiresAt: body.expiresAt,
@@ -5349,7 +5349,7 @@ export class ApiServer {
         credentials: body.credentials as Record<string, unknown> | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
         expiresAt: body.expiresAt,
-        resourcePrev: body.resourcePrev ?? null,
+        resourcePrev: (body.resourcePrev ?? null) as any,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -5651,7 +5651,7 @@ export class ApiServer {
         title: body.title,
         description: body.description,
         discussionUrl: body.discussionUrl,
-        actions: body.actions as import('@clawtoken/protocol').ProposalAction[],
+        actions: body.actions as unknown as import('@clawtoken/protocol').ProposalAction[],
         discussionPeriod: body.discussionPeriod ?? defaults.discussionPeriod,
         votingPeriod: body.votingPeriod ?? defaults.votingPeriod,
         timelockDelay: body.timelockDelay ?? defaults.timelockDelay,

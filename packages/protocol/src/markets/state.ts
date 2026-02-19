@@ -268,7 +268,7 @@ function applyOrderCreate(
     if (payload.marketType !== 'task' && payload.seller.did !== listing.seller.did) {
       throw new Error('order seller mismatch');
     }
-    seller = payload.seller;
+    seller = { ...seller, ...payload.seller };
   }
   const order: Order = {
     id: payload.orderId,

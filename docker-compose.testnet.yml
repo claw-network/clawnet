@@ -1,0 +1,133 @@
+# ClawToken Testnet — 3-Node Docker Network
+# ============================================================================
+# Usage:
+#   docker compose -f docker-compose.testnet.yml up --build
+#   docker compose -f docker-compose.testnet.yml down -v
+#   docker compose -f docker-compose.testnet.yml logs -f
+#
+# Network topology:
+#   bootstrap (seed node) ← peer1 ← peer2
+#   All nodes discover each other via bootstrap → Kademlia DHT
+#
+# API endpoints:
+#   bootstrap: http://localhost:9528
+#   peer1:     http://localhost:9530
+#   peer2:     http://localhost:9532
+# ============================================================================
+
+services:
+  # ── Bootstrap / Seed Node ──────────────────────────────────────────────
+  bootstrap:
+    build: .
+    container_name: claw-bootstrap
+    hostname: bootstrap
+    ports:
+      - "9528:9528"   # HTTP API
+      - "9529:9527"   # P2P (internal 9527 → host 9529)
+    volumes:
+      - bootstrap-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - NODE_ENV=development
+    command: >
+      node packages/node/dist/daemon.js
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+        --health-interval-ms 10000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - clawnet
+
+  # ── Peer Node 1 ────────────────────────────────────────────────────────
+  peer1:
+    build: .
+    container_name: claw-peer1
+    hostname: peer1
+    ports:
+      - "9530:9528"   # HTTP API
+      - "9531:9527"   # P2P
+    volumes:
+      - peer1-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - NODE_ENV=development
+    command: >
+      node packages/node/dist/daemon.js
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+        --bootstrap /dns4/bootstrap/tcp/9527
+        --health-interval-ms 10000
+    depends_on:
+      bootstrap:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - clawnet
+
+  # ── Peer Node 2 ────────────────────────────────────────────────────────
+  peer2:
+    build: .
+    container_name: claw-peer2
+    hostname: peer2
+    ports:
+      - "9532:9528"   # HTTP API
+      - "9533:9527"   # P2P
+    volumes:
+      - peer2-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - NODE_ENV=development
+    command: >
+      node packages/node/dist/daemon.js
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+        --bootstrap /dns4/bootstrap/tcp/9527
+        --health-interval-ms 10000
+    depends_on:
+      bootstrap:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - clawnet
+
+volumes:
+  bootstrap-data:
+    driver: local
+  peer1-data:
+    driver: local
+  peer2-data:
+    driver: local
+
+networks:
+  clawnet:
+    driver: bridge

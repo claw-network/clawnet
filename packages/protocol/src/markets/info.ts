@@ -146,6 +146,7 @@ export interface UsageRestrictions {
 }
 
 export interface InfoContent {
+  [key: string]: unknown;
   format: ContentFormat;
   size?: number;
   hash?: string;
@@ -155,6 +156,7 @@ export interface InfoContent {
 }
 
 export interface InfoMarketData {
+  [key: string]: unknown;
   infoType: InfoType;
   content: InfoContent;
   quality?: InfoQuality;

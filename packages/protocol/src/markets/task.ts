@@ -97,6 +97,7 @@ export interface TaskMilestone {
 }
 
 export interface TaskMarketData {
+  [key: string]: unknown;
   taskType: TaskType;
   task: {
     requirements: string;

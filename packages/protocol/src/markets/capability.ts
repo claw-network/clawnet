@@ -38,8 +38,6 @@ export type CapabilityInterfaceType = (typeof CAPABILITY_INTERFACE_TYPES)[number
 export const CAPABILITY_AUTH_TYPES = ['api_key', 'oauth', 'jwt', 'signature'] as const;
 export type CapabilityAuthType = (typeof CAPABILITY_AUTH_TYPES)[number];
 
-export type CapabilityPlanType = 'pay_per_use' | 'time_based' | 'subscription' | 'credits';
-
 export interface AuthMethod {
   type: CapabilityAuthType;
   apiKey?: {
@@ -136,6 +134,7 @@ export interface ServiceLevelAgreement {
 }
 
 export interface CapabilityMarketData {
+  [key: string]: unknown;
   capabilityType: CapabilityType;
   capability: {
     name: string;

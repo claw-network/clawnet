@@ -3,6 +3,7 @@ import { addressFromDid } from '@clawtoken/core/identity';
 import {
   createMarketOrderCreateEnvelope,
   createMarketOrderUpdateEnvelope,
+  TokenAmountLike,
 } from './events.js';
 import {
   createWalletEscrowCreateEnvelope,
@@ -13,6 +14,7 @@ import {
   WalletEscrowReleaseEventParams,
 } from '../wallet/events.js';
 import {
+  AppliedDiscount,
   MarketListing,
   OrderDelivery,
   OrderPayment,
@@ -27,8 +29,6 @@ import {
   InfoKeyEnvelope,
   sealInfoContentKey,
 } from './info-store.js';
-
-export type TokenAmountLike = TokenAmount | number | bigint;
 
 function normalizeTokenAmount(value: TokenAmountLike, field: string): string {
   let parsed: bigint;
@@ -163,7 +163,7 @@ export async function createInfoOrderCreateEnvelope(
     pricing: {
       subtotal,
       total,
-      discounts: params.pricing?.discounts,
+      discounts: params.pricing?.discounts as AppliedDiscount[] | undefined,
       fees: params.pricing?.fees,
     },
     payment: {

@@ -93,7 +93,7 @@ function resolvePartyDids(parties: ContractParties): string[] {
 }
 
 function isEscrowRequired(payment: Record<string, unknown>): boolean {
-  const value = payment.escrowRequired ?? payment.escrow?.required;
+  const value = payment.escrowRequired ?? (payment.escrow as Record<string, unknown> | undefined)?.required;
   if (typeof value === 'boolean') {
     return value;
   }
