@@ -374,6 +374,71 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     }
     fail(`unknown escrow subcommand: ${subcommand ?? ''}`);
   }
+  if (command === 'dao') {
+    const subcommand = argv[1];
+    const subArgs = argv.slice(2);
+    if (subcommand === 'proposals') {
+      await runDaoProposals(subArgs);
+      return;
+    }
+    if (subcommand === 'proposal') {
+      await runDaoProposal(subArgs);
+      return;
+    }
+    if (subcommand === 'create-proposal') {
+      await runDaoCreateProposal(subArgs);
+      return;
+    }
+    if (subcommand === 'advance') {
+      await runDaoAdvanceProposal(subArgs);
+      return;
+    }
+    if (subcommand === 'vote') {
+      await runDaoVote(subArgs);
+      return;
+    }
+    if (subcommand === 'votes') {
+      await runDaoVotes(subArgs);
+      return;
+    }
+    if (subcommand === 'delegate') {
+      await runDaoDelegate(subArgs);
+      return;
+    }
+    if (subcommand === 'revoke-delegation') {
+      await runDaoRevokeDelegation(subArgs);
+      return;
+    }
+    if (subcommand === 'delegations') {
+      await runDaoDelegations(subArgs);
+      return;
+    }
+    if (subcommand === 'treasury') {
+      await runDaoTreasury(subArgs);
+      return;
+    }
+    if (subcommand === 'deposit') {
+      await runDaoDeposit(subArgs);
+      return;
+    }
+    if (subcommand === 'timelock') {
+      await runDaoTimelock(subArgs);
+      return;
+    }
+    if (subcommand === 'execute') {
+      await runDaoTimelockExecute(subArgs);
+      return;
+    }
+    if (subcommand === 'cancel') {
+      await runDaoTimelockCancel(subArgs);
+      return;
+    }
+    if (subcommand === 'params') {
+      await runDaoParams(subArgs);
+      return;
+    }
+    fail(`unknown dao subcommand: ${subcommand ?? ''}`);
+  }
   fail(`unknown command: ${command}`);
 }
 
@@ -3131,6 +3196,158 @@ function parseEscrowExpireArgs(rawArgs: string[]) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// DAO Governance CLI Commands
+// ---------------------------------------------------------------------------
+
+async function runDaoProposals(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, rest } = splitApiArgs(rawArgs);
+  const status = rest.find((a) => !a.startsWith('-')) ?? undefined;
+  const path = status
+    ? `/api/dao/proposals?status=${encodeURIComponent(status)}`
+    : '/api/dao/proposals';
+  const result = await fetchApiJson(apiUrl, path, token);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoProposal(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, rest } = splitApiArgs(rawArgs);
+  const proposalId = rest[0];
+  if (!proposalId) fail('missing proposal id');
+  const result = await fetchApiJson(
+    apiUrl,
+    `/api/dao/proposals/${encodeURIComponent(proposalId)}`,
+    token,
+  );
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoCreateProposal(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const result = await fetchApiJsonWithBody(apiUrl, '/api/dao/proposals', 'POST', data, token);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoAdvanceProposal(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const proposalId = rest[0] ?? (data.proposalId as string);
+  if (!proposalId) fail('missing proposal id');
+  const result = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/dao/proposals/${encodeURIComponent(proposalId)}/advance`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoVote(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const result = await fetchApiJsonWithBody(apiUrl, '/api/dao/vote', 'POST', data, token);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoVotes(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, rest } = splitApiArgs(rawArgs);
+  const proposalId = rest[0];
+  if (!proposalId) fail('missing proposal id');
+  const result = await fetchApiJson(
+    apiUrl,
+    `/api/dao/proposals/${encodeURIComponent(proposalId)}/votes`,
+    token,
+  );
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoDelegate(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const result = await fetchApiJsonWithBody(apiUrl, '/api/dao/delegate', 'POST', data, token);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoRevokeDelegation(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const result = await fetchApiJsonWithBody(
+    apiUrl,
+    '/api/dao/delegate/revoke',
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoDelegations(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, rest } = splitApiArgs(rawArgs);
+  const did = rest[0];
+  if (!did) fail('missing DID');
+  const result = await fetchApiJson(
+    apiUrl,
+    `/api/dao/delegations/${encodeURIComponent(did)}`,
+    token,
+  );
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoTreasury(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token } = parseApiArgs(rawArgs);
+  const result = await fetchApiJson(apiUrl, '/api/dao/treasury', token);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoDeposit(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const result = await fetchApiJsonWithBody(
+    apiUrl,
+    '/api/dao/treasury/deposit',
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoTimelock(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token } = parseApiArgs(rawArgs);
+  const result = await fetchApiJson(apiUrl, '/api/dao/timelock', token);
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoTimelockExecute(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const actionId = rest[0] ?? (data.actionId as string);
+  if (!actionId) fail('missing action id');
+  const result = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/dao/timelock/${encodeURIComponent(actionId)}/execute`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoTimelockCancel(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token, data, rest } = await parseApiArgsWithData(rawArgs);
+  const actionId = rest[0] ?? (data.actionId as string);
+  if (!actionId) fail('missing action id');
+  const result = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/dao/timelock/${encodeURIComponent(actionId)}/cancel`,
+    'POST',
+    data,
+    token,
+  );
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runDaoParams(rawArgs: string[]): Promise<void> {
+  const { apiUrl, token } = parseApiArgs(rawArgs);
+  const result = await fetchApiJson(apiUrl, '/api/dao/params', token);
+  console.log(JSON.stringify(result, null, 2));
+}
+
 function printHelp(): void {
   console.log(`
 clawtoken daemon [options]
@@ -3150,6 +3367,7 @@ clawtoken market task list|get|publish|bids|bid|accept|reject|withdraw|deliver|c
 clawtoken market capability list|get|publish|lease|lease-get|invoke|pause|resume|terminate|remove [options]
 clawtoken market dispute open|respond|resolve [options]
 clawtoken contract list|get|create|sign|fund|complete|milestone-complete|milestone-approve|milestone-reject|dispute|dispute-resolve|settlement [options]
+clawtoken dao proposals|proposal|create-proposal|advance|vote|votes|delegate|revoke-delegation|delegations|treasury|deposit|timelock|execute|cancel|params [options]
 
 Daemon options:
   --data-dir <path>              Override storage root
@@ -3303,6 +3521,25 @@ Market info options:
   --data <json>                  Inline JSON payload for publish/purchase/deliver/confirm/review
   --data-file <path>             JSON payload file for publish/purchase/deliver/confirm/review
   -h, --help                     Show help
+
+DAO governance options:
+  clawtoken dao proposals [status] -- List proposals (optional status filter)
+  clawtoken dao proposal <id>      -- Get proposal details
+  clawtoken dao create-proposal --data <json>  -- Create a new proposal
+  clawtoken dao advance <id> --data <json>     -- Advance proposal status
+  clawtoken dao vote --data <json>             -- Cast a vote
+  clawtoken dao votes <proposalId>             -- Get votes for a proposal
+  clawtoken dao delegate --data <json>         -- Set delegation
+  clawtoken dao revoke-delegation --data <json> -- Revoke delegation
+  clawtoken dao delegations <did>              -- List delegations for a DID
+  clawtoken dao treasury                       -- View treasury status
+  clawtoken dao deposit --data <json>          -- Deposit to treasury
+  clawtoken dao timelock                       -- List timelock entries
+  clawtoken dao execute <actionId> --data <json> -- Execute timelocked action
+  clawtoken dao cancel <actionId> --data <json>  -- Cancel timelocked action
+  clawtoken dao params                         -- View governance parameters
+  --api <url>                    Node API base URL (default: http://127.0.0.1:9528)
+  --token <token>                API token (optional)
 `);
 }
 

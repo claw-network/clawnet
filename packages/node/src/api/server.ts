@@ -108,6 +108,18 @@ import {
   createMarketSubmissionSubmitEnvelope,
   createTaskListingPublishEnvelope,
   prepareInfoDeliveryRecord,
+  DaoStore,
+  createDaoProposalCreateEnvelope,
+  createDaoProposalAdvanceEnvelope,
+  createDaoVoteCastEnvelope,
+  createDaoDelegateSetEnvelope,
+  createDaoDelegateRevokeEnvelope,
+  createDaoTimelockQueueEnvelope,
+  createDaoTimelockExecuteEnvelope,
+  createDaoTimelockCancelEnvelope,
+  createDaoTreasuryDepositEnvelope,
+  createDaoTreasurySpendEnvelope,
+  PROPOSAL_THRESHOLDS,
 } from '@clawtoken/protocol';
 
 const MAX_BODY_BYTES = 1_000_000;
@@ -760,6 +772,119 @@ const CapabilityInvokeSchema = z
   })
   .passthrough();
 
+// DAO Governance Schemas
+const DaoProposalCreateSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    proposalId: z.string().min(1).optional(),
+    type: z.enum(['parameter_change', 'treasury_spend', 'protocol_upgrade', 'emergency', 'signal']),
+    title: z.string().min(1),
+    description: z.string().min(1),
+    discussionUrl: z.string().optional(),
+    actions: z.array(z.record(z.unknown())).min(1),
+    discussionPeriod: z.number().nonnegative().optional(),
+    votingPeriod: z.number().nonnegative().optional(),
+    timelockDelay: z.number().nonnegative().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DaoProposalAdvanceSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    proposalId: z.string().min(1),
+    newStatus: z.string().min(1),
+    resourcePrev: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DaoVoteCastSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    proposalId: z.string().min(1),
+    option: z.enum(['for', 'against', 'abstain']),
+    power: AmountSchema,
+    reason: z.string().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DaoDelegateSetSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    delegate: z.string().min(1),
+    scope: z
+      .object({
+        proposalTypes: z.array(z.string()).optional(),
+        topics: z.array(z.string()).optional(),
+        all: z.boolean().optional(),
+      })
+      .optional(),
+    percentage: z.number().min(0).max(100).optional(),
+    expiresAt: z.number().optional(),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DaoDelegateRevokeSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    delegate: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DaoTimelockExecuteSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    actionId: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DaoTimelockCancelSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    actionId: z.string().min(1),
+    reason: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
+const DaoTreasuryDepositSchema = z
+  .object({
+    did: z.string().min(1),
+    passphrase: z.string().min(1),
+    amount: AmountSchema,
+    source: z.string().min(1),
+    nonce: z.number().int().positive(),
+    prev: z.string().optional(),
+    ts: z.number().optional(),
+  })
+  .passthrough();
+
 export class ApiServer {
   private server?: Server;
 
@@ -770,6 +895,7 @@ export class ApiServer {
       eventStore?: EventStore;
       contractStore?: ContractStore;
       reputationStore?: ReputationStore;
+      daoStore?: DaoStore;
       marketStore?: MarketSearchStore;
       infoContentStore?: InfoContentStore;
       searchMarkets?: (query: SearchQuery) => SearchResult;
@@ -1189,6 +1315,86 @@ export class ApiServer {
               return;
             }
           }
+        }
+      }
+
+      // ── DAO Governance Routes ──────────────────────────────────────────
+      if (url?.pathname?.startsWith('/api/dao')) {
+        const segments = (url.pathname ?? '').split('/').filter(Boolean);
+        // GET /api/dao/proposals
+        if (segments.length === 3 && segments[2] === 'proposals' && method === 'GET') {
+          await this.handleDaoListProposals(req, res, url);
+          return;
+        }
+        // POST /api/dao/proposals
+        if (segments.length === 3 && segments[2] === 'proposals' && method === 'POST') {
+          await this.handleDaoCreateProposal(req, res);
+          return;
+        }
+        // GET /api/dao/proposals/:id
+        if (segments.length === 4 && segments[2] === 'proposals' && method === 'GET') {
+          await this.handleDaoGetProposal(req, res, decodeURIComponent(segments[3]));
+          return;
+        }
+        // POST /api/dao/proposals/:id/advance
+        if (segments.length === 5 && segments[2] === 'proposals' && segments[4] === 'advance' && method === 'POST') {
+          await this.handleDaoAdvanceProposal(req, res, decodeURIComponent(segments[3]));
+          return;
+        }
+        // GET /api/dao/proposals/:id/votes
+        if (segments.length === 5 && segments[2] === 'proposals' && segments[4] === 'votes' && method === 'GET') {
+          await this.handleDaoGetVotes(req, res, decodeURIComponent(segments[3]));
+          return;
+        }
+        // POST /api/dao/vote
+        if (segments.length === 3 && segments[2] === 'vote' && method === 'POST') {
+          await this.handleDaoVote(req, res);
+          return;
+        }
+        // POST /api/dao/delegate
+        if (segments.length === 3 && segments[2] === 'delegate' && method === 'POST') {
+          await this.handleDaoDelegateSet(req, res);
+          return;
+        }
+        // POST /api/dao/delegate/revoke
+        if (segments.length === 4 && segments[2] === 'delegate' && segments[3] === 'revoke' && method === 'POST') {
+          await this.handleDaoDelegateRevoke(req, res);
+          return;
+        }
+        // GET /api/dao/delegations/:did
+        if (segments.length === 4 && segments[2] === 'delegations' && method === 'GET') {
+          await this.handleDaoGetDelegations(req, res, decodeURIComponent(segments[3]));
+          return;
+        }
+        // GET /api/dao/treasury
+        if (segments.length === 3 && segments[2] === 'treasury' && method === 'GET') {
+          await this.handleDaoGetTreasury(req, res);
+          return;
+        }
+        // POST /api/dao/treasury/deposit
+        if (segments.length === 4 && segments[2] === 'treasury' && segments[3] === 'deposit' && method === 'POST') {
+          await this.handleDaoTreasuryDeposit(req, res);
+          return;
+        }
+        // GET /api/dao/timelock
+        if (segments.length === 3 && segments[2] === 'timelock' && method === 'GET') {
+          await this.handleDaoListTimelock(req, res);
+          return;
+        }
+        // POST /api/dao/timelock/:id/execute
+        if (segments.length === 5 && segments[2] === 'timelock' && segments[4] === 'execute' && method === 'POST') {
+          await this.handleDaoTimelockExecute(req, res, decodeURIComponent(segments[3]));
+          return;
+        }
+        // POST /api/dao/timelock/:id/cancel
+        if (segments.length === 5 && segments[2] === 'timelock' && segments[4] === 'cancel' && method === 'POST') {
+          await this.handleDaoTimelockCancel(req, res, decodeURIComponent(segments[3]));
+          return;
+        }
+        // GET /api/dao/params
+        if (segments.length === 3 && segments[2] === 'params' && method === 'GET') {
+          await this.handleDaoGetParams(req, res);
+          return;
         }
       }
 
@@ -5402,6 +5608,342 @@ export class ApiServer {
     } catch (error) {
       sendError(res, 400, 'INVALID_REQUEST', (error as Error).message);
     }
+  }
+
+  // ── DAO Governance Handlers ────────────────────────────────────────
+
+  private async handleDaoListProposals(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+  ): Promise<void> {
+    const daoStore = this.runtime.daoStore;
+    if (!daoStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
+      return;
+    }
+    const statusFilter = url.searchParams.get('status') ?? undefined;
+    const proposals = await daoStore.listProposals(
+      statusFilter as Parameters<typeof daoStore.listProposals>[0],
+    );
+    sendJson(res, 200, { proposals });
+  }
+
+  private async handleDaoCreateProposal(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const body = await parseBody(req, res, DaoProposalCreateSchema);
+    if (!body) return;
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'DAO_INVALID', 'key unavailable');
+      return;
+    }
+    try {
+      const proposalId = body.proposalId ?? `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const defaults = PROPOSAL_THRESHOLDS[body.type];
+      const envelope = await createDaoProposalCreateEnvelope({
+        issuer: body.did,
+        privateKey,
+        proposalId,
+        proposalType: body.type,
+        title: body.title,
+        description: body.description,
+        discussionUrl: body.discussionUrl,
+        actions: body.actions as import('@clawtoken/protocol').ProposalAction[],
+        discussionPeriod: body.discussionPeriod ?? defaults.discussionPeriod,
+        votingPeriod: body.votingPeriod ?? defaults.votingPeriod,
+        timelockDelay: body.timelockDelay ?? defaults.timelockDelay,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { proposalId, txHash: hash, status: 'broadcast' });
+    } catch (error) {
+      sendError(res, 400, 'DAO_INVALID', (error as Error).message);
+    }
+  }
+
+  private async handleDaoGetProposal(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    proposalId: string,
+  ): Promise<void> {
+    const daoStore = this.runtime.daoStore;
+    if (!daoStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
+      return;
+    }
+    const proposal = await daoStore.getProposal(proposalId);
+    if (!proposal) {
+      sendError(res, 404, 'NOT_FOUND', 'proposal not found');
+      return;
+    }
+    sendJson(res, 200, { proposal });
+  }
+
+  private async handleDaoAdvanceProposal(
+    req: IncomingMessage,
+    res: ServerResponse,
+    proposalId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, DaoProposalAdvanceSchema);
+    if (!body) return;
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'DAO_INVALID', 'key unavailable');
+      return;
+    }
+    try {
+      const envelope = await createDaoProposalAdvanceEnvelope({
+        issuer: body.did,
+        privateKey,
+        proposalId: body.proposalId || proposalId,
+        newStatus: body.newStatus,
+        resourcePrev: body.resourcePrev,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { proposalId, txHash: hash, newStatus: body.newStatus });
+    } catch (error) {
+      sendError(res, 400, 'DAO_INVALID', (error as Error).message);
+    }
+  }
+
+  private async handleDaoGetVotes(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    proposalId: string,
+  ): Promise<void> {
+    const daoStore = this.runtime.daoStore;
+    if (!daoStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
+      return;
+    }
+    const votes = await daoStore.getVotes(proposalId);
+    sendJson(res, 200, { proposalId, votes });
+  }
+
+  private async handleDaoVote(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await parseBody(req, res, DaoVoteCastSchema);
+    if (!body) return;
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'DAO_INVALID', 'key unavailable');
+      return;
+    }
+    try {
+      const envelope = await createDaoVoteCastEnvelope({
+        issuer: body.did,
+        privateKey,
+        proposalId: body.proposalId,
+        option: body.option,
+        power: body.power,
+        reason: body.reason,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, {
+        txHash: hash,
+        proposalId: body.proposalId,
+        option: body.option,
+        status: 'broadcast',
+      });
+    } catch (error) {
+      sendError(res, 400, 'DAO_INVALID', (error as Error).message);
+    }
+  }
+
+  private async handleDaoDelegateSet(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await parseBody(req, res, DaoDelegateSetSchema);
+    if (!body) return;
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'DAO_INVALID', 'key unavailable');
+      return;
+    }
+    try {
+      const envelope = await createDaoDelegateSetEnvelope({
+        issuer: body.did,
+        privateKey,
+        delegate: body.delegate,
+        scope: (body.scope ?? { all: true }) as import('@clawtoken/protocol').DelegationScope,
+        percentage: body.percentage ?? 100,
+        expiresAt: body.expiresAt,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { txHash: hash, delegate: body.delegate, status: 'broadcast' });
+    } catch (error) {
+      sendError(res, 400, 'DAO_INVALID', (error as Error).message);
+    }
+  }
+
+  private async handleDaoDelegateRevoke(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await parseBody(req, res, DaoDelegateRevokeSchema);
+    if (!body) return;
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'DAO_INVALID', 'key unavailable');
+      return;
+    }
+    try {
+      const envelope = await createDaoDelegateRevokeEnvelope({
+        issuer: body.did,
+        privateKey,
+        delegate: body.delegate,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { txHash: hash, delegate: body.delegate, status: 'revoked' });
+    } catch (error) {
+      sendError(res, 400, 'DAO_INVALID', (error as Error).message);
+    }
+  }
+
+  private async handleDaoGetDelegations(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    did: string,
+  ): Promise<void> {
+    const daoStore = this.runtime.daoStore;
+    if (!daoStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
+      return;
+    }
+    const from = await daoStore.getDelegationsFrom(did);
+    const to = await daoStore.getDelegationsTo(did);
+    sendJson(res, 200, { did, delegatedFrom: from, delegatedTo: to });
+  }
+
+  private async handleDaoGetTreasury(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const daoStore = this.runtime.daoStore;
+    if (!daoStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
+      return;
+    }
+    const treasury = await daoStore.getTreasury();
+    sendJson(res, 200, { treasury });
+  }
+
+  private async handleDaoTreasuryDeposit(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const body = await parseBody(req, res, DaoTreasuryDepositSchema);
+    if (!body) return;
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'DAO_INVALID', 'key unavailable');
+      return;
+    }
+    try {
+      const envelope = await createDaoTreasuryDepositEnvelope({
+        issuer: body.did,
+        privateKey,
+        amount: body.amount,
+        source: body.source,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { txHash: hash, amount: body.amount, status: 'broadcast' });
+    } catch (error) {
+      sendError(res, 400, 'DAO_INVALID', (error as Error).message);
+    }
+  }
+
+  private async handleDaoListTimelock(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const daoStore = this.runtime.daoStore;
+    if (!daoStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
+      return;
+    }
+    const entries = await daoStore.listTimelockEntries();
+    sendJson(res, 200, { entries });
+  }
+
+  private async handleDaoTimelockExecute(
+    req: IncomingMessage,
+    res: ServerResponse,
+    actionId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, DaoTimelockExecuteSchema);
+    if (!body) return;
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'DAO_INVALID', 'key unavailable');
+      return;
+    }
+    try {
+      const envelope = await createDaoTimelockExecuteEnvelope({
+        issuer: body.did,
+        privateKey,
+        actionId: body.actionId || actionId,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { txHash: hash, actionId, status: 'executed' });
+    } catch (error) {
+      sendError(res, 400, 'DAO_INVALID', (error as Error).message);
+    }
+  }
+
+  private async handleDaoTimelockCancel(
+    req: IncomingMessage,
+    res: ServerResponse,
+    actionId: string,
+  ): Promise<void> {
+    const body = await parseBody(req, res, DaoTimelockCancelSchema);
+    if (!body) return;
+    const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      sendError(res, 400, 'DAO_INVALID', 'key unavailable');
+      return;
+    }
+    try {
+      const envelope = await createDaoTimelockCancelEnvelope({
+        issuer: body.did,
+        privateKey,
+        actionId: body.actionId || actionId,
+        reason: body.reason,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await this.runtime.publishEvent(envelope);
+      sendJson(res, 200, { txHash: hash, actionId, status: 'cancelled' });
+    } catch (error) {
+      sendError(res, 400, 'DAO_INVALID', (error as Error).message);
+    }
+  }
+
+  private async handleDaoGetParams(
+    _req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    sendJson(res, 200, {
+      thresholds: PROPOSAL_THRESHOLDS,
+    });
   }
 }
 

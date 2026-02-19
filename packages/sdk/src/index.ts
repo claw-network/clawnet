@@ -19,6 +19,7 @@ export { WalletApi } from './wallet.js';
 export { ReputationApi } from './reputation.js';
 export { MarketsApi, InfoMarketApi, TaskMarketApi, CapabilityMarketApi, MarketDisputeApi } from './markets.js';
 export { ContractsApi } from './contracts.js';
+export { DaoApi } from './dao.js';
 export * from './types.js';
 
 import { HttpClient, type HttpClientConfig } from './http.js';
@@ -28,6 +29,7 @@ import { WalletApi } from './wallet.js';
 import { ReputationApi } from './reputation.js';
 import { MarketsApi } from './markets.js';
 import { ContractsApi } from './contracts.js';
+import { DaoApi } from './dao.js';
 
 /** Configuration for the top-level client. */
 export interface ClientConfig extends HttpClientConfig {}
@@ -47,6 +49,7 @@ export class ClawTokenClient {
   readonly reputation: ReputationApi;
   readonly markets: MarketsApi;
   readonly contracts: ContractsApi;
+  readonly dao: DaoApi;
 
   constructor(config?: Partial<ClientConfig>) {
     this.http = new HttpClient({
@@ -59,5 +62,6 @@ export class ClawTokenClient {
     this.reputation = new ReputationApi(this.http);
     this.markets = new MarketsApi(this.http);
     this.contracts = new ContractsApi(this.http);
+    this.dao = new DaoApi(this.http);
   }
 }

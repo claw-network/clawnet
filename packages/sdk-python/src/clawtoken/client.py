@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from clawtoken.contracts import AsyncContractsApi, ContractsApi
+from clawtoken.dao import AsyncDaoApi, DaoApi
 from clawtoken.http import DEFAULT_BASE_URL, AsyncHttpClient, HttpClient
 from clawtoken.identity import AsyncIdentityApi, IdentityApi
 from clawtoken.markets import AsyncMarketsApi, MarketsApi
@@ -36,6 +37,7 @@ class ClawTokenClient:
         self.reputation = ReputationApi(self.http)
         self.markets = MarketsApi(self.http)
         self.contracts = ContractsApi(self.http)
+        self.dao = DaoApi(self.http)
 
     def close(self) -> None:
         self.http.close()
@@ -71,6 +73,7 @@ class AsyncClawTokenClient:
         self.reputation = AsyncReputationApi(self.http)
         self.markets = AsyncMarketsApi(self.http)
         self.contracts = AsyncContractsApi(self.http)
+        self.dao = AsyncDaoApi(self.http)
 
     async def aclose(self) -> None:
         await self.http.aclose()

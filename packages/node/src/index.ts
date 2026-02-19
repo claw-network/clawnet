@@ -35,6 +35,7 @@ import {
   isMarketEventEnvelope,
   MarketSearchStore,
   MemoryContractStore,
+  MemoryDaoStore,
   MemoryReputationStore,
   signP2PEnvelope,
 } from '@clawtoken/protocol';
@@ -90,6 +91,7 @@ export class ClawTokenNode {
   private snapshotScheduler?: SnapshotScheduler;
   private contractStore?: MemoryContractStore;
   private reputationStore?: MemoryReputationStore;
+  private daoStore?: MemoryDaoStore;
   private marketSearchStore?: MarketSearchStore;
   private infoContentStore?: InfoContentStore;
   private rangeTimer?: NodeJS.Timeout;
@@ -154,6 +156,7 @@ export class ClawTokenNode {
       this.snapshotStore = new SnapshotStore(paths);
       await this.initContractStore();
       await this.initReputationStore();
+      await this.initDaoStore();
       await this.initMarketSearchStore();
       await this.initInfoContentStore();
       if (this.config.snapshotBuilder) {
@@ -201,6 +204,7 @@ export class ClawTokenNode {
           eventStore: this.eventStore,
           contractStore: this.contractStore,
           reputationStore: this.reputationStore,
+          daoStore: this.daoStore,
           marketStore: this.marketSearchStore,
           infoContentStore: this.infoContentStore,
           searchMarkets: (query) => {
@@ -432,6 +436,36 @@ export class ClawTokenNode {
     this.contractStore = store;
   }
 
+  private async initDaoStore(): Promise<void> {
+    if (!this.eventStore) {
+      return;
+    }
+    const store = new MemoryDaoStore();
+    let cursor: string | null = null;
+    while (true) {
+      const { events, cursor: next } = await this.eventStore.getEventLogRange(cursor, 200);
+      if (!events.length) {
+        break;
+      }
+      for (const bytes of events) {
+        const envelope = this.parseEventEnvelope(bytes);
+        if (!envelope) {
+          continue;
+        }
+        try {
+          await store.applyEvent(envelope as EventEnvelope);
+        } catch {
+          continue;
+        }
+      }
+      if (!next) {
+        break;
+      }
+      cursor = next;
+    }
+    this.daoStore = store;
+  }
+
   private async initMarketSearchStore(): Promise<void> {
     if (!this.eventStore || !this.stateDb) {
       return;
@@ -473,6 +507,13 @@ export class ClawTokenNode {
         await this.reputationStore.applyEvent(envelope as EventEnvelope);
       } catch {
         // Ignore malformed events for reputation aggregation.
+      }
+    }
+    if (this.daoStore) {
+      try {
+        await this.daoStore.applyEvent(envelope as EventEnvelope);
+      } catch {
+        // Ignore malformed events for DAO aggregation.
       }
     }
     if (this.marketSearchStore) {

@@ -695,3 +695,218 @@ export interface MarketDisputeResolveParams extends EventFields {
   sellerPayment?: number;
   resourcePrev?: string;
 }
+
+// ---------------------------------------------------------------------------
+// DAO Governance
+// ---------------------------------------------------------------------------
+
+export type DaoProposalType =
+  | 'parameter_change'
+  | 'treasury_spend'
+  | 'protocol_upgrade'
+  | 'emergency'
+  | 'signal';
+
+export type DaoProposalStatus =
+  | 'draft'
+  | 'discussion'
+  | 'voting'
+  | 'passed'
+  | 'rejected'
+  | 'queued'
+  | 'executed'
+  | 'expired'
+  | 'vetoed';
+
+export type DaoVoteOption = 'for' | 'against' | 'abstain';
+
+export interface DaoProposalAction {
+  type: string;
+  [key: string]: unknown;
+}
+
+export interface DaoProposalTimeline {
+  createdAt: number;
+  discussionEndsAt: number;
+  votingStartsAt: number;
+  votingEndsAt: number;
+  executionDelay: number;
+  expiresAt: number;
+}
+
+export interface DaoProposalVotes {
+  for: string;
+  against: string;
+  abstain: string;
+}
+
+export interface DaoProposal {
+  id: string;
+  proposer: string;
+  type: DaoProposalType;
+  title: string;
+  description: string;
+  discussionUrl?: string;
+  actions: DaoProposalAction[];
+  timeline: DaoProposalTimeline;
+  votes: DaoProposalVotes;
+  status: DaoProposalStatus;
+  resourcePrev?: string | null;
+}
+
+export interface DaoVote {
+  voter: string;
+  proposalId: string;
+  option: DaoVoteOption;
+  power: string;
+  reason?: string;
+  ts: number;
+  hash: string;
+}
+
+export interface DaoDelegationScope {
+  proposalTypes?: DaoProposalType[];
+  topics?: string[];
+  all?: boolean;
+}
+
+export interface DaoDelegation {
+  delegator: string;
+  delegate: string;
+  scope: DaoDelegationScope;
+  percentage: number;
+  expiresAt?: number;
+  revokedAt?: number;
+  createdAt: number;
+}
+
+export interface DaoTreasuryAllocationPolicy {
+  development: number;
+  nodeRewards: number;
+  ecosystem: number;
+  reserve: number;
+}
+
+export interface DaoTreasurySpendingLimits {
+  perProposal: string;
+  perQuarter: string;
+  requireMultisig: string;
+}
+
+export interface DaoTreasury {
+  balance: string;
+  allocationPolicy: DaoTreasuryAllocationPolicy;
+  spendingLimits: DaoTreasurySpendingLimits;
+  totalSpent: string;
+  spentThisQuarter: string;
+  quarterStart: number;
+}
+
+export interface DaoTimelockEntry {
+  actionId: string;
+  proposalId: string;
+  action: DaoProposalAction;
+  queuedAt: number;
+  executeAfter: number;
+  status: 'queued' | 'executed' | 'cancelled';
+}
+
+export interface DaoProposalThreshold {
+  createThreshold: number;
+  passThreshold: number;
+  quorum: number;
+  discussionPeriod: number;
+  votingPeriod: number;
+  timelockDelay: number;
+}
+
+// ---- DAO Request Params ----
+
+export interface DaoCreateProposalParams extends EventFields {
+  proposalId?: string;
+  type: DaoProposalType;
+  title: string;
+  description: string;
+  discussionUrl?: string;
+  actions: DaoProposalAction[];
+  discussionPeriod?: number;
+  votingPeriod?: number;
+  timelockDelay?: number;
+}
+
+export interface DaoAdvanceProposalParams extends EventFields {
+  proposalId: string;
+  newStatus: string;
+  resourcePrev: string;
+}
+
+export interface DaoVoteCastParams extends EventFields {
+  proposalId: string;
+  option: DaoVoteOption;
+  power: string | number;
+  reason?: string;
+}
+
+export interface DaoDelegateSetParams extends EventFields {
+  delegate: string;
+  scope?: DaoDelegationScope;
+  percentage?: number;
+  expiresAt?: number;
+}
+
+export interface DaoDelegateRevokeParams extends EventFields {
+  delegate: string;
+}
+
+export interface DaoTreasuryDepositParams extends EventFields {
+  amount: string | number;
+  source: string;
+}
+
+export interface DaoTimelockActionParams extends EventFields {
+  actionId: string;
+}
+
+export interface DaoTimelockCancelParams extends EventFields {
+  actionId: string;
+  reason: string;
+}
+
+// ---- DAO Response Types ----
+
+export interface DaoProposalListResponse {
+  proposals: DaoProposal[];
+}
+
+export interface DaoProposalResponse {
+  proposal: DaoProposal;
+}
+
+export interface DaoVotesResponse {
+  proposalId: string;
+  votes: DaoVote[];
+}
+
+export interface DaoDelegationsResponse {
+  did: string;
+  delegatedFrom: DaoDelegation[];
+  delegatedTo: DaoDelegation[];
+}
+
+export interface DaoTreasuryResponse {
+  treasury: DaoTreasury;
+}
+
+export interface DaoTimelockListResponse {
+  entries: DaoTimelockEntry[];
+}
+
+export interface DaoParamsResponse {
+  thresholds: Record<DaoProposalType, DaoProposalThreshold>;
+}
+
+export interface DaoTxResult {
+  txHash: string;
+  status: string;
+  [key: string]: unknown;
+}
