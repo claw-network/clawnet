@@ -1,0 +1,16 @@
+node_modules
+dist
+.git
+.github
+*.md
+!README.md
+docs/
+issues/
+examples/
+packages/sdk-python/
+*.test.ts
+*.test.js
+vitest.config.*
+.eslintrc*
+.prettier*
+.vscode

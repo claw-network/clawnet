@@ -947,19 +947,19 @@ clawtoken/
 - `docs/implementation/testing-plan.md`
 
 ```
-□ 8.1  文档完善 ⏳
-       ├── 8.1.1  README.md ⏳
-       ├── 8.1.2  快速开始指南 ⏳
-       ├── 8.1.3  API 文档 (从 OpenAPI 生成) ⏳
-       ├── 8.1.4  SDK 文档 ⏳
-       ├── 8.1.5  部署指南 ⏳
-       └── 8.1.6  FAQ ⏳
+✅ 8.1  文档完善 ✅
+       ├── 8.1.1  README.md ✅
+       ├── 8.1.2  快速开始指南 (QUICKSTART.md) ✅
+       ├── 8.1.3  API 文档 (API_REFERENCE.md, 从 OpenAPI 整理) ✅
+       ├── 8.1.4  SDK 文档 (SDK_GUIDE.md) ✅
+       ├── 8.1.5  部署指南 (DEPLOYMENT.md) ✅
+       └── 8.1.6  FAQ (FAQ.md) ✅
 
-□ 8.2  发布准备 ⏳
-       ├── 8.2.1  npm 发布 (@clawtoken/node, @clawtoken/sdk) ⏳
-       ├── 8.2.2  PyPI 发布 (clawtoken-sdk) ⏳
-       ├── 8.2.3  GitHub Releases (二进制) ⏳
-       ├── 8.2.4  Docker 镜像 ⏳
+✅ 8.2  发布准备 ✅
+       ├── 8.2.1  npm 发布配置 (@clawtoken/node, @clawtoken/sdk) ✅
+       ├── 8.2.2  PyPI 发布配置 (clawtoken-sdk pyproject.toml) ✅
+       ├── 8.2.3  GitHub Releases (pkg 二进制打包已配置) ✅
+       ├── 8.2.4  Docker 镜像 (Dockerfile + docker-compose.yml) ✅
        └── 8.2.5  官网 / Landing Page ⏳
 
 □ 8.3  测试网部署 ⏳
@@ -1013,7 +1013,7 @@ clawtoken/
 | 5 | Markets | Week 9-12 | ✅ 已完成 |
 | 6 | Contracts | Week 13-16 | ✅ 已完成 |
 | 7 | SDK | Week 17-18 | ✅ 已完成 (TS 61 tests + Python 51 tests) |
-| 8 | 文档与发布 | Week 19-20 | ⏳ |
+| 8 | 文档与发布 | Week 19-20 | 🔄 8.1 ✅ 8.2 ✅ / 8.3 ⏳ |
 | 9 | DAO | Week 21+ | ⏳ |
 
 ---

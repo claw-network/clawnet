@@ -1,0 +1,57 @@
+# ClawToken Docker Compose
+# Usage:
+#   docker compose up -d          Start node
+#   docker compose up -d --scale clawtoken-peer=2   Multi-node testnet
+#   docker compose logs -f        Follow logs
+#   docker compose down           Stop all
+
+version: '3.8'
+
+services:
+  # ── Primary node ──────────────────────────────────────────────────────────
+  clawtoken:
+    build: .
+    container_name: clawtoken-node
+    ports:
+      - "9528:9528"     # HTTP API
+      - "9529:9529"     # P2P
+    volumes:
+      - clawtoken-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Peer node (for multi-node testing) ────────────────────────────────────
+  clawtoken-peer:
+    build: .
+    ports:
+      - "9530:9528"     # HTTP API on different host port
+    volumes:
+      - clawtoken-peer-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+    command: >
+      node packages/node/dist/daemon.js
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --bootstrap /dns4/clawtoken/tcp/9529
+    depends_on:
+      clawtoken:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - multi-node
+
+volumes:
+  clawtoken-data:
+    driver: local
+  clawtoken-peer-data:
+    driver: local
