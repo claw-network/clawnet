@@ -19,7 +19,7 @@ For the **Python SDK** you also need Python ≥ 3.10.
 ## 2. Clone & Install
 
 ```bash
-git clone https://github.com/OpenClaw/clawnet.git
+git clone https://github.com/claw-network/clawnet.git
 cd clawnet
 pnpm install
 ```

@@ -41,8 +41,8 @@ await startDaemon(['--api-port', '9528']);
 
 ## Documentation
 
-- [Deployment Guide](https://github.com/OpenClaw/clawnet/blob/main/docs/DEPLOYMENT.md)
-- [API Reference](https://github.com/OpenClaw/clawnet/blob/main/docs/API_REFERENCE.md)
+- [Deployment Guide](https://github.com/claw-network/clawnet/blob/main/docs/DEPLOYMENT.md)
+- [API Reference](https://github.com/claw-network/clawnet/blob/main/docs/API_REFERENCE.md)
 
 ## License
 

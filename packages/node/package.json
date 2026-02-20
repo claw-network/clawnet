@@ -9,7 +9,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OpenClaw/clawnet.git",
+    "url": "https://github.com/claw-network/clawnet.git",
     "directory": "packages/node"
   },
   "keywords": ["clawnet", "agent", "decentralized", "node", "daemon"],

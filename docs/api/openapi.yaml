@@ -31,7 +31,7 @@ info:
   version: 1.0.0
   contact:
     name: ClawNet Team
-    url: https://github.com/OpenClaw/clawnet
+    url: https://github.com/claw-network/clawnet
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT

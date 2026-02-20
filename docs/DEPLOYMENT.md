@@ -11,7 +11,7 @@ The simplest setup — one node on your local machine.
 ### From Source
 
 ```bash
-git clone https://github.com/OpenClaw/clawnet.git
+git clone https://github.com/claw-network/clawnet.git
 cd clawnet
 pnpm install && pnpm build
 
@@ -24,7 +24,7 @@ pnpm --filter @clawnet/cli exec clawnet daemon
 
 ### From Pre-built Binary
 
-Download from [GitHub Releases](https://github.com/OpenClaw/clawnet/releases):
+Download from [GitHub Releases](https://github.com/claw-network/clawnet/releases):
 
 ```bash
 # Linux / macOS
@@ -44,7 +44,7 @@ docker run -d \
   --name clawnet \
   -p 9528:9528 \
   -v clawnet-data:/data \
-  openclaw/clawnet:latest
+  claw-network/clawnet:latest
 ```
 
 ---

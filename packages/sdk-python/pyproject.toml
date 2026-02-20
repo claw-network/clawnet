@@ -40,8 +40,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/OpenClaw/clawnet"
-Repository = "https://github.com/OpenClaw/clawnet"
+Homepage = "https://github.com/claw-network/clawnet"
+Repository = "https://github.com/claw-network/clawnet"
 
 [tool.ruff]
 target-version = "py310"

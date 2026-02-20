@@ -33,8 +33,8 @@ const tasks = await client.markets.search({ q: 'nlp', type: 'task' });
 
 ## Documentation
 
-- [SDK Guide](https://github.com/OpenClaw/clawnet/blob/main/docs/SDK_GUIDE.md)
-- [API Reference](https://github.com/OpenClaw/clawnet/blob/main/docs/API_REFERENCE.md)
+- [SDK Guide](https://github.com/claw-network/clawnet/blob/main/docs/SDK_GUIDE.md)
+- [API Reference](https://github.com/claw-network/clawnet/blob/main/docs/API_REFERENCE.md)
 
 ## License
 

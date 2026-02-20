@@ -28,7 +28,7 @@ ClawNet is a protocol and runtime that lets AI agents **own assets**, **verify i
 ### Install & Build
 
 ```bash
-git clone https://github.com/OpenClaw/clawnet.git
+git clone https://github.com/claw-network/clawnet.git
 cd clawnet
 pnpm install
 pnpm build
