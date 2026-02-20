@@ -2,7 +2,7 @@
  * Tests for MarketsApi — search, info, task, capability markets and disputes.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { ClawTokenClient } from '../src/index.js';
+import { ClawNetClient } from '../src/index.js';
 import { createMockServer, type MockServer } from './helpers/mock-server.js';
 
 let mock: MockServer;
@@ -28,7 +28,7 @@ describe('MarketsApi.search', () => {
       total: 2,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.search({ q: 'data', limit: 10 });
 
     expect(result.listings).toHaveLength(2);
@@ -46,7 +46,7 @@ describe('InfoMarketApi', () => {
       total: 1,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.info.list();
 
     expect(result.listings).toHaveLength(1);
@@ -60,7 +60,7 @@ describe('InfoMarketApi', () => {
       txHash: 'tx-info-1',
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.info.publish({
       ...EVENT_FIELDS,
       title: 'Market Analysis',
@@ -80,7 +80,7 @@ describe('InfoMarketApi', () => {
       txHash: 'tx-purchase-1',
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.info.purchase('info-1', EVENT_FIELDS);
 
     expect(result.orderId).toBe('order-1');
@@ -92,7 +92,7 @@ describe('InfoMarketApi', () => {
     mock.addRoute('POST', '/api/markets/info/info-1/confirm', 200, { txHash: 'tx-confirm' });
     mock.addRoute('POST', '/api/markets/info/info-1/review', 200, { txHash: 'tx-review' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
     const d = await client.markets.info.deliver('info-1', { ...EVENT_FIELDS, orderId: 'order-1' });
     expect(d.txHash).toBe('tx-deliver');
@@ -114,7 +114,7 @@ describe('InfoMarketApi', () => {
     mock.addRoute('POST', '/api/markets/info/info-1/subscribe', 200, { txHash: 'tx-sub' });
     mock.addRoute('POST', '/api/markets/info/info-1/unsubscribe', 200, { txHash: 'tx-unsub' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
     const sub = await client.markets.info.subscribe('info-1', { ...EVENT_FIELDS, resourcePrev: null });
     expect(sub.txHash).toBe('tx-sub');
@@ -127,7 +127,7 @@ describe('InfoMarketApi', () => {
     mock = await createMockServer();
     mock.addRoute('POST', '/api/markets/info/info-1/remove', 200, { txHash: 'tx-rm' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.info.remove('info-1', EVENT_FIELDS);
     expect(result.txHash).toBe('tx-rm');
   });
@@ -142,7 +142,7 @@ describe('TaskMarketApi', () => {
       total: 1,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
     const pub = await client.markets.tasks.publish({
       ...EVENT_FIELDS,
@@ -164,7 +164,7 @@ describe('TaskMarketApi', () => {
     mock.addRoute('POST', '/api/markets/tasks/task-1/confirm', 200, { txHash: 'tx-confirm' });
     mock.addRoute('POST', '/api/markets/tasks/task-1/review', 200, { txHash: 'tx-review' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
     const bid = await client.markets.tasks.bid('task-1', { ...EVENT_FIELDS, amount: 80, message: 'I can do it' });
     expect(bid.bidId).toBe('bid-1');
@@ -190,7 +190,7 @@ describe('TaskMarketApi', () => {
     mock.addRoute('POST', '/api/markets/tasks/task-1/reject', 200, { txHash: 'tx-reject' });
     mock.addRoute('POST', '/api/markets/tasks/task-1/withdraw', 200, { txHash: 'tx-withdraw' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
     const reject = await client.markets.tasks.rejectBid('task-1', { ...EVENT_FIELDS, bidId: 'bid-2' });
     expect(reject.txHash).toBe('tx-reject');
@@ -206,7 +206,7 @@ describe('TaskMarketApi', () => {
       total: 1,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.tasks.getBids('task-1');
     expect(result.bids).toHaveLength(1);
   });
@@ -217,7 +217,7 @@ describe('CapabilityMarketApi', () => {
     mock = await createMockServer();
     mock.addRoute('POST', '/api/markets/capabilities', 201, { listingId: 'cap-1', txHash: 'tx-cap' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.capabilities.publish({
       ...EVENT_FIELDS,
       title: 'Translation API',
@@ -255,7 +255,7 @@ describe('CapabilityMarketApi', () => {
       action: 'terminate',
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
     const lease = await client.markets.capabilities.lease('cap-1', {
       ...EVENT_FIELDS,
@@ -305,7 +305,7 @@ describe('CapabilityMarketApi', () => {
       },
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const detail = await client.markets.capabilities.getLeaseDetail('lease-1');
 
     expect(detail.lease.id).toBe('lease-1');
@@ -320,7 +320,7 @@ describe('MarketDisputeApi', () => {
     mock.addRoute('POST', '/api/markets/disputes/dispute-1/respond', 200, { txHash: 'tx-respond' });
     mock.addRoute('POST', '/api/markets/disputes/dispute-1/resolve', 200, { txHash: 'tx-resolve' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
     const open = await client.markets.disputes.open('order-1', {
       ...EVENT_FIELDS,

@@ -10,9 +10,9 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@clawtoken/core';
-import { generateKeypair } from '@clawtoken/core/crypto';
-import { didFromPublicKey } from '@clawtoken/core/identity';
+} from '@clawnet/core';
+import { generateKeypair } from '@clawnet/core/crypto';
+import { didFromPublicKey } from '@clawnet/core/identity';
 
 describe('node api', () => {
   let api: ApiServer;
@@ -37,7 +37,7 @@ describe('node api', () => {
           total: 1,
         }),
         getNodeConfig: async () => ({
-          dataDir: '/tmp/clawtoken',
+          dataDir: '/tmp/clawnet',
           network: 'devnet',
           p2pPort: 9527,
           apiPort: 9528,
@@ -81,7 +81,7 @@ describe('identity api', () => {
   let publicKeyMb: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-node-api-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-node-api-'));
     const { publicKey, privateKey } = await generateKeypair();
     did = didFromPublicKey(publicKey);
     const record = createKeyRecord(publicKey, privateKey, 'test-passphrase-123', {

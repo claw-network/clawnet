@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // ============================================================================
-// ClawToken Local Testnet Launcher
+// ClawNet Local Testnet Launcher
 // ============================================================================
-// Starts multiple ClawToken nodes locally on different ports for integration
+// Starts multiple ClawNet nodes locally on different ports for integration
 // testing. No Docker required.
 //
 // Usage:
@@ -180,7 +180,7 @@ async function main() {
 
   console.log('');
   console.log('═══════════════════════════════════════════════════════════');
-  console.log('  ClawToken Local Testnet Running');
+  console.log('  ClawNet Local Testnet Running');
   console.log('═══════════════════════════════════════════════════════════');
   console.log('');
   for (let i = 0; i < nodeCount; i++) {

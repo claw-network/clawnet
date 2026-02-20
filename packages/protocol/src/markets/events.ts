@@ -1,6 +1,6 @@
-import { multibaseEncode } from '@clawtoken/core/encoding';
-import { publicKeyFromDid } from '@clawtoken/core/identity';
-import { EventEnvelope, eventHashHex, signEvent } from '@clawtoken/core/protocol';
+import { multibaseEncode } from '@clawnet/core/encoding';
+import { publicKeyFromDid } from '@clawnet/core/identity';
+import { EventEnvelope, eventHashHex, signEvent } from '@clawnet/core/protocol';
 import {
   AppliedDiscount,
   ListingRestrictions,

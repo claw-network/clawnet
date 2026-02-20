@@ -1,12 +1,12 @@
-"""Custom exceptions for the ClawToken SDK."""
+"""Custom exceptions for the ClawNet SDK."""
 
 from __future__ import annotations
 
 from typing import Any
 
 
-class ClawTokenError(Exception):
-    """Raised when the ClawToken node returns an error response."""
+class ClawNetError(Exception):
+    """Raised when the ClawNet node returns an error response."""
 
     def __init__(
         self,
@@ -22,4 +22,4 @@ class ClawTokenError(Exception):
         self.details = details
 
     def __repr__(self) -> str:
-        return f"ClawTokenError(status={self.status}, code={self.code!r}, message={str(self)!r})"
+        return f"ClawNetError(status={self.status}, code={self.code!r}, message={str(self)!r})"

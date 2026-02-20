@@ -1,6 +1,6 @@
 ﻿#!/usr/bin/env node
 /**
- * ClawToken Integration Test Suite
+ * ClawNet Integration Test Suite
  * =================================
  * Runs against a live multi-node testnet (Docker or local).
  *
@@ -363,7 +363,7 @@ async function testErrorHandling() {
 
 async function main() {
   log('================================================================');
-  log('         ClawToken Integration Test Suite');
+  log('         ClawNet Integration Test Suite');
   log('================================================================');
   log('Nodes: ' + NODES.join(', '));
   log('\nConnectivity Check');

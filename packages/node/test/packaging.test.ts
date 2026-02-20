@@ -10,7 +10,7 @@ describe('binary packaging config', () => {
       bin?: Record<string, string>;
       pkg?: { targets?: string[]; outputPath?: string };
     };
-    expect(json.bin?.clawtokend).toBeDefined();
+    expect(json.bin?.clawnetd).toBeDefined();
     expect(json.pkg?.targets).toEqual(
       expect.arrayContaining(['node18-macos-x64', 'node18-linux-x64', 'node18-win-x64']),
     );
@@ -18,6 +18,6 @@ describe('binary packaging config', () => {
 
     const installPath = resolve(process.cwd(), '../../scripts/install.sh');
     const installRaw = await readFile(installPath, 'utf8');
-    expect(installRaw).toContain('clawtokend');
+    expect(installRaw).toContain('clawnetd');
   });
 });

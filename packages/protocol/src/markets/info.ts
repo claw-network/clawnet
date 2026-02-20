@@ -1,4 +1,4 @@
-import { EventEnvelope } from '@clawtoken/core/protocol';
+import { EventEnvelope } from '@clawnet/core/protocol';
 import {
   createMarketListingPublishEnvelope,
   MarketListingPublishEventParams,

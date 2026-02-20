@@ -6,9 +6,9 @@ const rootDir = path.resolve(__dirname, '..');
 const distDir = path.join(rootDir, 'packages', 'node', 'dist', 'pkg');
 
 const renames = [
-  { from: 'clawtokend-macos', to: 'clawtokend-macos-x64' },
-  { from: 'clawtokend-linux', to: 'clawtokend-linux-x64' },
-  { from: 'clawtokend-win.exe', to: 'clawtokend-windows-x64.exe' },
+  { from: 'clawnetd-macos', to: 'clawnetd-macos-x64' },
+  { from: 'clawnetd-linux', to: 'clawnetd-linux-x64' },
+  { from: 'clawnetd-win.exe', to: 'clawnetd-windows-x64.exe' },
 ];
 
 async function pathExists(target) {

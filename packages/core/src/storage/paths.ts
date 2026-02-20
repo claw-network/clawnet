@@ -14,7 +14,7 @@ export interface StoragePaths {
 }
 
 export function defaultStorageRoot(): string {
-  return process.env.CLAWTOKEN_HOME ?? resolve(homedir(), '.clawtoken');
+  return process.env.CLAWNET_HOME ?? resolve(homedir(), '.clawnet');
 }
 
 export function resolveStoragePaths(root: string = defaultStorageRoot()): StoragePaths {

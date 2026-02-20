@@ -1,4 +1,4 @@
-"""Low-level HTTP client for the ClawToken node API (sync + async)."""
+"""Low-level HTTP client for the ClawNet node API (sync + async)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 import httpx
 
-from clawtoken.exceptions import ClawTokenError
+from clawnet.exceptions import ClawNetError
 
 DEFAULT_BASE_URL = "http://127.0.0.1:9528"
 DEFAULT_TIMEOUT = 30.0
@@ -32,7 +32,7 @@ def _handle_error(resp: httpx.Response) -> None:
     except Exception:
         msg = resp.text
         code = None
-    raise ClawTokenError(msg, status=resp.status_code, code=code)
+    raise ClawNetError(msg, status=resp.status_code, code=code)
 
 
 # ---------------------------------------------------------------------------

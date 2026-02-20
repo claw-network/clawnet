@@ -25,7 +25,7 @@ export interface MockRoute {
  * ```ts
  * const mock = await createMockServer();
  * mock.addRoute('GET', '/api/node/status', 200, { synced: true });
- * const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+ * const client = new ClawNetClient({ baseUrl: mock.baseUrl });
  * await client.node.getStatus();
  * mock.close();
  * ```

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────
-# ClawToken — Market Browsing
+# ClawNet — Market Browsing
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 

@@ -1,6 +1,6 @@
-// FlatBuffers schema for ClawToken P2P messages (application/clawtoken-stream)
+// FlatBuffers schema for ClawNet P2P messages (application/clawnet-stream)
 
-namespace clawtoken.p2p;
+namespace clawnet.p2p;
 
 enum RequestType : byte {
   range_request = 1,
@@ -20,7 +20,7 @@ table P2PEnvelope {
   topic:string;
   sender:string;
   ts:ulong;
-  contentType:string; // MUST be "application/clawtoken-stream"
+  contentType:string; // MUST be "application/clawnet-stream"
   payload:[ubyte];
   sig:string; // base58btc Ed25519 signature
 }

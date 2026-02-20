@@ -22,18 +22,18 @@ PeerId validation:
 ### 2.1 Peer Rotation Announcement
 
 Rotation records are RequestMessage bodies (see Section 4.1) and broadcast on
-`/clawtoken/1.0.0/requests`.
+`/clawnet/1.0.0/requests`.
 
 ## 3. Topics
 
-- /clawtoken/1.0.0/events
-- /clawtoken/1.0.0/requests
-- /clawtoken/1.0.0/responses
+- /clawnet/1.0.0/events
+- /clawnet/1.0.0/requests
+- /clawnet/1.0.0/responses
 
 ## 4. Message Envelope
 
 The P2P envelope MUST be encoded as FlatBuffers with content type
-`application/clawtoken-stream`. JSON envelopes are not supported.
+`application/clawnet-stream`. JSON envelopes are not supported.
 
 Schema file:
 - `docs/implementation/p2p-spec.fbs`
@@ -46,7 +46,7 @@ table P2PEnvelope {
   topic:string;
   sender:string;
   ts:ulong;
-  contentType:string; // MUST be "application/clawtoken-stream"
+  contentType:string; // MUST be "application/clawnet-stream"
   payload:[ubyte];
   sig:string;         // base58btc Ed25519 signature
 }
@@ -83,8 +83,8 @@ flatc --python -o tools/p2p_schema docs/implementation/p2p-spec.fbs
   or change field types in place.
 - Forward compatibility: consumers MUST ignore unknown fields and preserve
   unknown data if re-encoding is required.
-- Breaking changes require a new topic prefix (e.g., `/clawtoken/2.0.0/*`) and
-  a new content type version suffix (`application/clawtoken-stream;v=2`).
+- Breaking changes require a new topic prefix (e.g., `/clawnet/2.0.0/*`) and
+  a new content type version suffix (`application/clawnet-stream;v=2`).
 
 Encoding rules:
 - Message envelope MUST be serialized as FlatBuffers with the schema above.
@@ -94,7 +94,7 @@ Encoding rules:
 
 Signature rules:
 - sig MUST be signed by peer key.
-- Signing bytes are: "clawtoken:p2p:v1:" + FlatBuffers bytes of the envelope
+- Signing bytes are: "clawnet:p2p:v1:" + FlatBuffers bytes of the envelope
   with sig set to empty.
 
 ### 4.1 Payload Message Types (FlatBuffers)
@@ -226,23 +226,23 @@ MUST only count eligible peers.
 ### 8.2 PoW Ticket
 
 PoW tickets are RequestMessage bodies (PowTicket) announced over
-`/clawtoken/1.0.0/requests`.
+`/clawnet/1.0.0/requests`.
 
 Validation:
 - hash MUST have at least `difficulty` leading zero bits.
 - ts MUST be within MAX_CLOCK_SKEW_MS (see protocol-spec constants).
 - sig MUST verify for the peer key.
 - PoW signing bytes: FlatBuffers bytes of PowTicket with sig empty, prefixed by
-  "clawtoken:pow:v1:".
+  "clawnet:pow:v1:".
 
 PoW hash bytes:
-- "clawtoken:pow:v1:" + FlatBuffers bytes of PowTicket with hash/sig empty.
+- "clawnet:pow:v1:" + FlatBuffers bytes of PowTicket with hash/sig empty.
 - hash MUST equal lowercase hex SHA-256 of the PoW hash bytes.
 
 ### 8.3 Stake Proof
 
 Stake proofs are RequestMessage bodies (StakeProof) announced over
-`/clawtoken/1.0.0/requests`.
+`/clawnet/1.0.0/requests`.
 
 Validation:
 - stakeEvent MUST exist in the local event log.
@@ -255,7 +255,7 @@ Validation:
 
 Stake proof signing bytes:
 - FlatBuffers bytes of StakeProof with sig/sigController empty, prefixed by
-  "clawtoken:stakeproof:v1:".
+  "clawnet:stakeproof:v1:".
 
 FlatBuffers schema (excerpt):
 

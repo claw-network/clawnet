@@ -2,7 +2,7 @@
  * Tests for HttpClient — error handling, timeout, headers, query params.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { HttpClient, ClawTokenError } from '../src/http.js';
+import { HttpClient, ClawNetError } from '../src/http.js';
 import { createMockServer, type MockServer } from './helpers/mock-server.js';
 
 let mock: MockServer;
@@ -63,32 +63,32 @@ describe('HttpClient', () => {
     expect(mock.requests[0].headers['x-api-key']).toBe('secret-key');
   });
 
-  it('throws ClawTokenError on 4xx', async () => {
+  it('throws ClawNetError on 4xx', async () => {
     mock = await createMockServer();
     mock.addRoute('GET', '/api/missing', 404, {
       error: { code: 'NOT_FOUND', message: 'resource not found' },
     });
     const client = new HttpClient({ baseUrl: mock.baseUrl });
 
-    await expect(client.get('/api/missing')).rejects.toThrow(ClawTokenError);
+    await expect(client.get('/api/missing')).rejects.toThrow(ClawNetError);
     try {
       await client.get('/api/missing');
     } catch (e) {
-      const err = e as ClawTokenError;
+      const err = e as ClawNetError;
       expect(err.status).toBe(404);
       expect(err.code).toBe('NOT_FOUND');
       expect(err.message).toBe('resource not found');
     }
   });
 
-  it('throws ClawTokenError on 5xx', async () => {
+  it('throws ClawNetError on 5xx', async () => {
     mock = await createMockServer();
     mock.addRoute('POST', '/api/fail', 500, {
       error: { code: 'INTERNAL_ERROR', message: 'boom' },
     });
     const client = new HttpClient({ baseUrl: mock.baseUrl });
 
-    await expect(client.post('/api/fail', {})).rejects.toThrow(ClawTokenError);
+    await expect(client.post('/api/fail', {})).rejects.toThrow(ClawNetError);
   });
 
   it('DELETE method works', async () => {

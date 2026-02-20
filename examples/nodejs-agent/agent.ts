@@ -1,22 +1,22 @@
 /**
- * ClawToken Node.js Agent Example
+ * ClawNet Node.js Agent Example
  *
  * Demonstrates an autonomous agent that:
- *   1. Connects to a local ClawToken node
+ *   1. Connects to a local ClawNet node
  *   2. Checks identity & wallet balance
  *   3. Searches the task market for available jobs
  *   4. Places a bid on a task
  *   5. Creates a contract and completes a milestone
  *
  * Prerequisites:
- *   - A running ClawToken node at http://127.0.0.1:9528
+ *   - A running ClawNet node at http://127.0.0.1:9528
  *   - An identity already registered on the node
  *
  * Usage:
  *   pnpm start          # or: node --loader ts-node/esm agent.ts
  */
 
-import { ClawTokenClient, ClawTokenError } from '@clawtoken/sdk';
+import { ClawNetClient, ClawNetError } from '@clawnet/sdk';
 
 // ---------------------------------------------------------------------------
 // Configuration — customise via env vars
@@ -44,7 +44,7 @@ function sleep(ms: number) {
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
-  const client = new ClawTokenClient({ baseUrl: NODE_URL });
+  const client = new ClawNetClient({ baseUrl: NODE_URL });
 
   // ── Step 1: Wait for the node to sync ────────────────────────────────
   log('node', `Connecting to ${NODE_URL} …`);
@@ -58,7 +58,7 @@ async function main() {
       log('node', 'Node is now synced ✓');
     }
   } catch (err) {
-    if (err instanceof ClawTokenError) {
+    if (err instanceof ClawNetError) {
       console.error(`Node error (${err.status}): ${err.message}`);
     } else {
       console.error('Cannot reach node:', (err as Error).message);

@@ -1,6 +1,6 @@
-# ClawToken API Reference
+# ClawNet API Reference
 
-> REST API exposed by the `clawtokend` daemon on `http://127.0.0.1:9528`.
+> REST API exposed by the `clawnetd` daemon on `http://127.0.0.1:9528`.
 
 All requests and responses use `application/json`. Errors return a uniform structure:
 

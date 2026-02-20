@@ -2,7 +2,7 @@
 
 from pytest_httpserver import HTTPServer
 
-from clawtoken.client import ClawTokenClient
+from clawnet.client import ClawNetClient
 
 
 class TestMarketsSearch:
@@ -11,7 +11,7 @@ class TestMarketsSearch:
             "listings": [{"id": "ls-1", "type": "task", "seller": "did:claw:z6MkA", "title": "Data"}],
             "total": 1,
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.search(q="data", type="task")
         assert result["total"] == 1
 
@@ -19,7 +19,7 @@ class TestMarketsSearch:
 class TestInfoMarket:
     def test_list(self, httpserver: HTTPServer) -> None:
         httpserver.expect_request("/api/markets/info").respond_with_json({"items": [], "total": 0})
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.info.list()
         assert result["total"] == 0
 
@@ -27,7 +27,7 @@ class TestInfoMarket:
         httpserver.expect_request("/api/markets/info", method="POST").respond_with_json({
             "listingId": "info-1", "txHash": "tx-info",
         }, status=201)
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.info.publish(
             did="d", passphrase="p", nonce=1, title="Dataset",
             infoType="dataset", contentFormat="csv",
@@ -39,7 +39,7 @@ class TestInfoMarket:
         httpserver.expect_request("/api/markets/info/info-1/purchase", method="POST").respond_with_json({
             "orderId": "ord-1", "txHash": "tx-purchase",
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.info.purchase("info-1", did="d", passphrase="p", nonce=1)
         assert result["orderId"] == "ord-1"
 
@@ -49,7 +49,7 @@ class TestTaskMarket:
         httpserver.expect_request("/api/markets/tasks", method="POST").respond_with_json({
             "listingId": "task-1", "txHash": "tx-task",
         }, status=201)
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.task.publish(
             did="d", passphrase="p", nonce=1, title="Analysis",
             taskType="data-analysis", pricing={"model": "fixed", "basePrice": 50},
@@ -60,7 +60,7 @@ class TestTaskMarket:
         httpserver.expect_request("/api/markets/tasks/task-1/bids", method="POST").respond_with_json({
             "bidId": "bid-1", "txHash": "tx-bid",
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.task.bid("task-1", did="d", passphrase="p", nonce=1, amount=40)
         assert result["bidId"] == "bid-1"
 
@@ -68,7 +68,7 @@ class TestTaskMarket:
         httpserver.expect_request("/api/markets/tasks/task-1/accept", method="POST").respond_with_json({
             "txHash": "tx-accept",
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.task.accept_bid("task-1", did="d", passphrase="p", nonce=1, bidId="bid-1")
         assert result["txHash"] == "tx-accept"
 
@@ -76,7 +76,7 @@ class TestTaskMarket:
         httpserver.expect_request("/api/markets/tasks/task-1/deliver", method="POST").respond_with_json({
             "txHash": "tx-deliver",
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.task.deliver("task-1", did="d", passphrase="p", nonce=1, submission={"file": "report.pdf"})
         assert result["txHash"] == "tx-deliver"
 
@@ -86,7 +86,7 @@ class TestCapabilityMarket:
         httpserver.expect_request("/api/markets/capabilities", method="POST").respond_with_json({
             "listingId": "cap-1", "txHash": "tx-cap",
         }, status=201)
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.capability.publish(
             did="d", passphrase="p", nonce=1, title="NLP API",
             capabilityType="nlp", pricing={"model": "pay_per_use", "basePrice": 1},
@@ -97,7 +97,7 @@ class TestCapabilityMarket:
         httpserver.expect_request("/api/markets/capabilities/cap-1/lease", method="POST").respond_with_json({
             "leaseId": "lease-1", "txHash": "tx-lease",
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.capability.lease(
             "cap-1", did="d", passphrase="p", nonce=1, plan={"type": "pay_per_use"},
         )
@@ -110,7 +110,7 @@ class TestCapabilityMarket:
             "leaseId": "lease-1", "txHash": "tx-invoke",
             "usage": {"id": "u-1", "leaseId": "lease-1", "resource": "/summarize", "success": True, "timestamp": 1700000000000},
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.capability.invoke(
             "cap-1", "lease-1", did="d", passphrase="p", nonce=1,
             resource="/summarize", latency=100, success=True,

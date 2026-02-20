@@ -15,7 +15,7 @@ import { bytesToHex } from '../src/utils/bytes.js';
 let tempDir: string | null = null;
 
 async function createPaths() {
-  tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-keys-'));
+  tempDir = await mkdtemp(join(tmpdir(), 'clawnet-keys-'));
   return resolveStoragePaths(tempDir);
 }
 

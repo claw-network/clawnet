@@ -13,10 +13,10 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@clawtoken/core';
-import { generateKeypair } from '@clawtoken/core/crypto';
-import { didFromPublicKey } from '@clawtoken/core/identity';
-import { createContractActivateEnvelope } from '@clawtoken/protocol';
+} from '@clawnet/core';
+import { generateKeypair } from '@clawnet/core/crypto';
+import { didFromPublicKey } from '@clawnet/core/identity';
+import { createContractActivateEnvelope } from '@clawnet/protocol';
 
 describe('contracts api', () => {
   let api: ApiServer;
@@ -81,7 +81,7 @@ describe('contracts api', () => {
   };
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-contracts-api-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-contracts-api-'));
     passphrase = 'test-passphrase-123';
 
     const client = await generateKeypair();

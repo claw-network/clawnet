@@ -2,7 +2,7 @@
  * Tests for ContractsApi — create, sign, fund, milestones, disputes, settlement.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { ClawTokenClient } from '../src/index.js';
+import { ClawNetClient } from '../src/index.js';
 import { createMockServer, type MockServer } from './helpers/mock-server.js';
 
 let mock: MockServer;
@@ -25,7 +25,7 @@ describe('ContractsApi', () => {
       txHash: 'tx-ct-1',
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.create({
       ...EVENT_FIELDS,
       provider: 'did:claw:z6MkProvider',
@@ -70,7 +70,7 @@ describe('ContractsApi', () => {
       total: 1,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.list({ status: 'active' });
 
     expect(result.contracts).toHaveLength(1);
@@ -92,7 +92,7 @@ describe('ContractsApi', () => {
       createdAt: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.get('ct-1');
 
     expect(result.id).toBe('ct-1');
@@ -103,7 +103,7 @@ describe('ContractsApi', () => {
     mock = await createMockServer();
     mock.addRoute('POST', '/api/contracts/ct-1/sign', 200, { txHash: 'tx-sign' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.sign('ct-1', EVENT_FIELDS);
 
     expect(result.txHash).toBe('tx-sign');
@@ -113,7 +113,7 @@ describe('ContractsApi', () => {
     mock = await createMockServer();
     mock.addRoute('POST', '/api/contracts/ct-1/fund', 200, { txHash: 'tx-fund' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.fund('ct-1', {
       ...EVENT_FIELDS,
       amount: 500,
@@ -128,7 +128,7 @@ describe('ContractsApi', () => {
     mock = await createMockServer();
     mock.addRoute('POST', '/api/contracts/ct-1/complete', 200, { txHash: 'tx-complete' });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.complete('ct-1', EVENT_FIELDS);
 
     expect(result.txHash).toBe('tx-complete');
@@ -139,7 +139,7 @@ describe('ContractsApi', () => {
       mock = await createMockServer();
       mock.addRoute('POST', '/api/contracts/ct-1/milestones/ms-1/submit', 200, { txHash: 'tx-ms-submit' });
 
-      const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+      const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.submitMilestone('ct-1', 'ms-1', {
         ...EVENT_FIELDS,
         deliverables: ['mockup.pdf'],
@@ -153,7 +153,7 @@ describe('ContractsApi', () => {
       mock = await createMockServer();
       mock.addRoute('POST', '/api/contracts/ct-1/milestones/ms-1/approve', 200, { txHash: 'tx-ms-approve' });
 
-      const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+      const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.approveMilestone('ct-1', 'ms-1', EVENT_FIELDS);
 
       expect(result.txHash).toBe('tx-ms-approve');
@@ -163,7 +163,7 @@ describe('ContractsApi', () => {
       mock = await createMockServer();
       mock.addRoute('POST', '/api/contracts/ct-1/milestones/ms-1/reject', 200, { txHash: 'tx-ms-reject' });
 
-      const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+      const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.rejectMilestone('ct-1', 'ms-1', {
         ...EVENT_FIELDS,
         reason: 'Does not match requirements',
@@ -178,7 +178,7 @@ describe('ContractsApi', () => {
       mock = await createMockServer();
       mock.addRoute('POST', '/api/contracts/ct-1/dispute', 200, { txHash: 'tx-dispute' });
 
-      const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+      const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.openDispute('ct-1', {
         ...EVENT_FIELDS,
         reason: 'Work not delivered',
@@ -192,7 +192,7 @@ describe('ContractsApi', () => {
       mock = await createMockServer();
       mock.addRoute('POST', '/api/contracts/ct-1/dispute/resolve', 200, { txHash: 'tx-resolve' });
 
-      const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+      const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.resolveDispute('ct-1', {
         ...EVENT_FIELDS,
         decision: 'Partial refund',
@@ -209,7 +209,7 @@ describe('ContractsApi', () => {
       mock = await createMockServer();
       mock.addRoute('POST', '/api/contracts/ct-1/settlement', 200, { txHash: 'tx-settle' });
 
-      const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+      const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.settlement('ct-1', EVENT_FIELDS);
 
       expect(result.txHash).toBe('tx-settle');

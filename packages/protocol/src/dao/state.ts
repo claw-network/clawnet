@@ -4,7 +4,7 @@
  * Pure, deterministic state transitions for DAO events.
  */
 
-import { EventEnvelope, eventHashHex } from '@clawtoken/core/protocol';
+import { EventEnvelope, eventHashHex } from '@clawnet/core/protocol';
 import type {
   Proposal,
   ProposalStatus,

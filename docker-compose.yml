@@ -1,7 +1,7 @@
-# ClawToken Docker Compose
+# ClawNet Docker Compose
 # Usage:
 #   docker compose up -d          Start node
-#   docker compose up -d --scale clawtoken-peer=2   Multi-node testnet
+#   docker compose up -d --scale clawnet-peer=2   Multi-node testnet
 #   docker compose logs -f        Follow logs
 #   docker compose down           Stop all
 
@@ -9,14 +9,14 @@ version: '3.8'
 
 services:
   # ── Primary node ──────────────────────────────────────────────────────────
-  clawtoken:
+  clawnet:
     build: .
-    container_name: clawtoken-node
+    container_name: clawnet-node
     ports:
       - "9528:9528"     # HTTP API
       - "9529:9529"     # P2P
     volumes:
-      - clawtoken-data:/data
+      - clawnet-data:/data
     environment:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
@@ -29,12 +29,12 @@ services:
       start_period: 10s
 
   # ── Peer node (for multi-node testing) ────────────────────────────────────
-  clawtoken-peer:
+  clawnet-peer:
     build: .
     ports:
       - "9530:9528"     # HTTP API on different host port
     volumes:
-      - clawtoken-peer-data:/data
+      - clawnet-peer-data:/data
     environment:
       - CLAW_API_HOST=0.0.0.0
     command: >
@@ -42,16 +42,16 @@ services:
         --data-dir /data
         --api-host 0.0.0.0
         --api-port 9528
-        --bootstrap /dns4/clawtoken/tcp/9529
+        --bootstrap /dns4/clawnet/tcp/9529
     depends_on:
-      clawtoken:
+      clawnet:
         condition: service_healthy
     restart: unless-stopped
     profiles:
       - multi-node
 
 volumes:
-  clawtoken-data:
+  clawnet-data:
     driver: local
-  clawtoken-peer-data:
+  clawnet-peer-data:
     driver: local

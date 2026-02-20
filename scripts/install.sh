@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 set -euf
 
-BASE_URL="${CLAWTOKEN_INSTALL_BASE:-https://clawtoken.network}"
-INSTALL_DIR="${CLAWTOKEN_INSTALL_DIR:-$HOME/.local/bin}"
-BIN_NAME="clawtokend"
+BASE_URL="${CLAWNET_INSTALL_BASE:-https://clawnet.network}"
+INSTALL_DIR="${CLAWNET_INSTALL_DIR:-$HOME/.local/bin}"
+BIN_NAME="clawnetd"
 
 os="$(uname -s | tr '[:upper:]' '[:lower:]')"
 arch="$(uname -m)"
@@ -35,8 +35,8 @@ trap 'rm -rf "$tmp"' EXIT
 echo "Downloading ${url}..."
 curl -fsSL "$url" -o "$tmp/${asset}"
 
-if [ -n "${CLAWTOKEN_SHA256:-}" ]; then
-  echo "${CLAWTOKEN_SHA256}  $tmp/${asset}" | sha256sum -c -
+if [ -n "${CLAWNET_SHA256:-}" ]; then
+  echo "${CLAWNET_SHA256}  $tmp/${asset}" | sha256sum -c -
 fi
 
 mkdir -p "$INSTALL_DIR"

@@ -1,10 +1,10 @@
 openapi: 3.0.3
 info:
-  title: ClawToken Node API
+  title: ClawNet Node API
   description: |
-    ClawToken 节点本地 API 规范。
+    ClawNet 节点本地 API 规范。
     
-    此 API 由 clawtokend 节点暴露在 `http://127.0.0.1:9528`，
+    此 API 由 clawnetd 节点暴露在 `http://127.0.0.1:9528`，
     供本地 Agent 和 CLI 工具调用。
     
     ## 认证
@@ -30,8 +30,8 @@ info:
     API 不接受小数金额。
   version: 1.0.0
   contact:
-    name: ClawToken Team
-    url: https://github.com/OpenClaw/clawtoken
+    name: ClawNet Team
+    url: https://github.com/OpenClaw/clawnet
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT

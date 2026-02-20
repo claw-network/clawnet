@@ -13,7 +13,7 @@ import {
   x25519SharedSecret,
   generateX25519Keypair,
   encryptAes256Gcm,
-} from '@clawtoken/core';
+} from '@clawnet/core';
 import {
   parseMarketListingPublishPayload,
   parseMarketOrderUpdatePayload,
@@ -28,7 +28,7 @@ const PREFIX_META = 'ix:info:meta:';
 const KEY_LAST_EVENT = `${PREFIX_META}last_event`;
 const KEY_VERSION = `${PREFIX_META}version`;
 const STORE_VERSION = 1;
-const INFO_KEY_INFO = utf8ToBytes('clawtoken:info:content-key');
+const INFO_KEY_INFO = utf8ToBytes('clawnet:info:content-key');
 
 export interface EncryptedInfoContent {
   hash: string;

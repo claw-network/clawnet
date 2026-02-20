@@ -1,8 +1,8 @@
 # ============================================================================
-# ClawToken Node — Multi-stage Docker build
+# ClawNet Node — Multi-stage Docker build
 # ============================================================================
-# Build:   docker build -t openclaw/clawtoken .
-# Run:     docker run -d -p 9528:9528 -v clawtoken-data:/data openclaw/clawtoken
+# Build:   docker build -t openclaw/clawnet .
+# Run:     docker run -d -p 9528:9528 -v clawnet-data:/data openclaw/clawnet
 # ============================================================================
 
 # --- Stage 1: Build ----------------------------------------------------------

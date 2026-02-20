@@ -24,7 +24,7 @@
   - 位置：无（缺失实现）。
 
 - CRYPTO-002：事件签名的待签名字节不符合规范。 ✅ 已修复
-  - 规范：crypto-spec.md §5 Signing Rules（签名载荷为 "clawtoken:event:v1:" + JCS(envelope without sig/hash)）。
+  - 规范：crypto-spec.md §5 Signing Rules（签名载荷为 "clawnet:event:v1:" + JCS(envelope without sig/hash)）。
   - 现状：eventSigningBytes 先对前缀+JCS 做 SHA-256，再签名哈希；与规范“直接签名规范化字节”不一致。
   - 位置：packages/core/src/protocol/event-hash.ts。
 

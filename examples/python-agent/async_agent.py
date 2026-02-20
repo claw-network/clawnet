@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Async agent example using AsyncClawTokenClient.
+Async agent example using AsyncClawNetClient.
 
 Demonstrates the same workflow as agent.py but using Python's asyncio.
 """
@@ -13,7 +13,7 @@ import os
 import sys
 import time
 
-from clawtoken import AsyncClawTokenClient, ClawTokenError
+from clawnet import AsyncClawNetClient, ClawNetError
 
 NODE_URL = os.environ.get("CLAW_NODE_URL", "http://127.0.0.1:9528")
 AGENT_DID = os.environ.get("CLAW_AGENT_DID", "did:claw:z6MkExampleAgent")
@@ -35,7 +35,7 @@ def log(section: str, msg: str, data: object = None) -> None:
 
 
 async def main() -> None:
-    async with AsyncClawTokenClient(NODE_URL) as client:
+    async with AsyncClawNetClient(NODE_URL) as client:
         # ── Parallel: fetch status, identity, balance concurrently ───────
         log("agent", "Fetching node status, identity & balance in parallel …")
         status_coro = client.node.get_status()
@@ -46,7 +46,7 @@ async def main() -> None:
             status, identity, balance = await asyncio.gather(
                 status_coro, identity_coro, balance_coro
             )
-        except ClawTokenError as exc:
+        except ClawNetError as exc:
             print(f"Error ({exc.status}): {exc}", file=sys.stderr)
             sys.exit(1)
 

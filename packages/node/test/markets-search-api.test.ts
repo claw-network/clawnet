@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { ApiServer } from '../src/api/server.js';
-import { MarketListing, MarketSearchIndex } from '@clawtoken/protocol';
+import { MarketListing, MarketSearchIndex } from '@clawnet/protocol';
 
 function createListing(overrides: Partial<MarketListing>): MarketListing {
   const base: MarketListing = {

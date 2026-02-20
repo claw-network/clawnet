@@ -3,7 +3,7 @@ import { signBase58, verifyBase58 } from '../crypto/ed25519.js';
 import { publicKeyFromDid } from '../identity/did.js';
 import { concatBytes, utf8ToBytes } from '../utils/bytes.js';
 
-export const VC_DOMAIN_PREFIX = 'clawtoken:vc:v1:';
+export const VC_DOMAIN_PREFIX = 'clawnet:vc:v1:';
 
 export interface VerifiableCredentialProof {
   type: 'Ed25519Signature2020';

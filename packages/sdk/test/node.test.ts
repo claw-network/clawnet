@@ -2,7 +2,7 @@
  * Tests for NodeApi — status, peers, config, waitForSync.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { ClawTokenClient } from '../src/index.js';
+import { ClawNetClient } from '../src/index.js';
 import { createMockServer, type MockServer } from './helpers/mock-server.js';
 
 let mock: MockServer;
@@ -25,7 +25,7 @@ describe('NodeApi', () => {
     };
     mock.addRoute('GET', '/api/node/status', 200, status);
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.node.getStatus();
 
     expect(result.did).toBe('did:claw:z6Mk1234');
@@ -45,7 +45,7 @@ describe('NodeApi', () => {
       total: 2,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.node.getPeers();
 
     expect(result.peers).toHaveLength(2);
@@ -56,11 +56,11 @@ describe('NodeApi', () => {
   it('getConfig returns node config', async () => {
     mock = await createMockServer();
     mock.addRoute('GET', '/api/node/config', 200, {
-      dataDir: '~/.clawtoken',
+      dataDir: '~/.clawnet',
       apiPort: 9528,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.node.getConfig();
 
     expect(result).toHaveProperty('dataDir');
@@ -107,7 +107,7 @@ describe('NodeApi', () => {
       }
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.node.waitForSync(10_000, 100);
     expect(result.synced).toBe(true);
     expect(callCount).toBeGreaterThanOrEqual(3);
@@ -125,7 +125,7 @@ describe('NodeApi', () => {
       uptime: 0,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     await expect(client.node.waitForSync(300, 100)).rejects.toThrow('did not sync');
   });
 });

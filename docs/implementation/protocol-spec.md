@@ -81,7 +81,7 @@ Rules:
 - Canonical JSON MUST follow JCS (RFC 8785).
 - The signing bytes are JCS(envelope without sig and hash fields).
 - Domain separation MUST prepend the ASCII string:
-  "clawtoken:event:v1:" before hashing for signature.
+  "clawnet:event:v1:" before hashing for signature.
 - Event hash MUST be SHA-256(JCS(envelope without sig and hash fields)).
 
 Signature verification:
@@ -116,7 +116,7 @@ Credential structure (minimum fields):
 Signing rules:
 
 - Canonical bytes = JCS(credential without the `proof` field).
-- Signing bytes = ASCII prefix `"clawtoken:vc:v1:"` + canonical bytes.
+- Signing bytes = ASCII prefix `"clawnet:vc:v1:"` + canonical bytes.
 - Signature algorithm = Ed25519 over signing bytes.
 - proof.proofValue MUST be base58btc encoded signature bytes.
 - issuer MUST be a did:claw DID (public key derived from DID).

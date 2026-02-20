@@ -9,7 +9,7 @@ describe('cli logs', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-logs-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-logs-'));
   });
 
   afterEach(async () => {

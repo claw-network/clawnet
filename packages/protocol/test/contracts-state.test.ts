@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateKeypair } from '@clawtoken/core/crypto';
-import { didFromPublicKey } from '@clawtoken/core/identity';
+import { generateKeypair } from '@clawnet/core/crypto';
+import { didFromPublicKey } from '@clawnet/core/identity';
 import {
   applyContractEvent,
   createContractActivateEnvelope,

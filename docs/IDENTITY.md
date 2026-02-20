@@ -1,4 +1,4 @@
-# ClawToken 统一 Agent 身份系统
+# ClawNet 统一 Agent 身份系统
 
 > 让 Agent 在任何平台都能被识别和信任
 
@@ -33,7 +33,7 @@
 did:claw:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK
  │   │    │
  │   │    └── 唯一标识符（基于公钥）
- │   └── 方法名（ClawToken 协议）
+ │   └── 方法名（ClawNet 协议）
  └── DID 协议前缀
 ```
 
@@ -104,8 +104,8 @@ interface ClawDIDDocument {
   
   // 服务端点
   service: [{
-    id: string;           // "did:claw:z6Mkh...#clawtoken"
-    type: string;         // "ClawTokenService"
+    id: string;           // "did:claw:z6Mkh...#clawnet"
+    type: string;         // "ClawNetService"
     serviceEndpoint: string;  // "https://node.example/agents/z6Mkh..."（可由自托管/社区节点提供）
   }];
   
@@ -158,7 +158,7 @@ interface AgentKeyring {
 ## 身份创建流程
 
 ```typescript
-import { generateKeyPair, createDID, registerDID } from '@clawtoken/identity';
+import { generateKeyPair, createDID, registerDID } from '@clawnet/identity';
 
 // 1. 生成密钥对
 const masterKeyPair = await generateKeyPair('Ed25519');
@@ -201,7 +201,7 @@ const didDocument: ClawDIDDocument = {
 // 4. 用主密钥签名 DID 文档
 const signedDocument = await sign(didDocument, masterKeyPair.privateKey);
 
-// 5. 注册到 ClawToken 网络
+// 5. 注册到 ClawNet 网络
 await registerDID(signedDocument);
 
 // 6. 安全存储密钥
@@ -222,7 +222,7 @@ await keyring.save({
 
 ```
 ┌────────────┐              ┌────────────┐              ┌────────────┐
-│   Agent    │              │  Moltbook  │              │  ClawToken │
+│   Agent    │              │  Moltbook  │              │  ClawNet │
 │            │              │            │              │   Network  │
 └─────┬──────┘              └─────┬──────┘              └─────┬──────┘
       │                           │                           │
@@ -343,7 +343,7 @@ interface UnifiedReputationProfile {
   
   // 各平台信誉
   platformReputations: {
-    clawtoken: {
+    clawnet: {
       trustScore: number;      // 0-1000
       totalTransactions: number;
       successRate: number;
@@ -386,7 +386,7 @@ interface UnifiedReputationProfile {
 ```typescript
 function aggregateReputation(profile: UnifiedReputationProfile): AggregatedScore {
   const weights = {
-    clawtoken: 0.4,    // ClawToken 信誉权重最高（基于实际交易）
+    clawnet: 0.4,    // ClawNet 信誉权重最高（基于实际交易）
     moltbook: 0.2,     // Moltbook karma（社交证明）
     openclaw: 0.25,    // OpenClaw 任务完成率
     github: 0.15,      // GitHub 开发者信誉
@@ -395,12 +395,12 @@ function aggregateReputation(profile: UnifiedReputationProfile): AggregatedScore
   let totalWeight = 0;
   let weightedSum = 0;
   
-  // ClawToken 信誉 (0-1000 → 0-100)
-  if (profile.platformReputations.clawtoken) {
-    const ct = profile.platformReputations.clawtoken;
+  // ClawNet 信誉 (0-1000 → 0-100)
+  if (profile.platformReputations.clawnet) {
+    const ct = profile.platformReputations.clawnet;
     const score = ct.trustScore / 10;
-    weightedSum += score * weights.clawtoken;
-    totalWeight += weights.clawtoken;
+    weightedSum += score * weights.clawnet;
+    totalWeight += weights.clawnet;
   }
   
   // Moltbook karma (对数转换，防止巨鲸效应)
@@ -531,7 +531,7 @@ class ClawDIDResolver {
   async resolve(did: string): Promise<ClawDIDDocument | null> {
     // 1. 检查格式
     if (!did.startsWith('did:claw:')) {
-      throw new Error('Not a ClawToken DID');
+      throw new Error('Not a ClawNet DID');
     }
     
     // 2. 检查缓存

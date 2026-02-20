@@ -21,7 +21,7 @@ describe('cli reputation', () => {
   let passphrase: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-reputation-cli-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-reputation-cli-'));
     passphrase = 'test-passphrase-123';
     const keypair = await generateKeypair();
     did = didFromPublicKey(keypair.publicKey);

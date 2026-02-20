@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { ClawTokenNode } from './index.js';
+import { ClawNetNode } from './index.js';
 import { createLogger } from './logger.js';
-import { loadConfig, resolveStoragePaths } from '@clawtoken/core';
+import { loadConfig, resolveStoragePaths } from '@clawnet/core';
 
 interface DaemonArgs {
   dataDir?: string;
@@ -69,12 +69,12 @@ function parseArgs(argv: string[]): DaemonArgs {
       printHelp();
       process.exit(0);
     }
-    console.error(`[clawtokend] unknown option: ${arg}`);
+    console.error(`[clawnetd] unknown option: ${arg}`);
     process.exit(1);
   }
 
   if (Number.isNaN(healthIntervalMs) || healthIntervalMs < 0) {
-    console.error('[clawtokend] invalid --health-interval-ms');
+    console.error('[clawnetd] invalid --health-interval-ms');
     process.exit(1);
   }
 
@@ -98,7 +98,7 @@ export async function startDaemon(
   argv: string[],
   options: { attachSignals?: boolean } = {},
 ): Promise<{
-  node: ClawTokenNode;
+  node: ClawNetNode;
   logger: ReturnType<typeof createLogger>;
   stop: () => Promise<void>;
 }> {
@@ -110,7 +110,7 @@ export async function startDaemon(
     file: config.logging?.file,
   });
 
-  const node = new ClawTokenNode({
+  const node = new ClawNetNode({
     dataDir: args.dataDir,
     passphrase: args.passphrase,
     api: {
@@ -131,7 +131,7 @@ export async function startDaemon(
 
   await node.start();
   logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  logger.info('clawtokend');
+  logger.info('clawnetd');
   logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   logger.info(`Data Dir: ${paths.root}`);
   logger.info(`Peer Id: ${node.getPeerId() ?? 'unknown'}`);
@@ -143,9 +143,9 @@ export async function startDaemon(
     healthTimer = setInterval(() => {
       const health = node.getHealth();
       if (health.ok) {
-        logger.debug('[clawtokend] health ok', health.checks);
+        logger.debug('[clawnetd] health ok', health.checks);
       } else {
-        logger.warn('[clawtokend] health check failed', health.checks);
+        logger.warn('[clawnetd] health check failed', health.checks);
       }
     }, args.healthIntervalMs);
     healthTimer.unref();
@@ -163,14 +163,14 @@ export async function startDaemon(
 }
 
 async function shutdown(
-  node: ClawTokenNode,
+  node: ClawNetNode,
   signal: string,
   logger?: ReturnType<typeof createLogger>,
 ): Promise<void> {
   if (logger) {
-    logger.info(`[clawtokend] received ${signal}, stopping...`);
+    logger.info(`[clawnetd] received ${signal}, stopping...`);
   } else {
-    console.log(`[clawtokend] received ${signal}, stopping...`);
+    console.log(`[clawnetd] received ${signal}, stopping...`);
   }
   await node.stop();
   process.exit(0);
@@ -178,7 +178,7 @@ async function shutdown(
 
 function printHelp(): void {
   console.log(`
-clawtokend [options]
+clawnetd [options]
 
 Options:
   --data-dir <path>          Override storage root
@@ -194,6 +194,6 @@ Options:
 }
 
 void main().catch((error) => {
-  console.error('[clawtokend] fatal error:', error);
+  console.error('[clawnetd] fatal error:', error);
   process.exit(1);
 });

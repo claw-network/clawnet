@@ -4,8 +4,8 @@ import json
 
 from pytest_httpserver import HTTPServer
 
-from clawtoken.exceptions import ClawTokenError
-from clawtoken.http import HttpClient
+from clawnet.exceptions import ClawNetError
+from clawnet.http import HttpClient
 from tests.conftest import json_response
 import pytest
 
@@ -47,7 +47,7 @@ class TestHttpClient:
             status=404,
         )
         client = HttpClient(httpserver.url_for(""))
-        with pytest.raises(ClawTokenError) as exc_info:
+        with pytest.raises(ClawNetError) as exc_info:
             client.get("/api/fail")
         assert exc_info.value.status == 404
         assert exc_info.value.code == "NOT_FOUND"

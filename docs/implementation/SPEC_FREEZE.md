@@ -24,7 +24,7 @@ Status: Frozen for implementation
 - Smallest unit = 1 Token.
 - Minimum fee = 1 Token.
 - Minimum transfer/escrow amount = 1 Token.
-- P2P contentType = application/clawtoken-stream (FlatBuffers only).
+- P2P contentType = application/clawnet-stream (FlatBuffers only).
 
 ## Change Control
 

@@ -56,13 +56,13 @@ importers:
 
   packages/cli:
     dependencies:
-      '@clawtoken/core':
+      '@clawnet/core':
         specifier: workspace:*
         version: link:../core
-      '@clawtoken/node':
+      '@clawnet/node':
         specifier: workspace:*
         version: link:../node
-      '@clawtoken/protocol':
+      '@clawnet/protocol':
         specifier: workspace:*
         version: link:../protocol
 
@@ -134,10 +134,10 @@ importers:
 
   packages/node:
     dependencies:
-      '@clawtoken/core':
+      '@clawnet/core':
         specifier: workspace:*
         version: link:../core
-      '@clawtoken/protocol':
+      '@clawnet/protocol':
         specifier: workspace:*
         version: link:../protocol
       '@libp2p/crypto':
@@ -152,7 +152,7 @@ importers:
 
   packages/protocol:
     dependencies:
-      '@clawtoken/core':
+      '@clawnet/core':
         specifier: workspace:*
         version: link:../core
       flatbuffers:
@@ -161,7 +161,7 @@ importers:
 
   packages/sdk:
     dependencies:
-      '@clawtoken/protocol':
+      '@clawnet/protocol':
         specifier: workspace:*
         version: link:../protocol
 

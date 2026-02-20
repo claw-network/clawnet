@@ -5,9 +5,9 @@
  *   node --loader ts-node/esm check-balance.ts
  */
 
-import { ClawTokenClient } from '@clawtoken/sdk';
+import { ClawNetClient } from '@clawnet/sdk';
 
-const client = new ClawTokenClient();
+const client = new ClawNetClient();
 
 const status = await client.node.getStatus();
 console.log('Node:', status.network, `block #${status.blockHeight}`, status.synced ? '(synced)' : '(syncing …)');

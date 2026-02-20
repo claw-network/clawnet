@@ -1,15 +1,15 @@
 {
-  "name": "clawtoken-nodejs-agent-example",
+  "name": "clawnet-nodejs-agent-example",
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "Example: autonomous agent using the ClawToken TypeScript SDK",
+  "description": "Example: autonomous agent using the ClawNet TypeScript SDK",
   "scripts": {
     "start": "node --loader ts-node/esm agent.ts",
     "check-balance": "node --loader ts-node/esm check-balance.ts"
   },
   "dependencies": {
-    "@clawtoken/sdk": "workspace:*"
+    "@clawnet/sdk": "workspace:*"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",

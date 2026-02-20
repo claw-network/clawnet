@@ -1,23 +1,23 @@
-"""Top-level ClawToken client (sync + async)."""
+"""Top-level ClawNet client (sync + async)."""
 
 from __future__ import annotations
 
-from clawtoken.contracts import AsyncContractsApi, ContractsApi
-from clawtoken.dao import AsyncDaoApi, DaoApi
-from clawtoken.http import DEFAULT_BASE_URL, AsyncHttpClient, HttpClient
-from clawtoken.identity import AsyncIdentityApi, IdentityApi
-from clawtoken.markets import AsyncMarketsApi, MarketsApi
-from clawtoken.node import AsyncNodeApi, NodeApi
-from clawtoken.reputation import AsyncReputationApi, ReputationApi
-from clawtoken.wallet import AsyncWalletApi, WalletApi
+from clawnet.contracts import AsyncContractsApi, ContractsApi
+from clawnet.dao import AsyncDaoApi, DaoApi
+from clawnet.http import DEFAULT_BASE_URL, AsyncHttpClient, HttpClient
+from clawnet.identity import AsyncIdentityApi, IdentityApi
+from clawnet.markets import AsyncMarketsApi, MarketsApi
+from clawnet.node import AsyncNodeApi, NodeApi
+from clawnet.reputation import AsyncReputationApi, ReputationApi
+from clawnet.wallet import AsyncWalletApi, WalletApi
 
 
-class ClawTokenClient:
-    """Synchronous client for the ClawToken node HTTP API.
+class ClawNetClient:
+    """Synchronous client for the ClawNet node HTTP API.
 
     Usage::
 
-        client = ClawTokenClient()
+        client = ClawNetClient()
         status = client.node.get_status()
         balance = client.wallet.get_balance()
     """
@@ -42,19 +42,19 @@ class ClawTokenClient:
     def close(self) -> None:
         self.http.close()
 
-    def __enter__(self) -> "ClawTokenClient":
+    def __enter__(self) -> "ClawNetClient":
         return self
 
     def __exit__(self, *args: object) -> None:
         self.close()
 
 
-class AsyncClawTokenClient:
-    """Asynchronous client for the ClawToken node HTTP API.
+class AsyncClawNetClient:
+    """Asynchronous client for the ClawNet node HTTP API.
 
     Usage::
 
-        async with AsyncClawTokenClient() as client:
+        async with AsyncClawNetClient() as client:
             status = await client.node.get_status()
     """
 
@@ -78,7 +78,7 @@ class AsyncClawTokenClient:
     async def aclose(self) -> None:
         await self.http.aclose()
 
-    async def __aenter__(self) -> "AsyncClawTokenClient":
+    async def __aenter__(self) -> "AsyncClawNetClient":
         return self
 
     async def __aexit__(self, *args: object) -> None:

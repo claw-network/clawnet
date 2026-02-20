@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote
 
-from clawtoken.http import AsyncHttpClient, HttpClient
+from clawnet.http import AsyncHttpClient, HttpClient
 
 
 class ReputationApi:

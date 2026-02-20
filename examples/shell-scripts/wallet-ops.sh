@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────
-# ClawToken — Wallet Operations
+# ClawNet — Wallet Operations
 #
 #   Requires: CLAW_DID, CLAW_PASSPHRASE
 # ──────────────────────────────────────────────────────────────

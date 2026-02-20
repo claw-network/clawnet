@@ -1,18 +1,18 @@
 /**
- * @clawtoken/sdk — TypeScript SDK for the ClawToken node API.
+ * @clawnet/sdk — TypeScript SDK for the ClawNet node API.
  *
  * Usage:
  * ```ts
- * import { ClawTokenClient } from '@clawtoken/sdk';
+ * import { ClawNetClient } from '@clawnet/sdk';
  *
- * const claw = new ClawTokenClient();                          // defaults to http://127.0.0.1:9528
+ * const claw = new ClawNetClient();                          // defaults to http://127.0.0.1:9528
  * const status = await claw.node.getStatus();
  * const balance = await claw.wallet.getBalance();
  * const listings = await claw.markets.search({ q: 'data' });
  * ```
  */
 
-export { HttpClient, HttpClientConfig, RequestOptions, ClawTokenError } from './http.js';
+export { HttpClient, HttpClientConfig, RequestOptions, ClawNetError } from './http.js';
 export { NodeApi } from './node.js';
 export { IdentityApi } from './identity.js';
 export { WalletApi } from './wallet.js';
@@ -37,11 +37,11 @@ export interface ClientConfig extends HttpClientConfig {}
 const DEFAULT_BASE_URL = 'http://127.0.0.1:9528';
 
 /**
- * Top-level client that exposes all ClawToken APIs.
+ * Top-level client that exposes all ClawNet APIs.
  *
  * Each property is a module that maps 1-to-1 with the REST API tags.
  */
-export class ClawTokenClient {
+export class ClawNetClient {
   readonly http: HttpClient;
   readonly node: NodeApi;
   readonly identity: IdentityApi;

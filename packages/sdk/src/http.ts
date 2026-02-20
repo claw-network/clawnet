@@ -1,18 +1,18 @@
 /**
- * HTTP client for ClawToken node API.
+ * HTTP client for ClawNet node API.
  *
  * Wraps fetch with base URL, JSON serialization, and unified error handling.
  */
 
-/** Error returned by the ClawToken node API. */
-export class ClawTokenError extends Error {
+/** Error returned by the ClawNet node API. */
+export class ClawNetError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
     message: string,
   ) {
     super(message);
-    this.name = 'ClawTokenError';
+    this.name = 'ClawNetError';
   }
 }
 
@@ -135,14 +135,14 @@ export class HttpClient {
         json = JSON.parse(text);
       } catch {
         if (!res.ok) {
-          throw new ClawTokenError(res.status, 'UNKNOWN', text || res.statusText);
+          throw new ClawNetError(res.status, 'UNKNOWN', text || res.statusText);
         }
         return text as T;
       }
 
       if (!res.ok) {
         const err = (json as { error?: { code?: string; message?: string } })?.error;
-        throw new ClawTokenError(
+        throw new ClawNetError(
           res.status,
           err?.code ?? 'UNKNOWN',
           err?.message ?? res.statusText,

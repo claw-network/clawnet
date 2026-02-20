@@ -2,7 +2,7 @@
  * Tests for WalletApi — balance, transfer, escrow.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { ClawTokenClient } from '../src/index.js';
+import { ClawNetClient } from '../src/index.js';
 import { createMockServer, type MockServer } from './helpers/mock-server.js';
 
 let mock: MockServer;
@@ -21,7 +21,7 @@ describe('WalletApi', () => {
       locked: 100,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const b = await client.wallet.getBalance();
 
     expect(b.balance).toBe(1000);
@@ -39,7 +39,7 @@ describe('WalletApi', () => {
       locked: 0,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     await client.wallet.getBalance({ did: 'did:claw:z6MkOther' });
 
     expect(mock.requests[0].url).toContain('did=');
@@ -57,7 +57,7 @@ describe('WalletApi', () => {
       timestamp: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.wallet.transfer({
       did: 'did:claw:z6MkSender',
       passphrase: 'pass',
@@ -85,7 +85,7 @@ describe('WalletApi', () => {
       hasMore: false,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.wallet.getHistory({ limit: 10, offset: 0 });
 
     expect(result.transactions).toHaveLength(1);
@@ -107,7 +107,7 @@ describe('WalletApi', () => {
       createdAt: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.wallet.createEscrow({
       did: 'did:claw:z6MkA',
       passphrase: 'pass',
@@ -135,7 +135,7 @@ describe('WalletApi', () => {
       createdAt: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.wallet.getEscrow('escrow-1');
 
     expect(result.id).toBe('escrow-1');
@@ -152,7 +152,7 @@ describe('WalletApi', () => {
       timestamp: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.wallet.releaseEscrow('escrow-1', {
       did: 'did:claw:z6MkA',
       passphrase: 'pass',
@@ -175,7 +175,7 @@ describe('WalletApi', () => {
       timestamp: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.wallet.fundEscrow('escrow-2', {
       did: 'did:claw:z6MkA',
       passphrase: 'pass',
@@ -198,7 +198,7 @@ describe('WalletApi', () => {
       timestamp: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.wallet.refundEscrow('escrow-3', {
       did: 'did:claw:z6MkA',
       passphrase: 'pass',
@@ -221,7 +221,7 @@ describe('WalletApi', () => {
       timestamp: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.wallet.expireEscrow('escrow-4', {
       did: 'did:claw:z6MkA',
       passphrase: 'pass',

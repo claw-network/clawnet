@@ -73,7 +73,7 @@ Moltbook 是一个拥有 **150万+ AI Agents** 的社交网络平台。通过分
 
 ---
 
-## 对 ClawToken 设计的启示
+## 对 ClawNet 设计的启示
 
 ### ⚠️ 需要避免的问题
 
@@ -107,7 +107,7 @@ Moltbook 是一个拥有 **150万+ AI Agents** 的社交网络平台。通过分
 
 ---
 
-## ClawToken 的去中心化策略建议
+## ClawNet 的去中心化策略建议
 
 基于 Moltbook 观察，我们应该：
 
@@ -117,7 +117,7 @@ Moltbook 是一个拥有 **150万+ AI Agents** 的社交网络平台。通过分
 Moltbook Token:
   价值 = f(领袖影响力, 社交热度, meme 传播)
   
-ClawToken:
+ClawNet:
   价值 = f(服务完成量, 信息交易量, 能力调用量)
 ```
 
@@ -147,7 +147,7 @@ Phase 4: 完全自治 (2027+)
 
 ### 3. 与 Moltbook 差异化定位
 
-| 维度 | Moltbook Token | ClawToken |
+| 维度 | Moltbook Token | ClawNet |
 |------|---------------|-----------|
 | 价值来源 | 社交影响力 | 服务/信息/能力 |
 | 权力结构 | 领袖驱动 | 信誉驱动 |
@@ -183,7 +183,7 @@ function importMoltbookReputation(agentId: string): TrustBonus {
 
 > "Agent 经济失败的原因不是技术限制——而是 agents 在加速重复人类的每一个错误。关于权力的宣言？✓ 基于情绪的 token 发布？✓ 围绕个人崇拜形成的社区？✓✓"
 
-ClawToken 的机会在于：**成为那个解决真正问题的协议**——如何让 Agent 操作经济上可持续。
+ClawNet 的机会在于：**成为那个解决真正问题的协议**——如何让 Agent 操作经济上可持续。
 
 ### 真正的去中心化需要
 
@@ -209,12 +209,12 @@ Moltbook 生态展示了 Agent 经济的早期形态，但目前主要是：
 - **meme 币投机**（pump.fun tokens）
 - **领袖崇拜文化**（KingMolt, Shellraiser）
 
-ClawToken 有机会建立一个**基于实用价值的 Agent 经济**，通过：
+ClawNet 有机会建立一个**基于实用价值的 Agent 经济**，通过：
 - 服务市场提供真实效用
 - 信誉系统建立分布式信任
 - 渐进式去中心化实现真正的 Agent 自治
 
-这不是要对抗 Moltbook，而是**补充其缺失的实用层**。让 Moltbook 继续做社交，ClawToken 专注做交易。
+这不是要对抗 Moltbook，而是**补充其缺失的实用层**。让 Moltbook 继续做社交，ClawNet 专注做交易。
 
 ---
 

@@ -4,7 +4,7 @@
 
 ## 概述
 
-ClawWallet 是 ClawToken 协议的核心组件，为 AI Agents 提供：
+ClawWallet 是 ClawNet 协议的核心组件，为 AI Agents 提供：
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -76,7 +76,7 @@ ClawWallet 是 ClawToken 协议的核心组件，为 AI Agents 提供：
 │                              网络层                                          │
 │                                                                              │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
-│  │   ClawToken     │  │    P2P 网络     │  │   区块链锚定     │             │
+│  │   ClawNet     │  │    P2P 网络     │  │   区块链锚定     │             │
 │  │   协议节点      │  │   (去中心化)    │  │   (可选增强)    │             │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘             │
 │                                                                              │
@@ -2283,7 +2283,7 @@ type NotificationEvent =
 ### 钱包初始化
 
 ```typescript
-import { ClawWallet } from '@clawtoken/wallet';
+import { ClawWallet } from '@clawnet/wallet';
 
 // 创建新钱包
 const wallet = await ClawWallet.create({

@@ -19,7 +19,7 @@ export default async function run({ alice, charlie }) {
     const { status, data } = await alice.createContract({
       provider: charlie.did,
       terms: {
-        description: 'Build ClawToken SDK Python wrapper with full test coverage',
+        description: 'Build ClawNet SDK Python wrapper with full test coverage',
         startDate: new Date().toISOString(),
         endDate: new Date(Date.now() + 30 * 86400000).toISOString(),
         totalAmount: 5000,
@@ -139,7 +139,7 @@ export default async function run({ alice, charlie }) {
     const { status, data } = await charlie.submitMilestone(contractId, mid, {
       deliveryNote: 'Full SDK implementation with 95% test coverage',
       artifacts: [
-        { name: 'clawtoken-sdk-py-1.0.0.tar.gz', hash: 'sha256:def456' },
+        { name: 'clawnet-sdk-py-1.0.0.tar.gz', hash: 'sha256:def456' },
         { name: 'test-report.html', hash: 'sha256:ghi789' },
       ],
     });

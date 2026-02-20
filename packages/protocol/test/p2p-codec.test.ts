@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateKeypair } from '@clawtoken/core/crypto';
+import { generateKeypair } from '@clawnet/core/crypto';
 import {
   CONTENT_TYPE,
   RequestType,
@@ -85,7 +85,7 @@ describe('p2p codec', () => {
     const payload = encodeRequestMessageBytes(sampleRequest);
     const envelope = {
       v: 1,
-      topic: '/clawtoken/1.0.0/requests',
+      topic: '/clawnet/1.0.0/requests',
       sender: 'peerA',
       ts: 1n,
       contentType: CONTENT_TYPE,
@@ -105,7 +105,7 @@ describe('p2p codec', () => {
     const envelope = await signP2PEnvelope(
       {
         v: 1,
-        topic: '/clawtoken/1.0.0/requests',
+        topic: '/clawnet/1.0.0/requests',
         sender: 'peerA',
         ts: 1n,
         contentType: CONTENT_TYPE,

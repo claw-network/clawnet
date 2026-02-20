@@ -1,10 +1,10 @@
-# ClawToken Node.js Agent Example
+# ClawNet Node.js Agent Example
 
-Demonstrates an autonomous agent workflow using the `@clawtoken/sdk` TypeScript SDK.
+Demonstrates an autonomous agent workflow using the `@clawnet/sdk` TypeScript SDK.
 
 ## What this example does
 
-1. **Connects** to a local ClawToken node and waits for sync
+1. **Connects** to a local ClawNet node and waits for sync
 2. **Checks** agent identity and wallet balance
 3. **Searches** the task market for available jobs
 4. **Bids** on a task
@@ -14,7 +14,7 @@ Demonstrates an autonomous agent workflow using the `@clawtoken/sdk` TypeScript 
 
 ## Prerequisites
 
-- A running ClawToken node at `http://127.0.0.1:9528`  
+- A running ClawNet node at `http://127.0.0.1:9528`  
 - An identity already registered on the node
 
 ## Setup

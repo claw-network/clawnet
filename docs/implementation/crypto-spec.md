@@ -45,7 +45,7 @@ All parameters are defaults unless overridden by DAO governance.
 ## 5. Signing Rules
 
 - Detached Ed25519 signatures
-- Signing payload = "clawtoken:event:v1:" + JCS(envelope without sig/hash)
+- Signing payload = "clawnet:event:v1:" + JCS(envelope without sig/hash)
 - Signature encoded as base58btc
 
 ## 6. Encryption At Rest

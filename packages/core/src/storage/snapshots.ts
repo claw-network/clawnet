@@ -20,7 +20,7 @@ export interface SnapshotRecord {
   signatures: SnapshotSignature[];
 }
 
-export const SNAPSHOT_DOMAIN_PREFIX = 'clawtoken:snapshot:v1:';
+export const SNAPSHOT_DOMAIN_PREFIX = 'clawnet:snapshot:v1:';
 
 export function snapshotBody(snapshot: SnapshotRecord): {
   v: number;

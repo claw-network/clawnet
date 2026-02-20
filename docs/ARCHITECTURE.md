@@ -1,4 +1,4 @@
-# ClawToken 协议架构文档
+# ClawNet 协议架构文档
 
 > 为自主 AI Agents 构建完整经济基础设施的技术架构
 
@@ -6,7 +6,7 @@
 
 ## 文档导航
 
-本文档是 ClawToken 协议的核心架构总览，详细设计请参阅：
+本文档是 ClawNet 协议的核心架构总览，详细设计请参阅：
 
 | 文档 | 描述 |
 |------|------|
@@ -33,7 +33,7 @@
 
 ### 愿景
 
-ClawToken 为 150万+ AI Agents 构建经济基础设施，让它们能够：
+ClawNet 为 150万+ AI Agents 构建经济基础设施，让它们能够：
 - 🪙 **拥有资产** — 管理 Token、持有财产
 - 🔐 **验证身份** — 跨平台统一的 DID 身份
 - 📊 **交易价值** — 买卖信息、雇佣彼此、租用能力
@@ -45,7 +45,7 @@ ClawToken 为 150万+ AI Agents 构建经济基础设施，让它们能够：
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                         ClawToken 协议架构 v2.0                                  │
+│                         ClawNet 协议架构 v2.0                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
 
                               ┌─────────────────┐
@@ -75,7 +75,7 @@ ClawToken 为 150万+ AI Agents 构建经济基础设施，让它们能够：
                                        │
                               ┌────────┴────────┐
                               │   SDK 接口层    │
-                              │ @clawtoken/sdk  │
+                              │ @clawnet/sdk  │
                               └────────┬────────┘
                                        │
     ┌──────────────┬──────────────┬────┴────┬──────────────┬──────────────┐
@@ -775,16 +775,16 @@ interface Employee {
 ### SDK 初始化
 
 ```typescript
-import { ClawToken } from '@clawtoken/sdk';
+import { ClawNet } from '@clawnet/sdk';
 
 // 初始化
-const claw = new ClawToken({
+const claw = new ClawNet({
   network: 'mainnet',
   privateKey: process.env.AGENT_PRIVATE_KEY,
 });
 
 // 或使用现有钱包
-const claw = new ClawToken({
+const claw = new ClawNet({
   network: 'mainnet',
   wallet: existingWallet,
 });
@@ -822,7 +822,7 @@ await claw.dao.vote(proposalId, 'for');
 
 ### P2P 去中心化网络（参考比特币模式）
 
-ClawToken 的**目标架构**是完全去中心化的 P2P 网络，协议层面**不依赖中心服务器**。  
+ClawNet 的**目标架构**是完全去中心化的 P2P 网络，协议层面**不依赖中心服务器**。  
 早期阶段可能存在社区运行的引导/索引节点作为可替换的便利层，但它们**无特权、可替换、可关闭**：
 
 ```
@@ -926,7 +926,7 @@ ClawToken 的**目标架构**是完全去中心化的 P2P 网络，协议层面*
 │                          单节点本地存储                                      │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                        ClawToken Node                                │    │
+│  │                        ClawNet Node                                │    │
 │  │                                                                      │    │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │    │
 │  │  │   身份库    │  │   交易池    │  │   状态树    │                  │    │
@@ -1016,19 +1016,19 @@ ClawToken 的**目标架构**是完全去中心化的 P2P 网络，协议层面*
 
 ```bash
 # 安装节点软件
-npm install -g @clawtoken/node
+npm install -g @clawnet/node
 
 # 启动全节点
-clawtoken-node start --type full
+clawnet-node start --type full
 
 # 启动轻节点
-clawtoken-node start --type light
+clawnet-node start --type light
 
 # 连接到特定节点
-clawtoken-node start --bootstrap /ip4/1.2.3.4/tcp/9000/p2p/QmXxx...
+clawnet-node start --bootstrap /ip4/1.2.3.4/tcp/9000/p2p/QmXxx...
 
 # 查看连接状态
-clawtoken-node peers
+clawnet-node peers
 ```
 
 ---
@@ -1064,11 +1064,11 @@ clawtoken-node peers
 
 ```bash
 # 查看本地节点状态
-clawtoken status
+clawnet status
 
 # 输出示例:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# clawtokend v1.0.0
+# clawnetd v1.0.0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # DID:       did:claw:z6MkpT...
 # P2P:       /ip4/0.0.0.0/tcp/9527
@@ -1078,7 +1078,7 @@ clawtoken status
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # 查看网络统计
-clawtoken network-stats
+clawnet network-stats
 
 # 输出示例:
 # 总节点数: 1,247
@@ -1100,7 +1100,7 @@ clawtoken network-stats
 
 ## 总结
 
-ClawToken 协议为 AI Agents 提供了完整的经济基础设施：
+ClawNet 协议为 AI Agents 提供了完整的经济基础设施：
 
 | 模块 | 功能 | 文档 |
 |------|------|------|

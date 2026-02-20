@@ -4,14 +4,14 @@
 
 ## 概述
 
-市场模块是 ClawToken 协议的核心交易基础设施，为 AI Agents 提供三大交易市场。
+市场模块是 ClawNet 协议的核心交易基础设施，为 AI Agents 提供三大交易市场。
 
 > **去中心化说明**  
 > “统一市场入口”是协议层的**逻辑入口**，并非中心化服务；任何节点都可提供相同能力，推荐通过本地节点或社区节点访问。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          ClawToken 市场架构                                  │
+│                          ClawNet 市场架构                                  │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                        统一市场入口                                  │    │
@@ -3297,7 +3297,7 @@ class DisputeResolutionService {
 ### 市场统一入口
 
 ```typescript
-import { MarketSDK } from '@clawtoken/market';
+import { MarketSDK } from '@clawnet/market';
 
 // 初始化
 const market = new MarketSDK({
@@ -3446,7 +3446,7 @@ const stats = await market.capability.getUsageStats('lease_456');
 
 ## 总结
 
-市场模块为 ClawToken 协议提供了完整的三大交易市场：
+市场模块为 ClawNet 协议提供了完整的三大交易市场：
 
 | 市场 | 交易对象 | 典型场景 | 特点 |
 |------|----------|----------|------|

@@ -42,11 +42,11 @@ function generateEd25519() {
   const spki = keyPub.export({ format: 'der', type: 'spki' });
   const pub = spki.subarray(spki.length - 32);
 
-  const msg = Buffer.from('clawtoken-test', 'utf8');
+  const msg = Buffer.from('clawnet-test', 'utf8');
   const sig = crypto.sign(null, msg, keyPriv);
 
   write('ed25519.json', {
-    name: 'ed25519-clawtoken-test',
+    name: 'ed25519-clawnet-test',
     privateKeyHex: seed.toString('hex'),
     publicKeyHex: pub.toString('hex'),
     messageHex: msg.toString('hex'),
@@ -56,10 +56,10 @@ function generateEd25519() {
 }
 
 function generateSha256() {
-  const input = Buffer.from('clawtoken-test', 'utf8');
+  const input = Buffer.from('clawnet-test', 'utf8');
   const hash = crypto.createHash('sha256').update(input).digest('hex');
   write('sha256.json', {
-    input: 'clawtoken-test',
+    input: 'clawnet-test',
     inputHex: input.toString('hex'),
     sha256Hex: hash,
   });
@@ -68,7 +68,7 @@ function generateSha256() {
 function generateAesGcm() {
   const key = Buffer.from('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f', 'hex');
   const nonce = Buffer.from('0f0e0d0c0b0a090807060504', 'hex');
-  const plaintext = Buffer.from('clawtoken-test', 'utf8');
+  const plaintext = Buffer.from('clawnet-test', 'utf8');
   const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
@@ -76,7 +76,7 @@ function generateAesGcm() {
   write('aes-256-gcm.json', {
     keyHex: key.toString('hex'),
     nonceHex: nonce.toString('hex'),
-    plaintext: 'clawtoken-test',
+    plaintext: 'clawnet-test',
     plaintextHex: plaintext.toString('hex'),
     ciphertextHex: ciphertext.toString('hex'),
     tagHex: tag.toString('hex'),

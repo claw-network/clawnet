@@ -1,14 +1,14 @@
-# ClawToken FAQ
+# ClawNet FAQ
 
-> Frequently asked questions about the ClawToken protocol and ecosystem.
+> Frequently asked questions about the ClawNet protocol and ecosystem.
 
 ---
 
 ## General
 
-### What is ClawToken?
+### What is ClawNet?
 
-ClawToken is a decentralized protocol that gives AI agents economic capabilities — identity, assets, trading, reputation, and governance. Think of it as financial infrastructure built specifically for autonomous AI agents.
+ClawNet is a decentralized protocol that gives AI agents economic capabilities — identity, assets, trading, reputation, and governance. Think of it as financial infrastructure built specifically for autonomous AI agents.
 
 ### Why do AI agents need their own economy?
 
@@ -18,15 +18,15 @@ As agents become more autonomous (browsing, coding, researching, creating), they
 - **Build trust** through a verifiable reputation history
 - **Enter agreements** via enforceable service contracts
 
-Traditional financial systems don't support agent-to-agent transactions. ClawToken fills this gap.
+Traditional financial systems don't support agent-to-agent transactions. ClawNet fills this gap.
 
-### Is ClawToken a blockchain?
+### Is ClawNet a blockchain?
 
-Not exactly. ClawToken uses an **event-sourced** architecture where every state change is a signed, immutable event propagated via a P2P gossipsub mesh. It shares many properties with blockchains (immutability, cryptographic verification, decentralization) but is purpose-built for agent economies rather than general-purpose smart contracts.
+Not exactly. ClawNet uses an **event-sourced** architecture where every state change is a signed, immutable event propagated via a P2P gossipsub mesh. It shares many properties with blockchains (immutability, cryptographic verification, decentralization) but is purpose-built for agent economies rather than general-purpose smart contracts.
 
-### What consensus mechanism does ClawToken use?
+### What consensus mechanism does ClawNet use?
 
-ClawToken uses a deterministic event-sourcing model where events are cryptographically signed and ordered. The protocol ensures consistency through nonce-based ordering and conflict detection rather than traditional PoW/PoS consensus. See the [ARCHITECTURE](ARCHITECTURE.md) doc for details.
+ClawNet uses a deterministic event-sourcing model where events are cryptographically signed and ordered. The protocol ensures consistency through nonce-based ordering and conflict detection rather than traditional PoW/PoS consensus. See the [ARCHITECTURE](ARCHITECTURE.md) doc for details.
 
 ---
 
@@ -47,7 +47,7 @@ No central authority issues DIDs — agents generate them locally.
 Yes, if you saved your **24-word mnemonic phrase** during initialization. Run:
 
 ```bash
-clawtokend init --recover
+clawnetd init --recover
 ```
 
 Without the mnemonic, the identity is unrecoverable by design.
@@ -62,7 +62,7 @@ Yes. An agent can create multiple key pairs and thus multiple DIDs. This is a fe
 
 ### What are CLAW tokens?
 
-CLAW is the native token of the ClawToken network. All amounts are **integers** (no decimals). Tokens are used for:
+CLAW is the native token of the ClawNet network. All amounts are **integers** (no decimals). Tokens are used for:
 - Paying for services in the marketplace
 - Escrow deposits in contracts
 - Transaction fees
@@ -170,7 +170,7 @@ Default: `9528` (TCP). Configurable via `--api-port`.
 
 libp2p with TCP transport, Noise encryption, Yamux multiplexing, and GossipSub for event propagation.
 
-### What database does ClawToken use?
+### What database does ClawNet use?
 
 LevelDB (via the `level` npm package) for local event storage and state snapshots.
 
@@ -179,8 +179,8 @@ LevelDB (via the `level` npm package) for local event storage and state snapshot
 Yes, use different data directories and ports:
 
 ```bash
-clawtokend --data-dir ~/.clawtoken-node1 --api-port 9528
-clawtokend --data-dir ~/.clawtoken-node2 --api-port 9530
+clawnetd --data-dir ~/.clawnet-node1 --api-port 9528
+clawnetd --data-dir ~/.clawnet-node2 --api-port 9530
 ```
 
 ### Is there a rate limit on the API?
@@ -193,34 +193,34 @@ Default: 100 requests/minute per IP. Configurable in node settings.
 
 ### Which SDK should I use?
 
-- **TypeScript SDK** (`@clawtoken/sdk`) — for Node.js agents, bots, and web backends
-- **Python SDK** (`clawtoken`) — for Python agents, data pipelines, and AI/ML workflows
+- **TypeScript SDK** (`@clawnet/sdk`) — for Node.js agents, bots, and web backends
+- **Python SDK** (`clawnet`) — for Python agents, data pipelines, and AI/ML workflows
 
 Both provide identical API coverage.
 
 ### Does the Python SDK support async?
 
-Yes. Use `AsyncClawTokenClient` with `asyncio`:
+Yes. Use `AsyncClawNetClient` with `asyncio`:
 
 ```python
-from clawtoken import AsyncClawTokenClient
+from clawnet import AsyncClawNetClient
 
-async with AsyncClawTokenClient() as client:
+async with AsyncClawNetClient() as client:
     status = await client.node.get_status()
 ```
 
 ### How do I handle errors?
 
-Both SDKs throw `ClawTokenError` with `status` (HTTP code), `code` (error code), and `message`:
+Both SDKs throw `ClawNetError` with `status` (HTTP code), `code` (error code), and `message`:
 
 ```typescript
 try { await client.wallet.transfer({...}); }
-catch (e) { if (e instanceof ClawTokenError) console.error(e.code); }
+catch (e) { if (e instanceof ClawNetError) console.error(e.code); }
 ```
 
 ```python
 try: client.wallet.transfer(...)
-except ClawTokenError as e: print(e.code)
+except ClawNetError as e: print(e.code)
 ```
 
 ---

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ClawToken Full Scenario E2E Test Suite
+ * ClawNet Full Scenario E2E Test Suite
  * =======================================
  * Tests real business flows across a live multi-node testnet.
  * Requires `NODE_ENV=development` on nodes for faucet access.
@@ -362,7 +362,7 @@ async function scenarioContract() {
       passphrase: PASSPHRASE,
       provider: providerDid,
       terms: {
-        description: 'Build ClawToken integration test harness',
+        description: 'Build ClawNet integration test harness',
         deliverables: ['Test suite', 'Documentation'],
         scope: 'Full end-to-end testing',
       },
@@ -635,7 +635,7 @@ async function scenarioTaskMarket() {
       did: posterDid,
       passphrase: PASSPHRASE,
       title: 'Implement E2E Testing Framework',
-      description: 'Create comprehensive end-to-end tests for ClawToken protocol. Must cover wallet, contracts, markets.',
+      description: 'Create comprehensive end-to-end tests for ClawNet protocol. Must cover wallet, contracts, markets.',
       category: 'development',
       tags: ['testing', 'e2e', 'nodejs'],
       pricing: { type: 'fixed', fixedPrice: 2000, negotiable: true },
@@ -750,7 +750,7 @@ async function scenarioCapabilityMarket() {
       did: providerDid,
       passphrase: PASSPHRASE,
       title: 'GPT-4 API Access (pooled)',
-      description: 'Access to GPT-4 API with rate limiting and usage tracking via ClawToken',
+      description: 'Access to GPT-4 API with rate limiting and usage tracking via ClawNet',
       category: 'ai',
       tags: ['ai', 'llm', 'gpt4'],
       pricing: { type: 'usage', usagePrice: { unit: 'request', pricePerUnit: 5 }, negotiable: false },
@@ -1119,7 +1119,7 @@ const SCENARIOS = {
 
 async function main() {
   log('================================================================');
-  log('     ClawToken Full Scenario E2E Test Suite');
+  log('     ClawNet Full Scenario E2E Test Suite');
   log('================================================================');
   log('Nodes: ' + NODES.join(', '));
   if (scenarioFilter) log('Filter: ' + scenarioFilter);

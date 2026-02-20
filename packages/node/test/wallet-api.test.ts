@@ -13,9 +13,9 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@clawtoken/core';
-import { generateKeypair } from '@clawtoken/core/crypto';
-import { addressFromDid, didFromPublicKey } from '@clawtoken/core/identity';
+} from '@clawnet/core';
+import { generateKeypair } from '@clawnet/core/crypto';
+import { addressFromDid, didFromPublicKey } from '@clawnet/core/identity';
 
 describe('wallet api', () => {
   let api: ApiServer;
@@ -40,7 +40,7 @@ describe('wallet api', () => {
   };
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-wallet-api-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-wallet-api-'));
     passphrase = 'test-passphrase-123';
     const { publicKey, privateKey } = await generateKeypair();
     did = didFromPublicKey(publicKey);

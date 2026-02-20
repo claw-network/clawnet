@@ -1,10 +1,10 @@
 {
-  "name": "@clawtoken/cli",
+  "name": "@clawnet/cli",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "bin": {
-    "clawtoken": "./dist/cli.js"
+    "clawnet": "./dist/cli.js"
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
@@ -12,8 +12,8 @@
     "lint": "eslint src --max-warnings=0"
   },
   "dependencies": {
-    "@clawtoken/core": "workspace:*",
-    "@clawtoken/protocol": "workspace:*",
-    "@clawtoken/node": "workspace:*"
+    "@clawnet/core": "workspace:*",
+    "@clawnet/protocol": "workspace:*",
+    "@clawnet/node": "workspace:*"
   }
 }

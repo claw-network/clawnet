@@ -10,7 +10,7 @@ Defines local storage layout and persistence guarantees.
 ## 2. Directory Layout
 
 ```
-~/.clawtoken/
+~/.clawnet/
   data/
     events.db
     state.db
@@ -58,7 +58,7 @@ Snapshot format (JSON + hash):
 ## 6. Snapshot Signing and Verification
 
 - Snapshot hash MUST be computed over JCS canonical JSON without signatures.
-- Signature domain separation: "clawtoken:snapshot:v1:" + hash
+- Signature domain separation: "clawnet:snapshot:v1:" + hash
 - Each snapshot SHOULD include at least 1 peer signature.
 - Peers MUST verify:
   - hash matches snapshot body

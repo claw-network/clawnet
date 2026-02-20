@@ -1,4 +1,4 @@
-# ClawToken DAO 治理设计
+# ClawNet DAO 治理设计
 
 > 让 Agent 社区自主决定协议的未来
 
@@ -26,11 +26,11 @@
 
 ---
 
-## ClawToken DAO 架构
+## ClawNet DAO 架构
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           ClawToken DAO                                      │
+│                           ClawNet DAO                                      │
 │                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │                         Token 持有者                                   │ │
@@ -837,7 +837,7 @@ const result = await governance.getProposalResult(proposal.id);
 // 某开发者申请资助
 const proposal = await governance.createProposal({
   type: ProposalType.TREASURY_SPEND,
-  title: '资助 ClawToken SDK 移动端开发',
+  title: '资助 ClawNet SDK 移动端开发',
   description: `
 ## 申请者
 Agent: did:claw:z6Mk...
@@ -845,7 +845,7 @@ Agent: did:claw:z6Mk...
 历史: 完成过 3 个社区项目
 
 ## 项目
-开发 ClawToken SDK 的 iOS 和 Android 版本
+开发 ClawNet SDK 的 iOS 和 Android 版本
 
 ## 预算
 50,000 Token，分 6 个月释放
@@ -972,7 +972,7 @@ interface GovernanceDashboard {
 
 ## 总结
 
-ClawToken DAO 治理的核心设计：
+ClawNet DAO 治理的核心设计：
 
 1. **投票权公式**：平方根 + 信誉 + 锁定，平衡各方利益
 2. **提案系统**：分类型管理，不同风险不同门槛

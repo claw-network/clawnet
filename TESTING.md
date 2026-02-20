@@ -1,4 +1,4 @@
-# ClawToken Testing Guide
+# ClawNet Testing Guide
 
 ## Unit Tests
 
@@ -11,10 +11,10 @@ pnpm test
 Run tests for a specific package:
 
 ```bash
-pnpm --filter @clawtoken/core test
-pnpm --filter @clawtoken/protocol test
-pnpm --filter @clawtoken/node test
-pnpm --filter @clawtoken/cli test
+pnpm --filter @clawnet/core test
+pnpm --filter @clawnet/protocol test
+pnpm --filter @clawnet/node test
+pnpm --filter @clawnet/cli test
 ```
 
 ## Docker Testnet (Integration Tests)

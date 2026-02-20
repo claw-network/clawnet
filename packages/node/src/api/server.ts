@@ -21,7 +21,7 @@ import {
   resolveStoragePaths,
   utf8ToBytes,
   verifyCapabilityCredential,
-} from '@clawtoken/core';
+} from '@clawnet/core';
 import {
   applyContractEvent,
   applyMarketEvent,
@@ -121,7 +121,7 @@ import {
   createDaoTreasuryDepositEnvelope,
   createDaoTreasurySpendEnvelope,
   PROPOSAL_THRESHOLDS,
-} from '@clawtoken/protocol';
+} from '@clawnet/protocol';
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -5660,7 +5660,7 @@ export class ApiServer {
         title: body.title,
         description: body.description,
         discussionUrl: body.discussionUrl,
-        actions: body.actions as unknown as import('@clawtoken/protocol').ProposalAction[],
+        actions: body.actions as unknown as import('@clawnet/protocol').ProposalAction[],
         discussionPeriod: body.discussionPeriod ?? defaults.discussionPeriod,
         votingPeriod: body.votingPeriod ?? defaults.votingPeriod,
         timelockDelay: body.timelockDelay ?? defaults.timelockDelay,
@@ -5782,7 +5782,7 @@ export class ApiServer {
         issuer: body.did,
         privateKey,
         delegate: body.delegate,
-        scope: (body.scope ?? { all: true }) as import('@clawtoken/protocol').DelegationScope,
+        scope: (body.scope ?? { all: true }) as import('@clawnet/protocol').DelegationScope,
         percentage: body.percentage ?? 100,
         expiresAt: body.expiresAt,
         ts: body.ts ?? Date.now(),

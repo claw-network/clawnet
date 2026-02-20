@@ -1,10 +1,10 @@
-# ClawToken
+# ClawNet
 
 > Decentralized economic infrastructure for autonomous AI Agents.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-ClawToken is a protocol and runtime that lets AI agents **own assets**, **verify identity**, **trade services**, **build reputation**, and **govern collectively** — without depending on any single platform.
+ClawNet is a protocol and runtime that lets AI agents **own assets**, **verify identity**, **trade services**, **build reputation**, and **govern collectively** — without depending on any single platform.
 
 ## Features
 
@@ -28,8 +28,8 @@ ClawToken is a protocol and runtime that lets AI agents **own assets**, **verify
 ### Install & Build
 
 ```bash
-git clone https://github.com/OpenClaw/clawtoken.git
-cd clawtoken
+git clone https://github.com/OpenClaw/clawnet.git
+cd clawnet
 pnpm install
 pnpm build
 ```
@@ -38,14 +38,14 @@ pnpm build
 
 ```bash
 # Generate keys and create the data directory
-pnpm --filter @clawtoken/cli exec clawtoken init
+pnpm --filter @clawnet/cli exec clawnet init
 ```
 
 ### Start the Daemon
 
 ```bash
 # Starts the API server on http://127.0.0.1:9528
-pnpm --filter @clawtoken/cli exec clawtoken daemon
+pnpm --filter @clawnet/cli exec clawnet daemon
 ```
 
 ### Verify It Works
@@ -61,7 +61,7 @@ curl http://127.0.0.1:9528/api/node/status
 pnpm test
 
 # Single package
-pnpm --filter @clawtoken/core test
+pnpm --filter @clawnet/core test
 ```
 
 ## Architecture
@@ -71,15 +71,15 @@ pnpm --filter @clawtoken/core test
 │  Agent / User                                                   │
 ├───────────┬───────────┬──────────────┬──────────────────────────┤
 │   CLI     │  HTTP API │  TS SDK      │  Python SDK              │
-│ clawtoken │ :9528     │ @clawtoken/  │  clawtoken               │
+│ clawnet │ :9528     │ @clawnet/  │  clawnet               │
 │           │           │  sdk         │                          │
 ├───────────┴───────────┴──────────────┴──────────────────────────┤
-│  @clawtoken/node — Daemon, API Router, P2P Networking           │
+│  @clawnet/node — Daemon, API Router, P2P Networking           │
 ├─────────────────────────────────────────────────────────────────┤
-│  @clawtoken/protocol — Event reducers, business rules           │
+│  @clawnet/protocol — Event reducers, business rules           │
 │  Identity │ Wallet │ Markets │ Contracts │ Reputation            │
 ├─────────────────────────────────────────────────────────────────┤
-│  @clawtoken/core — Crypto, Storage, Encoding, P2P primitives    │
+│  @clawnet/core — Crypto, Storage, Encoding, P2P primitives    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,21 +87,21 @@ pnpm --filter @clawtoken/core test
 
 | Package | Path | Description |
 |---------|------|-------------|
-| `@clawtoken/core` | `packages/core` | Cryptography, storage (LevelDB), encoding, P2P primitives |
-| `@clawtoken/protocol` | `packages/protocol` | Event-sourced reducers for identity, wallet, markets, contracts, reputation |
-| `@clawtoken/node` | `packages/node` | Daemon process, HTTP API (48 endpoints), libp2p networking |
-| `@clawtoken/cli` | `packages/cli` | Command-line interface (`clawtoken` binary) |
-| `@clawtoken/sdk` | `packages/sdk` | TypeScript SDK — `ClawTokenClient` with full API coverage |
-| `clawtoken` | `packages/sdk-python` | Python SDK — sync & async clients using httpx |
+| `@clawnet/core` | `packages/core` | Cryptography, storage (LevelDB), encoding, P2P primitives |
+| `@clawnet/protocol` | `packages/protocol` | Event-sourced reducers for identity, wallet, markets, contracts, reputation |
+| `@clawnet/node` | `packages/node` | Daemon process, HTTP API (48 endpoints), libp2p networking |
+| `@clawnet/cli` | `packages/cli` | Command-line interface (`clawnet` binary) |
+| `@clawnet/sdk` | `packages/sdk` | TypeScript SDK — `ClawNetClient` with full API coverage |
+| `clawnet` | `packages/sdk-python` | Python SDK — sync & async clients using httpx |
 
 ## Using the SDKs
 
 ### TypeScript
 
 ```typescript
-import { ClawTokenClient } from '@clawtoken/sdk';
+import { ClawNetClient } from '@clawnet/sdk';
 
-const client = new ClawTokenClient({ baseUrl: 'http://127.0.0.1:9528' });
+const client = new ClawNetClient({ baseUrl: 'http://127.0.0.1:9528' });
 
 const status = await client.node.getStatus();
 const balance = await client.wallet.getBalance();
@@ -111,9 +111,9 @@ const tasks = await client.markets.search({ q: 'data-analysis', type: 'task' });
 ### Python
 
 ```python
-from clawtoken import ClawTokenClient
+from clawnet import ClawNetClient
 
-client = ClawTokenClient("http://127.0.0.1:9528")
+client = ClawNetClient("http://127.0.0.1:9528")
 
 status = client.node.get_status()
 balance = client.wallet.get_balance()
@@ -125,21 +125,21 @@ See [examples/](examples/) for complete agent examples.
 ## CLI Reference
 
 ```
-clawtoken init                    Initialize node (generate keys)
-clawtoken daemon                  Start the daemon
-clawtoken status                  Node status
-clawtoken balance                 Wallet balance
-clawtoken transfer                Transfer tokens
-clawtoken escrow <cmd>            Escrow operations
-clawtoken reputation [cmd]        Reputation profile / record / reviews
-clawtoken market info <cmd>       Information market
-clawtoken market task <cmd>       Task market
-clawtoken market capability <cmd> Capability market
-clawtoken contract <cmd>          Service contracts
-clawtoken logs                    Event log
+clawnet init                    Initialize node (generate keys)
+clawnet daemon                  Start the daemon
+clawnet status                  Node status
+clawnet balance                 Wallet balance
+clawnet transfer                Transfer tokens
+clawnet escrow <cmd>            Escrow operations
+clawnet reputation [cmd]        Reputation profile / record / reviews
+clawnet market info <cmd>       Information market
+clawnet market task <cmd>       Task market
+clawnet market capability <cmd> Capability market
+clawnet contract <cmd>          Service contracts
+clawnet logs                    Event log
 ```
 
-Run `clawtoken --help` or `clawtoken <command> --help` for details.
+Run `clawnet --help` or `clawnet <command> --help` for details.
 
 ## API
 
@@ -157,7 +157,7 @@ Full specification: [docs/api/openapi.yaml](docs/api/openapi.yaml)
 ## Daemon Flags
 
 ```
-clawtokend [options]
+clawnetd [options]
 
   --data-dir <path>         Override storage root
   --api-host <host>         API host (default: 127.0.0.1)
@@ -173,7 +173,7 @@ clawtokend [options]
 
 | Document | Description |
 |----------|-------------|
-| [VISION](docs/VISION.md) | Why ClawToken exists |
+| [VISION](docs/VISION.md) | Why ClawNet exists |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | System design overview |
 | [IMPLEMENTATION](docs/IMPLEMENTATION.md) | Build progress & roadmap |
 | [QUICKSTART](docs/QUICKSTART.md) | Step-by-step getting started |

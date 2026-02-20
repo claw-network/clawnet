@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "clawtoken-sdk"
+name = "clawnet-sdk"
 version = "0.1.0"
-description = "Python SDK for the ClawToken decentralized agent economy"
+description = "Python SDK for the ClawNet decentralized agent economy"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "ClawToken Contributors" },
+    { name = "ClawNet Contributors" },
 ]
-keywords = ["clawtoken", "agent", "decentralized", "sdk"]
+keywords = ["clawnet", "agent", "decentralized", "sdk"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -40,8 +40,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/clawtoken/clawtoken"
-Repository = "https://github.com/clawtoken/clawtoken"
+Homepage = "https://github.com/clawnet/clawnet"
+Repository = "https://github.com/clawnet/clawnet"
 
 [tool.ruff]
 target-version = "py310"

@@ -1,28 +1,28 @@
 {
-  "name": "@clawtoken/node",
+  "name": "@clawnet/node",
   "version": "0.1.0",
   "private": true,
-  "description": "ClawToken node daemon — HTTP API and P2P networking for the agent economy",
+  "description": "ClawNet node daemon — HTTP API and P2P networking for the agent economy",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OpenClaw/clawtoken.git",
+    "url": "https://github.com/OpenClaw/clawnet.git",
     "directory": "packages/node"
   },
-  "keywords": ["clawtoken", "agent", "decentralized", "node", "daemon"],
+  "keywords": ["clawnet", "agent", "decentralized", "node", "daemon"],
   "files": ["dist", "README.md"],
   "exports": {
     ".": "./dist/index.js"
   },
   "bin": {
-    "clawtokend": "./dist/daemon.js"
+    "clawnetd": "./dist/daemon.js"
   },
   "scripts": {
     "build": "tsc -b tsconfig.json",
-    "package": "pnpm build && pkg . --output dist/pkg/clawtokend && node ../../scripts/rename-pkg.js",
+    "package": "pnpm build && pkg . --output dist/pkg/clawnetd && node ../../scripts/rename-pkg.js",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src --max-warnings=0"
   },
@@ -38,8 +38,8 @@
     "outputPath": "dist/pkg"
   },
   "dependencies": {
-    "@clawtoken/core": "workspace:*",
-    "@clawtoken/protocol": "workspace:*",
+    "@clawnet/core": "workspace:*",
+    "@clawnet/protocol": "workspace:*",
     "@libp2p/crypto": "^5.1.13",
     "@libp2p/peer-id-factory": "^4.2.4",
     "zod": "^3.24.2"

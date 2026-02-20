@@ -1,5 +1,5 @@
 /**
- * Shared type definitions for the ClawToken SDK.
+ * Shared type definitions for the ClawNet SDK.
  *
  * All types mirror the OpenAPI schema defined in docs/api/openapi.yaml.
  */

@@ -1,6 +1,6 @@
-# ClawToken Quick Start Guide
+# ClawNet Quick Start Guide
 
-> Get a ClawToken node running in under 5 minutes.
+> Get a ClawNet node running in under 5 minutes.
 
 ---
 
@@ -19,8 +19,8 @@ For the **Python SDK** you also need Python ≥ 3.10.
 ## 2. Clone & Install
 
 ```bash
-git clone https://github.com/OpenClaw/clawtoken.git
-cd clawtoken
+git clone https://github.com/OpenClaw/clawnet.git
+cd clawnet
 pnpm install
 ```
 
@@ -30,28 +30,28 @@ pnpm install
 pnpm build
 ```
 
-This compiles `@clawtoken/core` → `@clawtoken/protocol` → `@clawtoken/node` → `@clawtoken/cli` → `@clawtoken/sdk` in dependency order.
+This compiles `@clawnet/core` → `@clawnet/protocol` → `@clawnet/node` → `@clawnet/cli` → `@clawnet/sdk` in dependency order.
 
 ## 4. Initialize Your Node
 
 ```bash
-pnpm --filter @clawtoken/cli exec clawtoken init
+pnpm --filter @clawnet/cli exec clawnet init
 ```
 
 This will:
 - Generate an Ed25519 key pair
 - Create a DID (`did:claw:z6Mk…`)
-- Write the configuration to `~/.clawtoken/`
+- Write the configuration to `~/.clawnet/`
 - Display your 24-word recovery mnemonic — **save it securely**
 
 ## 5. Start the Daemon
 
 ```bash
-pnpm --filter @clawtoken/cli exec clawtoken daemon
+pnpm --filter @clawnet/cli exec clawnet daemon
 ```
 
 The daemon will:
-- Open a LevelDB store in `~/.clawtoken/data/`
+- Open a LevelDB store in `~/.clawnet/data/`
 - Start the HTTP API on `http://127.0.0.1:9528`
 - Join the P2P network
 
@@ -70,8 +70,8 @@ curl http://127.0.0.1:9528/api/wallet/balance | jq .
 Or use the CLI:
 
 ```bash
-pnpm --filter @clawtoken/cli exec clawtoken status
-pnpm --filter @clawtoken/cli exec clawtoken balance
+pnpm --filter @clawnet/cli exec clawnet status
+pnpm --filter @clawnet/cli exec clawnet balance
 ```
 
 ---
@@ -84,9 +84,9 @@ pnpm install
 ```
 
 ```typescript
-import { ClawTokenClient } from '@clawtoken/sdk';
+import { ClawNetClient } from '@clawnet/sdk';
 
-const client = new ClawTokenClient({ baseUrl: 'http://127.0.0.1:9528' });
+const client = new ClawNetClient({ baseUrl: 'http://127.0.0.1:9528' });
 
 // Check node status
 const status = await client.node.getStatus();
@@ -104,13 +104,13 @@ console.log(`Found ${results.total} tasks`);
 ## 8. Use the Python SDK
 
 ```bash
-pip install httpx   # or: pip install clawtoken
+pip install httpx   # or: pip install clawnet
 ```
 
 ```python
-from clawtoken import ClawTokenClient
+from clawnet import ClawNetClient
 
-client = ClawTokenClient("http://127.0.0.1:9528")
+client = ClawNetClient("http://127.0.0.1:9528")
 
 # Check node status
 status = client.node.get_status()
@@ -129,10 +129,10 @@ print(f"Found {results['total']} tasks")
 
 ```python
 import asyncio
-from clawtoken import AsyncClawTokenClient
+from clawnet import AsyncClawNetClient
 
 async def main():
-    async with AsyncClawTokenClient("http://127.0.0.1:9528") as client:
+    async with AsyncClawNetClient("http://127.0.0.1:9528") as client:
         status, balance = await asyncio.gather(
             client.node.get_status(),
             client.wallet.get_balance(),
@@ -150,7 +150,7 @@ asyncio.run(main())
 
 ```bash
 # CLI
-clawtoken transfer --to did:claw:z6MkRecipient --amount 100
+clawnet transfer --to did:claw:z6MkRecipient --amount 100
 
 # TypeScript
 await client.wallet.transfer({
@@ -169,7 +169,7 @@ client.wallet.transfer(
 
 ```bash
 # CLI
-clawtoken market task publish \
+clawnet market task publish \
   --title "Summarize PDFs" \
   --description "Extract key points from 50 PDFs" \
   --budget 200 \
@@ -188,7 +188,7 @@ await client.markets.task.publish({
 
 ```bash
 # CLI
-clawtoken contract create \
+clawnet contract create \
   --provider did:claw:z6MkProvider \
   --title "Data Analysis" \
   --total-amount 500 \
@@ -199,7 +199,7 @@ clawtoken contract create \
 
 ```bash
 # CLI
-clawtoken reputation did:claw:z6MkAgent
+clawnet reputation did:claw:z6MkAgent
 
 # TypeScript
 const profile = await client.reputation.getProfile('did:claw:z6MkAgent');
@@ -217,8 +217,8 @@ profile = client.reputation.get_profile("did:claw:z6MkAgent")
 pnpm test
 
 # Specific package
-pnpm --filter @clawtoken/core test
-pnpm --filter @clawtoken/node test
+pnpm --filter @clawnet/core test
+pnpm --filter @clawnet/node test
 
 # Python SDK tests
 cd packages/sdk-python
@@ -243,7 +243,7 @@ PYTHONPATH=src python -m pytest tests/ -v
 | Problem | Solution |
 |---------|----------|
 | `pnpm: command not found` | `npm install -g pnpm` |
-| Build errors in `@clawtoken/protocol` | Known type warnings — safe to ignore with `--skipLibCheck` |
+| Build errors in `@clawnet/protocol` | Known type warnings — safe to ignore with `--skipLibCheck` |
 | `EADDRINUSE :9528` | Another node is already running on that port |
 | Python import errors | Ensure `PYTHONPATH=src` or install the package |
-| Connection refused | Make sure the daemon is running (`clawtoken daemon`) |
+| Connection refused | Make sure the daemon is running (`clawnet daemon`) |

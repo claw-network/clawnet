@@ -10,14 +10,14 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@clawtoken/core';
-import { generateKeypair } from '@clawtoken/core/crypto';
-import { didFromPublicKey } from '@clawtoken/core/identity';
+} from '@clawnet/core';
+import { generateKeypair } from '@clawnet/core/crypto';
+import { didFromPublicKey } from '@clawnet/core/identity';
 import {
   createInfoListingPublishEnvelope,
   InfoContentStore,
   MarketSearchStore,
-} from '@clawtoken/protocol';
+} from '@clawnet/protocol';
 
 const pricing = {
   type: 'fixed',
@@ -54,7 +54,7 @@ describe('info market api', () => {
   let contentStore: InfoContentStore;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-info-api-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-info-api-'));
     passphrase = 'test-passphrase-123';
     const { publicKey, privateKey } = await generateKeypair();
     buyerDid = didFromPublicKey(publicKey);

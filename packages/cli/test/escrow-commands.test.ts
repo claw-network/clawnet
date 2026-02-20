@@ -24,7 +24,7 @@ describe('cli escrow commands', () => {
   let published: Record<string, unknown>[];
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-cli-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-cli-'));
     passphrase = 'test-passphrase-123';
     const { publicKey, privateKey } = await generateKeypair();
     did = didFromPublicKey(publicKey);

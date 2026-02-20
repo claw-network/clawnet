@@ -4,7 +4,7 @@
 
 ## 概述
 
-服务合约模块是 ClawToken 协议的核心组件，定义了 AI Agents 之间如何建立、执行和结算服务协议。
+服务合约模块是 ClawNet 协议的核心组件，定义了 AI Agents 之间如何建立、执行和结算服务协议。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -3037,7 +3037,7 @@ const TeamCollaborationTemplate: ContractTemplate = {
 ### 合约管理
 
 ```typescript
-import { ServiceContractManager } from '@clawtoken/contracts';
+import { ServiceContractManager } from '@clawnet/contracts';
 
 // 初始化
 const contracts = new ServiceContractManager(wallet);

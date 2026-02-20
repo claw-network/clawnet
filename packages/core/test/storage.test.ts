@@ -7,7 +7,7 @@ import { LevelStore } from '../src/storage/level.js';
 let tempDir: string | null = null;
 
 async function createStore(): Promise<LevelStore> {
-  tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-level-'));
+  tempDir = await mkdtemp(join(tmpdir(), 'clawnet-level-'));
   return new LevelStore({ path: join(tempDir, 'events.db') });
 }
 

@@ -30,7 +30,7 @@ import {
   StoragePaths,
   TOPIC_EVENTS,
   TOPIC_MARKETS,
-} from '@clawtoken/core';
+} from '@clawnet/core';
 import {
   CONTENT_TYPE,
   encodeP2PEnvelopeBytes,
@@ -41,7 +41,7 @@ import {
   MemoryDaoStore,
   MemoryReputationStore,
   signP2PEnvelope,
-} from '@clawtoken/protocol';
+} from '@clawnet/protocol';
 import { P2PSync, P2PSyncConfig } from './p2p/sync.js';
 import { ApiServer, ApiServerConfig } from './api/server.js';
 
@@ -56,7 +56,7 @@ export interface NodeRuntimeConfig {
     requestRangeOnStart?: boolean;
     requestSnapshotOnStart?: boolean;
     validateSnapshotState?: (
-      snapshot: import('@clawtoken/core').SnapshotRecord,
+      snapshot: import('@clawnet/core').SnapshotRecord,
       events: Uint8Array[],
     ) => Promise<boolean> | boolean;
   };
@@ -84,7 +84,7 @@ export const DEFAULT_NODE_RUNTIME_CONFIG: NodeRuntimeConfig = {
 type PeerIdLike = { toString: () => string };
 type PeerIdWithPrivateKey = PeerIdLike & { privateKey?: Uint8Array };
 
-export class ClawTokenNode {
+export class ClawNetNode {
   private readonly config: NodeRuntimeConfig;
   private p2p?: P2PNode;
   private sync?: P2PSync;
@@ -322,7 +322,7 @@ export class ClawTokenNode {
       peers,
       connections,
       network,
-      version: process.env.CLAWTOKEN_VERSION ?? '0.0.0',
+      version: process.env.CLAWNET_VERSION ?? '0.0.0',
       uptime,
     };
   }

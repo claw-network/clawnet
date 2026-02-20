@@ -1,7 +1,7 @@
 import { Builder } from 'flatbuffers';
-import { sha256Hex } from '@clawtoken/core/crypto';
-import { signBase58, verifyBase58 } from '@clawtoken/core/crypto';
-import { concatBytes, utf8ToBytes } from '@clawtoken/core/utils';
+import { sha256Hex } from '@clawnet/core/crypto';
+import { signBase58, verifyBase58 } from '@clawnet/core/crypto';
+import { concatBytes, utf8ToBytes } from '@clawnet/core/utils';
 import {
   CONTENT_TYPE,
   PeerRotate,
@@ -28,10 +28,10 @@ import {
   prefixDomain,
 } from './flatbuffers.js';
 
-const P2P_DOMAIN = 'clawtoken:p2p:v1:';
-const POW_DOMAIN = 'clawtoken:pow:v1:';
-const STAKE_DOMAIN = 'clawtoken:stakeproof:v1:';
-const PEER_ROTATE_DOMAIN = 'clawtoken:peer-rotate:v1:';
+const P2P_DOMAIN = 'clawnet:p2p:v1:';
+const POW_DOMAIN = 'clawnet:pow:v1:';
+const STAKE_DOMAIN = 'clawnet:stakeproof:v1:';
+const PEER_ROTATE_DOMAIN = 'clawnet:peer-rotate:v1:';
 
 export function encodeRequestMessageBytes(
   message: RequestMessage,

@@ -1,5 +1,5 @@
 /**
- * ClawNet Agent Client — HTTP wrapper for a single ClawToken node.
+ * ClawNet Agent Client — HTTP wrapper for a single ClawNet node.
  * Each Agent instance represents one independent AI Agent with its own identity.
  */
 import http from 'node:http';

@@ -10,10 +10,10 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@clawtoken/core';
-import { canonicalizeBytes, generateKeypair } from '@clawtoken/core/crypto';
-import { didFromPublicKey } from '@clawtoken/core/identity';
-import { createReputationRecordEnvelope } from '@clawtoken/protocol';
+} from '@clawnet/core';
+import { canonicalizeBytes, generateKeypair } from '@clawnet/core/crypto';
+import { didFromPublicKey } from '@clawnet/core/identity';
+import { createReputationRecordEnvelope } from '@clawnet/protocol';
 
 describe('reputation api', () => {
   let api: ApiServer;
@@ -25,7 +25,7 @@ describe('reputation api', () => {
   let published: Record<string, unknown>[];
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-reputation-api-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-reputation-api-'));
     passphrase = 'test-passphrase-123';
     const issuerKeys = await generateKeypair();
     issuerDid = didFromPublicKey(issuerKeys.publicKey);

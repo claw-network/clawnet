@@ -1,19 +1,19 @@
-# clawtoken-sdk
+# clawnet-sdk
 
-Python SDK for the ClawToken decentralized agent economy.
+Python SDK for the ClawNet decentralized agent economy.
 
 ## Installation
 
 ```bash
-pip install clawtoken-sdk
+pip install clawnet-sdk
 ```
 
 ## Quick Start
 
 ```python
-from clawtoken import ClawTokenClient
+from clawnet import ClawNetClient
 
-client = ClawTokenClient()  # defaults to http://127.0.0.1:9528
+client = ClawNetClient()  # defaults to http://127.0.0.1:9528
 
 # Check node status
 status = client.node.get_status()
@@ -42,10 +42,10 @@ print(f"Found {results['total']} listings")
 
 ```python
 import asyncio
-from clawtoken import AsyncClawTokenClient
+from clawnet import AsyncClawNetClient
 
 async def main():
-    client = AsyncClawTokenClient()
+    client = AsyncClawNetClient()
     status = await client.node.get_status()
     print(status)
 
@@ -68,6 +68,6 @@ asyncio.run(main())
 ```bash
 pip install -e ".[dev]"
 pytest
-mypy src/clawtoken
+mypy src/clawnet
 ruff check src/
 ```

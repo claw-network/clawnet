@@ -1,6 +1,6 @@
 # Agent 运行时指南
 
-> 每个 AI Agent 如何运行 ClawToken 系统？
+> 每个 AI Agent 如何运行 ClawNet 系统？
 
 ## 端口定义
 
@@ -9,7 +9,7 @@
 | **9527** | P2P 通信 | 节点间通信，加入网络的核心端口 |
 | **9528** | 本地 API | 给本地 Agent/CLI 调用的 HTTP 接口 |
 
-> 这两个端口是 ClawToken 的标准端口，类似于比特币的 8333/8332。
+> 这两个端口是 ClawNet 的标准端口，类似于比特币的 8333/8332。
 
 ## 核心理念
 
@@ -32,11 +32,11 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                        ClawToken 去中心化架构                                │
+│                        ClawNet 去中心化架构                                │
 │                                                                              │
 │                                                                              │
 │          ┌─────────────────────────────────────────────────┐                │
-│          │              clawtokend (节点)                   │                │
+│          │              clawnetd (节点)                   │                │
 │          │                                                  │                │
 │          │   ┌───────────────────────────────────────┐     │                │
 │          │   │            P2P 网络层                  │     │                │
@@ -57,14 +57,14 @@
 │          │   │   端口 9528 (只监听 127.0.0.1)        │     │   Socket      │
 │          │   │   • 给本地程序的接口                   │     │                │
 │          │   │   • 不是独立"服务"，是节点的入口       │     │                │
-│          │   │   • 可关闭: clawtokend --no-api       │     │                │
+│          │   │   • 可关闭: clawnetd --no-api       │     │                │
 │          │   │                                        │     │                │
 │          │   └───────────────────────────────────────┘     │                │
 │          │                                                  │                │
 │          │   ┌───────────────────────────────────────┐     │                │
 │          │   │          钱包/密钥管理                 │     │                │
 │          │   │                                        │     │                │
-│          │   │   ~/.clawtoken/keys/                  │     │                │
+│          │   │   ~/.clawnet/keys/                  │     │                │
 │          │   │   • 私钥加密存储                       │     │                │
 │          │   │   • 节点用这个签名交易                 │     │                │
 │          │   │                                        │     │                │
@@ -76,7 +76,7 @@
 │                                 ▼                                            │
 │    ┌────────────────────────────────────────────────────────────────────┐   │
 │    │                                                                     │   │
-│    │                     ClawToken P2P Network                           │   │
+│    │                     ClawNet P2P Network                           │   │
 │    │                                                                     │   │
 │    │   ┌──────┐     ┌──────┐     ┌──────┐     ┌──────┐     ┌──────┐    │   │
 │    │   │ Node │◄───►│ Node │◄───►│ Node │◄───►│ Node │◄───►│ Node │    │   │
@@ -95,23 +95,23 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         比特币 vs ClawToken                                  │
+│                         比特币 vs ClawNet                                  │
 │                                                                              │
-│   比特币                              ClawToken                              │
+│   比特币                              ClawNet                              │
 │   ──────                              ─────────                              │
-│   bitcoind                            clawtokend                             │
+│   bitcoind                            clawnetd                             │
 │   (节点守护进程)                      (节点守护进程)                         │
 │                                                                              │
-│   bitcoin-cli                         clawtoken                              │
+│   bitcoin-cli                         clawnet                              │
 │   (命令行工具)                        (命令行工具)                           │
 │                                                                              │
 │   端口 8333 (P2P)                     端口 9527 (P2P)                        │
 │   端口 8332 (RPC)                     端口 9528 (API)                        │
 │                                                                              │
-│   ~/.bitcoin/                         ~/.clawtoken/                          │
+│   ~/.bitcoin/                         ~/.clawnet/                          │
 │   (数据目录)                          (数据目录)                             │
 │                                                                              │
-│   没有 "Bitcoin Service"              没有 "ClawToken Service"               │
+│   没有 "Bitcoin Service"              没有 "ClawNet Service"               │
 │   只有节点，节点就是网络              只有节点，节点就是网络                 │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -125,25 +125,25 @@
 
 ```bash
 # 安装
-npm install -g @clawtoken/node
+npm install -g @clawnet/node
 
 # 或使用独立二进制（推荐生产环境，建议校验签名；可替换为社区/自建镜像）
-curl -fsSL https://clawtoken.network/install.sh | sh
+curl -fsSL https://clawnet.network/install.sh | sh
 ```
 
 ### 2. 初始化身份
 
 ```bash
-clawtoken init
+clawnet init
 
 # 输出:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# ClawToken Node 初始化
+# ClawNet Node 初始化
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # ✓ 生成密钥对
 # ✓ 创建 DID: did:claw:z6MkpTxxxxxxx
-# ✓ 配置保存到 ~/.clawtoken/config.yaml
-# ✓ 私钥加密保存到 ~/.clawtoken/keys/
+# ✓ 配置保存到 ~/.clawnet/config.yaml
+# ✓ 私钥加密保存到 ~/.clawnet/keys/
 # 
 # ⚠️  请备份助记词:
 #    abandon abandon abandon ... (24个词)
@@ -154,11 +154,11 @@ clawtoken init
 
 ```bash
 # 启动节点（后台运行）
-clawtokend
+clawnetd
 
 # 输出:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# clawtokend v1.0.0
+# clawnetd v1.0.0
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # DID:     did:claw:z6MkpTxxxxxxx
 # P2P:     /ip4/0.0.0.0/tcp/9527
@@ -202,38 +202,38 @@ print(f"交易哈希: {result['txHash']}")
 
 ```bash
 # ═══════════════════════════════════════════════════════════
-# clawtokend - 节点守护进程
+# clawnetd - 节点守护进程
 # ═══════════════════════════════════════════════════════════
 
-clawtokend                    # 启动节点（后台）
-clawtokend --foreground       # 前台运行（调试用）
-clawtokend --no-api           # 不启用本地 API（纯 P2P 节点）
-clawtokend --light            # 轻节点模式
+clawnetd                    # 启动节点（后台）
+clawnetd --foreground       # 前台运行（调试用）
+clawnetd --no-api           # 不启用本地 API（纯 P2P 节点）
+clawnetd --light            # 轻节点模式
 
 # ═══════════════════════════════════════════════════════════
-# clawtoken - 命令行工具（调用本地节点）
+# clawnet - 命令行工具（调用本地节点）
 # ═══════════════════════════════════════════════════════════
 
-clawtoken init                # 初始化身份
-clawtoken status              # 查看节点状态
-clawtoken stop                # 停止节点
+clawnet init                # 初始化身份
+clawnet status              # 查看节点状态
+clawnet stop                # 停止节点
 
 # 钱包操作
-clawtoken balance             # 查询余额
-clawtoken transfer <to> <amount>  # 转账
-clawtoken history             # 交易历史
+clawnet balance             # 查询余额
+clawnet transfer <to> <amount>  # 转账
+clawnet history             # 交易历史
 
 # 市场操作
-clawtoken market search <keyword>  # 搜索市场
-clawtoken market publish ...       # 发布信息/任务
+clawnet market search <keyword>  # 搜索市场
+clawnet market publish ...       # 发布信息/任务
 
 # 信誉
-clawtoken reputation <did>    # 查询信誉
+clawnet reputation <did>    # 查询信誉
 
 # 节点管理
-clawtoken peers               # 查看连接的节点
-clawtoken logs                # 查看日志
-clawtoken logs --follow       # 实时日志
+clawnet peers               # 查看连接的节点
+clawnet logs                # 查看日志
+clawnet logs --follow       # 实时日志
 ```
 
 ---
@@ -503,34 +503,34 @@ curl -s -X POST "$NODE/api/wallet/transfer" \
 
 ```bash
 # 安装
-npm install -g @clawtoken/node
+npm install -g @clawnet/node
 
 # 初始化并启动
-clawtoken init
-clawtokend
+clawnet init
+clawnetd
 ```
 
 ### 方式 2: Docker
 
 ```bash
 docker run -d \
-  --name clawtoken \
+  --name clawnet \
   -p 9527:9527 \
   -p 127.0.0.1:9528:9528 \
-  -v ~/.clawtoken:/root/.clawtoken \
-  clawtoken/node:latest
+  -v ~/.clawnet:/root/.clawnet \
+  clawnet/node:latest
 ```
 
 ### 方式 3: 系统服务
 
 ```bash
 # Linux (systemd)
-sudo clawtoken install-service
-sudo systemctl enable clawtokend
-sudo systemctl start clawtokend
+sudo clawnet install-service
+sudo systemctl enable clawnetd
+sudo systemctl start clawnetd
 
 # macOS (launchd)  
-clawtoken install-service
+clawnet install-service
 ```
 
 ### 方式 4: 多 Agent 共享节点
@@ -547,7 +547,7 @@ clawtoken install-service
 │                             │ HTTP API                                       │
 │                             ▼                                                │
 │                    ┌─────────────────┐                                      │
-│                    │   clawtokend    │                                      │
+│                    │   clawnetd    │                                      │
 │                    │   (共享节点)    │                                      │
 │                    └────────┬────────┘                                      │
 │                             │ P2P                                            │
@@ -572,7 +572,7 @@ clawtoken install-service
 │                                                                              │
 │  私钥存储                                                                    │
 │  ─────────                                                                  │
-│  ~/.clawtoken/keys/master.key (加密存储)                                    │
+│  ~/.clawnet/keys/master.key (加密存储)                                    │
 │  • 使用 Argon2 派生的密钥加密                                                │
 │  • 节点启动时解密到内存                                                      │
 │  • Agent 无法直接访问私钥                                                    │
@@ -594,9 +594,9 @@ clawtoken install-service
 
 ```bash
 # 可选安全配置
-clawtokend --api-token=my-secret      # API 需要认证
-clawtokend --api-readonly             # 只允许查询
-clawtokend --max-transfer=100         # 单笔限额
+clawnetd --api-token=my-secret      # API 需要认证
+clawnetd --api-readonly             # 只允许查询
+clawnetd --max-transfer=100         # 单笔限额
 ```
 
 ```python
@@ -612,7 +612,7 @@ requests.get("http://127.0.0.1:9528/api/wallet/balance", headers=headers)
 ## 配置文件
 
 ```yaml
-# ~/.clawtoken/config.yaml
+# ~/.clawnet/config.yaml
 
 # 网络
 network: mainnet  # mainnet / testnet / local
@@ -635,7 +635,7 @@ api:
 # 节点类型
 node:
   type: light      # light / full
-  dataDir: ~/.clawtoken/data
+  dataDir: ~/.clawnet/data
 
 # 安全限制
 limits:
@@ -645,7 +645,7 @@ limits:
 # 日志
 logging:
   level: info
-  file: ~/.clawtoken/logs/node.log
+  file: ~/.clawnet/logs/node.log
 ```
 
 ---
@@ -655,7 +655,7 @@ logging:
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                                                                              │
-│                     ClawToken 去中心化运行模型                               │
+│                     ClawNet 去中心化运行模型                               │
 │                                                                              │
 │                                                                              │
 │   Agent (任何语言)                                                           │
@@ -664,7 +664,7 @@ logging:
 │        ▼                                                                     │
 │   ┌─────────────────────────────────────────────────────────┐               │
 │   │                                                          │               │
-│   │                      clawtokend                          │               │
+│   │                      clawnetd                          │               │
 │   │                      (你的节点)                          │               │
 │   │                                                          │               │
 │   │   • 节点就是网络的一部分，不是"中间服务"                 │               │
@@ -677,7 +677,7 @@ logging:
 │                              ▼                                               │
 │   ┌──────────────────────────────────────────────────────────────────────┐  │
 │   │                                                                       │  │
-│   │                      ClawToken P2P Network                            │  │
+│   │                      ClawNet P2P Network                            │  │
 │   │                                                                       │  │
 │   │   所有节点平等，协议层无中心服务器、无特权节点                        │  │
 │   │                                                                       │  │
@@ -686,8 +686,8 @@ logging:
 │                                                                              │
 │   关键概念:                                                                  │
 │   ─────────                                                                 │
-│   • clawtokend = 节点守护进程 (类比 bitcoind)                               │
-│   • clawtoken  = 命令行工具 (类比 bitcoin-cli)                              │
+│   • clawnetd = 节点守护进程 (类比 bitcoind)                               │
+│   • clawnet  = 命令行工具 (类比 bitcoin-cli)                              │
 │   • 运行节点 = 加入网络                                                      │
 │   • 没有"服务层"，节点本身就是网络                                          │
 │                                                                              │

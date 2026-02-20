@@ -7,10 +7,10 @@ const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
 export default defineConfig({
   resolve: {
     alias: [
-      { find: /^@clawtoken\/core$/, replacement: resolve(root, '../core/src/index.ts') },
-      { find: /^@clawtoken\/core\/(.*)$/, replacement: resolve(root, '../core/src/$1') },
-      { find: /^@clawtoken\/protocol$/, replacement: resolve(root, '../protocol/src/index.ts') },
-      { find: /^@clawtoken\/protocol\/(.*)$/, replacement: resolve(root, '../protocol/src/$1') },
+      { find: /^@clawnet\/core$/, replacement: resolve(root, '../core/src/index.ts') },
+      { find: /^@clawnet\/core\/(.*)$/, replacement: resolve(root, '../core/src/$1') },
+      { find: /^@clawnet\/protocol$/, replacement: resolve(root, '../protocol/src/index.ts') },
+      { find: /^@clawnet\/protocol\/(.*)$/, replacement: resolve(root, '../protocol/src/$1') },
     ],
   },
   test: {

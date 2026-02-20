@@ -22,7 +22,7 @@ describe('cli transfer/balance', () => {
   let privateKey: Uint8Array;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-cli-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-cli-'));
     passphrase = 'test-passphrase-123';
     const keypair = await generateKeypair();
     did = didFromPublicKey(keypair.publicKey);

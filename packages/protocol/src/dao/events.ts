@@ -14,9 +14,9 @@
  *   dao.treasury.spend      — Spend from treasury
  */
 
-import { multibaseEncode } from '@clawtoken/core/encoding';
-import { publicKeyFromDid } from '@clawtoken/core/identity';
-import { EventEnvelope, eventHashHex, signEvent } from '@clawtoken/core/protocol';
+import { multibaseEncode } from '@clawnet/core/encoding';
+import { publicKeyFromDid } from '@clawnet/core/identity';
+import { EventEnvelope, eventHashHex, signEvent } from '@clawnet/core/protocol';
 import type { ProposalAction, ProposalType, VoteOption, DelegationScope } from './types.js';
 import { isProposalType, isVoteOption } from './types.js';
 

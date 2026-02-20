@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { generateKeypair } from '@clawtoken/core/crypto';
-import { addressFromDid, didFromPublicKey } from '@clawtoken/core/identity';
+import { generateKeypair } from '@clawnet/core/crypto';
+import { addressFromDid, didFromPublicKey } from '@clawnet/core/identity';
 import {
   createWalletEscrowCreateEnvelope,
   createWalletEscrowFundEnvelope,

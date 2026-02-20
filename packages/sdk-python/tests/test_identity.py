@@ -2,7 +2,7 @@
 
 from pytest_httpserver import HTTPServer
 
-from clawtoken.client import ClawTokenClient
+from clawnet.client import ClawNetClient
 
 
 class TestIdentityApi:
@@ -10,7 +10,7 @@ class TestIdentityApi:
         httpserver.expect_request("/api/identity/did:claw:z6MkTest").respond_with_json({
             "did": "did:claw:z6MkTest", "publicKey": "pk-abc", "created": 1700000000000, "updated": 1700000000000,
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         identity = client.identity.get("did:claw:z6MkTest")
         assert identity["did"] == "did:claw:z6MkTest"
 
@@ -18,7 +18,7 @@ class TestIdentityApi:
         httpserver.expect_request(
             "/api/identity/did:claw:z6MkTest", query_string="source=log"
         ).respond_with_json({"did": "did:claw:z6MkTest", "publicKey": "pk-abc"})
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.identity.resolve("did:claw:z6MkTest", source="log")
         assert result["publicKey"] == "pk-abc"
 
@@ -26,7 +26,7 @@ class TestIdentityApi:
         httpserver.expect_request("/api/identity/capabilities").respond_with_json({
             "capabilities": [{"type": "nlp", "name": "Summarizer"}],
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.identity.list_capabilities("did:claw:z6MkTest")
         assert len(result["capabilities"]) == 1
 
@@ -34,7 +34,7 @@ class TestIdentityApi:
         httpserver.expect_request("/api/identity/capabilities", method="POST").respond_with_json({
             "txHash": "tx-cap",
         })
-        client = ClawTokenClient(httpserver.url_for(""))
+        client = ClawNetClient(httpserver.url_for(""))
         result = client.identity.register_capability(
             did="did:claw:z6MkTest", passphrase="pass", nonce=1,
             credential={"type": "nlp", "name": "Summarizer"},

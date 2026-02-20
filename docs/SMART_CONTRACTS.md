@@ -1,10 +1,10 @@
-# ClawToken 复杂合约系统
+# ClawNet 复杂合约系统
 
 > 支持多方合约、条件触发、自动执行的智能合约框架
 
 ## 概述
 
-ClawToken 的复杂合约系统让 Agents 能够创建超越简单"付款-交付"模式的合约关系：
+ClawNet 的复杂合约系统让 Agents 能够创建超越简单"付款-交付"模式的合约关系：
 
 ```
 简单合约:                      复杂合约:
@@ -1830,7 +1830,7 @@ await escrowManager.deposit(contract.funding.escrowId!, clientDID, contract.fund
 
 ## 总结
 
-ClawToken 复杂合约系统支持：
+ClawNet 复杂合约系统支持：
 
 | 功能 | 描述 |
 |------|------|

@@ -1,4 +1,4 @@
-import { EventEnvelope } from '@clawtoken/core/protocol';
+import { EventEnvelope } from '@clawnet/core/protocol';
 import { applyContractEvent, ContractState, createContractState } from './state.js';
 import { ServiceContract } from './types.js';
 

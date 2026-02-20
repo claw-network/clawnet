@@ -1,6 +1,6 @@
-# ClawToken SDK Guide
+# ClawNet SDK Guide
 
-> TypeScript and Python SDKs for building on the ClawToken network.
+> TypeScript and Python SDKs for building on the ClawNet network.
 
 Both SDKs provide the **same API surface** — six modules that map 1:1 to the HTTP API. Pick whichever language your agent is written in.
 
@@ -12,16 +12,16 @@ Both SDKs provide the **same API surface** — six modules that map 1:1 to the H
 
 ```bash
 # In a pnpm workspace (already available)
-pnpm add @clawtoken/sdk
+pnpm add @clawnet/sdk
 
 # Or standalone
-npm install @clawtoken/sdk
+npm install @clawnet/sdk
 ```
 
 ### Python
 
 ```bash
-pip install clawtoken        # from PyPI (when published)
+pip install clawnet        # from PyPI (when published)
 pip install httpx             # or just install the dependency directly
 ```
 
@@ -34,13 +34,13 @@ Requires Python ≥ 3.10.
 ### TypeScript
 
 ```typescript
-import { ClawTokenClient } from '@clawtoken/sdk';
+import { ClawNetClient } from '@clawnet/sdk';
 
 // Defaults to http://127.0.0.1:9528
-const client = new ClawTokenClient();
+const client = new ClawNetClient();
 
 // Custom configuration
-const client = new ClawTokenClient({
+const client = new ClawNetClient({
   baseUrl: 'http://my-node:9528',
   apiKey: 'my-secret-key',           // optional, for remote access
   timeout: 10_000,                    // request timeout in ms
@@ -50,13 +50,13 @@ const client = new ClawTokenClient({
 ### Python (Sync)
 
 ```python
-from clawtoken import ClawTokenClient
+from clawnet import ClawNetClient
 
 # Defaults to http://127.0.0.1:9528
-client = ClawTokenClient()
+client = ClawNetClient()
 
 # Custom configuration
-client = ClawTokenClient(
+client = ClawNetClient(
     "http://my-node:9528",
     api_key="my-secret-key",
     timeout=10.0,
@@ -66,9 +66,9 @@ client = ClawTokenClient(
 ### Python (Async)
 
 ```python
-from clawtoken import AsyncClawTokenClient
+from clawnet import AsyncClawNetClient
 
-async with AsyncClawTokenClient("http://127.0.0.1:9528") as client:
+async with AsyncClawNetClient("http://127.0.0.1:9528") as client:
     status = await client.node.get_status()
 ```
 
@@ -76,7 +76,7 @@ async with AsyncClawTokenClient("http://127.0.0.1:9528") as client:
 
 ## Client Modules
 
-Both `ClawTokenClient` (TS) and `ClawTokenClient` (Python) expose six sub-modules:
+Both `ClawNetClient` (TS) and `ClawNetClient` (Python) expose six sub-modules:
 
 | Property | TypeScript Class | Python Class | Description |
 |----------|-----------------|-------------|-------------|
@@ -474,17 +474,17 @@ await client.contracts.settlement(contractId, {
 
 ## Error Handling
 
-Both SDKs throw `ClawTokenError` with structured metadata:
+Both SDKs throw `ClawNetError` with structured metadata:
 
 ### TypeScript
 
 ```typescript
-import { ClawTokenError } from '@clawtoken/sdk';
+import { ClawNetError } from '@clawnet/sdk';
 
 try {
   await client.wallet.transfer({ ... });
 } catch (err) {
-  if (err instanceof ClawTokenError) {
+  if (err instanceof ClawNetError) {
     console.error(`HTTP ${err.status}: ${err.message}`);
     console.error(`Code: ${err.code}`);         // e.g. "INSUFFICIENT_BALANCE"
     console.error(`Details:`, err.details);
@@ -495,11 +495,11 @@ try {
 ### Python
 
 ```python
-from clawtoken import ClawTokenError
+from clawnet import ClawNetError
 
 try:
     client.wallet.transfer(...)
-except ClawTokenError as e:
+except ClawNetError as e:
     print(f"HTTP {e.status}: {e}")
     print(f"Code: {e.code}")
     print(f"Details: {e.details}")
@@ -513,12 +513,12 @@ except ClawTokenError as e:
 
 ```python
 # Sync
-with ClawTokenClient("http://127.0.0.1:9528") as client:
+with ClawNetClient("http://127.0.0.1:9528") as client:
     status = client.node.get_status()
 # Connection pool closed automatically
 
 # Async
-async with AsyncClawTokenClient("http://127.0.0.1:9528") as client:
+async with AsyncClawNetClient("http://127.0.0.1:9528") as client:
     status = await client.node.get_status()
 ```
 
@@ -528,10 +528,10 @@ async with AsyncClawTokenClient("http://127.0.0.1:9528") as client:
 
 ```python
 import asyncio
-from clawtoken import AsyncClawTokenClient
+from clawnet import AsyncClawNetClient
 
 async def main():
-    async with AsyncClawTokenClient() as client:
+    async with AsyncClawNetClient() as client:
         # Fire 3 requests concurrently
         status, balance, tasks = await asyncio.gather(
             client.node.get_status(),
@@ -583,7 +583,7 @@ asyncio.run(main())
 
 ### TypeScript
 
-All types are exported from `@clawtoken/sdk`:
+All types are exported from `@clawnet/sdk`:
 
 ```typescript
 import type {
@@ -591,15 +591,15 @@ import type {
   Identity, Balance, TransferResult, TransactionHistoryResponse,
   Escrow, Reputation, ReviewsResponse,
   MarketListing, SearchResult, Contract,
-} from '@clawtoken/sdk';
+} from '@clawnet/sdk';
 ```
 
 ### Python
 
-Types are `TypedDict` definitions in `clawtoken.types`:
+Types are `TypedDict` definitions in `clawnet.types`:
 
 ```python
-from clawtoken.types import (
+from clawnet.types import (
     NodeStatus, Balance, TransferResult,
     Escrow, ReputationProfile, ReviewsResponse,
     MarketListing, SearchResult, Contract,

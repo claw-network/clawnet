@@ -1,5 +1,5 @@
 {
-  "name": "ed25519-clawtoken-test",
+  "name": "ed25519-clawnet-test",
   "privateKeyHex": "381ea641a651f1e2011b948ee45c69a989a9582d29d9512b60c6d6dd78bea9bc",
   "publicKeyHex": "28e4b24dc96e47a480a4c74fb70e7635ae2a4c5330ef7d6a8ec79dc46a57931b",
   "messageHex": "636c6177746f6b656e2d74657374",

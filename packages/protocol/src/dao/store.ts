@@ -5,7 +5,7 @@
  * for future persistence compatibility.
  */
 
-import { EventEnvelope } from '@clawtoken/core/protocol';
+import { EventEnvelope } from '@clawnet/core/protocol';
 import type {
   Proposal,
   ProposalStatus,

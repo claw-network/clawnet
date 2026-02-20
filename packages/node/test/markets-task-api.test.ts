@@ -11,11 +11,11 @@ import {
   resolveStoragePaths,
   saveKeyRecord,
   eventHashHex,
-} from '@clawtoken/core';
-import { canonicalizeBytes, generateKeypair } from '@clawtoken/core/crypto';
-import { didFromPublicKey } from '@clawtoken/core/identity';
-import { MarketSearchStore } from '@clawtoken/protocol';
-import type { EventEnvelope } from '@clawtoken/core/protocol';
+} from '@clawnet/core';
+import { canonicalizeBytes, generateKeypair } from '@clawnet/core/crypto';
+import { didFromPublicKey } from '@clawnet/core/identity';
+import { MarketSearchStore } from '@clawnet/protocol';
+import type { EventEnvelope } from '@clawnet/core/protocol';
 
 const pricing = {
   type: 'fixed',
@@ -36,7 +36,7 @@ describe('task market api', () => {
   let marketStore: MarketSearchStore;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-task-api-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnet-task-api-'));
     passphrase = 'test-passphrase-123';
 
     const clientKeys = await generateKeypair();

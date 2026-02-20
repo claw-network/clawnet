@@ -39,12 +39,12 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install
         run: pnpm install
-      - name: Package clawtokend
-        run: pnpm --filter @clawtoken/node package
-      - name: Upload clawtokend binaries
+      - name: Package clawnetd
+        run: pnpm --filter @clawnet/node package
+      - name: Upload clawnetd binaries
         uses: actions/upload-artifact@v4
         with:
-          name: clawtokend-${{ matrix.os }}
+          name: clawnetd-${{ matrix.os }}
           path: packages/node/dist/pkg
   release:
     needs: build
@@ -59,4 +59,4 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: release-artifacts/clawtokend-*
+          files: release-artifacts/clawnetd-*

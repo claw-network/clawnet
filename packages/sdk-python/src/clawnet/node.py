@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from clawtoken.http import AsyncHttpClient, HttpClient
+from clawnet.http import AsyncHttpClient, HttpClient
 
 
 class NodeApi:

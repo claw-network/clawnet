@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────
-# ClawToken — Contract Lifecycle
+# ClawNet — Contract Lifecycle
 #
 # Full lifecycle: create → sign → fund → submit milestone → approve → complete
 #

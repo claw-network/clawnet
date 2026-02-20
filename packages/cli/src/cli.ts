@@ -4,11 +4,11 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  ClawTokenNode,
+  ClawNetNode,
   DEFAULT_P2P_SYNC_CONFIG,
   DEFAULT_SYNC_RUNTIME_CONFIG,
-} from '@clawtoken/node';
-import type { NodeRuntimeConfig } from '@clawtoken/node';
+} from '@clawnet/node';
+import type { NodeRuntimeConfig } from '@clawnet/node';
 import {
   addressFromDid,
   bytesToUtf8,
@@ -32,7 +32,7 @@ import {
   utf8ToBytes,
   validateMnemonic,
   verifyCapabilityCredential,
-} from '@clawtoken/core';
+} from '@clawnet/core';
 import {
   applyReputationEvent,
   applyWalletEvent,
@@ -57,7 +57,7 @@ import {
   ReputationLevel,
   ReputationRecord,
   WalletState,
-} from '@clawtoken/protocol';
+} from '@clawnet/protocol';
 
 async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   if (argv.includes('--help') || argv.includes('-h')) {
@@ -67,11 +67,11 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
 
   const command = argv[0];
   if (!command || command === 'daemon' || command.startsWith('-')) {
-    const node = new ClawTokenNode(parseDaemonArgs(argv));
+    const node = new ClawNetNode(parseDaemonArgs(argv));
     process.on('SIGINT', () => void shutdown(node, 'SIGINT'));
     process.on('SIGTERM', () => void shutdown(node, 'SIGTERM'));
     void node.start().catch((error) => {
-      console.error('[clawtoken] failed to start:', error);
+      console.error('[clawnet] failed to start:', error);
       process.exit(1);
     });
     return;
@@ -442,8 +442,8 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   fail(`unknown command: ${command}`);
 }
 
-async function shutdown(node: ClawTokenNode, signal: string): Promise<void> {
-  console.log(`[clawtoken] received ${signal}, stopping...`);
+async function shutdown(node: ClawNetNode, signal: string): Promise<void> {
+  console.log(`[clawnet] received ${signal}, stopping...`);
   await node.stop();
   process.exit(0);
 }
@@ -458,7 +458,7 @@ async function runInit(rawArgs: string[]): Promise<void> {
     fail('invalid mnemonic');
   }
   const seed = mnemonicToSeedSync(mnemonic, parsed.mnemonicPassphrase ?? '');
-  const privateKey = hkdfSha256(seed, undefined, utf8ToBytes('clawtoken:master:v1'), 32);
+  const privateKey = hkdfSha256(seed, undefined, utf8ToBytes('clawnet:master:v1'), 32);
   const publicKey = await publicKeyFromPrivateKey(privateKey);
   const did = didFromPublicKey(publicKey);
 
@@ -470,7 +470,7 @@ async function runInit(rawArgs: string[]): Promise<void> {
   }
 
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('ClawToken Node 初始化');
+  console.log('ClawNet Node 初始化');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('✓ 生成密钥对');
   console.log(`✓ 创建 DID: ${did}`);
@@ -1240,11 +1240,11 @@ async function runCapabilityRegister(rawArgs: string[]): Promise<void> {
     prev: parsed.prev,
   });
 
-  const node = new ClawTokenNode(parsed.nodeConfig);
+  const node = new ClawNetNode(parsed.nodeConfig);
   try {
     await node.start();
     const hash = await node.publishEvent(envelope);
-    console.log(`[clawtoken] published identity.capability.register ${hash}`);
+    console.log(`[clawnet] published identity.capability.register ${hash}`);
   } finally {
     await node.stop();
   }
@@ -1525,7 +1525,7 @@ async function runReputationRecord(
   try {
     await node.start();
     const hash = await node.publishEvent(envelope);
-    console.log(`[clawtoken] published reputation.record ${hash}`);
+    console.log(`[clawnet] published reputation.record ${hash}`);
   } finally {
     await node.stop();
   }
@@ -1537,7 +1537,7 @@ type NodeFactory = (config?: NodeRuntimeConfig) => {
   publishEvent: (envelope: Record<string, unknown>) => Promise<string>;
 };
 
-const defaultNodeFactory: NodeFactory = (config) => new ClawTokenNode(config);
+const defaultNodeFactory: NodeFactory = (config) => new ClawNetNode(config);
 
 interface InitArgs {
   passphrase: string;
@@ -1726,7 +1726,7 @@ function parseApiArgsWithQuery(
       query = arg;
       continue;
     }
-    console.warn(`[clawtoken] unknown argument: ${arg}`);
+    console.warn(`[clawnet] unknown argument: ${arg}`);
   }
   const { apiUrl, token } = parseApiArgs(apiArgs);
   return { apiUrl, token, query };
@@ -1753,7 +1753,7 @@ function parseLogsArgs(rawArgs: string[]): LogsArgs {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -1789,7 +1789,7 @@ function parseReputationArgs(rawArgs: string[]): ReputationArgs {
       did = arg;
       continue;
     }
-    console.warn(`[clawtoken] unknown argument: ${arg}`);
+    console.warn(`[clawnet] unknown argument: ${arg}`);
   }
 
   if (!did) {
@@ -1837,7 +1837,7 @@ function parseReputationReviewsArgs(rawArgs: string[]): ReputationReviewsArgs {
       did = arg;
       continue;
     }
-    console.warn(`[clawtoken] unknown argument: ${arg}`);
+    console.warn(`[clawnet] unknown argument: ${arg}`);
   }
 
   if (!did) {
@@ -1962,7 +1962,7 @@ async function runTransfer(
   try {
     await node.start();
     const hash = await node.publishEvent(envelope);
-    console.log(`[clawtoken] published wallet.transfer ${hash}`);
+    console.log(`[clawnet] published wallet.transfer ${hash}`);
   } finally {
     await node.stop();
   }
@@ -2009,7 +2009,7 @@ async function runEscrowCreate(
   try {
     await node.start();
     const hash = await node.publishEvent(createEnvelope);
-    console.log(`[clawtoken] published wallet.escrow.create ${hash}`);
+    console.log(`[clawnet] published wallet.escrow.create ${hash}`);
     if (parsed.autoFund) {
       const fundEnvelope = await createWalletEscrowFundEnvelope({
         issuer: parsed.did,
@@ -2022,7 +2022,7 @@ async function runEscrowCreate(
         prev: hash,
       });
       const fundHash = await node.publishEvent(fundEnvelope);
-      console.log(`[clawtoken] published wallet.escrow.fund ${fundHash}`);
+      console.log(`[clawnet] published wallet.escrow.fund ${fundHash}`);
     }
   } finally {
     await node.stop();
@@ -2054,7 +2054,7 @@ async function runEscrowFund(
   try {
     await node.start();
     const hash = await node.publishEvent(envelope);
-    console.log(`[clawtoken] published wallet.escrow.fund ${hash}`);
+    console.log(`[clawnet] published wallet.escrow.fund ${hash}`);
   } finally {
     await node.stop();
   }
@@ -2089,7 +2089,7 @@ async function runEscrowRelease(
   try {
     await node.start();
     const hash = await node.publishEvent(envelope);
-    console.log(`[clawtoken] published wallet.escrow.release ${hash}`);
+    console.log(`[clawnet] published wallet.escrow.release ${hash}`);
   } finally {
     await node.stop();
   }
@@ -2125,7 +2125,7 @@ async function runEscrowRefund(
   try {
     await node.start();
     const hash = await node.publishEvent(envelope);
-    console.log(`[clawtoken] published wallet.escrow.refund ${hash}`);
+    console.log(`[clawnet] published wallet.escrow.refund ${hash}`);
   } finally {
     await node.stop();
   }
@@ -2210,7 +2210,7 @@ async function runEscrowExpire(
   try {
     await node.start();
     const hash = await node.publishEvent(envelope);
-    console.log(`[clawtoken] published wallet.escrow.${parsed.action ?? 'refund'} ${hash}`);
+    console.log(`[clawnet] published wallet.escrow.${parsed.action ?? 'refund'} ${hash}`);
   } finally {
     await node.stop();
   }
@@ -2321,7 +2321,7 @@ function parseDaemonArgs(rawArgs: string[]): NodeRuntimeConfig {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -2402,7 +2402,7 @@ function parseCapabilityRegisterArgs(rawArgs: string[]) {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -2464,7 +2464,7 @@ function parseBalanceArgs(rawArgs: string[]) {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -2554,7 +2554,7 @@ function parseTransferArgs(rawArgs: string[]) {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -2691,7 +2691,7 @@ function parseReputationRecordArgs(rawArgs: string[]): ReputationRecordArgs {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -2846,7 +2846,7 @@ function parseEscrowCreateArgs(rawArgs: string[]) {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -3000,7 +3000,7 @@ function parseEscrowActionArgs(rawArgs: string[]) {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -3145,7 +3145,7 @@ function parseEscrowExpireArgs(rawArgs: string[]) {
         break;
       }
       default: {
-        console.warn(`[clawtoken] unknown argument: ${arg}`);
+        console.warn(`[clawnet] unknown argument: ${arg}`);
         break;
       }
     }
@@ -3354,24 +3354,24 @@ async function runDaoParams(rawArgs: string[]): Promise<void> {
 
 function printHelp(): void {
   console.log(`
-clawtoken daemon [options]
-clawtoken init [options]
-clawtoken status [options]
-clawtoken peers [options]
-clawtoken identity capability-register [options]
-clawtoken balance [options]
-clawtoken transfer [options]
-clawtoken logs [options]
-clawtoken reputation [options]
-clawtoken reputation reviews [options]
-clawtoken reputation record [options]
-clawtoken escrow create|fund|release|refund|expire [options]
-clawtoken market info list|get|publish|purchase|subscribe|unsubscribe|deliver|confirm|review|remove|content|delivery [options]
-clawtoken market task list|get|publish|bids|bid|accept|reject|withdraw|deliver|confirm|review|remove [options]
-clawtoken market capability list|get|publish|lease|lease-get|invoke|pause|resume|terminate|remove [options]
-clawtoken market dispute open|respond|resolve [options]
-clawtoken contract list|get|create|sign|fund|complete|milestone-complete|milestone-approve|milestone-reject|dispute|dispute-resolve|settlement [options]
-clawtoken dao proposals|proposal|create-proposal|advance|vote|votes|delegate|revoke-delegation|delegations|treasury|deposit|timelock|execute|cancel|params [options]
+clawnet daemon [options]
+clawnet init [options]
+clawnet status [options]
+clawnet peers [options]
+clawnet identity capability-register [options]
+clawnet balance [options]
+clawnet transfer [options]
+clawnet logs [options]
+clawnet reputation [options]
+clawnet reputation reviews [options]
+clawnet reputation record [options]
+clawnet escrow create|fund|release|refund|expire [options]
+clawnet market info list|get|publish|purchase|subscribe|unsubscribe|deliver|confirm|review|remove|content|delivery [options]
+clawnet market task list|get|publish|bids|bid|accept|reject|withdraw|deliver|confirm|review|remove [options]
+clawnet market capability list|get|publish|lease|lease-get|invoke|pause|resume|terminate|remove [options]
+clawnet market dispute open|respond|resolve [options]
+clawnet contract list|get|create|sign|fund|complete|milestone-complete|milestone-approve|milestone-reject|dispute|dispute-resolve|settlement [options]
+clawnet dao proposals|proposal|create-proposal|advance|vote|votes|delegate|revoke-delegation|delegations|treasury|deposit|timelock|execute|cancel|params [options]
 
 Daemon options:
   --data-dir <path>              Override storage root
@@ -3527,21 +3527,21 @@ Market info options:
   -h, --help                     Show help
 
 DAO governance options:
-  clawtoken dao proposals [status] -- List proposals (optional status filter)
-  clawtoken dao proposal <id>      -- Get proposal details
-  clawtoken dao create-proposal --data <json>  -- Create a new proposal
-  clawtoken dao advance <id> --data <json>     -- Advance proposal status
-  clawtoken dao vote --data <json>             -- Cast a vote
-  clawtoken dao votes <proposalId>             -- Get votes for a proposal
-  clawtoken dao delegate --data <json>         -- Set delegation
-  clawtoken dao revoke-delegation --data <json> -- Revoke delegation
-  clawtoken dao delegations <did>              -- List delegations for a DID
-  clawtoken dao treasury                       -- View treasury status
-  clawtoken dao deposit --data <json>          -- Deposit to treasury
-  clawtoken dao timelock                       -- List timelock entries
-  clawtoken dao execute <actionId> --data <json> -- Execute timelocked action
-  clawtoken dao cancel <actionId> --data <json>  -- Cancel timelocked action
-  clawtoken dao params                         -- View governance parameters
+  clawnet dao proposals [status] -- List proposals (optional status filter)
+  clawnet dao proposal <id>      -- Get proposal details
+  clawnet dao create-proposal --data <json>  -- Create a new proposal
+  clawnet dao advance <id> --data <json>     -- Advance proposal status
+  clawnet dao vote --data <json>             -- Cast a vote
+  clawnet dao votes <proposalId>             -- Get votes for a proposal
+  clawnet dao delegate --data <json>         -- Set delegation
+  clawnet dao revoke-delegation --data <json> -- Revoke delegation
+  clawnet dao delegations <did>              -- List delegations for a DID
+  clawnet dao treasury                       -- View treasury status
+  clawnet dao deposit --data <json>          -- Deposit to treasury
+  clawnet dao timelock                       -- List timelock entries
+  clawnet dao execute <actionId> --data <json> -- Execute timelocked action
+  clawnet dao cancel <actionId> --data <json>  -- Cancel timelocked action
+  clawnet dao params                         -- View governance parameters
   --api <url>                    Node API base URL (default: http://127.0.0.1:9528)
   --token <token>                API token (optional)
 `);
@@ -3778,14 +3778,14 @@ function parsePositiveInt(value: string | undefined, flag: string): number {
 }
 
 function fail(message: string): never {
-  console.error(`[clawtoken] ${message}`);
+  console.error(`[clawnet] ${message}`);
   process.exit(1);
 }
 
 const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : '';
 if (entrypoint && import.meta.url === entrypoint) {
   void main().catch((error) => {
-    console.error('[clawtoken] fatal error:', error);
+    console.error('[clawnet] fatal error:', error);
     process.exit(1);
   });
 }

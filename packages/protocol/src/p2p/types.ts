@@ -1,4 +1,4 @@
-export const CONTENT_TYPE = 'application/clawtoken-stream';
+export const CONTENT_TYPE = 'application/clawnet-stream';
 
 export enum RequestType {
   RangeRequest = 1,

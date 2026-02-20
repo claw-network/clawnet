@@ -2,7 +2,7 @@
  * Tests for IdentityApi.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { ClawTokenClient } from '../src/index.js';
+import { ClawNetClient } from '../src/index.js';
 import { createMockServer, type MockServer } from './helpers/mock-server.js';
 
 let mock: MockServer;
@@ -21,7 +21,7 @@ describe('IdentityApi', () => {
       updated: 1700000001000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const id = await client.identity.get();
 
     expect(id.did).toBe('did:claw:z6MkLocal');
@@ -38,7 +38,7 @@ describe('IdentityApi', () => {
       updated: 1700000001000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const id = await client.identity.resolve(did);
 
     expect(id.did).toBe(did);
@@ -54,7 +54,7 @@ describe('IdentityApi', () => {
       updated: 1700000001000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     await client.identity.resolve(did, 'store');
 
     expect(mock.requests[0].url).toContain('source=store');
@@ -68,7 +68,7 @@ describe('IdentityApi', () => {
       ],
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.identity.listCapabilities();
 
     expect(result.capabilities).toHaveLength(1);
@@ -83,7 +83,7 @@ describe('IdentityApi', () => {
       version: '2.0',
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.identity.registerCapability({
       did: 'did:claw:z6MkLocal',
       passphrase: 'test',

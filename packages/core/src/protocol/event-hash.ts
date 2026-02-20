@@ -3,7 +3,7 @@ import { sha256Bytes, sha256Hex } from '../crypto/hash.js';
 import { concatBytes, utf8ToBytes } from '../utils/bytes.js';
 import { signBase58, verifyBase58 } from '../crypto/ed25519.js';
 
-export const EVENT_DOMAIN_PREFIX = 'clawtoken:event:v1:';
+export const EVENT_DOMAIN_PREFIX = 'clawnet:event:v1:';
 
 export type EventEnvelope = Record<string, unknown>;
 

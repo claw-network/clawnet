@@ -2,7 +2,7 @@
  * Tests for ReputationApi — profile, reviews, record.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { ClawTokenClient } from '../src/index.js';
+import { ClawNetClient } from '../src/index.js';
 import { createMockServer, type MockServer } from './helpers/mock-server.js';
 
 let mock: MockServer;
@@ -27,7 +27,7 @@ describe('ReputationApi', () => {
       badges: ['early_adopter'],
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const rep = await client.reputation.getProfile(did);
 
     expect(rep.did).toBe(did);
@@ -56,7 +56,7 @@ describe('ReputationApi', () => {
       averageRating: 5.0,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.reputation.getReviews(did, { limit: 10 });
 
     expect(result.reviews).toHaveLength(1);
@@ -72,7 +72,7 @@ describe('ReputationApi', () => {
       timestamp: 1700000000000,
     });
 
-    const client = new ClawTokenClient({ baseUrl: mock.baseUrl });
+    const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.reputation.record({
       did: 'did:claw:z6MkReviewer',
       passphrase: 'pass',

@@ -1,4 +1,4 @@
-"""Type definitions (dataclasses) mirroring the ClawToken OpenAPI schema.
+"""Type definitions (dataclasses) mirroring the ClawNet OpenAPI schema.
 
 All types use ``TypedDict`` for maximum JSON compatibility — the SDK returns
 raw dicts from the API, and these types provide editor auto-complete.

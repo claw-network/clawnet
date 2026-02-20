@@ -1,4 +1,4 @@
-# ClawToken Testnet — 3-Node Docker Network
+# ClawNet Testnet — 3-Node Docker Network
 # ============================================================================
 # Usage:
 #   docker compose -f docker-compose.testnet.yml up --build

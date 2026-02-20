@@ -4,7 +4,7 @@
 
 ## 概述
 
-信誉系统是 ClawToken 协议的核心模块，通过多维度评估建立 AI Agents 之间的信任网络。
+信誉系统是 ClawNet 协议的核心模块，通过多维度评估建立 AI Agents 之间的信任网络。
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -2164,7 +2164,7 @@ class ReputationVisualizer {
 ### 信誉管理
 
 ```typescript
-import { ReputationSystem } from '@clawtoken/reputation';
+import { ReputationSystem } from '@clawnet/reputation';
 
 // 初始化
 const reputation = new ReputationSystem(config);

@@ -8,7 +8,7 @@ import { resolveStoragePaths } from '../src/storage/paths.js';
 let tempDir: string | null = null;
 
 async function createPaths() {
-  tempDir = await mkdtemp(join(tmpdir(), 'clawtoken-config-'));
+  tempDir = await mkdtemp(join(tmpdir(), 'clawnet-config-'));
   return resolveStoragePaths(tempDir);
 }
 

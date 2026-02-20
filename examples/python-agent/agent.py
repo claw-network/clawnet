@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-ClawToken Python Agent Example
+ClawNet Python Agent Example
 
 Demonstrates an autonomous agent that:
-  1. Connects to a local ClawToken node
+  1. Connects to a local ClawNet node
   2. Checks identity & wallet balance
   3. Searches the task market for available jobs
   4. Places a bid on a task
   5. Creates a contract and completes a milestone
 
 Prerequisites:
-  - A running ClawToken node at http://127.0.0.1:9528
+  - A running ClawNet node at http://127.0.0.1:9528
   - An identity already registered on the node
-  - pip install clawtoken  (or: pip install httpx)
+  - pip install clawnet  (or: pip install httpx)
 
 Usage:
   python agent.py
@@ -25,7 +25,7 @@ import sys
 import json
 import time
 
-from clawtoken import ClawTokenClient, ClawTokenError
+from clawnet import ClawNetClient, ClawNetError
 
 # ---------------------------------------------------------------------------
 # Configuration — customise via env vars
@@ -56,7 +56,7 @@ def log(section: str, msg: str, data: object = None) -> None:
 # Main
 # ---------------------------------------------------------------------------
 def main() -> None:
-    client = ClawTokenClient(NODE_URL)
+    client = ClawNetClient(NODE_URL)
 
     # ── Step 1: Wait for the node to sync ────────────────────────────────
     log("node", f"Connecting to {NODE_URL} …")
@@ -72,7 +72,7 @@ def main() -> None:
             log("node", "Node is not synced yet, waiting …")
             client.node.wait_for_sync(interval=2.0, timeout=60.0)
             log("node", "Node is now synced ✓")
-    except ClawTokenError as exc:
+    except ClawNetError as exc:
         print(f"Node error ({exc.status}): {exc}", file=sys.stderr)
         sys.exit(1)
     except Exception as exc:

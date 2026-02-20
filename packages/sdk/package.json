@@ -1,17 +1,17 @@
 {
-  "name": "@clawtoken/sdk",
+  "name": "@clawnet/sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for the ClawToken decentralized agent economy",
+  "description": "TypeScript SDK for the ClawNet decentralized agent economy",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/OpenClaw/clawtoken.git",
+    "url": "https://github.com/OpenClaw/clawnet.git",
     "directory": "packages/sdk"
   },
-  "keywords": ["clawtoken", "agent", "decentralized", "sdk", "ai"],
+  "keywords": ["clawnet", "agent", "decentralized", "sdk", "ai"],
   "files": ["dist", "README.md"],
   "exports": {
     ".": "./dist/index.js"
@@ -22,6 +22,6 @@
     "lint": "eslint src --max-warnings=0"
   },
   "dependencies": {
-    "@clawtoken/protocol": "workspace:*"
+    "@clawnet/protocol": "workspace:*"
   }
 }

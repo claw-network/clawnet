@@ -3,8 +3,8 @@ import {
   EventEnvelope,
   EventStore,
   utf8ToBytes,
-} from '@clawtoken/core';
-import { KVStore } from '@clawtoken/core/storage';
+} from '@clawnet/core';
+import { KVStore } from '@clawnet/core/storage';
 import {
   MarketListing,
   ListingStats,

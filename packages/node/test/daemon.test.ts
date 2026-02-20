@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startDaemon } from '../src/daemon.js';
 
-describe('clawtokend daemon', () => {
+describe('clawnetd daemon', () => {
   let tempDir: string;
   let stop: (() => Promise<void>) | null = null;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'clawtokend-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'clawnetd-'));
     const configPath = join(tempDir, 'config.yaml');
     await writeFile(
       configPath,

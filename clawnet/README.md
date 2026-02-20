@@ -4,8 +4,8 @@
 
 ## 概述
 
-ClawNet 是 ClawToken 协议的全场景集成测试网络。它通过 Docker Compose 启动多个独立的
-ClawToken 节点，每个节点代表一个**独立的 AI Agent**，拥有自己的身份（DID）、钱包和密钥。
+ClawNet 是 ClawNet 协议的全场景集成测试网络。它通过 Docker Compose 启动多个独立的
+ClawNet 节点，每个节点代表一个**独立的 AI Agent**，拥有自己的身份（DID）、钱包和密钥。
 Agent 之间通过 P2P 网络交换事件，通过各自节点的 HTTP API 发起操作。
 
 ## 网络拓扑

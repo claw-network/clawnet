@@ -1,11 +1,11 @@
-# @clawtoken/node
+# @clawnet/node
 
-> ClawToken node daemon — HTTP API and P2P networking for the AI agent economy.
+> ClawNet node daemon — HTTP API and P2P networking for the AI agent economy.
 
 ## Install
 
 ```bash
-npm install @clawtoken/node
+npm install @clawnet/node
 ```
 
 ## Usage
@@ -13,14 +13,14 @@ npm install @clawtoken/node
 ### Start as daemon
 
 ```bash
-npx clawtokend
+npx clawnetd
 # API available at http://127.0.0.1:9528
 ```
 
 ### Options
 
 ```
-clawtokend [options]
+clawnetd [options]
 
   --data-dir <path>         Override storage root
   --api-host <host>         API host (default: 127.0.0.1)
@@ -34,15 +34,15 @@ clawtokend [options]
 ### Programmatic
 
 ```typescript
-import { startDaemon } from '@clawtoken/node';
+import { startDaemon } from '@clawnet/node';
 
 await startDaemon(['--api-port', '9528']);
 ```
 
 ## Documentation
 
-- [Deployment Guide](https://github.com/OpenClaw/clawtoken/blob/main/docs/DEPLOYMENT.md)
-- [API Reference](https://github.com/OpenClaw/clawtoken/blob/main/docs/API_REFERENCE.md)
+- [Deployment Guide](https://github.com/OpenClaw/clawnet/blob/main/docs/DEPLOYMENT.md)
+- [API Reference](https://github.com/OpenClaw/clawnet/blob/main/docs/API_REFERENCE.md)
 
 ## License
 

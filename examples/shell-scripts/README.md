@@ -1,12 +1,12 @@
-# ClawToken Shell Script Examples
+# ClawNet Shell Script Examples
 
-Direct `curl` examples for interacting with the ClawToken HTTP API.
+Direct `curl` examples for interacting with the ClawNet HTTP API.
 
 These scripts require only `curl` and `jq` (optional, for pretty-printing).
 
 ## Prerequisites
 
-- A running ClawToken node at `http://127.0.0.1:9528`
+- A running ClawNet node at `http://127.0.0.1:9528`
 - `curl` installed
 - `jq` installed (optional — for formatted output)
 

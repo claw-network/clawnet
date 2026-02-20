@@ -1,6 +1,6 @@
-# ClawToken Deployment Guide
+# ClawNet Deployment Guide
 
-> How to run a ClawToken node in development, staging, and production.
+> How to run a ClawNet node in development, staging, and production.
 
 ---
 
@@ -11,40 +11,40 @@ The simplest setup — one node on your local machine.
 ### From Source
 
 ```bash
-git clone https://github.com/OpenClaw/clawtoken.git
-cd clawtoken
+git clone https://github.com/OpenClaw/clawnet.git
+cd clawnet
 pnpm install && pnpm build
 
-# Initialize (generates keys, writes ~/.clawtoken/)
-pnpm --filter @clawtoken/cli exec clawtoken init
+# Initialize (generates keys, writes ~/.clawnet/)
+pnpm --filter @clawnet/cli exec clawnet init
 
 # Start daemon
-pnpm --filter @clawtoken/cli exec clawtoken daemon
+pnpm --filter @clawnet/cli exec clawnet daemon
 ```
 
 ### From Pre-built Binary
 
-Download from [GitHub Releases](https://github.com/OpenClaw/clawtoken/releases):
+Download from [GitHub Releases](https://github.com/OpenClaw/clawnet/releases):
 
 ```bash
 # Linux / macOS
-chmod +x clawtokend
-./clawtokend init
-./clawtokend
+chmod +x clawnetd
+./clawnetd init
+./clawnetd
 
 # Windows
-clawtokend.exe init
-clawtokend.exe
+clawnetd.exe init
+clawnetd.exe
 ```
 
 ### From Docker
 
 ```bash
 docker run -d \
-  --name clawtoken \
+  --name clawnet \
   -p 9528:9528 \
-  -v clawtoken-data:/data \
-  openclaw/clawtoken:latest
+  -v clawnet-data:/data \
+  openclaw/clawnet:latest
 ```
 
 ---
@@ -64,8 +64,8 @@ WORKDIR /app
 COPY --from=build /app/packages/node/dist ./dist
 COPY --from=build /app/packages/node/package.json .
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages/core/dist ./node_modules/@clawtoken/core/dist
-COPY --from=build /app/packages/protocol/dist ./node_modules/@clawtoken/protocol/dist
+COPY --from=build /app/packages/core/dist ./node_modules/@clawnet/core/dist
+COPY --from=build /app/packages/protocol/dist ./node_modules/@clawnet/protocol/dist
 
 ENV CLAW_DATA_DIR=/data
 ENV CLAW_API_HOST=0.0.0.0
@@ -81,12 +81,12 @@ ENTRYPOINT ["node", "dist/daemon.js"]
 version: '3.8'
 
 services:
-  clawtoken:
+  clawnet:
     build: .
     ports:
       - "9528:9528"
     volumes:
-      - clawtoken-data:/data
+      - clawnet-data:/data
     environment:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
@@ -98,20 +98,20 @@ services:
       retries: 3
 
   # Second node for multi-node testing
-  clawtoken-peer:
+  clawnet-peer:
     build: .
     ports:
       - "9529:9528"
     volumes:
-      - clawtoken-peer-data:/data
+      - clawnet-peer-data:/data
     environment:
       - CLAW_API_HOST=0.0.0.0
-    command: ["--bootstrap", "/ip4/clawtoken/tcp/9529"]
+    command: ["--bootstrap", "/ip4/clawnet/tcp/9529"]
     restart: unless-stopped
 
 volumes:
-  clawtoken-data:
-  clawtoken-peer-data:
+  clawnet-data:
+  clawnet-peer-data:
 ```
 
 ---
@@ -120,22 +120,22 @@ volumes:
 
 ### Data Directory
 
-Default: `~/.clawtoken/`
+Default: `~/.clawnet/`
 
 Override:
 ```bash
-clawtokend --data-dir /opt/clawtoken/data
+clawnetd --data-dir /opt/clawnet/data
 ```
 
 Or via environment variable:
 ```bash
-export CLAW_DATA_DIR=/opt/clawtoken/data
+export CLAW_DATA_DIR=/opt/clawnet/data
 ```
 
 ### Directory Structure
 
 ```
-~/.clawtoken/
+~/.clawnet/
 ├── config.yaml          # Node configuration
 ├── keystore/            # Encrypted Ed25519 keys
 └── data/                # LevelDB store (events, state, snapshots)
@@ -161,7 +161,7 @@ export CLAW_DATA_DIR=/opt/clawtoken/data
 
 Example:
 ```bash
-clawtokend \
+clawnetd \
   --listen /ip4/0.0.0.0/tcp/9529 \
   --bootstrap /ip4/1.2.3.4/tcp/9529/p2p/12D3KooW… \
   --bootstrap /ip4/5.6.7.8/tcp/9529/p2p/12D3KooW…
@@ -185,10 +185,10 @@ clawtokend \
 ```nginx
 server {
     listen 443 ssl;
-    server_name clawtoken.example.com;
+    server_name clawnet.example.com;
 
-    ssl_certificate     /etc/ssl/certs/clawtoken.pem;
-    ssl_certificate_key /etc/ssl/private/clawtoken.key;
+    ssl_certificate     /etc/ssl/certs/clawnet.pem;
+    ssl_certificate_key /etc/ssl/private/clawnet.key;
 
     location /api/ {
         proxy_pass http://127.0.0.1:9528;
@@ -211,13 +211,13 @@ server {
 
 ```bash
 # Backup data directory
-tar -czf clawtoken-backup-$(date +%Y%m%d).tar.gz ~/.clawtoken/
+tar -czf clawnet-backup-$(date +%Y%m%d).tar.gz ~/.clawnet/
 
 # Restore from backup
-tar -xzf clawtoken-backup-20260219.tar.gz -C ~/
+tar -xzf clawnet-backup-20260219.tar.gz -C ~/
 
 # Restore from mnemonic (new machine)
-clawtokend init --recover
+clawnetd init --recover
 # Enter your 24-word mnemonic when prompted
 ```
 
@@ -225,7 +225,7 @@ clawtokend init --recover
 
 - LevelDB grows with event log size
 - Snapshots compact historical state
-- Monitor disk usage: `du -sh ~/.clawtoken/data/`
+- Monitor disk usage: `du -sh ~/.clawnet/data/`
 - Recommended: SSD with ≥ 10 GB free space for testnet
 
 ---
@@ -237,8 +237,8 @@ clawtokend init --recover
 A bootstrap node is the first peer in a network that helps new nodes discover each other.
 
 ```bash
-clawtokend \
-  --data-dir /opt/clawtoken/bootstrap \
+clawnetd \
+  --data-dir /opt/clawnet/bootstrap \
   --listen /ip4/0.0.0.0/tcp/9529 \
   --api-host 0.0.0.0 \
   --api-port 9528
@@ -252,7 +252,7 @@ Record the node's peer ID from startup logs, then share the multiaddr:
 ### Joining the Testnet
 
 ```bash
-clawtokend \
+clawnetd \
   --bootstrap /ip4/<bootstrap-ip>/tcp/9529/p2p/<bootstrap-peer-id>
 ```
 
@@ -261,9 +261,9 @@ clawtokend \
 For testnet, tokens can be distributed via a genesis allocation or a simple faucet endpoint. A faucet service can be built using the SDK:
 
 ```typescript
-import { ClawTokenClient } from '@clawtoken/sdk';
+import { ClawNetClient } from '@clawnet/sdk';
 
-const client = new ClawTokenClient();
+const client = new ClawNetClient();
 
 async function drip(recipientDid: string, amount = 1000) {
   return client.wallet.transfer({

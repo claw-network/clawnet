@@ -1,4 +1,4 @@
-import { EventEnvelope, eventHashHex } from '@clawtoken/core/protocol';
+import { EventEnvelope, eventHashHex } from '@clawnet/core/protocol';
 import {
   MarketListing,
   ListingStats,

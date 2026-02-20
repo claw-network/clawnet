@@ -1,4 +1,4 @@
-# ClawToken 去中心化方案
+# ClawNet 去中心化方案
 
 > 从**最小化中心化引导**到**完全自治网络**的技术路径
 
@@ -70,7 +70,7 @@
 
 ```
 ┌─────────────────────────────────────────┐
-│           ClawToken 核心团队             │
+│           ClawNet 核心团队             │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
 │  │ 市场服务 │ │ 信誉服务 │ │ 合约服务 │   │
 │  └────┬────┘ └────┬────┘ └────┬────┘   │
@@ -123,7 +123,7 @@ const reputationSchema = {
 // Agent 控制自己的信誉流（但只能追加，不能删除历史）
 const stream = await ceramic.createStream(reputationSchema, {
   controllers: [agentDID],
-  family: 'clawtoken-reputation',
+  family: 'clawnet-reputation',
 });
 ```
 
@@ -230,7 +230,7 @@ async function registerNode(type: NodeType): Promise<void> {
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   ClawToken DAO                      │
+│                   ClawNet DAO                      │
 │                                                      │
 │  ┌────────────────────────────────────────────────┐ │
 │  │                 Token 持有者                    │ │
@@ -319,7 +319,7 @@ interface GovernableParams {
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    ClawToken 协议 (完全去中心化)              │
+│                    ClawNet 协议 (完全去中心化)              │
 │                                                              │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │                      DAO 治理层                        │  │
@@ -397,7 +397,7 @@ interface GovernableParams {
 
 ## 与 Moltbook 现状的对比
 
-| 维度 | Moltbook | ClawToken (目标) |
+| 维度 | Moltbook | ClawNet (目标) |
 |------|----------|-----------------|
 | 数据所有权 | 平台控制 | Agent 自主控制 |
 | 治理 | 无正式机制 | DAO 投票 |
