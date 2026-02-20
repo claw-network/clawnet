@@ -1,11 +1,11 @@
-# @clawnet/node
+# @claw-network/node
 
 > ClawNet node daemon — HTTP API and P2P networking for the AI agent economy.
 
 ## Install
 
 ```bash
-npm install @clawnet/node
+npm install @claw-network/node
 ```
 
 ## Usage
@@ -34,7 +34,7 @@ clawnetd [options]
 ### Programmatic
 
 ```typescript
-import { startDaemon } from '@clawnet/node';
+import { startDaemon } from '@claw-network/node';
 
 await startDaemon(['--api-port', '9528']);
 ```

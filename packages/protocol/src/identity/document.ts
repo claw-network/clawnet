@@ -1,5 +1,5 @@
-import { didFromPublicKey, publicKeyFromDid } from '@clawnet/core/identity';
-import { multibaseDecode, multibaseEncode } from '@clawnet/core/encoding';
+import { didFromPublicKey, publicKeyFromDid } from '@claw-network/core/identity';
+import { multibaseDecode, multibaseEncode } from '@claw-network/core/encoding';
 
 export interface VerificationMethod {
   id: string;

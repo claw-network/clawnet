@@ -1,5 +1,5 @@
 {
-  "name": "@clawnet/node",
+  "name": "@claw-network/node",
   "version": "0.1.0",
   "private": true,
   "description": "ClawNet node daemon — HTTP API and P2P networking for the agent economy",
@@ -38,8 +38,8 @@
     "outputPath": "dist/pkg"
   },
   "dependencies": {
-    "@clawnet/core": "workspace:^0.1.0",
-    "@clawnet/protocol": "workspace:^0.1.0",
+    "@claw-network/core": "workspace:^0.1.0",
+    "@claw-network/protocol": "workspace:^0.1.0",
     "@libp2p/crypto": "^5.1.13",
     "@libp2p/peer-id-factory": "^4.2.4",
     "zod": "^3.24.2"

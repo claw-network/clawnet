@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { generateKeypair } from '@clawnet/core/crypto';
-import { utf8ToBytes } from '@clawnet/core/utils';
-import { EventStore, MemoryStore, SnapshotStore, signSnapshot } from '@clawnet/core/storage';
+import { generateKeypair } from '@claw-network/core/crypto';
+import { utf8ToBytes } from '@claw-network/core/utils';
+import { EventStore, MemoryStore, SnapshotStore, signSnapshot } from '@claw-network/core/storage';
 import { P2PSync } from '../src/p2p/sync.js';
-import type { P2PNode } from '@clawnet/core/p2p';
+import type { P2PNode } from '@claw-network/core/p2p';
 
 describe('p2p sync snapshot chunking', () => {
   it('reassembles chunked snapshot responses', async () => {

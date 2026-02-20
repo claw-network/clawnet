@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalizeBytes, blake3Hex, generateKeypair, generateX25519Keypair } from '@clawnet/core/crypto';
-import { EventStore, MemoryStore } from '@clawnet/core/storage';
-import { didFromPublicKey } from '@clawnet/core/identity';
-import { bytesToHex, bytesToUtf8, utf8ToBytes } from '@clawnet/core/utils';
+import { canonicalizeBytes, blake3Hex, generateKeypair, generateX25519Keypair } from '@claw-network/core/crypto';
+import { EventStore, MemoryStore } from '@claw-network/core/storage';
+import { didFromPublicKey } from '@claw-network/core/identity';
+import { bytesToHex, bytesToUtf8, utf8ToBytes } from '@claw-network/core/utils';
 import {
   createInfoListingPublishEnvelope,
   InfoContentStore,

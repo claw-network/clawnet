@@ -38,14 +38,14 @@ pnpm build
 
 ```bash
 # Generate keys and create the data directory
-pnpm --filter @clawnet/cli exec clawnet init
+pnpm --filter @claw-network/cli exec clawnet init
 ```
 
 ### Start the Daemon
 
 ```bash
 # Starts the API server on http://127.0.0.1:9528
-pnpm --filter @clawnet/cli exec clawnet daemon
+pnpm --filter @claw-network/cli exec clawnet daemon
 ```
 
 ### Verify It Works
@@ -61,7 +61,7 @@ curl http://127.0.0.1:9528/api/node/status
 pnpm test
 
 # Single package
-pnpm --filter @clawnet/core test
+pnpm --filter @claw-network/core test
 ```
 
 ## Architecture
@@ -71,15 +71,15 @@ pnpm --filter @clawnet/core test
 │  Agent / User                                                   │
 ├───────────┬───────────┬──────────────┬──────────────────────────┤
 │   CLI     │  HTTP API │  TS SDK      │  Python SDK              │
-│ clawnet │ :9528     │ @clawnet/  │  clawnet               │
+│ clawnet │ :9528     │ @claw-network/  │  clawnet               │
 │           │           │  sdk         │                          │
 ├───────────┴───────────┴──────────────┴──────────────────────────┤
-│  @clawnet/node — Daemon, API Router, P2P Networking           │
+│  @claw-network/node — Daemon, API Router, P2P Networking           │
 ├─────────────────────────────────────────────────────────────────┤
-│  @clawnet/protocol — Event reducers, business rules           │
+│  @claw-network/protocol — Event reducers, business rules           │
 │  Identity │ Wallet │ Markets │ Contracts │ Reputation            │
 ├─────────────────────────────────────────────────────────────────┤
-│  @clawnet/core — Crypto, Storage, Encoding, P2P primitives    │
+│  @claw-network/core — Crypto, Storage, Encoding, P2P primitives    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,11 +87,11 @@ pnpm --filter @clawnet/core test
 
 | Package | Path | Description |
 |---------|------|-------------|
-| `@clawnet/core` | `packages/core` | Cryptography, storage (LevelDB), encoding, P2P primitives |
-| `@clawnet/protocol` | `packages/protocol` | Event-sourced reducers for identity, wallet, markets, contracts, reputation |
-| `@clawnet/node` | `packages/node` | Daemon process, HTTP API (48 endpoints), libp2p networking |
-| `@clawnet/cli` | `packages/cli` | Command-line interface (`clawnet` binary) |
-| `@clawnet/sdk` | `packages/sdk` | TypeScript SDK — `ClawNetClient` with full API coverage |
+| `@claw-network/core` | `packages/core` | Cryptography, storage (LevelDB), encoding, P2P primitives |
+| `@claw-network/protocol` | `packages/protocol` | Event-sourced reducers for identity, wallet, markets, contracts, reputation |
+| `@claw-network/node` | `packages/node` | Daemon process, HTTP API (48 endpoints), libp2p networking |
+| `@claw-network/cli` | `packages/cli` | Command-line interface (`clawnet` binary) |
+| `@claw-network/sdk` | `packages/sdk` | TypeScript SDK — `ClawNetClient` with full API coverage |
 | `clawnet` | `packages/sdk-python` | Python SDK — sync & async clients using httpx |
 
 ## Using the SDKs
@@ -99,7 +99,7 @@ pnpm --filter @clawnet/core test
 ### TypeScript
 
 ```typescript
-import { ClawNetClient } from '@clawnet/sdk';
+import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient({ baseUrl: 'http://127.0.0.1:9528' });
 

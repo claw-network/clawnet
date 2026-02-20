@@ -13,10 +13,10 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@clawnet/core';
-import { generateKeypair } from '@clawnet/core/crypto';
-import { didFromPublicKey } from '@clawnet/core/identity';
-import { createContractActivateEnvelope } from '@clawnet/protocol';
+} from '@claw-network/core';
+import { generateKeypair } from '@claw-network/core/crypto';
+import { didFromPublicKey } from '@claw-network/core/identity';
+import { createContractActivateEnvelope } from '@claw-network/protocol';
 
 describe('contracts api', () => {
   let api: ApiServer;

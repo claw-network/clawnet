@@ -16,7 +16,7 @@ import {
   TOPIC_RESPONSES,
   verifySnapshotHash,
   verifySnapshotSignatures,
-} from '@clawnet/core';
+} from '@claw-network/core';
 import {
   CONTENT_TYPE,
   P2PEnvelope,
@@ -40,7 +40,7 @@ import {
   verifyP2PEnvelopeSignature,
   verifyStakeProofControllerSignature,
   verifyStakeProofPeerSignature,
-} from '@clawnet/protocol';
+} from '@claw-network/protocol';
 
 export type SybilPolicy = 'none' | 'allowlist' | 'pow' | 'stake';
 

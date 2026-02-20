@@ -1,4 +1,4 @@
-import { EventEnvelope } from '@clawnet/core/protocol';
+import { EventEnvelope } from '@claw-network/core/protocol';
 
 export const MARKET_EVENT_PREFIX = 'market.';
 

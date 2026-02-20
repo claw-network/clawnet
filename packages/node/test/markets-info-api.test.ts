@@ -10,14 +10,14 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@clawnet/core';
-import { generateKeypair } from '@clawnet/core/crypto';
-import { didFromPublicKey } from '@clawnet/core/identity';
+} from '@claw-network/core';
+import { generateKeypair } from '@claw-network/core/crypto';
+import { didFromPublicKey } from '@claw-network/core/identity';
 import {
   createInfoListingPublishEnvelope,
   InfoContentStore,
   MarketSearchStore,
-} from '@clawnet/protocol';
+} from '@claw-network/protocol';
 
 const pricing = {
   type: 'fixed',

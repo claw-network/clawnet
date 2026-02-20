@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { generateKeypair } from '@clawnet/core/crypto';
-import { didFromPublicKey } from '@clawnet/core/identity';
-import { verifyEventSignature } from '@clawnet/core/protocol';
+import { generateKeypair } from '@claw-network/core/crypto';
+import { didFromPublicKey } from '@claw-network/core/identity';
+import { verifyEventSignature } from '@claw-network/core/protocol';
 import { createDIDDocument } from '../src/identity/document.js';
 import {
   CapabilityCredential,

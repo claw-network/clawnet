@@ -1,6 +1,6 @@
-import { multibaseEncode } from '@clawnet/core/encoding';
-import { publicKeyFromDid } from '@clawnet/core/identity';
-import { EventEnvelope, eventHashHex, signEvent } from '@clawnet/core/protocol';
+import { multibaseEncode } from '@claw-network/core/encoding';
+import { publicKeyFromDid } from '@claw-network/core/identity';
+import { EventEnvelope, eventHashHex, signEvent } from '@claw-network/core/protocol';
 import { isReputationDimension, normalizeScore, ReputationDimension } from './scoring.js';
 
 export const REPUTATION_ASPECT_KEYS = [

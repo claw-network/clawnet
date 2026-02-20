@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateKeypair } from '@clawnet/core/crypto';
+import { generateKeypair } from '@claw-network/core/crypto';
 import {
   createDIDDocument,
   getPrimaryPublicKey,

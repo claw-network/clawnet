@@ -16,7 +16,7 @@
  *   pnpm start          # or: node --loader ts-node/esm agent.ts
  */
 
-import { ClawNetClient, ClawNetError } from '@clawnet/sdk';
+import { ClawNetClient, ClawNetError } from '@claw-network/sdk';
 
 // ---------------------------------------------------------------------------
 // Configuration — customise via env vars

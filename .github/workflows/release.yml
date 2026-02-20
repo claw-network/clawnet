@@ -40,7 +40,7 @@ jobs:
       - name: Install
         run: pnpm install
       - name: Package clawnetd
-        run: pnpm --filter @clawnet/node package
+        run: pnpm --filter @claw-network/node package
       - name: Upload clawnetd binaries
         uses: actions/upload-artifact@v4
         with:

@@ -7,8 +7,8 @@ import {
   ClawNetNode,
   DEFAULT_P2P_SYNC_CONFIG,
   DEFAULT_SYNC_RUNTIME_CONFIG,
-} from '@clawnet/node';
-import type { NodeRuntimeConfig } from '@clawnet/node';
+} from '@claw-network/node';
+import type { NodeRuntimeConfig } from '@claw-network/node';
 import {
   addressFromDid,
   bytesToUtf8,
@@ -32,7 +32,7 @@ import {
   utf8ToBytes,
   validateMnemonic,
   verifyCapabilityCredential,
-} from '@clawnet/core';
+} from '@claw-network/core';
 import {
   applyReputationEvent,
   applyWalletEvent,
@@ -57,7 +57,7 @@ import {
   ReputationLevel,
   ReputationRecord,
   WalletState,
-} from '@clawnet/protocol';
+} from '@claw-network/protocol';
 
 async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   if (argv.includes('--help') || argv.includes('-h')) {

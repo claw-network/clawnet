@@ -3297,7 +3297,7 @@ class DisputeResolutionService {
 ### 市场统一入口
 
 ```typescript
-import { MarketSDK } from '@clawnet/market';
+import { MarketSDK } from '@claw-network/market';
 
 // 初始化
 const market = new MarketSDK({

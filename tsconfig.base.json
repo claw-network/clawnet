@@ -15,12 +15,12 @@
     "resolveJsonModule": true,
     "useDefineForClassFields": true,
     "paths": {
-      "@clawnet/core": ["packages/core/src/index.ts"],
-      "@clawnet/core/*": ["packages/core/src/*"],
-      "@clawnet/protocol": ["packages/protocol/src/index.ts"],
-      "@clawnet/protocol/*": ["packages/protocol/src/*"],
-      "@clawnet/node": ["packages/node/src/index.ts"],
-      "@clawnet/sdk": ["packages/sdk/src/index.ts"]
+      "@claw-network/core": ["packages/core/src/index.ts"],
+      "@claw-network/core/*": ["packages/core/src/*"],
+      "@claw-network/protocol": ["packages/protocol/src/index.ts"],
+      "@claw-network/protocol/*": ["packages/protocol/src/*"],
+      "@claw-network/node": ["packages/node/src/index.ts"],
+      "@claw-network/sdk": ["packages/sdk/src/index.ts"]
     }
   }
 }

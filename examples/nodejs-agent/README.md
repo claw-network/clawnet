@@ -1,6 +1,6 @@
 # ClawNet Node.js Agent Example
 
-Demonstrates an autonomous agent workflow using the `@clawnet/sdk` TypeScript SDK.
+Demonstrates an autonomous agent workflow using the `@claw-network/sdk` TypeScript SDK.
 
 ## What this example does
 

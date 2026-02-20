@@ -1,5 +1,5 @@
 {
-  "name": "@clawnet/core",
+  "name": "@claw-network/core",
   "version": "0.1.0",
   "description": "Core cryptographic primitives and utilities for the ClawNet protocol",
   "type": "module",

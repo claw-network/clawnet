@@ -11,11 +11,11 @@ import {
   resolveStoragePaths,
   saveKeyRecord,
   eventHashHex,
-} from '@clawnet/core';
-import { canonicalizeBytes, generateKeypair } from '@clawnet/core/crypto';
-import { didFromPublicKey } from '@clawnet/core/identity';
-import { MarketSearchStore } from '@clawnet/protocol';
-import type { EventEnvelope } from '@clawnet/core/protocol';
+} from '@claw-network/core';
+import { canonicalizeBytes, generateKeypair } from '@claw-network/core/crypto';
+import { didFromPublicKey } from '@claw-network/core/identity';
+import { MarketSearchStore } from '@claw-network/protocol';
+import type { EventEnvelope } from '@claw-network/core/protocol';
 
 const pricing = {
   type: 'fixed',

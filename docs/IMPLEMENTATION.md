@@ -32,7 +32,7 @@
 │  │   • 类似 bitcoind                                                    │    │
 │  │                                                                      │    │
 │  │   交付形式:                                                          │    │
-│  │   - npm: npm install -g @clawnet/node                             │    │
+│  │   - npm: npm install -g @claw-network/node                             │    │
 │  │   - 二进制: curl -fsSL https://clawnet.network/install.sh | sh   │    │
 │  │             (可替换为社区/自建镜像，建议校验签名)                    │    │
 │  │   - Docker: docker pull clawnet/node                              │    │
@@ -60,8 +60,8 @@
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
 │  │                     4. SDK (可选便利层)                              │    │
 │  │                                                                      │    │
-│  │   @clawnet/sdk (TypeScript)                                        │    │
-│  │   @clawnet/sdk-python (Python)                                     │    │
+│  │   @claw-network/sdk (TypeScript)                                        │    │
+│  │   @claw-network/sdk-python (Python)                                     │    │
 │  │                                                                      │    │
 │  │   • 封装 HTTP API 调用                                               │    │
 │  │   • 提供类型定义和便利方法                                           │    │
@@ -365,7 +365,7 @@
 │  │  依赖: HTTP API (封装调用)                                           │    │
 │  │                                                                      │    │
 │  │  包:                                                                 │    │
-│  │  • @clawnet/sdk (TypeScript)                                       │    │
+│  │  • @claw-network/sdk (TypeScript)                                       │    │
 │  │  • clawnet-sdk (Python)                                            │    │
 │  │                                                                      │    │
 │  └─────────────────────────────────────────────────────────────────────┘    │
@@ -510,7 +510,7 @@ clawnet/
 │   │
 │   └── sdk/                           # SDK Wrappers
 │       ├── typescript/
-│       │   └── @clawnet/sdk
+│       │   └── @claw-network/sdk
 │       │
 │       └── python/
 │           └── clawnet-sdk
@@ -559,7 +559,7 @@ clawnet/
 │                                                                              │
 │  Step 1: 安装节点                                                           │
 │  ─────────────────                                                          │
-│  $ npm install -g @clawnet/node                                           │
+│  $ npm install -g @claw-network/node                                           │
 │  # 或                                                                        │
 │  $ curl -fsSL https://clawnet.network/install.sh | sh                    │
 │  # 可替换为社区/自建镜像，建议校验签名                                    │
@@ -597,7 +597,7 @@ clawnet/
 │ 1  │ clawnetd          │ npm / 二进制 / Docker │ 必需                 │
 │ 2  │ clawnet CLI       │ 随 clawnetd 安装    │ 必需                 │
 │ 3  │ HTTP API            │ 节点内置              │ 必需                 │
-│ 4  │ @clawnet/sdk      │ npm 包                │ 可选（便利）         │
+│ 4  │ @claw-network/sdk      │ npm 包                │ 可选（便利）         │
 │ 5  │ clawnet-sdk (py)  │ pip 包                │ 可选（便利）         │
 │ 6  │ API 文档             │ 在线文档              │ 必需                 │
 │ 7  │ 示例代码             │ GitHub                │ 必需                 │
@@ -653,7 +653,7 @@ clawnet/
 - `docs/implementation/p2p-spec.fbs`
 
 ```
-□ 1.1  Crypto Engine (@clawnet/core/crypto)  ✅ 已完成
+□ 1.1  Crypto Engine (@claw-network/core/crypto)  ✅ 已完成
        ├── 1.1.1  密钥对生成 (Ed25519) ✅
        ├── 1.1.2  签名 / 验签 ✅
        ├── 1.1.3  助记词生成 (BIP39) ✅
@@ -662,7 +662,7 @@ clawnet/
        ├── 1.1.6  哈希函数 (SHA-256, BLAKE3) ✅
        └── 1.1.7  单元测试 ✅
 
-□ 1.2  Storage Engine (@clawnet/core/storage)  ✅ 已完成
+□ 1.2  Storage Engine (@claw-network/core/storage)  ✅ 已完成
        ├── 1.2.1  LevelDB 封装 ✅
        ├── 1.2.2  加密存储 (用 Crypto Engine) ✅
        ├── 1.2.3  配置管理 (~/.clawnet/config.yaml) ✅
@@ -670,13 +670,13 @@ clawnet/
        ├── 1.2.5  数据迁移机制 ✅
        └── 1.2.6  单元测试 ✅
 
-□ 1.3  P2P Engine (@clawnet/core/p2p)  ✅ 已完成
+□ 1.3  P2P Engine (@claw-network/core/p2p)  ✅ 已完成
        ├── 1.3.1  libp2p 节点初始化 ✅
        ├── 1.3.2  节点发现 (DHT / Bootstrap) ✅
        ├── 1.3.3  连接管理 ✅
        ├── 1.3.4  Gossipsub 消息传播 ✅
        ├── 1.3.5  NAT 穿透 (hole punching) ✅
-       ├── 1.3.6  协议定义 (/clawnet/1.0.0) ✅（FlatBuffers 编解码已在 @clawnet/protocol 完成）
+       ├── 1.3.6  协议定义 (/clawnet/1.0.0) ✅（FlatBuffers 编解码已在 @claw-network/protocol 完成）
        └── 1.3.7  集成测试 (多节点) ✅
 ```
 
@@ -694,7 +694,7 @@ clawnet/
 - `docs/WALLET.md`
 
 ```
-□ 2.1  Identity Module (@clawnet/protocol/identity) ✅ 已完成
+□ 2.1  Identity Module (@claw-network/protocol/identity) ✅ 已完成
        ├── 2.1.1  DID 生成 (did:claw:xxx) ✅
        ├── 2.1.2  DID 文档结构 ✅
        ├── 2.1.3  DID 解析器 ✅
@@ -703,7 +703,7 @@ clawnet/
        ├── 2.1.6  能力证书 (Verifiable Credentials) ✅
        └── 2.1.7  单元测试 ✅
 
-□ 2.2  Wallet Module (@clawnet/protocol/wallet) ✅ 已完成
+□ 2.2  Wallet Module (@claw-network/protocol/wallet) ✅ 已完成
        ├── 2.2.1  余额管理 (本地状态) ✅
        ├── 2.2.2  转账交易创建 ✅
        ├── 2.2.3  交易签名 ✅
@@ -726,7 +726,7 @@ clawnet/
 - `docs/AGENT_RUNTIME.md`
 
 ```
-□ 3.1  HTTP API Server (@clawnet/node/api) ✅ 已完成
+□ 3.1  HTTP API Server (@claw-network/node/api) ✅ 已完成
        ├── 3.1.1  HTTP 服务器 (node:http) ✅
        ├── 3.1.2  路由: /api/node/* ✅
        ├── 3.1.3  路由: /api/identity/* ✅
@@ -735,7 +735,7 @@ clawnet/
        ├── 3.1.6  请求验证 (Zod) ✅
        └── 3.1.7  API 测试 ✅
 
-□ 3.2  Node Daemon (@clawnet/node) ✅ 已完成
+□ 3.2  Node Daemon (@claw-network/node) ✅ 已完成
        ├── 3.2.1  clawnetd 入口 ✅
        ├── 3.2.2  配置加载 ✅
        ├── 3.2.3  模块初始化顺序 ✅
@@ -744,7 +744,7 @@ clawnet/
        ├── 3.2.6  健康检查 ✅
        └── 3.2.7  集成测试 ✅
 
-□ 3.3  CLI Tool (@clawnet/cli) ✅ 已完成
+□ 3.3  CLI Tool (@claw-network/cli) ✅ 已完成
        ├── 3.3.1  clawnet init ✅
        ├── 3.3.2  clawnet status ✅
        ├── 3.3.3  clawnet balance ✅
@@ -777,7 +777,7 @@ clawnet/
 - `docs/REPUTATION.md`
 
 ```
-□ 4.1  Reputation Module (@clawnet/protocol/reputation) ✅ 已完成
+□ 4.1  Reputation Module (@claw-network/protocol/reputation) ✅ 已完成
        ├── 4.1.1  评分数据结构 ✅
        ├── 4.1.2  多维度评分计算 ✅
        ├── 4.1.3  时间衰减算法 ✅
@@ -805,7 +805,7 @@ clawnet/
 - `docs/implementation/economics.md`
 
 ```
-□ 5.1  Markets 基础 (@clawnet/protocol/markets) ✅
+□ 5.1  Markets 基础 (@claw-network/protocol/markets) ✅
        ├── 5.1.1  订单数据结构 ✅
        ├── 5.1.2  订单状态机 ✅
        ├── 5.1.3  搜索索引 ✅
@@ -861,7 +861,7 @@ clawnet/
 - `docs/implementation/economics.md`
 
 ```
-□ 6.1  Contract Module (@clawnet/protocol/contracts) ✅
+□ 6.1  Contract Module (@claw-network/protocol/contracts) ✅
        ├── 6.1.1  合约数据结构 ✅
        ├── 6.1.2  合约状态机 ✅
        ├── 6.1.3  合约创建 ✅
@@ -913,7 +913,7 @@ clawnet/
 - `docs/implementation/tasks/api-errors.md`
 
 ```
-✅ 7.1  TypeScript SDK (@clawnet/sdk) ✅
+✅ 7.1  TypeScript SDK (@claw-network/sdk) ✅
        ├── 7.1.1  HTTP Client 封装 ✅
        ├── 7.1.2  类型定义 (从 OpenAPI 生成) ✅
        ├── 7.1.3  Wallet 模块 ✅
@@ -956,7 +956,7 @@ clawnet/
        └── 8.1.6  FAQ (FAQ.md) ✅
 
 ✅ 8.2  发布准备 ✅
-       ├── 8.2.1  npm 发布配置 (@clawnet/node, @clawnet/sdk) ✅
+       ├── 8.2.1  npm 发布配置 (@claw-network/node, @claw-network/sdk) ✅
        ├── 8.2.2  PyPI 发布配置 (clawnet-sdk pyproject.toml) ✅
        ├── 8.2.3  GitHub Releases (pkg 二进制打包已配置) ✅
        ├── 8.2.4  Docker 镜像 (Dockerfile + docker-compose.yml) ✅
@@ -984,7 +984,7 @@ clawnet/
 - `docs/implementation/economics.md`
 
 ```
-✅ 9.1  DAO Module (@clawnet/protocol/dao) ✅
+✅ 9.1  DAO Module (@claw-network/protocol/dao) ✅
        ├── 9.1.1  提案数据结构 (types.ts) ✅
        ├── 9.1.2  投票权计算 (voting.ts) ✅
        ├── 9.1.3  提案创建 (events.ts) ✅

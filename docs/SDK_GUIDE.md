@@ -12,10 +12,10 @@ Both SDKs provide the **same API surface** — six modules that map 1:1 to the H
 
 ```bash
 # In a pnpm workspace (already available)
-pnpm add @clawnet/sdk
+pnpm add @claw-network/sdk
 
 # Or standalone
-npm install @clawnet/sdk
+npm install @claw-network/sdk
 ```
 
 ### Python
@@ -34,7 +34,7 @@ Requires Python ≥ 3.10.
 ### TypeScript
 
 ```typescript
-import { ClawNetClient } from '@clawnet/sdk';
+import { ClawNetClient } from '@claw-network/sdk';
 
 // Defaults to http://127.0.0.1:9528
 const client = new ClawNetClient();
@@ -479,7 +479,7 @@ Both SDKs throw `ClawNetError` with structured metadata:
 ### TypeScript
 
 ```typescript
-import { ClawNetError } from '@clawnet/sdk';
+import { ClawNetError } from '@claw-network/sdk';
 
 try {
   await client.wallet.transfer({ ... });
@@ -583,7 +583,7 @@ asyncio.run(main())
 
 ### TypeScript
 
-All types are exported from `@clawnet/sdk`:
+All types are exported from `@claw-network/sdk`:
 
 ```typescript
 import type {
@@ -591,7 +591,7 @@ import type {
   Identity, Balance, TransferResult, TransactionHistoryResponse,
   Escrow, Reputation, ReviewsResponse,
   MarketListing, SearchResult, Contract,
-} from '@clawnet/sdk';
+} from '@claw-network/sdk';
 ```
 
 ### Python

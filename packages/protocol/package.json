@@ -1,5 +1,5 @@
 {
-  "name": "@clawnet/protocol",
+  "name": "@claw-network/protocol",
   "version": "0.1.0",
   "description": "Protocol definitions and event envelopes for the ClawNet network",
   "type": "module",
@@ -36,7 +36,7 @@
     "lint": "eslint src --max-warnings=0"
   },
   "dependencies": {
-    "@clawnet/core": "workspace:^0.1.0",
+    "@claw-network/core": "workspace:^0.1.0",
     "flatbuffers": "^24.3.25"
   }
 }

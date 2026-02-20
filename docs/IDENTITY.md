@@ -158,7 +158,7 @@ interface AgentKeyring {
 ## 身份创建流程
 
 ```typescript
-import { generateKeyPair, createDID, registerDID } from '@clawnet/identity';
+import { generateKeyPair, createDID, registerDID } from '@claw-network/identity';
 
 // 1. 生成密钥对
 const masterKeyPair = await generateKeyPair('Ed25519');

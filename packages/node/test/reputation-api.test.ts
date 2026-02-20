@@ -10,10 +10,10 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@clawnet/core';
-import { canonicalizeBytes, generateKeypair } from '@clawnet/core/crypto';
-import { didFromPublicKey } from '@clawnet/core/identity';
-import { createReputationRecordEnvelope } from '@clawnet/protocol';
+} from '@claw-network/core';
+import { canonicalizeBytes, generateKeypair } from '@claw-network/core/crypto';
+import { didFromPublicKey } from '@claw-network/core/identity';
+import { createReputationRecordEnvelope } from '@claw-network/protocol';
 
 describe('reputation api', () => {
   let api: ApiServer;

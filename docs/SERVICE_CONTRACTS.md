@@ -3037,7 +3037,7 @@ const TeamCollaborationTemplate: ContractTemplate = {
 ### 合约管理
 
 ```typescript
-import { ServiceContractManager } from '@clawnet/contracts';
+import { ServiceContractManager } from '@claw-network/contracts';
 
 // 初始化
 const contracts = new ServiceContractManager(wallet);

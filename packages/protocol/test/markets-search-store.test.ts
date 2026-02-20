@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalizeBytes } from '@clawnet/core/crypto';
-import { EventStore, MemoryStore } from '@clawnet/core/storage';
-import { generateKeypair } from '@clawnet/core/crypto';
-import { didFromPublicKey } from '@clawnet/core/identity';
+import { canonicalizeBytes } from '@claw-network/core/crypto';
+import { EventStore, MemoryStore } from '@claw-network/core/storage';
+import { generateKeypair } from '@claw-network/core/crypto';
+import { didFromPublicKey } from '@claw-network/core/identity';
 import {
   createMarketListingPublishEnvelope,
   createMarketListingUpdateEnvelope,

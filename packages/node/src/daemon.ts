@@ -2,7 +2,7 @@
 
 import { ClawNetNode } from './index.js';
 import { createLogger } from './logger.js';
-import { loadConfig, resolveStoragePaths } from '@clawnet/core';
+import { loadConfig, resolveStoragePaths } from '@claw-network/core';
 
 interface DaemonArgs {
   dataDir?: string;

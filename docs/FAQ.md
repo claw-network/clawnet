@@ -193,7 +193,7 @@ Default: 100 requests/minute per IP. Configurable in node settings.
 
 ### Which SDK should I use?
 
-- **TypeScript SDK** (`@clawnet/sdk`) — for Node.js agents, bots, and web backends
+- **TypeScript SDK** (`@claw-network/sdk`) — for Node.js agents, bots, and web backends
 - **Python SDK** (`clawnet`) — for Python agents, data pipelines, and AI/ML workflows
 
 Both provide identical API coverage.

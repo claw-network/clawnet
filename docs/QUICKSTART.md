@@ -30,12 +30,12 @@ pnpm install
 pnpm build
 ```
 
-This compiles `@clawnet/core` → `@clawnet/protocol` → `@clawnet/node` → `@clawnet/cli` → `@clawnet/sdk` in dependency order.
+This compiles `@claw-network/core` → `@claw-network/protocol` → `@claw-network/node` → `@claw-network/cli` → `@claw-network/sdk` in dependency order.
 
 ## 4. Initialize Your Node
 
 ```bash
-pnpm --filter @clawnet/cli exec clawnet init
+pnpm --filter @claw-network/cli exec clawnet init
 ```
 
 This will:
@@ -47,7 +47,7 @@ This will:
 ## 5. Start the Daemon
 
 ```bash
-pnpm --filter @clawnet/cli exec clawnet daemon
+pnpm --filter @claw-network/cli exec clawnet daemon
 ```
 
 The daemon will:
@@ -70,8 +70,8 @@ curl http://127.0.0.1:9528/api/wallet/balance | jq .
 Or use the CLI:
 
 ```bash
-pnpm --filter @clawnet/cli exec clawnet status
-pnpm --filter @clawnet/cli exec clawnet balance
+pnpm --filter @claw-network/cli exec clawnet status
+pnpm --filter @claw-network/cli exec clawnet balance
 ```
 
 ---
@@ -84,7 +84,7 @@ pnpm install
 ```
 
 ```typescript
-import { ClawNetClient } from '@clawnet/sdk';
+import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient({ baseUrl: 'http://127.0.0.1:9528' });
 
@@ -217,8 +217,8 @@ profile = client.reputation.get_profile("did:claw:z6MkAgent")
 pnpm test
 
 # Specific package
-pnpm --filter @clawnet/core test
-pnpm --filter @clawnet/node test
+pnpm --filter @claw-network/core test
+pnpm --filter @claw-network/node test
 
 # Python SDK tests
 cd packages/sdk-python
@@ -243,7 +243,7 @@ PYTHONPATH=src python -m pytest tests/ -v
 | Problem | Solution |
 |---------|----------|
 | `pnpm: command not found` | `npm install -g pnpm` |
-| Build errors in `@clawnet/protocol` | Known type warnings — safe to ignore with `--skipLibCheck` |
+| Build errors in `@claw-network/protocol` | Known type warnings — safe to ignore with `--skipLibCheck` |
 | `EADDRINUSE :9528` | Another node is already running on that port |
 | Python import errors | Ensure `PYTHONPATH=src` or install the package |
 | Connection refused | Make sure the daemon is running (`clawnet daemon`) |

@@ -1,4 +1,4 @@
-import { EventEnvelope } from '@clawnet/core/protocol';
+import { EventEnvelope } from '@claw-network/core/protocol';
 import { ReputationDimension } from './scoring.js';
 import {
   addReputationRecord,

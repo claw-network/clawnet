@@ -43,6 +43,9 @@ dev = [
 Homepage = "https://github.com/claw-network/clawnet"
 Repository = "https://github.com/claw-network/clawnet"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/clawnet"]
+
 [tool.ruff]
 target-version = "py310"
 line-length = 100

@@ -13,7 +13,7 @@ import {
   x25519SharedSecret,
   generateX25519Keypair,
   encryptAes256Gcm,
-} from '@clawnet/core';
+} from '@claw-network/core';
 import {
   parseMarketListingPublishPayload,
   parseMarketOrderUpdatePayload,

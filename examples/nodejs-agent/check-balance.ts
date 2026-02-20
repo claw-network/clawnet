@@ -5,7 +5,7 @@
  *   node --loader ts-node/esm check-balance.ts
  */
 
-import { ClawNetClient } from '@clawnet/sdk';
+import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient();
 

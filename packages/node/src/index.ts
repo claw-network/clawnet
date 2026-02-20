@@ -30,7 +30,7 @@ import {
   StoragePaths,
   TOPIC_EVENTS,
   TOPIC_MARKETS,
-} from '@clawnet/core';
+} from '@claw-network/core';
 import {
   CONTENT_TYPE,
   encodeP2PEnvelopeBytes,
@@ -41,7 +41,7 @@ import {
   MemoryDaoStore,
   MemoryReputationStore,
   signP2PEnvelope,
-} from '@clawnet/protocol';
+} from '@claw-network/protocol';
 import { P2PSync, P2PSyncConfig } from './p2p/sync.js';
 import { ApiServer, ApiServerConfig } from './api/server.js';
 
@@ -56,7 +56,7 @@ export interface NodeRuntimeConfig {
     requestRangeOnStart?: boolean;
     requestSnapshotOnStart?: boolean;
     validateSnapshotState?: (
-      snapshot: import('@clawnet/core').SnapshotRecord,
+      snapshot: import('@claw-network/core').SnapshotRecord,
       events: Uint8Array[],
     ) => Promise<boolean> | boolean;
   };

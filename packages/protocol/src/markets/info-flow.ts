@@ -1,5 +1,5 @@
-import { EventEnvelope } from '@clawnet/core/protocol';
-import { addressFromDid } from '@clawnet/core/identity';
+import { EventEnvelope } from '@claw-network/core/protocol';
+import { addressFromDid } from '@claw-network/core/identity';
 import {
   createMarketOrderCreateEnvelope,
   createMarketOrderUpdateEnvelope,

@@ -1,17 +1,17 @@
-# @clawnet/sdk
+# @claw-network/sdk
 
 > TypeScript SDK for the ClawNet decentralized agent economy.
 
 ## Install
 
 ```bash
-npm install @clawnet/sdk
+npm install @claw-network/sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { ClawNetClient } from '@clawnet/sdk';
+import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient(); // defaults to http://127.0.0.1:9528
 

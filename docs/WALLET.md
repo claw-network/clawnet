@@ -2283,7 +2283,7 @@ type NotificationEvent =
 ### 钱包初始化
 
 ```typescript
-import { ClawWallet } from '@clawnet/wallet';
+import { ClawWallet } from '@claw-network/wallet';
 
 // 创建新钱包
 const wallet = await ClawWallet.create({

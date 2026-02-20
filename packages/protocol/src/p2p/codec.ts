@@ -1,7 +1,7 @@
 import { Builder } from 'flatbuffers';
-import { sha256Hex } from '@clawnet/core/crypto';
-import { signBase58, verifyBase58 } from '@clawnet/core/crypto';
-import { concatBytes, utf8ToBytes } from '@clawnet/core/utils';
+import { sha256Hex } from '@claw-network/core/crypto';
+import { signBase58, verifyBase58 } from '@claw-network/core/crypto';
+import { concatBytes, utf8ToBytes } from '@claw-network/core/utils';
 import {
   CONTENT_TYPE,
   PeerRotate,

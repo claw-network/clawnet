@@ -1,12 +1,12 @@
-import { canonicalizeBytes } from '@clawnet/core/crypto';
-import { sha256Hex } from '@clawnet/core/crypto';
-import { multibaseEncode } from '@clawnet/core/encoding';
-import { didFromPublicKey, publicKeyFromDid } from '@clawnet/core/identity';
+import { canonicalizeBytes } from '@claw-network/core/crypto';
+import { sha256Hex } from '@claw-network/core/crypto';
+import { multibaseEncode } from '@claw-network/core/encoding';
+import { didFromPublicKey, publicKeyFromDid } from '@claw-network/core/identity';
 import {
   EventEnvelope,
   eventHashHex,
   signEvent,
-} from '@clawnet/core/protocol';
+} from '@claw-network/core/protocol';
 import { ClawDIDDocument, createDIDDocument } from './document.js';
 
 export interface IdentityCreatePayload {

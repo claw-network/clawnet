@@ -1,6 +1,6 @@
-import { EventEnvelope, eventHashHex, signEvent } from '@clawnet/core/protocol';
-import { multibaseEncode } from '@clawnet/core/encoding';
-import { addressFromDid, publicKeyFromAddress, publicKeyFromDid } from '@clawnet/core/identity';
+import { EventEnvelope, eventHashHex, signEvent } from '@claw-network/core/protocol';
+import { multibaseEncode } from '@claw-network/core/encoding';
+import { addressFromDid, publicKeyFromAddress, publicKeyFromDid } from '@claw-network/core/identity';
 
 export type AmountLike = string | number | bigint;
 

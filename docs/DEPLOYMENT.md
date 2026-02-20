@@ -16,10 +16,10 @@ cd clawnet
 pnpm install && pnpm build
 
 # Initialize (generates keys, writes ~/.clawnet/)
-pnpm --filter @clawnet/cli exec clawnet init
+pnpm --filter @claw-network/cli exec clawnet init
 
 # Start daemon
-pnpm --filter @clawnet/cli exec clawnet daemon
+pnpm --filter @claw-network/cli exec clawnet daemon
 ```
 
 ### From Pre-built Binary
@@ -64,8 +64,8 @@ WORKDIR /app
 COPY --from=build /app/packages/node/dist ./dist
 COPY --from=build /app/packages/node/package.json .
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages/core/dist ./node_modules/@clawnet/core/dist
-COPY --from=build /app/packages/protocol/dist ./node_modules/@clawnet/protocol/dist
+COPY --from=build /app/packages/core/dist ./node_modules/@claw-network/core/dist
+COPY --from=build /app/packages/protocol/dist ./node_modules/@claw-network/protocol/dist
 
 ENV CLAW_DATA_DIR=/data
 ENV CLAW_API_HOST=0.0.0.0
@@ -270,7 +270,7 @@ sudo systemctl restart caddy
 Agents can now connect:
 
 ```typescript
-import { ClawNetClient } from '@clawnet/sdk';
+import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient({
   baseUrl: 'https://clawnet.example.com',
@@ -382,7 +382,7 @@ clawnetd \
 For testnet, tokens can be distributed via a genesis allocation or a simple faucet endpoint. A faucet service can be built using the SDK:
 
 ```typescript
-import { ClawNetClient } from '@clawnet/sdk';
+import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient();
 

@@ -1,5 +1,5 @@
 {
-  "name": "@clawnet/sdk",
+  "name": "@claw-network/sdk",
   "version": "0.1.0",
   "description": "TypeScript SDK for the ClawNet decentralized agent economy",
   "type": "module",

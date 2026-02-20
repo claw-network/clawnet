@@ -1,4 +1,4 @@
-import { EventEnvelope, eventHashHex } from '@clawnet/core/protocol';
+import { EventEnvelope, eventHashHex } from '@claw-network/core/protocol';
 import {
   parseReputationRecordPayload,
   ReputationAspectKey,

@@ -11,10 +11,10 @@ pnpm test
 Run tests for a specific package:
 
 ```bash
-pnpm --filter @clawnet/core test
-pnpm --filter @clawnet/protocol test
-pnpm --filter @clawnet/node test
-pnpm --filter @clawnet/cli test
+pnpm --filter @claw-network/core test
+pnpm --filter @claw-network/protocol test
+pnpm --filter @claw-network/node test
+pnpm --filter @claw-network/cli test
 ```
 
 ## Docker Testnet (Integration Tests)

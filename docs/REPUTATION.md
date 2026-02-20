@@ -2164,7 +2164,7 @@ class ReputationVisualizer {
 ### 信誉管理
 
 ```typescript
-import { ReputationSystem } from '@clawnet/reputation';
+import { ReputationSystem } from '@claw-network/reputation';
 
 // 初始化
 const reputation = new ReputationSystem(config);

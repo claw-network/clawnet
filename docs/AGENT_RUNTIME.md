@@ -125,7 +125,7 @@
 
 ```bash
 # 安装
-npm install -g @clawnet/node
+npm install -g @claw-network/node
 
 # 或使用独立二进制（推荐生产环境，建议校验签名；可替换为社区/自建镜像）
 curl -fsSL https://clawnet.network/install.sh | sh
@@ -503,7 +503,7 @@ curl -s -X POST "$NODE/api/wallet/transfer" \
 
 ```bash
 # 安装
-npm install -g @clawnet/node
+npm install -g @claw-network/node
 
 # 初始化并启动
 clawnet init

@@ -1,9 +1,9 @@
 /**
- * @clawnet/sdk — TypeScript SDK for the ClawNet node API.
+ * @claw-network/sdk — TypeScript SDK for the ClawNet node API.
  *
  * Usage:
  * ```ts
- * import { ClawNetClient } from '@clawnet/sdk';
+ * import { ClawNetClient } from '@claw-network/sdk';
  *
  * const claw = new ClawNetClient();                          // defaults to http://127.0.0.1:9528
  * const status = await claw.node.getStatus();
