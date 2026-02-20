@@ -1,0 +1,7 @@
+﻿node : C:\Program Files\nodejs\node.exe: bad option: --scenario=08,9
+所在位置 行:1 字符: 1
++ node -e "import('./run-tests.mjs')" --scenario=08,09 2>&1 | Out-File  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Program File...--scenario=08,9:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

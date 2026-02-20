@@ -1,0 +1,164 @@
+================================================================
+     ClawNet Full-Scenario E2E Test Suite
+     5 Agents: Alice, Bob, Charlie, Dave, Eve
+================================================================
+
+Waiting for all nodes to be healthy...
+All nodes healthy.
+
+Initializing agent identities...
+All agents initialized.
+
+Funding agents via dev faucet...
+All agents funded.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 01: Identity & Wallet
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ all agents have unique DID identities
+  ✅ all agents have positive balance after faucet
+  ✅ Alice transfers 500 CLAW to Bob
+  ✅ Alice balance decreased after transfer
+  ✅ Bob sees received balance on his own node (P2P sync)
+  ✅ Dave transfers 200 CLAW to Charlie
+  ✅ Eve transfers 300 CLAW to Alice
+  ✅ Alice has transaction history entries
+  ✅ all nodes report status and peers
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 02: Info Market Trade
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ Alice publishes research report to info market
+  ✅ Alice sees her listing on her own node
+  ✅ Bob discovers listing via P2P sync
+  ✅ Bob searches info market
+  ✅ Bob purchases research report
+  ✅ Dave purchases research report
+  ✅ Bob rates Alice on quality dimension
+  ✅ Dave rates Alice on quality dimension
+  ✅ Alice has reputation profile
+  ✅ Alice removes her listing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 03: Task Market Flow
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ Alice publishes a translation task
+  ✅ Bob discovers the task via P2P
+  ✅ Bob submits a bid for the task
+  ✅ Charlie submits a competing bid
+  ✅ Alice views bids for her task
+  ✅ Alice accepts Bob's bid
+  ✅ Bob delivers the completed task
+  ✅ Alice confirms task delivery
+  ✅ Alice rates Bob on fulfillment dimension
+  ✅ Alice removes the task listing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 04: Capability Market
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ Charlie publishes code-review API capability
+  ✅ Alice discovers capability via P2P
+  ✅ Alice searches capability market
+  ✅ Alice leases Charlie's code-review API
+  ✅ Charlie sees his capability listing
+  ✅ Alice rates Charlie's service quality
+  ✅ Charlie removes capability listing
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 05: Service Contract
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ Alice creates a development service contract
+  ✅ Alice queries contract details
+  ✅ Charlie sees contract via P2P
+  ✅ Alice (client) signs the contract
+  ✅ Charlie (provider) signs the contract
+  ✅ Alice funds the contract (creates escrow)
+  ✅ Charlie submits first milestone (API Design)
+  ✅ Alice approves first milestone
+  ✅ Charlie submits second milestone (Implementation)
+  ✅ Alice approves second milestone
+  ✅ Alice marks contract as complete
+  ✅ Alice rates Charlie on quality and fulfillment
+  ✅ Charlie rates Alice on transaction dimension
+  ✅ Contract appears in Alice's contract list
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 06: Contract Dispute
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ Alice creates a review contract with Bob
+  ✅ Alice and Bob sign the contract
+  ✅ Alice funds the dispute contract
+  ✅ Bob submits incomplete milestone delivery
+  ✅ Alice opens a dispute on the contract
+  ✅ Eve can see the contract (auditor perspective)
+  ✅ Alice resolves the dispute (partial payment)
+  ❌ Alice rates Bob negatively on fulfillment
+     alice: timeout POST /api/reputation/record
+  ✅ Eve rates Bob on behavior (auditor perspective)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 07: DAO Governance
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ DAO treasury is accessible
+  ✅ Dave deposits 2000 CLAW to DAO treasury
+  ✅ Treasury balance reflects deposit
+  ✅ Alice creates a signal proposal
+  ✅ Alice can read her proposal
+  ✅ Bob sees proposal via P2P sync
+  ✅ Advance proposal to voting status
+  ✅ Bob votes FOR the proposal
+  ✅ Charlie votes AGAINST the proposal
+  ✅ Dave votes FOR the proposal
+  ✅ Alice delegates voting power to Eve
+  ✅ Eve delegation is visible
+  ✅ Eve votes ABSTAIN on proposal
+  ✅ Proposal has recorded votes
+  ✅ Alice revokes delegation to Eve
+  ✅ DAO governance params are readable
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 08: Cross-Node Sync
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ All 5 nodes have at least 1 peer
+  ✅ Block heights across all nodes
+  ✅ Transfer from Alice propagates to all nodes
+  ✅ Bob→Charlie transfer verifiable on Charlie node
+  ✅ Eve publishes info listing visible on other nodes
+  ✅ Parallel transfers maintain balance consistency
+  ✅ Block heights converge after sync period
+  ✅ Alice wallet history shows all transfers
+  ✅ Each node reports chain metrics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scenario 09: Full Economic Cycle
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✅ P1: Alice publishes AI agent research report
+  ✅ P1: Dave discovers and purchases the report
+  ✅ P1: Dave rates Alice on quality
+  ✅ P2: Charlie publishes translation API capability
+  ✅ P2: Bob leases Charlie's translation API
+  ✅ P3: Alice posts translation task for her research
+  ✅ P3: Bob bids on translation task (has API access)
+  ✅ P3: Alice accepts Bob's bid
+  ✅ P3: Bob delivers translation
+  ✅ P3: Alice confirms delivery
+  ✅ P4: Bob creates service contract with Charlie
+  ✅ P4: Both parties sign the contract
+  ✅ P5: Charlie donates 100 CLAW to DAO treasury
+  ✅ P5: Treasury reflects Charlie's donation
+  ✅ P6: Alice rates Bob on fulfillment (task delivery)
+  ✅ P6: Bob rates Charlie on quality (API service)
+  ✅ P6: Eve audits and rates Alice on social contribution
+  ✅ P6: Dave rates the network (social reputation for Eve)
+  ✅ P7: All agents have valid final balances
+  ✅ P7: Reputation profiles exist for active agents
+
+Total time: 1322.0s
+
+================================================================
+Results: 103 passed, 1 failed, 0 skipped
+================================================================
+
+Failed tests:
+  - Alice rates Bob negatively on fulfillment: alice: timeout POST /api/reputation/record

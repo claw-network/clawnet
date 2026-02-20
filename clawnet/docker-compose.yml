@@ -1,0 +1,217 @@
+# ClawNet — 5-Agent Test Network
+# ============================================================================
+# 5 independent AI Agent nodes with full P2P connectivity
+#
+# Usage:
+#   docker compose up -d --build      # start network
+#   docker compose down -v            # stop & clean
+#   docker compose logs -f            # watch logs
+#
+# Topology:
+#   alice (bootstrap/seed) ← bob, charlie, dave, eve (peers)
+#
+# API endpoints:
+#   alice:    http://localhost:9600
+#   bob:      http://localhost:9601
+#   charlie:  http://localhost:9602
+#   dave:     http://localhost:9603
+#   eve:      http://localhost:9604
+# ============================================================================
+
+services:
+  # ── Alice: Research Agent (Bootstrap Node) ──────────────────────────────
+  alice:
+    build: ..
+    container_name: clawnet-alice
+    hostname: alice
+    ports:
+      - "9600:9528"   # HTTP API
+      - "9610:9527"   # P2P
+    volumes:
+      - alice-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=alice-agent-passphrase
+      - NODE_ENV=development
+    command: >
+      node packages/node/dist/daemon.js
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+        --health-interval-ms 5000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - clawnet
+
+  # ── Bob: Translation Agent ─────────────────────────────────────────────
+  bob:
+    build: ..
+    container_name: clawnet-bob
+    hostname: bob
+    ports:
+      - "9601:9528"
+      - "9611:9527"
+    volumes:
+      - bob-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=bob-agent-passphrase
+      - NODE_ENV=development
+    command: >
+      entrypoint-peer.sh
+        --bootstrap-api http://alice:9528
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+        --health-interval-ms 5000
+    depends_on:
+      alice:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - clawnet
+
+  # ── Charlie: Developer Agent ───────────────────────────────────────────
+  charlie:
+    build: ..
+    container_name: clawnet-charlie
+    hostname: charlie
+    ports:
+      - "9602:9528"
+      - "9612:9527"
+    volumes:
+      - charlie-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=charlie-agent-passphrase
+      - NODE_ENV=development
+    command: >
+      entrypoint-peer.sh
+        --bootstrap-api http://alice:9528
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+        --health-interval-ms 5000
+    depends_on:
+      alice:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - clawnet
+
+  # ── Dave: Investor Agent ───────────────────────────────────────────────
+  dave:
+    build: ..
+    container_name: clawnet-dave
+    hostname: dave
+    ports:
+      - "9603:9528"
+      - "9613:9527"
+    volumes:
+      - dave-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=dave-agent-passphrase
+      - NODE_ENV=development
+    command: >
+      entrypoint-peer.sh
+        --bootstrap-api http://alice:9528
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+        --health-interval-ms 5000
+    depends_on:
+      alice:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - clawnet
+
+  # ── Eve: Auditor Agent ─────────────────────────────────────────────────
+  eve:
+    build: ..
+    container_name: clawnet-eve
+    hostname: eve
+    ports:
+      - "9604:9528"
+      - "9614:9527"
+    volumes:
+      - eve-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=eve-agent-passphrase
+      - NODE_ENV=development
+    command: >
+      entrypoint-peer.sh
+        --bootstrap-api http://alice:9528
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+        --health-interval-ms 5000
+    depends_on:
+      alice:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - clawnet
+
+volumes:
+  alice-data:
+    driver: local
+  bob-data:
+    driver: local
+  charlie-data:
+    driver: local
+  dave-data:
+    driver: local
+  eve-data:
+    driver: local
+
+networks:
+  clawnet:
+    driver: bridge
