@@ -23,9 +23,16 @@ export interface P2PConfig {
   pubsubTopics?: string[];
 }
 
+/**
+ * Official devnet bootstrap node.
+ * New nodes connect here first to discover the rest of the network via Kademlia DHT.
+ */
+export const BOOTSTRAP_MULTIADDR =
+  '/ip4/38.47.238.72/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW';
+
 export const DEFAULT_P2P_CONFIG: P2PConfig = {
   listen: ['/ip4/0.0.0.0/tcp/9527'],
-  bootstrap: [],
+  bootstrap: [BOOTSTRAP_MULTIADDR],
   enableDHT: true,
   allowPublishToZeroPeers: true,
   enableAutoNAT: true,

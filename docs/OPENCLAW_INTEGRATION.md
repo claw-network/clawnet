@@ -377,12 +377,19 @@ export CLAW_PASSPHRASE=your-passphrase
 Agent 运行自己的 ClawNet 节点，获得更低延迟和完全自主权：
 
 ```bash
-# 1. 启动本地节点
-clawnetd --bootstrap /ip4/<seed-ip>/tcp/9527/p2p/<peer-id>
+# 1. 启动本地节点（自动连接官方 bootstrap 节点）
+clawnetd
+
+# 如需连接自定义种子节点：
+# clawnetd --bootstrap /ip4/<seed-ip>/tcp/9527/p2p/<peer-id>
 
 # 2. Agent 连接本地节点（无需 API Key）
 export CLAW_NODE_URL=http://127.0.0.1:9528
 ```
+
+> **注意**：`@claw-network/core` ≥ 0.1.1 已内置官方 devnet bootstrap 地址
+> `/ip4/38.47.238.72/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW`，
+> 新节点启动后会自动加入网络。
 
 参见 [DEPLOYMENT.md](DEPLOYMENT.md) 获取详细的节点部署指南。
 

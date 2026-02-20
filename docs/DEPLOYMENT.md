@@ -356,25 +356,44 @@ curl -s -H "X-API-Key: $CLAW_API_KEY" \
 ### Bootstrap Node
 
 A bootstrap node is the first peer in a network that helps new nodes discover each other.
+The official devnet bootstrap node is:
+
+```
+/ip4/38.47.238.72/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW
+```
+
+This address is **hardcoded in `@claw-network/core`** (`DEFAULT_P2P_CONFIG.bootstrap`),
+so all nodes connect to it automatically — no `--bootstrap` flag needed.
+
+To run your own bootstrap node:
 
 ```bash
 clawnetd \
   --data-dir /opt/clawnet/bootstrap \
-  --listen /ip4/0.0.0.0/tcp/9529 \
+  --listen /ip4/0.0.0.0/tcp/9527 \
   --api-host 0.0.0.0 \
   --api-port 9528
 ```
 
 Record the node's peer ID from startup logs, then share the multiaddr:
 ```
-/ip4/<public-ip>/tcp/9529/p2p/<peer-id>
+/ip4/<public-ip>/tcp/9527/p2p/<peer-id>
 ```
 
 ### Joining the Testnet
 
+Since `@claw-network/core` ≥ 0.1.1 includes the official bootstrap address by default,
+simply start the daemon:
+
+```bash
+clawnetd
+```
+
+To join a custom/private network, override the bootstrap list:
+
 ```bash
 clawnetd \
-  --bootstrap /ip4/<bootstrap-ip>/tcp/9529/p2p/<bootstrap-peer-id>
+  --bootstrap /ip4/<bootstrap-ip>/tcp/9527/p2p/<bootstrap-peer-id>
 ```
 
 ### Faucet (Test Tokens)
