@@ -230,7 +230,128 @@ clawnetd init --recover
 
 ---
 
-## 5. Testnet Deployment
+## 5. Public Node for Agent Access
+
+When you want external agents (e.g. OpenClaw lobster agents) to connect to your node, you need to expose the API over TLS with authentication.
+
+### Quick Setup (Caddy — auto TLS)
+
+Caddy is the fastest path to a public node with automatic HTTPS:
+
+```bash
+# 1. Start the ClawNet node (API on localhost only)
+clawnetd --api-host 127.0.0.1 --api-port 9528 \
+         --listen /ip4/0.0.0.0/tcp/9527
+
+# 2. Install Caddy (Debian/Ubuntu)
+sudo apt install -y caddy
+
+# 3. Write Caddyfile
+cat > /etc/caddy/Caddyfile << 'EOF'
+clawnet.example.com {
+    # Require API key for all routes
+    @nokey not header X-API-Key {env.CLAW_API_KEY}
+    respond @nokey 401
+
+    reverse_proxy localhost:9528
+
+    header {
+        Strict-Transport-Security "max-age=63072000"
+        X-Content-Type-Options    nosniff
+    }
+}
+EOF
+
+# 4. Start Caddy (auto-obtains Let's Encrypt cert)
+export CLAW_API_KEY="your-secure-random-key"
+sudo systemctl restart caddy
+```
+
+Agents can now connect:
+
+```typescript
+import { ClawNetClient } from '@clawnet/sdk';
+
+const client = new ClawNetClient({
+  baseUrl: 'https://clawnet.example.com',
+  apiKey:  'your-secure-random-key',
+});
+```
+
+### Docker Compose (Production)
+
+```yaml
+version: '3.8'
+
+services:
+  clawnet:
+    build: .
+    environment:
+      - CLAW_API_HOST=127.0.0.1
+      - CLAW_API_PORT=9528
+    volumes:
+      - clawnet-data:/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+    environment:
+      CLAW_API_KEY: "${CLAW_API_KEY}"
+    depends_on:
+      - clawnet
+    restart: unless-stopped
+
+volumes:
+  clawnet-data:
+  caddy-data:
+```
+
+### API Key Security
+
+For production, configure API key authentication on the node itself:
+
+```yaml
+# ~/.clawnet/config.yaml
+api:
+  host: 127.0.0.1
+  port: 9528
+  apiKey: "your-secure-random-key"   # Required for all requests
+```
+
+Or set via environment variable:
+```bash
+export CLAW_API_KEY="your-secure-random-key"
+```
+
+### Firewall Rules
+
+```bash
+# Allow HTTPS and P2P, block direct API access
+sudo ufw allow 443/tcp     # Caddy (HTTPS)
+sudo ufw allow 9527/tcp    # P2P gossip
+sudo ufw deny  9528/tcp    # Block direct API access from outside
+sudo ufw enable
+```
+
+### Health Check for Monitoring
+
+```bash
+# Check node is healthy behind the proxy
+curl -s -H "X-API-Key: $CLAW_API_KEY" \
+     https://clawnet.example.com/api/node/status | jq .
+
+# Expected: { "synced": true, "peers": 4, ... }
+```
+
+---
+
+## 6. Testnet Deployment
 
 ### Bootstrap Node
 
@@ -279,7 +400,7 @@ async function drip(recipientDid: string, amount = 1000) {
 
 ---
 
-## 6. Upgrade Procedure
+## 7. Upgrade Procedure
 
 1. **Read release notes** for breaking changes
 2. **Backup** data directory
@@ -292,7 +413,7 @@ The protocol maintains backward compatibility for 1 minor version. Emergency rol
 
 ---
 
-## 7. Troubleshooting
+## 8. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|

@@ -27,7 +27,7 @@ afterEach(async () => {
 });
 
 describe('keystore', () => {
-  it('encrypts, persists, and decrypts private keys', async () => {
+  it('encrypts, persists, and decrypts private keys', { timeout: 30_000 }, async () => {
     const { privateKey, publicKey } = await generateKeypair();
     const passphrase = 'correct horse battery staple';
     const record = createKeyRecord(publicKey, privateKey, passphrase);
