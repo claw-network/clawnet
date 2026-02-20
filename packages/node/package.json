@@ -38,8 +38,8 @@
     "outputPath": "dist/pkg"
   },
   "dependencies": {
-    "@clawnet/core": "workspace:*",
-    "@clawnet/protocol": "workspace:*",
+    "@clawnet/core": "workspace:^0.1.0",
+    "@clawnet/protocol": "workspace:^0.1.0",
     "@libp2p/crypto": "^5.1.13",
     "@libp2p/peer-id-factory": "^4.2.4",
     "zod": "^3.24.2"

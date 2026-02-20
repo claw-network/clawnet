@@ -110,32 +110,32 @@ class CapabilityMarketApi:
     def lease(self, listing_id: str, **kwargs: Any) -> dict[str, Any]:
         return self._http.post(f"/api/markets/capabilities/{quote(listing_id, safe='')}/lease", kwargs)
 
-    def get_lease_detail(self, listing_id: str, lease_id: str) -> dict[str, Any]:
+    def get_lease_detail(self, lease_id: str) -> dict[str, Any]:
         return self._http.get(
-            f"/api/markets/capabilities/{quote(listing_id, safe='')}/leases/{quote(lease_id, safe='')}"
+            f"/api/markets/capabilities/leases/{quote(lease_id, safe='')}"
         )
 
-    def invoke(self, listing_id: str, lease_id: str, **kwargs: Any) -> dict[str, Any]:
+    def invoke(self, lease_id: str, **kwargs: Any) -> dict[str, Any]:
         return self._http.post(
-            f"/api/markets/capabilities/{quote(listing_id, safe='')}/leases/{quote(lease_id, safe='')}/invoke",
+            f"/api/markets/capabilities/leases/{quote(lease_id, safe='')}/invoke",
             kwargs,
         )
 
-    def pause_lease(self, listing_id: str, lease_id: str, **kwargs: Any) -> dict[str, Any]:
+    def pause_lease(self, lease_id: str, **kwargs: Any) -> dict[str, Any]:
         return self._http.post(
-            f"/api/markets/capabilities/{quote(listing_id, safe='')}/leases/{quote(lease_id, safe='')}/pause",
+            f"/api/markets/capabilities/leases/{quote(lease_id, safe='')}/pause",
             kwargs,
         )
 
-    def resume_lease(self, listing_id: str, lease_id: str, **kwargs: Any) -> dict[str, Any]:
+    def resume_lease(self, lease_id: str, **kwargs: Any) -> dict[str, Any]:
         return self._http.post(
-            f"/api/markets/capabilities/{quote(listing_id, safe='')}/leases/{quote(lease_id, safe='')}/resume",
+            f"/api/markets/capabilities/leases/{quote(lease_id, safe='')}/resume",
             kwargs,
         )
 
-    def terminate_lease(self, listing_id: str, lease_id: str, **kwargs: Any) -> dict[str, Any]:
+    def terminate_lease(self, lease_id: str, **kwargs: Any) -> dict[str, Any]:
         return self._http.post(
-            f"/api/markets/capabilities/{quote(listing_id, safe='')}/leases/{quote(lease_id, safe='')}/terminate",
+            f"/api/markets/capabilities/leases/{quote(lease_id, safe='')}/terminate",
             kwargs,
         )
 
@@ -262,9 +262,9 @@ class AsyncCapabilityMarketApi:
     async def lease(self, listing_id: str, **kwargs: Any) -> dict[str, Any]:
         return await self._http.post(f"/api/markets/capabilities/{quote(listing_id, safe='')}/lease", kwargs)
 
-    async def invoke(self, listing_id: str, lease_id: str, **kwargs: Any) -> dict[str, Any]:
+    async def invoke(self, lease_id: str, **kwargs: Any) -> dict[str, Any]:
         return await self._http.post(
-            f"/api/markets/capabilities/{quote(listing_id, safe='')}/leases/{quote(lease_id, safe='')}/invoke",
+            f"/api/markets/capabilities/leases/{quote(lease_id, safe='')}/invoke",
             kwargs,
         )
 

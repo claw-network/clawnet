@@ -137,7 +137,7 @@ describe('ContractsApi', () => {
   describe('milestones', () => {
     it('submit milestone', async () => {
       mock = await createMockServer();
-      mock.addRoute('POST', '/api/contracts/ct-1/milestones/ms-1/submit', 200, { txHash: 'tx-ms-submit' });
+      mock.addRoute('POST', '/api/contracts/ct-1/milestones/ms-1/complete', 200, { txHash: 'tx-ms-submit' });
 
       const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.submitMilestone('ct-1', 'ms-1', {

@@ -43,7 +43,7 @@ class ContractsApi:
     def submit_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
         """Submit a milestone deliverable."""
         return self._http.post(
-            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/submit",
+            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/complete",
             kwargs,
         )
 
@@ -104,7 +104,7 @@ class AsyncContractsApi:
 
     async def submit_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
         return await self._http.post(
-            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/submit",
+            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/complete",
             kwargs,
         )
 

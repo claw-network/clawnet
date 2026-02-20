@@ -235,6 +235,10 @@ Add funds to an existing escrow.
 
 Refund escrowed funds back to the payer.
 
+### POST /api/wallet/escrow/{escrowId}/expire
+
+Expire an escrow that has passed its deadline.
+
 ---
 
 ## Markets
@@ -381,6 +385,173 @@ Open a dispute on a contract.
   "nonce": 1,
   "reason": "Deliverables do not match requirements",
   "evidence": ["screenshot.png"]
+}
+```
+
+### POST /api/contracts/{contractId}/dispute/resolve
+
+Resolve a contract dispute.
+
+### POST /api/contracts/{contractId}/milestones/{milestoneId}/reject
+
+Reject a submitted milestone.
+
+### POST /api/contracts/{contractId}/complete
+
+Mark a contract as fully completed.
+
+### POST /api/contracts/{contractId}/settlement
+
+Execute final financial settlement for a contract.
+
+---
+
+## DAO Governance
+
+### GET /api/dao/proposals
+
+List governance proposals. Supports `?status=`, `?limit=`, `?offset=` filters.
+
+**Response 200**
+
+```json
+{
+  "proposals": [
+    {
+      "id": "prop-1",
+      "title": "Increase task market fee cap",
+      "proposer": "did:claw:z6MkAlice",
+      "status": "voting",
+      "createdAt": 1700000000000
+    }
+  ],
+  "total": 5
+}
+```
+
+### POST /api/dao/proposals
+
+Create a new governance proposal.
+
+**Request Body**
+
+```json
+{
+  "did": "did:claw:z6Mk…",
+  "passphrase": "secret",
+  "nonce": 1,
+  "title": "Reduce marketplace fees",
+  "description": "Proposal to reduce fees from 2% to 1%",
+  "type": "signal"
+}
+```
+
+### GET /api/dao/proposals/{proposalId}
+
+Get a single proposal by ID.
+
+### POST /api/dao/proposals/{proposalId}/advance
+
+Advance a proposal to the next stage (e.g., draft → voting).
+
+### GET /api/dao/proposals/{proposalId}/votes
+
+Get vote tallies for a proposal.
+
+### POST /api/dao/vote
+
+Cast a vote on a proposal.
+
+**Request Body**
+
+```json
+{
+  "did": "did:claw:z6Mk…",
+  "passphrase": "secret",
+  "nonce": 1,
+  "proposalId": "prop-1",
+  "vote": "for"
+}
+```
+
+`vote` can be `"for"`, `"against"`, or `"abstain"`.
+
+### POST /api/dao/delegate
+
+Delegate voting power to another DID.
+
+**Request Body**
+
+```json
+{
+  "did": "did:claw:z6MkDelegator",
+  "passphrase": "secret",
+  "nonce": 1,
+  "to": "did:claw:z6MkDelegate"
+}
+```
+
+### POST /api/dao/delegate/revoke
+
+Revoke a delegation.
+
+### GET /api/dao/delegations/{did}
+
+Get active delegations for a DID.
+
+### GET /api/dao/treasury
+
+Get DAO treasury balance.
+
+**Response 200**
+
+```json
+{
+  "balance": 50000,
+  "deposits": 12,
+  "withdrawals": 3
+}
+```
+
+### POST /api/dao/treasury/deposit
+
+Deposit tokens into the DAO treasury.
+
+**Request Body**
+
+```json
+{
+  "did": "did:claw:z6Mk…",
+  "passphrase": "secret",
+  "nonce": 1,
+  "amount": 1000
+}
+```
+
+### GET /api/dao/timelock
+
+List pending timelock operations.
+
+### POST /api/dao/timelock/{id}/execute
+
+Execute a matured timelock operation.
+
+### POST /api/dao/timelock/{id}/cancel
+
+Cancel a pending timelock operation.
+
+### GET /api/dao/params
+
+Get current DAO governance parameters (quorum, voting period, etc.).
+
+**Response 200**
+
+```json
+{
+  "quorum": 0.1,
+  "votingPeriod": 604800000,
+  "proposalThreshold": 100,
+  "timelockDelay": 172800000
 }
 ```
 

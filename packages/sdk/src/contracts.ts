@@ -68,7 +68,7 @@ export class ContractsApi {
   /** Submit a milestone deliverable. */
   async submitMilestone(contractId: string, milestoneId: string, params: MilestoneSubmitParams, opts?: RequestOptions): Promise<TxHashResponse> {
     return this.http.post<TxHashResponse>(
-      `/api/contracts/${enc(contractId)}/milestones/${enc(milestoneId)}/submit`,
+      `/api/contracts/${enc(contractId)}/milestones/${enc(milestoneId)}/complete`,
       params,
       opts,
     );
