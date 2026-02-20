@@ -113,8 +113,7 @@ All agents funded.
   ✅ Eve delegation is visible
   ✅ Eve votes ABSTAIN on proposal
   ✅ Proposal has recorded votes
-  ❌ Alice revokes delegation to Eve
-     alice: timeout POST /api/dao/delegate/revoke
+  ✅ Alice revokes delegation to Eve
   ✅ DAO governance params are readable
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -154,11 +153,8 @@ All agents funded.
   ✅ P7: All agents have valid final balances
   ✅ P7: Reputation profiles exist for active agents
 
-Total time: 503.6s
+Total time: 260.7s
 
 ================================================================
-Results: 103 passed, 1 failed, 0 skipped
+Results: 104 passed, 0 failed, 0 skipped
 ================================================================
-
-Failed tests:
-  - Alice revokes delegation to Eve: alice: timeout POST /api/dao/delegate/revoke
