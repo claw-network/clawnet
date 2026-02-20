@@ -6,6 +6,7 @@ import { yamux } from '@chainsafe/libp2p-yamux';
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
 import { kadDHT } from '@libp2p/kad-dht';
 import { bootstrap } from '@libp2p/bootstrap';
+import { mdns } from '@libp2p/mdns';
 import { identify } from '@libp2p/identify';
 import { autoNAT } from '@libp2p/autonat';
 import { dcutr } from '@libp2p/dcutr';
@@ -110,6 +111,14 @@ export class P2PNode {
     const pubsub = gossipsub({
       allowPublishToZeroTopicPeers: this.config.allowPublishToZeroPeers,
       msgIdFn: (message: { data: Uint8Array }) => sha256Bytes(message.data),
+      // ── Mesh tuning for small networks ──────────────────────────────────
+      // floodPublish bypasses mesh and sends to ALL connected peers, which
+      // guarantees delivery in networks with sparse GossipSub mesh coverage.
+      floodPublish: this.config.floodPublish ?? true,
+      D: this.config.meshD ?? 3,       // mesh degree target (default 6 too high for ≤10 nodes)
+      Dlo: this.config.meshDlo ?? 1,   // min mesh peers before grafting
+      Dhi: this.config.meshDhi ?? 5,   // max mesh peers before pruning
+      heartbeatInterval: this.config.heartbeatInterval ?? 700,
     });
 
     const services: Record<string, unknown> = {
@@ -139,18 +148,27 @@ export class P2PNode {
       connectionManager: {
         minConnections: this.config.connectionManager?.minConnections ?? 1,
         maxConnections: this.config.connectionManager?.maxConnections ?? 100,
+        // Auto-dial peers discovered via KadDHT every 5 s (default 60 s is too
+        // slow for mesh formation in small networks).
+        autoDialInterval: 5_000,
       },
       transports: [tcp()],
       streamMuxers: [yamux()],
       connectionEncrypters: [noise()],
-      peerDiscovery: this.config.bootstrap.length
-        ? [
-            bootstrap({
-              list: this.config.bootstrap,
-              timeout: 1000,
-            }),
-          ]
-        : [],
+      peerDiscovery: [
+        // mDNS: discovers all peers on the same LAN / Docker bridge network
+        // within seconds via multicast DNS.
+        mdns({ interval: 5_000 }),
+        // Bootstrap: connects to known seed nodes by multiaddr.
+        ...(this.config.bootstrap.length
+          ? [
+              bootstrap({
+                list: this.config.bootstrap,
+                timeout: 1000,
+              }),
+            ]
+          : []),
+      ],
       services,
     };
 
@@ -261,6 +279,81 @@ export class P2PNode {
       pubsub.getSubscribers?.(topic)?.map((peer: { toString: () => string }) => peer.toString()) ??
       []
     );
+  }
+
+  /**
+   * Actively discover peers via KadDHT random walk and dial them.
+   * This breaks out of a star topology by querying the bootstrap node's
+   * DHT routing table for other peers, then connecting directly.
+   * Returns the number of newly dialled peers.
+   */
+  async amplifyMesh(): Promise<number> {
+    if (!this.node) return 0;
+
+    const currentPeers = new Set(this.getConnections());
+    const myPeerId = this.getPeerId() ?? '';
+    let newPeers = 0;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodeAny = this.node as any;
+
+    // ── Approach 1: Enumerate peerStore and dial unknown peers ──────────
+    // mDNS / KadDHT populate the peerStore with peers on the local network.
+    // Explicitly dialling them ensures a full-mesh topology.
+    try {
+      const peerStore = nodeAny.peerStore;
+      if (peerStore?.all) {
+        const allPeers = await peerStore.all();
+        for (const peer of allPeers) {
+          const pid = peer?.id?.toString?.() ?? '';
+          if (!pid || pid === myPeerId || currentPeers.has(pid)) continue;
+          try {
+            await this.node.dial?.(peer.id);
+            newPeers++;
+            currentPeers.add(pid);
+          } catch {
+            // peer may not be reachable yet
+          }
+        }
+      }
+    } catch {
+      // peerStore enumeration not available in this libp2p version
+    }
+
+    // ── Approach 2: KadDHT random walk (fallback) ──────────────────────
+    if (newPeers === 0) {
+      try {
+        const routing = nodeAny.peerRouting ?? nodeAny.services?.dht;
+        if (routing?.getClosestPeers) {
+          const randomKey = new Uint8Array(32);
+          globalThis.crypto.getRandomValues(randomKey);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 3_000);
+          try {
+            for await (const peer of routing.getClosestPeers(randomKey, {
+              signal: controller.signal,
+            })) {
+              const id = peer?.id;
+              const pid = id?.toString?.() ?? '';
+              if (!pid || pid === myPeerId || currentPeers.has(pid)) continue;
+              try {
+                await this.node.dial?.(id);
+                newPeers++;
+                currentPeers.add(pid);
+              } catch {
+                // dial failure expected for unreachable peers
+              }
+            }
+          } finally {
+            clearTimeout(timeout);
+          }
+        }
+      } catch {
+        // DHT walk can fail / timeout when node is still bootstrapping
+      }
+    }
+
+    return newPeers;
   }
 
   async getPeerPublicKey(peerId: string): Promise<Uint8Array | null> {

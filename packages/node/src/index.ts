@@ -100,6 +100,7 @@ export class ClawTokenNode {
   private infoContentStore?: InfoContentStore;
   private rangeTimer?: NodeJS.Timeout;
   private snapshotTimer?: NodeJS.Timeout;
+  private meshAmplifierTimer?: NodeJS.Timeout;
   private apiServer?: ApiServer;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
@@ -205,6 +206,9 @@ export class ClawTokenNode {
 
       await this.startSyncLoops();
 
+      // Actively discover peers beyond bootstrap to form a full-mesh topology
+      this.startMeshAmplifier();
+
       if (this.config.api?.enabled !== false) {
         const apiConfig: ApiServerConfig = {
           host: this.config.api?.host ?? '127.0.0.1',
@@ -250,6 +254,7 @@ export class ClawTokenNode {
   private async stopInternal(): Promise<void> {
     // Shutdown order: api -> sync -> p2p -> storage
     this.stopSyncLoops();
+    this.stopMeshAmplifier();
 
     const tasks: Array<() => Promise<void>> = [
       async () => this.apiServer?.stop(),
@@ -641,6 +646,45 @@ export class ClawTokenNode {
     if (this.snapshotTimer) {
       clearInterval(this.snapshotTimer);
       this.snapshotTimer = undefined;
+    }
+  }
+
+  /**
+   * Periodically run KadDHT random walks to discover peers beyond bootstrap.
+   * Runs every 5 s for the first 60 s, then stops because the mesh should
+   * have converged by then.
+   */
+  private startMeshAmplifier(): void {
+    let attempts = 0;
+    const maxAttempts = 12; // 12 × 5 s = 60 s
+    const intervalMs = 5_000;
+
+    const amplify = async () => {
+      attempts++;
+      try {
+        const n = await this.p2p?.amplifyMesh() ?? 0;
+        if (n > 0) {
+          console.log(`[mesh] +${n} new peer(s) discovered via DHT walk`);
+        }
+      } catch {
+        // best-effort
+      }
+      if (attempts >= maxAttempts) {
+        this.stopMeshAmplifier();
+        const conns = this.p2p?.getConnections().length ?? 0;
+        console.log(`[mesh] amplification complete — ${conns} peer connection(s)`);
+      }
+    };
+
+    // First attempt immediately, then every 5 s
+    void amplify();
+    this.meshAmplifierTimer = setInterval(() => void amplify(), intervalMs);
+  }
+
+  private stopMeshAmplifier(): void {
+    if (this.meshAmplifierTimer) {
+      clearInterval(this.meshAmplifierTimer);
+      this.meshAmplifierTimer = undefined;
     }
   }
 

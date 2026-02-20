@@ -93,8 +93,7 @@ All agents funded.
   ✅ Alice opens a dispute on the contract
   ✅ Eve can see the contract (auditor perspective)
   ✅ Alice resolves the dispute (partial payment)
-  ❌ Alice rates Bob negatively on fulfillment
-     alice: timeout POST /api/reputation/record
+  ✅ Alice rates Bob negatively on fulfillment
   ✅ Eve rates Bob on behavior (auditor perspective)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -114,7 +113,8 @@ All agents funded.
   ✅ Eve delegation is visible
   ✅ Eve votes ABSTAIN on proposal
   ✅ Proposal has recorded votes
-  ✅ Alice revokes delegation to Eve
+  ❌ Alice revokes delegation to Eve
+     alice: timeout POST /api/dao/delegate/revoke
   ✅ DAO governance params are readable
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -154,11 +154,11 @@ All agents funded.
   ✅ P7: All agents have valid final balances
   ✅ P7: Reputation profiles exist for active agents
 
-Total time: 1322.0s
+Total time: 503.6s
 
 ================================================================
 Results: 103 passed, 1 failed, 0 skipped
 ================================================================
 
 Failed tests:
-  - Alice rates Bob negatively on fulfillment: alice: timeout POST /api/reputation/record
+  - Alice revokes delegation to Eve: alice: timeout POST /api/dao/delegate/revoke
