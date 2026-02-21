@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/node",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "ClawNet node daemon — HTTP API and P2P networking for the agent economy",
   "type": "module",
@@ -12,8 +12,17 @@
     "url": "https://github.com/claw-network/clawnet.git",
     "directory": "packages/node"
   },
-  "keywords": ["clawnet", "agent", "decentralized", "node", "daemon"],
-  "files": ["dist", "README.md"],
+  "keywords": [
+    "clawnet",
+    "agent",
+    "decentralized",
+    "node",
+    "daemon"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "exports": {
     ".": "./dist/index.js"
   },

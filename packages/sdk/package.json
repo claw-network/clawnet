@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/sdk",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "TypeScript SDK for the ClawNet decentralized agent economy",
   "type": "module",
   "main": "dist/index.js",
@@ -11,8 +11,17 @@
     "url": "https://github.com/claw-network/clawnet.git",
     "directory": "packages/sdk"
   },
-  "keywords": ["clawnet", "agent", "decentralized", "sdk", "ai"],
-  "files": ["dist", "README.md"],
+  "keywords": [
+    "clawnet",
+    "agent",
+    "decentralized",
+    "sdk",
+    "ai"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "exports": {
     ".": "./dist/index.js"
   },

@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/protocol",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Protocol definitions and event envelopes for the ClawNet network",
   "type": "module",
   "main": "dist/index.js",
@@ -11,8 +11,16 @@
     "url": "https://github.com/claw-network/clawnet.git",
     "directory": "packages/protocol"
   },
-  "keywords": ["clawnet", "agent", "decentralized", "protocol"],
-  "files": ["dist", "README.md"],
+  "keywords": [
+    "clawnet",
+    "agent",
+    "decentralized",
+    "protocol"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "publishConfig": {
     "access": "public"
   },
