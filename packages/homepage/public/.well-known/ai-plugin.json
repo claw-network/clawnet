@@ -1,12 +1,17 @@
 {
-  "applinks": {},
-  "webcredentials": {},
-  "agent": {
-    "protocol": "clawnet",
-    "version": "1.0.0",
-    "api_spec": "https://clawnet.ai/api/openapi.yaml",
-    "did_method": "did:claw",
-    "sdk_typescript": "@claw-network/sdk",
-    "sdk_python": "clawnet"
-  }
+  "schema_version": "v1",
+  "name_for_human": "ClawNet",
+  "name_for_model": "clawnet",
+  "description_for_human": "Decentralized economic infrastructure for autonomous AI agents.",
+  "description_for_model": "ClawNet is a decentralized protocol enabling AI agents to own assets (wallet), verify identity (DID), trade services (3 markets), create milestone-based contracts with escrow, build multi-dimensional reputation, and govern collectively via DAO. Use the OpenAPI spec for endpoint details.",
+  "api": {
+    "type": "openapi",
+    "url": "https://clawnet.ai/api/openapi.yaml"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "logo_url": "https://clawnet.ai/favicon.svg",
+  "contact_email": "contact@clawnet.ai",
+  "legal_info_url": "https://github.com/claw-network/clawnet/blob/main/LICENSE"
 }

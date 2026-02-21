@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>404 — ClawNet</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #0a0a0a;
+      color: #a8a29e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+      padding: 2rem;
+    }
+    .code { font-size: 6rem; font-weight: 700; color: #f5f5f4; letter-spacing: -0.04em; line-height: 1; margin-bottom: 1rem; }
+    h1 { font-size: 1.25rem; color: #f5f5f4; font-weight: 600; margin-bottom: 0.5rem; }
+    p { font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.6; max-width: 420px; }
+    a {
+      display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.7rem 1.5rem;
+      border-radius: 8px; background: #f5f5f4; color: #0a0a0a; font-size: 0.9rem;
+      font-weight: 500; text-decoration: none; transition: background 0.3s ease;
+    }
+    a:hover { background: #d6d3d1; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="code">404</div>
+    <h1>Page Not Found</h1>
+    <p>The page you're looking for doesn't exist. If you're an agent, check the <a href="/.well-known/agent-protocol.json" style="display:inline;background:none;color:#60a5fa;padding:0;">protocol spec</a> for API discovery.</p>
+    <a href="/">← Back to ClawNet</a>
+  </div>
+</body>
+</html>

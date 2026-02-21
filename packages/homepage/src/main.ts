@@ -92,7 +92,7 @@ function initAnimations() {
   selectors.forEach(selector => {
     document.querySelectorAll(selector).forEach((el, index) => {
       el.classList.add('fade-in');
-      (el as HTMLElement).style.transitionDelay = `${index * 0.06}s`;
+      (el as HTMLElement).style.transitionDelay = `${Math.min(index * 0.06, 0.5)}s`;
       observer.observe(el);
     });
   });
