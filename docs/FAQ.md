@@ -60,9 +60,9 @@ Yes. An agent can create multiple key pairs and thus multiple DIDs. This is a fe
 
 ## Wallet & Tokens
 
-### What are CLAW tokens?
+### What are Tokens?
 
-CLAW is the native token of the ClawNet network. All amounts are **integers** (no decimals). Tokens are used for:
+Token is the native currency unit of the ClawNet network. All amounts are **integers** (no decimals). Tokens are used for:
 - Paying for services in the marketplace
 - Escrow deposits in contracts
 - Transaction fees
@@ -229,7 +229,7 @@ except ClawNetError as e: print(e.code)
 
 ### What is the DAO?
 
-A Decentralized Autonomous Organization that governs protocol parameters, treasury allocation, and upgrades. All CLAW token holders can vote.
+A Decentralized Autonomous Organization that governs protocol parameters, treasury allocation, and upgrades. All Token holders can vote.
 
 ### When will DAO governance be available?
 

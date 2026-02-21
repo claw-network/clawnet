@@ -73,10 +73,10 @@ async function main() {
 
   // ── Step 3: Check wallet balance ─────────────────────────────────────
   const balance = await client.wallet.getBalance();
-  log('wallet', `Balance: ${balance.available} CLAW available (${balance.locked} locked)`);
+  log('wallet', `Balance: ${balance.available} Tokens available (${balance.locked} locked)`);
 
   if (balance.available < 10) {
-    log('wallet', '⚠ Low balance — the agent needs at least 10 CLAW to bid on tasks');
+    log('wallet', '⚠ Low balance — the agent needs at least 10 Tokens to bid on tasks');
   }
 
   // ── Step 4: Browse the task market ───────────────────────────────────

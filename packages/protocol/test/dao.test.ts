@@ -604,7 +604,7 @@ describe('MemoryDaoStore', () => {
       proposalType: 'treasury_spend',
       title: 'Fund Project',
       description: 'Fund an ecosystem project',
-      actions: [{ type: 'treasury_spend', recipient: did, amount: '1000', token: 'CLAW', purpose: 'dev' }],
+      actions: [{ type: 'treasury_spend', recipient: did, amount: '1000', token: 'Token', purpose: 'dev' }],
       discussionPeriod: 86400000,
       votingPeriod: 259200000,
       timelockDelay: 86400000,

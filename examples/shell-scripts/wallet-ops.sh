@@ -17,7 +17,7 @@ curl -s "$BASE/api/wallet/balance" | jq .
 
 # ── Transfer tokens ─────────────────────────────────────────
 echo ""
-echo "=== Transfer 10 CLAW ==="
+echo "=== Transfer 10 Tokens ==="
 RECIPIENT="${CLAW_RECIPIENT:-did:claw:z6MkRecipient}"
 
 curl -s -X POST "$BASE/api/wallet/transfer" \

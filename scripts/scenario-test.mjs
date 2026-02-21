@@ -368,7 +368,7 @@ async function scenarioContract() {
       },
       payment: {
         totalAmount: '1000',
-        currency: 'CLAW',
+        currency: 'Token',
         schedule: 'milestone',
       },
       milestones: [
@@ -882,8 +882,8 @@ async function scenarioDAO() {
       did: proposerDid,
       passphrase: PASSPHRASE,
       type: 'parameter_change',
-      title: 'Reduce minimum transfer fee to 0.5 CLAW',
-      description: 'This proposal aims to reduce the minimum transfer fee from 1 CLAW to 0.5 CLAW to increase adoption.',
+      title: 'Reduce minimum transfer fee to 0.5 Token',
+      description: 'This proposal aims to reduce the minimum transfer fee from 1 Token to 0.5 Token to increase adoption.',
       actions: [
         { type: 'set_parameter', parameter: 'min_transfer_fee', value: '500000000' }
       ],
@@ -1050,7 +1050,7 @@ async function scenarioContractDispute() {
       passphrase: PASSPHRASE,
       provider: providerDid,
       terms: { description: 'Dispute test contract', deliverables: ['Widget'] },
-      payment: { totalAmount: '100', currency: 'CLAW' },
+      payment: { totalAmount: '100', currency: 'Token' },
       nonce: nextNonce(),
     });
     assert(cs === 201, 'create: ' + cs);

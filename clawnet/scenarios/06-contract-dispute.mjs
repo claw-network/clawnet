@@ -21,7 +21,7 @@ export default async function run({ alice, bob, eve }) {
         startDate: new Date().toISOString(),
         endDate: new Date(Date.now() + 7 * 86400000).toISOString(),
         totalAmount: 1000,
-        currency: 'CLAW',
+        currency: 'Token',
       },
       milestones: [
         {

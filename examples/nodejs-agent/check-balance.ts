@@ -13,7 +13,7 @@ const status = await client.node.getStatus();
 console.log('Node:', status.network, `block #${status.blockHeight}`, status.synced ? '(synced)' : '(syncing …)');
 
 const balance = await client.wallet.getBalance();
-console.log(`Balance : ${balance.balance} CLAW`);
+console.log(`Balance : ${balance.balance} Tokens`);
 console.log(`  available : ${balance.available}`);
 console.log(`  pending   : ${balance.pending}`);
 console.log(`  locked    : ${balance.locked}`);

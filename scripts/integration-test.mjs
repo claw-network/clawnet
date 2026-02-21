@@ -233,7 +233,7 @@ async function testContracts() {
     const { status } = await post(node, '/api/contracts', {
       did, passphrase: 'wrong-passphrase', provider: providerDid,
       terms: { description: 'Integration test contract', deliverables: ['Test'] },
-      payment: { totalAmount: '100', currency: 'CLAW' }, nonce: Date.now(),
+      payment: { totalAmount: '100', currency: 'Token' }, nonce: Date.now(),
     });
     assert(status >= 200 && status < 500, 'unexpected status: ' + status);
   });

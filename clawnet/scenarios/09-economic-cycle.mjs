@@ -242,7 +242,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
         startDate: new Date().toISOString(),
         endDate: new Date(Date.now() + 30 * 86400000).toISOString(),
         totalAmount: 300,
-        currency: 'CLAW',
+        currency: 'Token',
       },
       milestones: [{
         id: 'ms-month1',
@@ -275,7 +275,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   // PHASE 5: DAO Contribution — Charlie donates profits to treasury
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  await test('P5: Charlie donates 100 CLAW to DAO treasury', async () => {
+  await test('P5: Charlie donates 100 Tokens to DAO treasury', async () => {
     const { status, data } = await charlie.depositTreasury(100, 'API revenue contribution to ecosystem');
     assertOk(status, 'treasury deposit');
     vlog(`Donation: ${status}`);
@@ -325,7 +325,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
       const { status, data } = await agent.balance();
       assertOk(status, `${agent.name} balance`);
       const bal = data?.balance ?? data?.available ?? 0;
-      vlog(`${agent.name}: ${bal} CLAW`);
+      vlog(`${agent.name}: ${bal} Tokens`);
     }
   });
 

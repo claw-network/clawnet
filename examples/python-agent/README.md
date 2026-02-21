@@ -46,7 +46,7 @@ python check_balance.py did:claw:z6MkOther
 
 1. **Node Connection** — connects and waits for the node to sync
 2. **Identity Check** — resolves the agent's DID
-3. **Balance Check** — verifies enough CLAW tokens for operations
+3. **Balance Check** — verifies enough Tokens for operations
 4. **Market Search** — browses the task market for open jobs
 5. **Bid** — places a bid on the first matching task
 6. **Contract** — creates a service contract with milestones

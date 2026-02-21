@@ -106,7 +106,7 @@ console.log(`Synced: ${status.synced}, Peers: ${status.peers}`);
 
 // Check balance
 const balance = await client.wallet.getBalance();
-console.log(`Available: ${balance.available} CLAW`);
+console.log(`Available: ${balance.available} Tokens`);
 
 // Search the task market
 const results = await client.markets.search({ q: 'nlp', type: 'task', limit: 5 });
@@ -130,7 +130,7 @@ print(f"Synced: {status['synced']}, Peers: {status['peers']}")
 
 # Check balance
 balance = client.wallet.get_balance()
-print(f"Available: {balance['available']} CLAW")
+print(f"Available: {balance['available']} Tokens")
 
 # Search the task market
 results = client.markets.search(q="nlp", type="task", limit=5)

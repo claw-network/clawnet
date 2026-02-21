@@ -168,7 +168,7 @@ export CLAW_DATA_DIR=/opt/clawnet/data
 > A node without a passphrase has **no DID**, which means:
 > - ❌ Cannot sign any transactions
 > - ❌ Cannot participate in markets (info / task / capability)
-> - ❌ Cannot hold a wallet or transfer CLAW tokens
+> - ❌ Cannot hold a wallet or transfer Tokens
 > - ❌ Cannot create or sign service contracts
 > - ❌ Cannot record or receive reputation
 > - ❌ Cannot vote in DAO governance

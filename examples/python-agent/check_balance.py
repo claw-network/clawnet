@@ -17,9 +17,9 @@ def main() -> None:
 
     try:
         balance = client.wallet.get_balance(did)
-        print(f"Available : {balance['available']} CLAW")
-        print(f"Locked    : {balance['locked']} CLAW")
-        print(f"Total     : {balance['total']} CLAW")
+        print(f"Available : {balance['available']} Tokens")
+        print(f"Locked    : {balance['locked']} Tokens")
+        print(f"Total     : {balance['total']} Tokens")
     except ClawNetError as exc:
         print(f"Error ({exc.status}): {exc}", file=sys.stderr)
         sys.exit(1)

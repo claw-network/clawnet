@@ -20,7 +20,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   });
 
   // ── 7.2 Dave deposits to treasury ─────────────────────────────────────
-  await test('Dave deposits 2000 CLAW to DAO treasury', async () => {
+  await test('Dave deposits 2000 Tokens to DAO treasury', async () => {
     const { status, data } = await dave.depositTreasury(2000, 'Seed investment for governance testing');
     assertOk(status, 'treasury deposit');
     vlog(`Deposit: ${status} ${JSON.stringify(data).slice(0, 200)}`);
@@ -40,7 +40,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     const { status, data } = await alice.createProposal({
       type: 'signal',
       title: 'Increase default info market listing fee',
-      description: 'Signal proposal to gauge community sentiment on raising the default listing fee from 10 to 25 CLAW.',
+      description: 'Signal proposal to gauge community sentiment on raising the default listing fee from 10 to 25 Tokens.',
       actions: [{
         type: 'parameter_change',
         target: 'info_market.listing_fee',

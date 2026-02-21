@@ -79,7 +79,7 @@ async function main() {
     if (status !== 200 && status !== 201) {
       log(`WARNING: faucet failed for ${agent.name}: ${status} ${JSON.stringify(data)}`);
     } else {
-      vlog(`${agent.name}: funded ${data.amount} CLAW`);
+      vlog(`${agent.name}: funded ${data.amount} Tokens`);
     }
   }
   // Small wait for state to settle

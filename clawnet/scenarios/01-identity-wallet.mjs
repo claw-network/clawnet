@@ -29,13 +29,13 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
       assertOk(status, `${agent.name} balance status`);
       const bal = Number(data.balance ?? data.available ?? 0);
       assert(bal > 0, `${agent.name} balance should be > 0, got ${bal}`);
-      vlog(`${agent.name}: ${bal} CLAW`);
+      vlog(`${agent.name}: ${bal} Tokens`);
     }
   });
 
   // ── 1.3 Alice transfers to Bob ────────────────────────────────────────
   let aliceBalBefore;
-  await test('Alice transfers 500 CLAW to Bob', async () => {
+  await test('Alice transfers 500 Tokens to Bob', async () => {
     const { data: balData } = await alice.balance();
     aliceBalBefore = Number(balData.balance || balData.available);
 
@@ -69,14 +69,14 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
   });
 
   // ── 1.5 Multiple transfers: Dave → Charlie, Eve → Alice ──────────────
-  await test('Dave transfers 200 CLAW to Charlie', async () => {
+  await test('Dave transfers 200 Tokens to Charlie', async () => {
     const { status, data } = await dave.transfer(charlie.did, 200, 'investment');
     assertOk(status, 'Dave→Charlie transfer');
     assert(data.txHash, 'txHash present');
     vlog(`Dave→Charlie: ${data.txHash}`);
   });
 
-  await test('Eve transfers 300 CLAW to Alice', async () => {
+  await test('Eve transfers 300 Tokens to Alice', async () => {
     const { status, data } = await eve.transfer(alice.did, 300, 'audit fee refund');
     assertOk(status, 'Eve→Alice transfer');
     assert(data.txHash, 'txHash present');

@@ -56,7 +56,7 @@ async def main() -> None:
             f"synced={status['synced']}",
         )
         log("identity", f"publicKey={identity['publicKey']}")
-        log("wallet", f"{balance['available']} CLAW available")
+        log("wallet", f"{balance['available']} Tokens available")
 
         # ── Search task market ───────────────────────────────────────────
         results = await client.markets.search(

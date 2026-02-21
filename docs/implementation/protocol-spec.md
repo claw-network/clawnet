@@ -18,7 +18,26 @@ validate state. All statements using MUST/SHOULD are normative.
   rules and optional finality heuristics.
 - Indexers are optional and non-authoritative.
 
-## 2. Constants (MVP defaults)
+## 2. Currency Unit
+
+The native currency of the ClawNet network is called **Token**.
+
+| Property | Value |
+|----------|-------|
+| **Name** | Token |
+| **Plural** | Tokens |
+| **Symbol** (display) | Token / Tokens |
+| **Smallest unit** | 1 Token (integer, no decimals) |
+| **Wire format** | Unsigned integer string (e.g. `"500"`) |
+| **Field name** | `currency: 'Token'` in contract / payment objects |
+
+Examples: `1 Token`, `500 Tokens`, `100,000 Tokens`.
+
+> **Note:** All amounts in the protocol are **integers**. There are no fractional
+> Tokens. The `amount` field in events and API payloads is always a string
+> representation of a non-negative integer.
+
+## 3. Constants (MVP defaults)
 
 - MAX_EVENT_SIZE = 1_000_000 bytes
 - MAX_CLOCK_SKEW_MS = 10 * 60 * 1000
@@ -34,7 +53,7 @@ validate state. All statements using MUST/SHOULD are normative.
 
 All constants are DAO-controlled unless marked fixed.
 
-## 3. Data Types
+## 4. Data Types
 
 - Timestamp: milliseconds since Unix epoch.
 - Amount: unsigned integer string in Token (smallest unit is 1 Token).
@@ -44,7 +63,7 @@ All constants are DAO-controlled unless marked fixed.
 - Hash: lowercase hex SHA-256 digest.
 - ID: ASCII string, max length 64.
 
-## 4. Event Envelope
+## 5. Event Envelope
 
 All protocol events MUST be wrapped in an envelope:
 
@@ -76,7 +95,7 @@ Rules:
 - hash MUST be SHA-256(canonical bytes without sig and hash fields).
 - hash is the stable identifier for deduplication, indexing, and conflict resolution.
 
-## 5. Canonical Serialization and Signing
+## 6. Canonical Serialization and Signing
 
 - Canonical JSON MUST follow JCS (RFC 8785).
 - The signing bytes are JCS(envelope without sig and hash fields).
@@ -89,7 +108,7 @@ Signature verification:
 - Extract pub key from envelope.pub (multibase).
 - Verify signature over canonical bytes with domain separation.
 
-## 5.1 Verifiable Credential Signing (Capability / Platform Link)
+## 6.1 Verifiable Credential Signing (Capability / Platform Link)
 
 Verifiable Credentials (VCs) are used for capability registration and platform link proofs.
 External issuers MUST follow the signing rules below for interoperability.
@@ -128,7 +147,7 @@ Capability credential subject requirements:
 - credentialSubject.id MUST be the subject DID.
 - credentialSubject.name and credentialSubject.pricing MUST be present.
 
-## 6. Replay Protection
+## 7. Replay Protection
 
 - Each issuer maintains a monotonic nonce.
 - Nodes MUST track committedNonce per issuer (highest contiguous accepted nonce).
@@ -137,7 +156,7 @@ Capability credential subject requirements:
 - Buffered events MUST be applied in nonce order once gaps are filled.
 - Events beyond the NONCE_WINDOW MUST be rejected.
 
-## 7. Event Types (Aligned with WALLET/MARKETS/CONTRACTS)
+## 8. Event Types (Aligned with WALLET/MARKETS/CONTRACTS)
 
 The following event names align with:
 - `docs/WALLET.md` (transactions, escrow, permissions)
@@ -213,7 +232,7 @@ The following event names align with:
 
 - reputation.record (MVP)
 
-## 8. Detailed Event Schemas (Field-Level Alignment)
+## 9. Detailed Event Schemas (Field-Level Alignment)
 
 Field-level schemas are maintained in dedicated files for versioning and reuse:
 
@@ -223,7 +242,7 @@ Field-level schemas are maintained in dedicated files for versioning and reuse:
 - `docs/implementation/event-schemas/contracts.md`
 - `docs/implementation/event-schemas/reputation.md`
 
-## 9. Validation Pipeline
+## 10. Validation Pipeline
 
 Nodes MUST validate events in this order:
 
@@ -245,7 +264,7 @@ Amount thresholds (anti-dust):
 - wallet.transfer amount MUST be >= MIN_TRANSFER_AMOUNT.
 - wallet.escrow.create amount MUST be >= MIN_ESCROW_AMOUNT.
 
-## 10. Reducers and State
+## 11. Reducers and State
 
 - Reducers MUST be deterministic and pure.
 - Reducers MUST be versioned.
@@ -263,7 +282,7 @@ Conflict rules:
   not match, reject. For create events, resourcePrev MAY be omitted or null.
   If two events share the same resourcePrev, keep lower hash and reject others.
 
-## 11. Finality (MVP)
+## 12. Finality (MVP)
 
 - An event is considered confirmed after:
   - observed from N distinct peers according to FINALITY_TIERS OR
@@ -285,25 +304,25 @@ Finality overrides for non-amount events (MVP):
 These thresholds are local policy and DAO-controlled. Recommendation adopted:
 use tiered N (3/5/7) based on amount with optional arbitration on disputes.
 
-## 12. Payload Size Limits
+## 13. Payload Size Limits
 
 - Envelope size MUST be <= MAX_EVENT_SIZE.
 - Larger payloads MUST be stored out-of-band (IPFS/content hash)
   with hash reference in payload.
 
-## 13. Versioning and Upgrades
+## 14. Versioning and Upgrades
 
 - Envelope v indicates protocol version.
 - Nodes MUST reject unknown major versions.
 - Minor versions SHOULD be backward compatible.
 
-## 14. Decentralization Guarantees
+## 15. Decentralization Guarantees
 
 - No event type requires a central sequencer.
 - Indexers are optional and non-authoritative.
 - Any node can validate from the event log alone.
 
-## 15. Conformance Tests
+## 16. Conformance Tests
 
 - Canonical serialization test vectors
 - Signature verification tests

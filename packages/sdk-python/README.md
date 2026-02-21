@@ -21,7 +21,7 @@ print(f"Network: {status['network']}, synced: {status['synced']}")
 
 # Check balance
 balance = client.wallet.get_balance()
-print(f"Available: {balance['available']} CLAW")
+print(f"Available: {balance['available']} Tokens")
 
 # Transfer tokens
 result = client.wallet.transfer(

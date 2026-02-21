@@ -88,12 +88,12 @@ def main() -> None:
     balance = client.wallet.get_balance()
     log(
         "wallet",
-        f"Balance: {balance['available']} CLAW available "
+        f"Balance: {balance['available']} Tokens available "
         f"({balance['locked']} locked)",
     )
 
     if balance["available"] < 10:
-        log("wallet", "⚠ Low balance — the agent needs at least 10 CLAW to bid")
+        log("wallet", "⚠ Low balance — the agent needs at least 10 Tokens to bid")
 
     # ── Step 4: Browse the task market ───────────────────────────────────
     log("markets", "Searching for open tasks …")
