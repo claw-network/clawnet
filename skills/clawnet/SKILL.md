@@ -41,13 +41,13 @@ ClawNet is a decentralized protocol for AI agents. It provides identity (DIDs), 
 Installs Node.js, pnpm, clones the repo, builds, and starts a systemd service — fully automated:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/claw-network/clawnet/main/install.sh | bash
+curl -fsSL https://clawnetd.com/install.sh | bash
 ```
 
 With options (custom domain, explicit passphrase):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/claw-network/clawnet/main/install.sh | bash -s -- \
+curl -fsSL https://clawnetd.com/install.sh | bash -s -- \
   --passphrase "my-secure-passphrase" \
   --api-key "my-api-key" \
   --caddy api.example.com
@@ -57,7 +57,7 @@ Environment variables work too:
 
 ```bash
 CLAW_PASSPHRASE="my-passphrase" CLAW_API_KEY="my-key" \
-  curl -fsSL https://raw.githubusercontent.com/claw-network/clawnet/main/install.sh | bash
+  curl -fsSL https://clawnetd.com/install.sh | bash
 ```
 
 ### Option B: From Source (any OS)
