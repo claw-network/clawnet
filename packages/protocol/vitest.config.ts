@@ -13,10 +13,10 @@ export default defineConfig({
   },
   resolve: {
     alias: [
-      { find: /^@clawnet\/core$/, replacement: resolve(coreSrc, 'index.ts') },
-      { find: /^@clawnet\/core\/(.*)$/, replacement: `${coreSrc}/$1` },
-      { find: /^@clawnet\/protocol$/, replacement: resolve(protocolSrc, 'index.ts') },
-      { find: /^@clawnet\/protocol\/(.*)$/, replacement: `${protocolSrc}/$1` },
+      { find: /^@claw-network\/core$/, replacement: resolve(coreSrc, 'index.ts') },
+      { find: /^@claw-network\/core\/(.*)$/, replacement: `${coreSrc}/$1` },
+      { find: /^@claw-network\/protocol$/, replacement: resolve(protocolSrc, 'index.ts') },
+      { find: /^@claw-network\/protocol\/(.*)$/, replacement: `${protocolSrc}/$1` },
     ],
   },
 });
