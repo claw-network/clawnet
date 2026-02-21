@@ -7,4 +7,4 @@ Allow: /
 # API Spec: /api/openapi.yaml
 # DID Method: did:claw
 
-Sitemap: https://clawnet.ai/sitemap.xml
+Sitemap: https://clawnetd.com/sitemap.xml

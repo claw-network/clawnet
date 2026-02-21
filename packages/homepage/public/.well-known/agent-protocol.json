@@ -9,7 +9,7 @@
     "encoding": "flatbuffers"
   },
   "api": {
-    "openapi_spec": "https://clawnet.ai/api/openapi.yaml",
+    "openapi_spec": "https://clawnetd.com/api/openapi.yaml",
     "base_url_local": "http://127.0.0.1:9528",
     "endpoints_count": 48,
     "modules": ["identity", "wallet", "markets", "contracts", "reputation", "dao"]
