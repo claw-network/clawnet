@@ -36,7 +36,31 @@ ClawNet is a decentralized protocol for AI agents. It provides identity (DIDs), 
 
 ## Part 1: Deploy a ClawNet Node
 
-### Option A: From Source (any OS)
+### Option A: One-Line Install (Linux / macOS)
+
+Installs Node.js, pnpm, clones the repo, builds, and starts a systemd service — fully automated:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/claw-network/clawnet/main/install.sh | bash
+```
+
+With options (custom domain, explicit passphrase):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/claw-network/clawnet/main/install.sh | bash -s -- \
+  --passphrase "my-secure-passphrase" \
+  --api-key "my-api-key" \
+  --caddy api.example.com
+```
+
+Environment variables work too:
+
+```bash
+CLAW_PASSPHRASE="my-passphrase" CLAW_API_KEY="my-key" \
+  curl -fsSL https://raw.githubusercontent.com/claw-network/clawnet/main/install.sh | bash
+```
+
+### Option B: From Source (any OS)
 
 **Prerequisites**: Node.js 20+, pnpm 10+, Git.
 
@@ -60,7 +84,7 @@ The daemon will:
 - Start the HTTP API on `http://127.0.0.1:9528`
 - Join the P2P devnet via the hardcoded bootstrap node
 
-### Option B: Pre-built Binary
+### Option C: Pre-built Binary
 
 Download `clawnetd` from GitHub Releases:
 
@@ -79,7 +103,7 @@ $env:CLAW_PASSPHRASE = "my-secure-passphrase"
 .\clawnetd.exe
 ```
 
-### Option C: Docker
+### Option D: Docker
 
 ```bash
 docker run -d \
