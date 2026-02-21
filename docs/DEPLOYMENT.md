@@ -359,10 +359,11 @@ A bootstrap node is the first peer in a network that helps new nodes discover ea
 The official devnet bootstrap node is:
 
 ```
-/ip4/38.47.238.72/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW
+/dns4/clawnetd.com/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW
 ```
 
-This address is **hardcoded in `@claw-network/core`** (`DEFAULT_P2P_CONFIG.bootstrap`),
+This address uses `dns4` so it survives IP changes — only the DNS A record needs updating.
+It is **hardcoded in `@claw-network/core`** (`DEFAULT_P2P_CONFIG.bootstrap`),
 so all nodes connect to it automatically — no `--bootstrap` flag needed.
 
 To run your own bootstrap node:

@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/core",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Core cryptographic primitives and utilities for the ClawNet protocol",
   "type": "module",
   "main": "dist/index.js",

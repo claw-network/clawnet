@@ -387,9 +387,9 @@ clawnetd
 export CLAW_NODE_URL=http://127.0.0.1:9528
 ```
 
-> **注意**：`@claw-network/core` ≥ 0.1.1 已内置官方 devnet bootstrap 地址
-> `/ip4/38.47.238.72/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW`，
-> 新节点启动后会自动加入网络。
+> **注意**：`@claw-network/core` ≥ 0.1.2 已内置官方 devnet bootstrap 地址
+> `/dns4/clawnetd.com/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW`，
+> 新节点启动后会自动加入网络（使用域名，IP 变更时无需更新代码）。
 
 参见 [DEPLOYMENT.md](DEPLOYMENT.md) 获取详细的节点部署指南。
 
