@@ -41,6 +41,8 @@ describe('clawnetd daemon', () => {
         '/ip4/127.0.0.1/tcp/0',
         '--health-interval-ms',
         '50',
+        '--passphrase',
+        'test-passphrase',
       ],
       { attachSignals: false },
     );

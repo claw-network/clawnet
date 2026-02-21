@@ -103,6 +103,30 @@ export async function startDaemon(
   stop: () => Promise<void>;
 }> {
   const args = parseArgs(argv);
+
+  // ── Passphrase is REQUIRED ──────────────────────────────────────────
+  // Without a passphrase the node cannot create or decrypt its identity
+  // key record, which means: no DID, no signing, no transactions.
+  if (!args.passphrase) {
+    console.error(
+      `[clawnetd] FATAL: No passphrase configured.
+
+A passphrase is required so the node can create its on-chain identity (DID).
+Without it the node cannot sign transactions, participate in markets, or
+hold a wallet — it is essentially non-functional.
+
+Provide one via either:
+  --passphrase <string>
+  CLAW_PASSPHRASE=<string>   (environment variable)
+
+Example:
+  clawnetd --passphrase "my-secure-passphrase"
+  CLAW_PASSPHRASE="my-secure-passphrase" clawnetd
+`,
+    );
+    process.exit(1);
+  }
+
   const paths = resolveStoragePaths(args.dataDir);
   const config = await loadConfig(paths);
   const logger = createLogger({
@@ -133,9 +157,10 @@ export async function startDaemon(
   logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   logger.info('clawnetd');
   logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  logger.info(`Data Dir: ${paths.root}`);
-  logger.info(`Peer Id: ${node.getPeerId() ?? 'unknown'}`);
-  logger.info(`Network: ${config.network}`);
+  logger.info(`Data Dir : ${paths.root}`);
+  logger.info(`Peer Id  : ${node.getPeerId() ?? 'unknown'}`);
+  logger.info(`DID      : ${node.getDid() ?? '(pending)'}`);
+  logger.info(`Network  : ${config.network}`);
   logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   let healthTimer: NodeJS.Timeout | undefined;
@@ -188,12 +213,20 @@ Options:
   --listen <multiaddr>       Add libp2p listen multiaddr (repeatable)
   --bootstrap <multiaddr>    Add bootstrap peer multiaddr (repeatable)
   --health-interval-ms <ms>  Health check interval (default: 30000, 0 to disable)
-  --passphrase <str>         Passphrase for auto-creating node identity (env: CLAW_PASSPHRASE)
+  --passphrase <str>         Passphrase for node identity key (REQUIRED, env: CLAW_PASSPHRASE)
   -h, --help                 Show help
 `);
 }
 
-void main().catch((error) => {
-  console.error('[clawnetd] fatal error:', error);
-  process.exit(1);
-});
+// Only auto-run when executed directly (not when imported by tests)
+const isDirectRun =
+  typeof process !== 'undefined' &&
+  process.argv[1] &&
+  (process.argv[1].endsWith('daemon.js') || process.argv[1].endsWith('daemon.ts'));
+
+if (isDirectRun) {
+  void main().catch((error) => {
+    console.error('[clawnetd] fatal error:', error);
+    process.exit(1);
+  });
+}

@@ -108,6 +108,7 @@ export class ClawNetNode {
   private persistedConfig?: NodeConfig;
   private starting?: Promise<void>;
   private stopping?: Promise<void>;
+  private cachedDid?: string;
 
   constructor(config: NodeRuntimeConfig = {}) {
     this.config = {
@@ -148,6 +149,9 @@ export class ClawNetNode {
 
     // Auto-create identity key record if none exists and passphrase is available
     await this.ensureIdentityKeyRecord(paths, peerId);
+
+    // Cache DID for synchronous access
+    this.cachedDid = (await this.resolveLocalDid()) ?? undefined;
 
     // Convert PeerId's protobuf private key to PrivateKey object for libp2p v3
     const libp2pPrivateKey = peerId.privateKey
@@ -292,6 +296,11 @@ export class ClawNetNode {
       return null;
     }
     return this.peerId.toString();
+  }
+
+  /** Return the node's DID (synchronous, cached after start). */
+  getDid(): string | null {
+    return this.cachedDid ?? null;
   }
 
   getHealth(): {
@@ -754,7 +763,11 @@ export class ClawNetNode {
   ): Promise<void> {
     const passphrase = this.config.passphrase;
     if (!passphrase) {
-      return; // No passphrase configured, skip auto-identity creation
+      throw new Error(
+        'CLAW_PASSPHRASE is required. Without it the node cannot create an identity (DID) ' +
+        'and will be unable to sign transactions, join markets, or operate a wallet. ' +
+        'Set it via --passphrase <str> or the CLAW_PASSPHRASE environment variable.',
+      );
     }
     const existing = await listKeyRecords(paths);
     if (existing.length > 0) {

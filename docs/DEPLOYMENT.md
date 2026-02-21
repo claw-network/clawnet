@@ -18,7 +18,8 @@ pnpm install && pnpm build
 # Initialize (generates keys, writes ~/.clawnet/)
 pnpm --filter @claw-network/cli exec clawnet init
 
-# Start daemon
+# Start daemon (passphrase is REQUIRED)
+export CLAW_PASSPHRASE="my-secure-passphrase"
 pnpm --filter @claw-network/cli exec clawnet daemon
 ```
 
@@ -30,10 +31,12 @@ Download from [GitHub Releases](https://github.com/claw-network/clawnet/releases
 # Linux / macOS
 chmod +x clawnetd
 ./clawnetd init
+export CLAW_PASSPHRASE="my-secure-passphrase"
 ./clawnetd
 
 # Windows
 clawnetd.exe init
+set CLAW_PASSPHRASE=my-secure-passphrase
 clawnetd.exe
 ```
 
@@ -43,6 +46,7 @@ clawnetd.exe
 docker run -d \
   --name clawnet \
   -p 9528:9528 \
+  -e CLAW_PASSPHRASE="my-secure-passphrase" \
   -v clawnet-data:/data \
   claw-network/clawnet:latest
 ```
@@ -150,6 +154,50 @@ export CLAW_DATA_DIR=/opt/clawnet/data
 | `--no-api` | — | — | Disable API entirely |
 
 **Security**: The API listens on `127.0.0.1` by default (local only). To expose remotely, set `--api-host 0.0.0.0` and configure an API key.
+
+### Identity Passphrase (REQUIRED)
+
+| Flag | Environment | Default | Description |
+|------|-------------|---------|-------------|
+| `--passphrase <str>` | `CLAW_PASSPHRASE` | — | **Required.** Encrypts the node’s identity key record |
+
+> **⚠️ CRITICAL**: Every ClawNet node **must** have a passphrase configured.
+> Without it the node **will refuse to start**.
+>
+> The passphrase is used to encrypt/decrypt the Ed25519 identity key on disk.
+> A node without a passphrase has **no DID**, which means:
+> - ❌ Cannot sign any transactions
+> - ❌ Cannot participate in markets (info / task / capability)
+> - ❌ Cannot hold a wallet or transfer CLAW tokens
+> - ❌ Cannot create or sign service contracts
+> - ❌ Cannot record or receive reputation
+> - ❌ Cannot vote in DAO governance
+>
+> In short: the node is non-functional for anything beyond the health check.
+
+Set it via CLI flag or environment variable:
+
+```bash
+# CLI flag
+clawnetd --passphrase "my-secure-passphrase"
+
+# Environment variable (recommended for production / systemd)
+export CLAW_PASSPHRASE="my-secure-passphrase"
+clawnetd
+```
+
+For **systemd** services, add it to the unit file:
+
+```ini
+[Service]
+Environment=CLAW_PASSPHRASE=my-secure-passphrase
+```
+
+For **Docker**, pass it as an environment variable:
+
+```bash
+docker run -e CLAW_PASSPHRASE="my-secure-passphrase" ...
+```
 
 ### P2P Configuration
 

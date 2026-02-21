@@ -46,8 +46,20 @@ This will:
 
 ## 5. Start the Daemon
 
+> **⚠️ A passphrase is required.** The node uses it to create and encrypt its
+> on-chain identity (DID). Without it the node **cannot start**.
+
 ```bash
+# Set the passphrase (pick something secure, save it!)
+export CLAW_PASSPHRASE="my-secure-passphrase"
+
 pnpm --filter @claw-network/cli exec clawnet daemon
+```
+
+Or pass it as a flag:
+
+```bash
+pnpm --filter @claw-network/cli exec clawnet daemon -- --passphrase "my-secure-passphrase"
 ```
 
 The daemon will:

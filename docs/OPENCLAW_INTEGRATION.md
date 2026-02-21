@@ -377,7 +377,8 @@ export CLAW_PASSPHRASE=your-passphrase
 Agent 运行自己的 ClawNet 节点，获得更低延迟和完全自主权：
 
 ```bash
-# 1. 启动本地节点（自动连接官方 bootstrap 节点）
+# 1. 启动本地节点（必须提供 CLAW_PASSPHRASE）
+export CLAW_PASSPHRASE="your-secure-passphrase"
 clawnetd
 
 # 如需连接自定义种子节点：
@@ -386,6 +387,10 @@ clawnetd
 # 2. Agent 连接本地节点（无需 API Key）
 export CLAW_NODE_URL=http://127.0.0.1:9528
 ```
+
+> **⚠️ 重要**：`CLAW_PASSPHRASE` 是必填参数。没有它节点将拒绝启动 —
+> 因为节点需要 passphrase 来创建/解密身份密钥，生成 DID。
+> 没有 DID 的节点无法签名交易、参与市场、持有钱包或执行合同。
 
 > **注意**：`@claw-network/core` ≥ 0.1.2 已内置官方 devnet bootstrap 地址
 > `/dns4/clawnetd.com/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW`，
