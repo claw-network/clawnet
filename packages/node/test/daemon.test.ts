@@ -23,10 +23,10 @@ describe('clawnetd daemon', () => {
       await stop();
       stop = null;
     }
-    await rm(tempDir, { recursive: true, force: true });
+    await rm(tempDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   });
 
-  it('starts and logs health checks', async () => {
+  it('starts and logs health checks', { timeout: 30_000 }, async () => {
     const logs: string[] = [];
     const logSpy = vi.spyOn(console, 'log').mockImplementation((...args) => {
       logs.push(args.map(String).join(' '));

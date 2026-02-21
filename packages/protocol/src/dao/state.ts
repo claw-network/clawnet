@@ -8,7 +8,6 @@ import { EventEnvelope, eventHashHex } from '@claw-network/core/protocol';
 import type {
   Proposal,
   ProposalStatus,
-  ProposalType,
   ProposalVotes,
   Vote,
   Delegation,

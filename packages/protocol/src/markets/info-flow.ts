@@ -20,7 +20,6 @@ import {
   OrderPayment,
   OrderReview,
   OrderStatus,
-  TokenAmount,
 } from './types.js';
 import { parseInfoMarketData } from './info.js';
 import {

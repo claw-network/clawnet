@@ -115,11 +115,9 @@ import {
   createDaoVoteCastEnvelope,
   createDaoDelegateSetEnvelope,
   createDaoDelegateRevokeEnvelope,
-  createDaoTimelockQueueEnvelope,
   createDaoTimelockExecuteEnvelope,
   createDaoTimelockCancelEnvelope,
   createDaoTreasuryDepositEnvelope,
-  createDaoTreasurySpendEnvelope,
   PROPOSAL_THRESHOLDS,
 } from '@claw-network/protocol';
 
@@ -2441,6 +2439,7 @@ export class ApiServer {
         terms: body.terms as Record<string, unknown>,
         payment: (body.payment ?? { escrowRequired: true }) as Record<string, unknown>,
         timeline: (body.timeline ?? {}) as Record<string, unknown>,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         milestones: milestones as any,
         attachments: body.attachments as Record<string, unknown>[] | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
@@ -3626,6 +3625,7 @@ export class ApiServer {
           accessMethod: body.accessMethod as Record<string, unknown>,
           license: body.license as Record<string, unknown>,
           usageRestrictions: body.usageRestrictions as Record<string, unknown> | undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
         restrictions: body.restrictions as Record<string, unknown> | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
@@ -4350,6 +4350,7 @@ export class ApiServer {
           workerRequirements: body.workerRequirements as Record<string, unknown> | undefined,
           bidding: body.bidding as Record<string, unknown> | undefined,
           milestones: body.milestones as Record<string, unknown>[] | undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
         restrictions: body.restrictions as Record<string, unknown> | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
@@ -5213,6 +5214,7 @@ export class ApiServer {
           quota: body.quota as Record<string, unknown>,
           access: body.access as Record<string, unknown>,
           sla: body.sla as Record<string, unknown> | undefined,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
         restrictions: body.restrictions as Record<string, unknown> | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
@@ -5358,6 +5360,7 @@ export class ApiServer {
         credentials: body.credentials as Record<string, unknown> | undefined,
         metadata: body.metadata as Record<string, unknown> | undefined,
         expiresAt: body.expiresAt,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         resourcePrev: (body.resourcePrev ?? null) as any,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,

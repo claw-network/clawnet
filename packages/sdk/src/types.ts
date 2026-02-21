@@ -484,7 +484,7 @@ export interface CapabilityInvokeResponse {
   usage: CapabilityUsageRecord;
 }
 
-export interface CapabilityLeaseActionParams extends EventFields {}
+export type CapabilityLeaseActionParams = EventFields;
 
 export interface CapabilityLeaseActionResponse {
   leaseId: string;

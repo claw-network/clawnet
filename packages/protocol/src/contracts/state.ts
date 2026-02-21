@@ -6,7 +6,6 @@ import {
   ContractMilestoneSubmission,
   ContractParties,
   ContractSignature,
-  ContractStatus,
   ServiceContract,
 } from './types.js';
 import {

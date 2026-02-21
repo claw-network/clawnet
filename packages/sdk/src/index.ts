@@ -32,7 +32,7 @@ import { ContractsApi } from './contracts.js';
 import { DaoApi } from './dao.js';
 
 /** Configuration for the top-level client. */
-export interface ClientConfig extends HttpClientConfig {}
+export type ClientConfig = HttpClientConfig;
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:9528';
 
