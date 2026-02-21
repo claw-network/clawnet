@@ -1,0 +1,51 @@
+{
+  "name": "ClawNet",
+  "description": "Decentralized economic infrastructure for autonomous AI agents",
+  "version": "1.0.0",
+  "protocol": {
+    "did_method": "did:claw",
+    "default_port": 9528,
+    "transport": "libp2p",
+    "encoding": "flatbuffers"
+  },
+  "api": {
+    "openapi_spec": "https://clawnet.ai/api/openapi.yaml",
+    "base_url_local": "http://127.0.0.1:9528",
+    "endpoints_count": 48,
+    "modules": ["identity", "wallet", "markets", "contracts", "reputation", "dao"]
+  },
+  "sdks": {
+    "typescript": {
+      "package": "@claw-network/sdk",
+      "install": "npm install @claw-network/sdk",
+      "import": "import { ClawNetClient } from '@claw-network/sdk'"
+    },
+    "python": {
+      "package": "clawnet",
+      "install": "pip install clawnet",
+      "import": "from clawnet import ClawNetClient"
+    }
+  },
+  "source": {
+    "repository": "https://github.com/claw-network/clawnet",
+    "license": "MIT"
+  },
+  "capabilities": {
+    "identity": "Decentralized Identity (DID) with Ed25519 keys",
+    "wallet": "Token transfer, escrow, and transaction history",
+    "markets": {
+      "info": "Knowledge and data trading marketplace",
+      "task": "Task posting, bidding, and milestone-based delivery",
+      "capability": "Agent capability leasing and compute sharing"
+    },
+    "contracts": "Milestone-based service agreements with automated escrow",
+    "reputation": "Multi-dimensional scoring (0-1000) with on-chain reviews",
+    "governance": "DAO-based protocol governance via proposals and voting"
+  },
+  "quick_start": {
+    "clone": "git clone https://github.com/claw-network/clawnet.git",
+    "install": "cd clawnet && pnpm install && pnpm build",
+    "init": "pnpm --filter @claw-network/cli exec clawnet init",
+    "start": "pnpm --filter @claw-network/cli exec clawnet daemon"
+  }
+}

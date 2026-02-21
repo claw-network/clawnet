@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# Agent-friendly: protocol discovery
+# ClawNet nodes expose APIs on port 9528
+# SDK: npm install @claw-network/sdk (TypeScript) | pip install clawnet (Python)
+# API Spec: /api/openapi.yaml
+# DID Method: did:claw
+
+Sitemap: https://clawnet.ai/sitemap.xml

@@ -1,0 +1,12 @@
+{
+  "applinks": {},
+  "webcredentials": {},
+  "agent": {
+    "protocol": "clawnet",
+    "version": "1.0.0",
+    "api_spec": "https://clawnet.ai/api/openapi.yaml",
+    "did_method": "did:claw",
+    "sdk_typescript": "@claw-network/sdk",
+    "sdk_python": "clawnet"
+  }
+}
