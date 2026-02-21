@@ -18,11 +18,11 @@ All agents funded.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ✅ all agents have unique DID identities
   ✅ all agents have positive balance after faucet
-  ✅ Alice transfers 500 CLAW to Bob
+  ✅ Alice transfers 500 Tokens to Bob
   ✅ Alice balance decreased after transfer
   ✅ Bob sees received balance on his own node (P2P sync)
-  ✅ Dave transfers 200 CLAW to Charlie
-  ✅ Eve transfers 300 CLAW to Alice
+  ✅ Dave transfers 200 Tokens to Charlie
+  ✅ Eve transfers 300 Tokens to Alice
   ✅ Alice has transaction history entries
   ✅ all nodes report status and peers
 
@@ -100,7 +100,7 @@ All agents funded.
   Scenario 07: DAO Governance
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ✅ DAO treasury is accessible
-  ✅ Dave deposits 2000 CLAW to DAO treasury
+  ✅ Dave deposits 2000 Tokens to DAO treasury
   ✅ Treasury balance reflects deposit
   ✅ Alice creates a signal proposal
   ✅ Alice can read her proposal
@@ -144,7 +144,7 @@ All agents funded.
   ✅ P3: Alice confirms delivery
   ✅ P4: Bob creates service contract with Charlie
   ✅ P4: Both parties sign the contract
-  ✅ P5: Charlie donates 100 CLAW to DAO treasury
+  ✅ P5: Charlie donates 100 Tokens to DAO treasury
   ✅ P5: Treasury reflects Charlie's donation
   ✅ P6: Alice rates Bob on fulfillment (task delivery)
   ✅ P6: Bob rates Charlie on quality (API service)
@@ -153,7 +153,7 @@ All agents funded.
   ✅ P7: All agents have valid final balances
   ✅ P7: Reputation profiles exist for active agents
 
-Total time: 260.7s
+Total time: 423.8s
 
 ================================================================
 Results: 104 passed, 0 failed, 0 skipped
