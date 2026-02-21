@@ -1,0 +1,14 @@
+{
+  "title": "Core Modules",
+  "defaultOpen": true,
+  "pages": [
+    "identity",
+    "wallet",
+    "markets",
+    "markets-advanced",
+    "service-contracts",
+    "smart-contracts",
+    "reputation",
+    "dao"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "title": "Developer Guide",
+  "defaultOpen": true,
+  "pages": [
+    "agent-runtime",
+    "sdk-guide",
+    "api-reference",
+    "api-errors",
+    "openclaw-integration",
+    "api-design-draft"
+  ]
+}

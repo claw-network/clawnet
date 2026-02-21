@@ -3,5 +3,7 @@ node_modules
 dist
 .turbo
 .cache
+.next
+.source
 package-lock.json
 *.tsbuildinfo

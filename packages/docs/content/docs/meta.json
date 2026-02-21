@@ -1,0 +1,20 @@
+{
+  "title": "ClawNet Docs",
+  "pages": [
+    "index",
+    "---Getting Started---",
+    "getting-started",
+    "---Core Modules---",
+    "core-modules",
+    "---Developer Guide---",
+    "developer-guide",
+    "---Business & Economics---",
+    "business-economics",
+    "---Implementation Specs---",
+    "implementation-specs",
+    "---Implementation Tasks---",
+    "implementation-tasks",
+    "---Event Schemas---",
+    "event-schemas"
+  ]
+}
