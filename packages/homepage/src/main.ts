@@ -76,10 +76,11 @@ const observer = new IntersectionObserver((entries) => {
 // Apply fade-in classes to animated elements
 function initAnimations() {
   const selectors = [
-    '.problem-card',
     '.feature-card',
     '.market-card',
     '.protocol-layer',
+    '.principle-card',
+    '.flow-step',
     '.dev-code-block',
     '.dev-feature',
     '.governance-step',
@@ -87,6 +88,7 @@ function initAnimations() {
     '.section-eyebrow',
     '.section-title',
     '.section-desc',
+    '.protocol-flow',
   ];
 
   selectors.forEach(selector => {

@@ -266,30 +266,6 @@ button { border: none; background: none; cursor: pointer; font-family: inherit; 
 }
 .section-desc em { color: var(--text-accent); font-style: normal; font-weight: 500; }
 
-/* ---------- Problem Section ---------- */
-.section-problem { background: var(--bg-secondary); }
-.problem-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.5rem;
-}
-.problem-card {
-  padding: 2rem;
-  border-radius: 12px;
-  border: 1px solid var(--border-primary);
-  background: var(--bg-card);
-  transition: border-color var(--duration) var(--ease), transform var(--duration) var(--ease);
-}
-.problem-card:hover { border-color: var(--border-accent); transform: translateY(-2px); }
-.problem-icon { font-size: 1.5rem; margin-bottom: 1rem; }
-.problem-card h3 {
-  font-size: 1.1rem;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-.problem-card p { font-size: 0.9rem; line-height: 1.6; color: var(--text-secondary); }
-
 /* ---------- Features Section ---------- */
 .features-grid {
   display: grid;
@@ -334,25 +310,39 @@ button { border: none; background: none; cursor: pointer; font-family: inherit; 
 
 /* ---------- Protocol Section ---------- */
 .section-protocol { background: var(--bg-secondary); }
-.protocol-stack {
-  max-width: 800px;
-  margin: 0 auto;
+.protocol-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: start;
+  margin-bottom: 4rem;
 }
+.protocol-stack { display: flex; flex-direction: column; }
 .protocol-layer {
   padding: 1.25rem 1.5rem;
   border-radius: 12px;
   border: 1px solid var(--border-primary);
   background: var(--bg-card);
+  transition: border-color var(--duration) var(--ease);
 }
+.protocol-layer:hover { border-color: var(--border-accent); }
 .protocol-layer-top { border: 1px solid var(--border-accent); }
+.protocol-layer-mid { background: linear-gradient(135deg, var(--bg-card) 0%, rgba(96, 165, 250, 0.03) 100%); }
 .protocol-layer-bottom { background: var(--bg-tertiary); }
 .protocol-layer-label {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-tertiary);
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+.protocol-layer-desc {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
   margin-bottom: 0.75rem;
-  font-weight: 500;
+  line-height: 1.4;
+  opacity: 0.8;
 }
 .protocol-layer-content {
   display: flex;
@@ -366,17 +356,140 @@ button { border: none; background: none; cursor: pointer; font-family: inherit; 
   background: var(--accent-dim);
   color: var(--text-secondary);
   border: 1px solid var(--border-primary);
+  transition: all var(--duration) var(--ease);
 }
-.chip-highlight {
+.protocol-chip:hover { background: rgba(214, 211, 209, 0.2); }
+.chip-ts {
   background: rgba(96, 165, 250, 0.1);
   color: var(--color-blue);
   border-color: rgba(96, 165, 250, 0.2);
 }
-.protocol-arrow {
+.chip-py {
+  background: rgba(74, 222, 128, 0.08);
+  color: var(--color-green);
+  border-color: rgba(74, 222, 128, 0.15);
+}
+.chip-module {
+  background: rgba(192, 132, 252, 0.08);
+  color: var(--color-purple);
+  border-color: rgba(192, 132, 252, 0.15);
+}
+.protocol-connector {
   text-align: center;
   color: var(--text-tertiary);
+  padding: 0.35rem 0;
+  opacity: 0.4;
+}
+
+/* Principles */
+.protocol-principles {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+.principle-card {
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card);
+  position: relative;
+  transition: border-color var(--duration) var(--ease), transform var(--duration) var(--ease);
+}
+.principle-card:hover { border-color: var(--border-accent); transform: translateX(4px); }
+.principle-number {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  opacity: 0.5;
+}
+.principle-card h4 {
+  font-size: 1rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.principle-card p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* Transaction Flow */
+.protocol-flow {
+  padding: 2.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--border-primary);
+  background: var(--bg-card);
+}
+.protocol-flow-title {
   font-size: 1.2rem;
-  padding: 0.5rem 0;
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.protocol-flow-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin-bottom: 2rem;
+}
+.flow-steps {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  overflow-x: auto;
+}
+.flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 150px;
+  flex: 1;
+}
+.flow-step-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+.flow-step-content { max-width: 160px; }
+.flow-step-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+.flow-step-detail {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+}
+.flow-line {
+  flex-shrink: 0;
+  width: 40px;
+  height: 1px;
+  background: var(--border-accent);
+  margin-top: 22px;
+}
+
+@media (max-width: 1024px) {
+  .protocol-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .flow-steps { flex-direction: column; align-items: flex-start; }
+  .flow-step { flex-direction: row; text-align: left; min-width: auto; gap: 1rem; }
+  .flow-step-icon { margin-bottom: 0; }
+  .flow-step-content { max-width: 100%; }
+  .flow-line { width: 1px; height: 24px; margin-top: 0; margin-left: 22px; }
 }
 
 /* ---------- Markets Section ---------- */
@@ -492,7 +605,6 @@ button { border: none; background: none; cursor: pointer; font-family: inherit; 
   align-items: flex-start;
 }
 .dev-feature-icon {
-  font-size: 1.3rem;
   flex-shrink: 0;
   width: 2.5rem;
   height: 2.5rem;
@@ -501,6 +613,7 @@ button { border: none; background: none; cursor: pointer; font-family: inherit; 
   justify-content: center;
   border-radius: 8px;
   background: var(--accent-dim);
+  color: var(--text-tertiary);
 }
 .dev-feature h4 {
   font-size: 0.95rem;
@@ -568,6 +681,17 @@ button { border: none; background: none; cursor: pointer; font-family: inherit; 
   border: 1px solid var(--border-primary);
   background: var(--bg-card);
 }
+.agent-info-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--accent-dim);
+  color: var(--text-tertiary);
+  margin-bottom: 0.75rem;
+}
 .agent-info-card h4 {
   font-size: 1rem;
   color: var(--text-primary);
@@ -587,56 +711,66 @@ button { border: none; background: none; cursor: pointer; font-family: inherit; 
   color: var(--text-tertiary);
 }
 
-/* ---------- CTA Section ---------- */
-.section-cta {
-  text-align: center;
-  padding: var(--section-pad) 0;
-  position: relative;
-  overflow: hidden;
-}
-.section-cta::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse 50% 50% at 50% 100%, rgba(168, 162, 158, 0.06) 0%, transparent 60%);
-  pointer-events: none;
-}
-.cta-title {
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-  margin-bottom: 1rem;
-  position: relative;
-}
-.cta-desc {
-  font-size: 1.1rem;
-  color: var(--text-secondary);
-  margin-bottom: 2.5rem;
-  position: relative;
-}
-.cta-actions {
+/* ---------- CTA Install Bar ---------- */
+.cta-install-bar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-bottom: 2.5rem;
-  position: relative;
-}
-.cta-install {
-  position: relative;
-}
-.cta-install code {
-  display: inline-block;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  background: var(--bg-code);
+  width: 100%;
+  max-width: 680px;
+  padding: 0.75rem 0.75rem 0.75rem 1.75rem;
+  border-radius: 16px;
+  background: #1a1a1a;
   border: 1px solid var(--border-primary);
-  font-size: 0.82rem;
-  color: var(--text-tertiary);
-  max-width: 100%;
+}
+.cta-install-cmd {
+  flex: 1;
+  min-width: 0;
   overflow-x: auto;
-  word-break: break-all;
+}
+.cta-install-cmd code {
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  line-height: 1;
+}
+.cta-url {
+  color: #c2703e;
+}
+.cta-get-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.5rem;
+  border-radius: 12px;
+  background: #f5f0eb;
+  color: #1a1a1a;
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: none;
+  transition: background var(--duration) var(--ease), transform var(--duration) var(--ease);
+  white-space: nowrap;
+}
+.cta-get-btn:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+}
+@media (max-width: 540px) {
+  .cta-install-bar {
+    flex-direction: column;
+    padding: 1.25rem;
+    text-align: center;
+    gap: 1rem;
+  }
+  .cta-install-cmd code {
+    font-size: 0.8rem;
+  }
+  .cta-get-btn {
+    width: 100%;
+  }
 }
 
 /* ---------- Footer ---------- */
