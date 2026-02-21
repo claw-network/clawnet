@@ -6,7 +6,7 @@ on:
       ref:
         description: 'Git ref to build (branch, tag, or SHA)'
         required: false
-        default: 'master'
+        default: 'main'
   push:
     tags:
       - 'v*'
