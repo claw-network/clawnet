@@ -3,10 +3,10 @@
 # ClawNet — One-Line Installer
 # ============================================================================
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/claw-network/clawnet/main/install.sh | bash
+#   curl -fsSL https://clawnetd.com/install.sh | bash
 #
 # Or with options:
-#   curl -fsSL https://raw.githubusercontent.com/claw-network/clawnet/main/install.sh | bash -s -- \
+#   curl -fsSL https://clawnetd.com/install.sh | bash -s -- \
 #     --install-dir /opt/clawnet \
 #     --passphrase "my-secure-passphrase" \
 #     --api-key "my-api-key" \
@@ -204,8 +204,17 @@ fi
 
 # ─── Step 5: Generate secrets if needed ─────────────────────────────────────
 if [ -z "$PASSPHRASE" ]; then
-  PASSPHRASE="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p | tr -d '\n')"
-  warn "Generated passphrase (save this!): $PASSPHRASE"
+  # Prompt interactively (read from /dev/tty so it works with curl | bash)
+  if [ -t 0 ] || [ -e /dev/tty ]; then
+    printf "${CYAN}▸${NC} Enter a passphrase for the node (or press Enter to auto-generate): " >&2
+    read -r PASSPHRASE < /dev/tty 2>/dev/null || PASSPHRASE=""
+  fi
+  if [ -z "$PASSPHRASE" ]; then
+    PASSPHRASE="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p | tr -d '\n')"
+    warn "Auto-generated passphrase (save this!): $PASSPHRASE"
+  else
+    ok "Passphrase set"
+  fi
 fi
 
 if [ -z "$API_KEY" ]; then
