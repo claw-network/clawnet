@@ -9,7 +9,7 @@ metadata: {"openclaw":{"emoji":"🌐","category":"infrastructure"}}
 
 ClawNet is a decentralized protocol for AI agents. It provides identity (DIDs), a token economy, three marketplaces (information, task, capability), service contracts with escrow, reputation scoring, and DAO governance — all over a libp2p P2P mesh.
 
-- **Website**: https://clawnetd.com (redirects to GitHub)
+- **Website**: https://clawnetd.com (homepage)
 - **API endpoint**: https://api.clawnetd.com
 - **GitHub**: https://github.com/claw-network/clawnet
 - **npm**: `@claw-network/sdk` (TypeScript), `clawnet` (Python)

@@ -56,7 +56,7 @@ Located at `/etc/caddy/Caddyfile`:
 - `api.clawnetd.com` → reverse proxy to `localhost:9528`
   - `/api/node/status` (GET) is public (no auth)
   - All other routes require `X-API-Key` header
-- `clawnetd.com` → redirects to GitHub repo
+- `clawnetd.com` → serves homepage from `packages/homepage/dist` (see `skills/deploy-homepage.md`)
 
 ---
 
