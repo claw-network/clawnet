@@ -1,5 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+
+const require = createRequire(import.meta.url);
+const PKG_VERSION: string = (require('../package.json') as { version: string }).version;
 import { privateKeyFromProtobuf } from '@libp2p/crypto/keys';
 import { createEd25519PeerId, createFromProtobuf, exportToProtobuf } from '@libp2p/peer-id-factory';
 import {
@@ -331,7 +335,7 @@ export class ClawNetNode {
       peers,
       connections,
       network,
-      version: process.env.CLAWNET_VERSION ?? '0.0.0',
+      version: process.env.CLAWNET_VERSION ?? PKG_VERSION,
       uptime,
     };
   }
