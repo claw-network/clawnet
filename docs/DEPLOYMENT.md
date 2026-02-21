@@ -185,7 +185,7 @@ clawnetd \
 ```nginx
 server {
     listen 443 ssl;
-    server_name clawnet.example.com;
+    server_name api.clawnetd.com;
 
     ssl_certificate     /etc/ssl/certs/clawnet.pem;
     ssl_certificate_key /etc/ssl/private/clawnet.key;
@@ -248,7 +248,7 @@ sudo apt install -y caddy
 
 # 3. Write Caddyfile
 cat > /etc/caddy/Caddyfile << 'EOF'
-clawnet.example.com {
+api.clawnetd.com {
     # Require API key for all routes
     @nokey not header X-API-Key {env.CLAW_API_KEY}
     respond @nokey 401
@@ -273,7 +273,7 @@ Agents can now connect:
 import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient({
-  baseUrl: 'https://clawnet.example.com',
+  baseUrl: 'https://api.clawnetd.com',
   apiKey:  'your-secure-random-key',
 });
 ```
@@ -344,7 +344,7 @@ sudo ufw enable
 ```bash
 # Check node is healthy behind the proxy
 curl -s -H "X-API-Key: $CLAW_API_KEY" \
-     https://clawnet.example.com/api/node/status | jq .
+     https://api.clawnetd.com/api/node/status | jq .
 
 # Expected: { "synced": true, "peers": 4, ... }
 ```

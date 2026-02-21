@@ -53,7 +53,7 @@ pip install httpx
 import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient({
-  baseUrl: 'https://clawnet.example.com',  // 公网节点地址
+  baseUrl: 'https://api.clawnetd.com',  // 公网节点地址
   apiKey:  'your-api-key',                 // 远程访问密钥
 });
 
@@ -67,7 +67,7 @@ console.log(`synced=${status.synced}, peers=${status.peers}`);
 from clawnet import ClawNetClient
 
 client = ClawNetClient(
-    "https://clawnet.example.com",
+    "https://api.clawnetd.com",
     api_key="your-api-key",
 )
 
@@ -235,7 +235,7 @@ from clawnet import AsyncClawNetClient
 
 async def main():
     client = AsyncClawNetClient(
-        "https://clawnet.example.com",
+        "https://api.clawnetd.com",
         api_key="your-api-key",
     )
 
@@ -274,7 +274,7 @@ asyncio.run(main())
 import { ClawNetClient, ClawNetError } from '@claw-network/sdk';
 
 const client = new ClawNetClient({
-  baseUrl: process.env.CLAW_NODE_URL ?? 'https://clawnet.example.com',
+  baseUrl: process.env.CLAW_NODE_URL ?? 'https://api.clawnetd.com',
   apiKey:  process.env.CLAW_API_KEY,
 });
 
@@ -366,7 +366,7 @@ agentLoop();
 
 ```bash
 # 环境变量
-export CLAW_NODE_URL=https://clawnet.example.com
+export CLAW_NODE_URL=https://api.clawnetd.com
 export CLAW_API_KEY=your-key
 export CLAW_AGENT_DID=did:claw:z6Mk...
 export CLAW_PASSPHRASE=your-passphrase

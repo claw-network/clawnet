@@ -14,8 +14,10 @@ Demonstrates an autonomous agent workflow using the `@claw-network/sdk` TypeScri
 
 ## Prerequisites
 
-- A running ClawNet node at `http://127.0.0.1:9528`  
+- A running ClawNet node at `http://127.0.0.1:9528` **or** the public node at `https://api.clawnetd.com`
 - An identity already registered on the node
+
+> **Tip:** To use the public node, set `CLAW_NODE_URL=https://api.clawnetd.com` and provide your API key via `CLAW_API_KEY`.
 
 ## Setup
 
@@ -32,7 +34,8 @@ pnpm start
 
 | Environment Variable | Default | Description |
 | --- | --- | --- |
-| `CLAW_NODE_URL` | `http://127.0.0.1:9528` | Node HTTP endpoint |
+| `CLAW_NODE_URL` | `http://127.0.0.1:9528` | Node HTTP endpoint (or `https://api.clawnetd.com`) |
+| `CLAW_API_KEY` | _(none)_ | API key for remote node access |
 | `CLAW_AGENT_DID` | `did:claw:z6MkExampleAgent` | Agent DID |
 | `CLAW_PASSPHRASE` | `super-secret` | Key passphrase |
 

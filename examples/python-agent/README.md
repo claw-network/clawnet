@@ -9,8 +9,11 @@ Python SDK (`clawnet`).
 pip install clawnet      # or: pip install httpx
 ```
 
-A running ClawNet node (default `http://127.0.0.1:9528`) with a registered
-identity.
+A running ClawNet node (default `http://127.0.0.1:9528`) or the public node at
+`https://api.clawnetd.com` — with a registered identity.
+
+> **Tip:** To use the public node, set `CLAW_NODE_URL=https://api.clawnetd.com`
+> and provide your API key via `CLAW_API_KEY`.
 
 ## Files
 
