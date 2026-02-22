@@ -104,7 +104,9 @@
 
 - [ ] **T-0.11** 编写合约验证脚本
   - 产出：`scripts/verify.ts`
-  - 验收：可对 ClawNet Chain 测试网上的合约自动提交源码验证（链浏览器）
+  - 说明：无 Blockscout 链浏览器，改用 `cast` CLI + 本地源码验证方式
+  - 功能：基于 `forge verify-contract` 或自定义脚本，从 ABI + bytecode 对比验证链上合约
+  - 验收：可通过 `cast code <address> --rpc-url $RPC` 获取 bytecode 并与编译结果比较
   - 工时：0.5 天
 
 ### Sprint 0-D：链节点软件搭建 + Ed25519 预编译（W4）
@@ -118,11 +120,39 @@
     - 创世配置：预分配 Token 给开发账户
     - Ed25519 自定义预编译（如可行，在此阶段集成）
   - 产出：`infra/chain-devnet/` 配置文件 + docker-compose
-    - `genesis.json` — 创世块配置
+    - `genesis.json` — 创世块配置（参考 `infra/chain-testnet/genesis.json` 模板）
     - `chain.toml` — Reth 链参数
-    - `docker-compose.yml` — 本地节点启动
+    - `docker-compose.yml` — 单节点本地启动
   - 验收：本地链可启动，可部署合约 + 执行交易，零外部依赖
   - 工时：4 天
+
+- [ ] **T-0.12a** 部署 ClawNet Chain 3 节点测试网
+  - 基于已创建的 `infra/chain-testnet/` 配置文件，在 3 台云服务器上部署
+  - 服务器架构（已确定）：
+    - Server A: clawnetd.com（现有）— Validator #1 + Bootstrap + Caddy 反向代理
+    - Server B: Contabo VPS S — Validator #2
+    - Server C: Contabo VPS S — Validator #3
+  - 部署步骤：
+    1. 在 3 台服务器执行 `infra/chain-testnet/setup-server.sh`
+    2. 用 `cast wallet new` 生成 3 个 Validator 密钥
+    3. 填入 `genesis.json` 中 extradata 和 alloc 字段
+    4. `reth init --chain genesis.json` 初始化各节点
+    5. Server A: `docker compose -f docker-compose.yml up -d`
+    6. Server B/C: `docker compose -f docker-compose.peer.yml up -d`
+    7. 配置 Caddy（Server A）→ `api.clawnetd.com` / `rpc.clawnetd.com`
+  - 配置文件（已就绪）：
+    - `infra/README.md` — 完整部署指南
+    - `infra/chain-testnet/genesis.json` — 创世块（chainId=7625, Clique, period=2s）
+    - `infra/chain-testnet/docker-compose.yml` — Server A compose
+    - `infra/chain-testnet/docker-compose.peer.yml` — Server B/C compose
+    - `infra/chain-testnet/Caddyfile` — 反向代理配置
+    - `infra/chain-testnet/.env.example` — 环境变量模板
+    - `infra/chain-testnet/health-check.sh` — 健康检查
+    - `infra/chain-testnet/setup-server.sh` — 服务器初始化
+  - 验收：3 个 Validator 出块正常，PoA BFT 容忍 1 节点宕机，RPC 可通过 HTTPS 访问
+  - 工时：2 天
+  - 前置：T-0.12
+  - 月费：¥92（2× Contabo VPS S €5.99）
 
 - [ ] **T-0.13** 调研并实现 Ed25519 自定义预编译
   - 独立链可自由添加自定义预编译，无需 EIP 审批
@@ -154,6 +184,7 @@
 □ UUPS 部署脚本可用
 □ Ed25519 兼容方案确定并有 PoC
 □ ClawNet Chain 本地 devnet 可启动 + 部署合约（零外部依赖）
+□ ClawNet Chain 3 节点测试网上线（api.clawnetd.com / rpc.clawnetd.com 可访问）
 □ DID → EVM address 映射工具通过测试
 ```
 
@@ -371,13 +402,16 @@
   - 前置：T-1.1, T-1.5, T-1.9, T-1.13
 
 - [ ] **T-1.17** ClawNet Chain 测试网部署
+  - 前提：T-0.12a 已完成（3 节点测试网已运行）
   - 操作：
-    1. 启动 ClawNet Chain 测试网节点（云服务器 / 本地 devnet）
+    1. 确认 `rpc.clawnetd.com` 可连接：`cast block-number --rpc-url https://rpc.clawnetd.com`
     2. 执行 `deploy-all-p0.ts --network clawnetTestnet`
-    3. 在链浏览器验证所有合约源码
+    3. 用 `cast` 验证合约 bytecode：`cast code <address> --rpc-url $RPC`
     4. 记录合约地址到 `packages/contracts/deployments/clawnetTestnet.json`
-  - 验收：所有 4 个合约部署成功 + 已验证
+  - 说明：无 Blockscout 链浏览器，使用 `cast` CLI 进行链上查询和验证
+  - 验收：所有 4 个合约部署成功 + bytecode 验证通过
   - 工时：1 天
+  - 前置：T-1.16, T-0.12a
 
 - [ ] **T-1.18** SDK 新增链上模式：WalletOnChainApi
   - 文件：`packages/sdk/src/wallet-onchain.ts`
@@ -873,11 +907,11 @@ T-0.13(Ed25519)──┼──→ T-1.1 (Token)──→ T-1.3 (Test)
 
 | Phase | 合约开发 | 测试 | 部署/脚本 | SDK/CLI | 审计/安全 | 迁移 | 总计 |
 |-------|---------|------|----------|---------|----------|------|------|
-| Phase 0 | 4d | — | 3d | — | — | — | **~10d** |
+| Phase 0 | 4d | — | 5d | — | — | — | **~12d** |
 | Phase 1 | 13d | 13d | 4d | 6d | — | 1d | **~40d** |
 | Phase 2 | 22d | 15d | 4d | 8d | 6d | — | **~55d** |
 | Phase 3 | — | — | 3d | — | 持续 | 14d | **~20d** |
-| **总计** | **39d** | **28d** | **14d** | **14d** | **6d+** | **15d** | **~125d** |
+| **总计** | **39d** | **28d** | **16d** | **14d** | **6d+** | **15d** | **~127d** |
 
 > 按 2 名合约工程师 + 2 名后端工程师并行，预计 8–9 个月完成全部 Phase。
 
