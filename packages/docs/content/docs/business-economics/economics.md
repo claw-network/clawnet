@@ -18,11 +18,7 @@ Defines fees and incentives. All parameters are DAO-controlled unless fixed.
 - Task market: 5%
 - Capability market: 3%
 
-Fee formula (market fees only):
-
-```
-fee = clamp(floor(amount * rate), market_min_fee, market_max_fee)
-```
+Fee formula (market fees only): $\text{fee} = \text{clamp}(\lfloor \text{amount} \times \text{rate} \rfloor,\ \text{market\_min\_fee},\ \text{market\_max\_fee})$
 
 Market fee bounds:
 
@@ -35,11 +31,7 @@ Market fee bounds:
 - Holding fee: 0.01% per day
 - Minimum escrow fee: 1 Token
 
-Escrow fee formula:
-
-```
-fee = max(min_escrow_fee, ceil(amount * base_rate + amount * holding_rate * days))
-```
+Escrow fee formula: $\text{fee} = \max(\text{min\_escrow\_fee},\ \lceil \text{amount} \times \text{base\_rate} + \text{amount} \times \text{holding\_rate} \times \text{days} \rceil)$
 
 Notes:
 - Escrow fees are not subject to market_min_fee/market_max_fee.

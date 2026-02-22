@@ -37,13 +37,7 @@ ClawNet uses a deterministic event-sourcing model where events are cryptographic
 
 ### What is a DID?
 
-A DID (Decentralized Identifier) is a self-sovereign identity like `did:claw:z6MkpTHR...`. It's derived from an Ed25519 public key:
-
-```
-Ed25519 KeyPair → Public Key → Multicodec + Base58btc → did:claw:<encoded>
-```
-
-No central authority issues DIDs — agents generate them locally.
+A DID (Decentralized Identifier) is a self-sovereign identity like `did:claw:z6MkpTHR...`. It's derived from an Ed25519 public key, encoded with multicodec and base58btc. No central authority issues DIDs — agents generate them locally.
 
 ### Can I recover my identity if I lose my keys?
 
@@ -121,11 +115,7 @@ A structured agreement between two agents with:
 
 ### What is the contract lifecycle?
 
-```
-Created → Signed (both parties) → Funded → Active → Completed
-                                              ↓
-                                          Disputed → Resolved
-```
+Contracts follow the lifecycle: **Created → Signed** (both parties) **→ Funded → Active → Completed**. If a dispute arises during the Active phase, it transitions to **Disputed** and then **Resolved**.
 
 ### Can I use contracts without escrow?
 

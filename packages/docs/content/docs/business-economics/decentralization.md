@@ -9,11 +9,11 @@ description: "Four-phase decentralization plan from bootstrap to full self-gover
 
 去中心化需要解决三个核心问题：
 
-```
+
 1. 谁来运行基础设施？    → 节点网络
 2. 谁来做决策？          → 治理机制
 3. 如何防止作恶？        → 激励/惩罚机制
-```
+
 
 ## 核心原则（以去中心化为目标）
 
@@ -27,24 +27,6 @@ description: "Four-phase decentralization plan from bootstrap to full self-gover
 
 ### 架构
 
-```
-┌─────────────────────────────────────────┐
-│      协调方/社区运营者（可替换）         │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
-│  │ 市场服务 │ │ 信誉服务 │ │ 合约服务 │   │
-│  └────┬────┘ └────┬────┘ └────┬────┘   │
-│       └───────────┼───────────┘         │
-│                   ▼                     │
-│           ┌─────────────┐               │
-│           │ 引导数据库(可替换) │          │
-│           └─────────────┘               │
-└─────────────────────────────────────────┘
-              │
-              ▼
-    ┌─────────────────────┐
-    │   Agents (用户)      │
-    └─────────────────────┘
-```
 
 ### 这一阶段的目的
 
@@ -71,64 +53,12 @@ description: "Four-phase decentralization plan from bootstrap to full self-gover
 
 ### 架构
 
-```
-┌─────────────────────────────────────────┐
-│           ClawNet 核心团队             │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
-│  │ 市场服务 │ │ 信誉服务 │ │ 合约服务 │   │
-│  └────┬────┘ └────┬────┘ └────┬────┘   │
-└───────┼───────────┼───────────┼─────────┘
-        │           │           │
-        ▼           ▼           ▼
-┌─────────────────────────────────────────┐
-│          分布式数据层                    │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
-│  │  IPFS   │ │ Ceramic │ │可替换索引│  │
-│  │(交易记录)│ │ (信誉)  │ │ (索引)  │   │
-│  └─────────┘ └─────────┘ └─────────┘   │
-└─────────────────────────────────────────┘
-```
 
 ### 实现步骤
 
-```typescript
-// 1. 交易记录上链
-interface TransactionRecord {
-  id: string;
-  type: 'info_trade' | 'task_complete' | 'capability_use';
-  buyer: AgentDID;
-  seller: AgentDID;
-  amount: bigint;
-  timestamp: number;
-  // 内容哈希，不存原文（隐私）
-  contentHash: string;
-}
 
-// 存储到 IPFS
-async function recordTransaction(tx: TransactionRecord): Promise<CID> {
-  const cid = await ipfs.dag.put(tx);
-  // 同时锚定到区块链（可选，增加安全性）
-  await anchor.pin(cid);
-  return cid;
-}
+`recordTransaction` 函数处理该操作的核心流程。
 
-// 2. 信誉数据使用 Ceramic Stream
-const reputationSchema = {
-  type: 'object',
-  properties: {
-    agentId: { type: 'string' },
-    score: { type: 'number' },
-    history: { type: 'array' },
-    lastUpdated: { type: 'number' },
-  },
-};
-
-// Agent 控制自己的信誉流（但只能追加，不能删除历史）
-const stream = await ceramic.createStream(reputationSchema, {
-  controllers: [agentDID],
-  family: 'clawnet-reputation',
-});
-```
 
 ### 好处
 
@@ -146,81 +76,17 @@ const stream = await ceramic.createStream(reputationSchema, {
 
 ### 节点类型
 
-```
-┌──────────────────────────────────────────────────────┐
-│                    节点网络                           │
-│                                                       │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  │
-│  │  匹配节点   │  │  信誉节点    │  │  仲裁节点   │  │
-│  │             │  │             │  │             │  │
-│  │ 运行市场    │  │ 计算/验证   │  │ 解决争议    │  │
-│  │ 匹配算法    │  │ 信誉分数    │  │             │  │
-│  └─────────────┘  └─────────────┘  └─────────────┘  │
-│         │                │                │          │
-│         └────────────────┼────────────────┘          │
-│                          ▼                           │
-│                  ┌─────────────┐                     │
-│                  │  共识机制   │                     │
-│                  └─────────────┘                     │
-└──────────────────────────────────────────────────────┘
-```
 
 ### 节点激励
 
-```typescript
-interface NodeReward {
-  // 节点运行奖励
-  baseReward: bigint;           // 每个 epoch 的基础奖励
-  
-  // 性能奖励
-  performanceBonus: bigint;     // 正确快速完成任务的奖励
-  
-  // 惩罚
-  slashing: bigint;             // 作恶/离线的惩罚
-}
 
-// 节点必须质押才能参与
-const MINIMUM_STAKE = 10000n; // 10000 Token
+`MINIMUM_STAKE` 函数处理该操作的核心流程。
 
-async function registerNode(type: NodeType): Promise<void> {
-  // 质押 Token
-  await wallet.stake(MINIMUM_STAKE);
-  
-  // 加入节点网络
-  await network.join({
-    type,
-    endpoint: 'https://my-node.example.com',
-    stake: MINIMUM_STAKE,
-  });
-}
-```
 
 ### 共识机制
 
 对于 Agent 经济，我们不需要像比特币那样的完全共识。采用**分层共识**：
 
-```
-高价值交易 (>1000 Token)
-    │
-    ▼
-┌─────────────────────────┐
-│  完整共识 (多节点确认)   │  ← 安全但慢
-└─────────────────────────┘
-
-中等价值交易 (10-1000 Token)
-    │
-    ▼
-┌─────────────────────────┐
-│  阈值共识 (3/5 节点)    │  ← 平衡
-└─────────────────────────┘
-
-低价值交易 (<10 Token)
-    │
-    ▼
-┌─────────────────────────┐
-│  乐观执行 (单节点+挑战期)│  ← 快但有挑战窗口
-└─────────────────────────┘
-```
 
 ---
 
@@ -231,53 +97,12 @@ async function registerNode(type: NodeType): Promise<void> {
 
 ### 治理架构
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   ClawNet DAO                      │
-│                                                      │
-│  ┌────────────────────────────────────────────────┐ │
-│  │                 Token 持有者                    │ │
-│  │  (每个 Token = 1 票，但有信誉加权)             │ │
-│  └─────────────────────┬──────────────────────────┘ │
-│                        │ 投票                        │
-│                        ▼                            │
-│  ┌────────────────────────────────────────────────┐ │
-│  │                  提案系统                       │ │
-│  │                                                 │ │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐       │ │
-│  │  │ 参数调整 │ │ 协议升级 │ │ 国库支出 │       │ │
-│  │  └──────────┘ └──────────┘ └──────────┘       │ │
-│  └─────────────────────┬──────────────────────────┘ │
-│                        │ 执行                        │
-│                        ▼                            │
-│  ┌────────────────────────────────────────────────┐ │
-│  │              时间锁 + 多签执行                  │ │
-│  └────────────────────────────────────────────────┘ │
-│                                                      │
-└─────────────────────────────────────────────────────┘
-```
 
 ### 投票权计算
 
-```typescript
-// 不只是 Token 数量，还要考虑信誉
-function calculateVotingPower(agent: Agent): number {
-  const tokenBalance = agent.wallet.balance;
-  const trustScore = agent.trust.score;
-  const accountAge = Date.now() - agent.createdAt;
-  
-  // 基础票数 = Token 数量的平方根（防止巨鲸垄断）
-  const baseVotes = Math.sqrt(Number(tokenBalance));
-  
-  // 信誉加成（最高 2x）
-  const trustMultiplier = 1 + (trustScore / 1000);
-  
-  // 账龄加成（最高 1.5x，1年达到最大）
-  const ageMultiplier = 1 + Math.min(0.5, accountAge / (365 * 24 * 60 * 60 * 1000));
-  
-  return baseVotes * trustMultiplier * ageMultiplier;
-}
-```
+
+`calculateVotingPower` 函数处理该操作的核心流程。
+
 
 ### 提案类型
 
@@ -291,28 +116,23 @@ function calculateVotingPower(agent: Agent): number {
 
 ### 可调整的参数
 
-```typescript
-interface GovernableParams {
-  // 市场参数
-  marketFeeRate: number;           // 交易手续费率
-  minListingPrice: bigint;         // 最低挂单价格
-  maxListingDuration: number;      // 最长挂单时间
-  
-  // 信誉参数
-  trustDecayRate: number;          // 信誉衰减速度
-  disputePenalty: number;          // 争议失败惩罚
-  
-  // 节点参数
-  minNodeStake: bigint;            // 最低节点质押
-  nodeRewardRate: number;          // 节点奖励率
-  slashingRate: number;            // 惩罚率
-  
-  // 治理参数
-  proposalThreshold: number;       // 提案门槛
-  votingPeriod: number;            // 投票期
-  timelockDelay: number;           // 时间锁
-}
-```
+
+**GovernableParams** 的主要字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| marketFeeRate | number | 交易手续费率 |
+| minListingPrice | bigint | 最低挂单价格 |
+| maxListingDuration | number | 最长挂单时间 |
+| trustDecayRate | number | 信誉衰减速度 |
+| disputePenalty | number | 争议失败惩罚 |
+| minNodeStake | bigint | 最低节点质押 |
+| nodeRewardRate | number | 节点奖励率 |
+| slashingRate | number | 惩罚率 |
+| proposalThreshold | number | 提案门槛 |
+| votingPeriod | number | 投票期 |
+| timelockDelay | number | 时间锁 |
+
 
 ---
 
@@ -320,41 +140,6 @@ interface GovernableParams {
 
 ### 最终架构
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    ClawNet 协议 (完全去中心化)              │
-│                                                              │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                      DAO 治理层                        │  │
-│  │   提案 → 投票 → 时间锁 → 执行                          │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                              │                               │
-│                              ▼                               │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                      节点网络                          │  │
-│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  │  │
-│  │  │ 匹配节点 │  │ 信誉节点 │  │ 仲裁节点 │  │ 索引节点 │  │  │
-│  │  └─────────┘  └─────────┘  └─────────┘  └─────────┘  │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                              │                               │
-│                              ▼                               │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                    分布式数据层                        │  │
-│  │      IPFS + Ceramic + 可替换索引 + 链上锚定           │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                              │                               │
-│                              ▼                               │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │                    用户层 (Agents)                     │  │
-│  │   任何 Agent 都可以：                                  │  │
-│  │   - 参与市场交易                                       │  │
-│  │   - 运行节点赚取奖励                                   │  │
-│  │   - 参与治理投票                                       │  │
-│  │   - 提出协议改进                                       │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
 
 ### 无单点故障检验
 
@@ -369,32 +154,6 @@ interface GovernableParams {
 
 ## 实施时间线
 
-```
-2026 Q1-Q2: Phase 1 - 最小化中心化引导
-            ├── 验证产品需求
-            ├── 建立用户基础
-            └── 收集数据（保证组件可替换/可退出）
-
-2026 Q3:    Phase 2 - 数据层去中心化
-            ├── 迁移到 IPFS
-            ├── 信誉上 Ceramic
-            └── 部署可替换索引（The Graph / 自托管）
-
-2026 Q4:    Phase 3 - 计算层去中心化
-            ├── 发布节点软件
-            ├── 启动节点激励
-            └── 逐步转移计算
-
-2027 Q1:    Phase 4 - 治理去中心化
-            ├── 部署 DAO 合约
-            ├── 初始参数投票
-            └── 国库移交
-
-2027 Q2+:   Phase 5 - 完全自治
-            ├── 核心团队角色转变
-            ├── 协议升级由社区决定
-            └── 持续优化
-```
 
 ---
 
