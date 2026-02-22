@@ -517,7 +517,7 @@
 
 ### Sprint 2-B：ClawDAO.sol（W2–W5）
 
-- [ ] **T-2.4** 实现 ClawDAO.sol 核心逻辑
+- [x] **T-2.4** 实现 ClawDAO.sol 核心逻辑  ✅ ~500 lines, split-struct, sqrt voting, EIP-191 multisig
   - 功能：
     - `initialize(token, reputation, staking, paramRegistry, params)`
     - `propose(pType, descriptionHash, target, callData)` → proposalId
@@ -537,38 +537,38 @@
   - 工时：6 天
   - 前置：T-2.1
 
-- [ ] **T-2.5** 实现 TimeLock 逻辑
+- [x] **T-2.5** 实现 TimeLock 逻辑  ✅ 内嵌 ClawDAO (queue → timelock → execute)
   - 可内嵌 ClawDAO 或单独合约
   - 功能：延迟执行 + 取消
   - 工时：2 天
 
-- [ ] **T-2.6** 实现 EmergencyMultiSig 逻辑
+- [x] **T-2.6** 实现 EmergencyMultiSig 逻辑  ✅ 内嵌 ClawDAO, EIP-191 签名, 5/9 阈值
   - 9 个 signer 地址，5/9 阈值
   - 可内嵌或独立
   - 工时：2 天
 
-- [ ] **T-2.7** 编写 ClawDAO 单元测试
+- [x] **T-2.7** 编写 ClawDAO 单元测试  ✅ 59 tests passing
   - 用例清单：
-    - [ ] 提案创建（各类型）
-    - [ ] 提案门槛不足 revert
-    - [ ] 投票权重计算正确（多个场景）
-    - [ ] 投票 — 讨论期投票 revert / 投票期投票成功
-    - [ ] 投票 — 重复投票 revert
-    - [ ] 提案通过（forVotes > againstVotes + quorum 达标）
-    - [ ] 提案未通过
-    - [ ] 时间锁延迟执行
-    - [ ] 时间锁未到期执行 revert
-    - [ ] execute 调用目标合约的 callData
-    - [ ] 参数修改提案 e2e（propose → vote → queue → execute → 参数生效）
-    - [ ] 国库支出提案 e2e
-    - [ ] 紧急多签执行
-    - [ ] 闪电贷攻击防护（快照余额）
-    - [ ] 升级后状态保留
+    - [x] 提案创建（各类型）
+    - [x] 提案门槛不足 revert
+    - [x] 投票权重计算正确（多个场景）
+    - [x] 投票 — 讨论期投票 revert / 投票期投票成功
+    - [x] 投票 — 重复投票 revert
+    - [x] 提案通过（forVotes > againstVotes + quorum 达标）
+    - [x] 提案未通过
+    - [x] 时间锁延迟执行
+    - [x] 时间锁未到期执行 revert
+    - [x] execute 调用目标合约的 callData
+    - [x] 参数修改提案 e2e（propose → vote → queue → execute → 参数生效）
+    - [x] 国库支出提案 e2e
+    - [x] 紧急多签执行
+    - [x] 闪电贷攻击防护（快照余额）
+    - [x] 升级后状态保留
   - 验收：覆盖率 > 95%
   - 工时：5 天
   - 前置：T-2.4
 
-- [ ] **T-2.8** ClawDAO 部署脚本
+- [x] **T-2.8** ClawDAO 部署脚本  ✅ deploy-dao.ts
   - 工时：1 天
 
 ### Sprint 2-C：ClawContracts.sol（W5–W8）
@@ -615,7 +615,7 @@
 
 ### Sprint 2-D：ClawReputation.sol（W8–W9）
 
-- [ ] **T-2.11** 实现 ClawReputation.sol
+- [x] **T-2.11** 实现 ClawReputation.sol  ✅ 2025-07-22
   - 功能：
     - `anchorReputation(agentDIDHash, overallScore, dimensionScores[5], merkleRoot)` — ANCHOR_ROLE
     - `batchAnchorReputation(agentDIDHashes[], scores[], merkleRoots[])` — ANCHOR_ROLE
@@ -627,12 +627,12 @@
   - 验收：合约编译通过
   - 工时：3 天
 
-- [ ] **T-2.12** 编写 ClawReputation 单元测试
+- [x] **T-2.12** 编写 ClawReputation 单元测试  ✅ 59 tests
   - 用例：锚定、批量锚定、查询、epoch 递增、权限控制
   - 验收：覆盖率 > 95%
   - 工时：2 天
 
-- [ ] **T-2.13** 编写 Merkle 树工具
+- [x] **T-2.13** 编写 Merkle 树工具  ✅ merkle-builder.ts
   - 文件：`packages/contracts/scripts/merkle-builder.ts`
   - 功能：给定评价列表 → 构建 Merkle 树 → 输出 root + proof
   - 验收：链下 proof → 链上验证通过

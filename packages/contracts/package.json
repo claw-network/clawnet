@@ -30,10 +30,11 @@
     "@openzeppelin/contracts": "^5.2.0",
     "@openzeppelin/contracts-upgradeable": "^5.2.0",
     "@openzeppelin/hardhat-upgrades": "^3.6.0",
+    "dotenv": "^16.4.0",
     "hardhat": "^2.22.0",
     "hardhat-gas-reporter": "^2.2.0",
-    "solidity-coverage": "^0.8.0",
+    "merkletreejs": "^0.6.0",
     "solhint": "^5.0.0",
-    "dotenv": "^16.4.0"
+    "solidity-coverage": "^0.8.0"
   }
 }
