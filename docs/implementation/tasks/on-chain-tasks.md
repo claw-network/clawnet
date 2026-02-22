@@ -640,13 +640,13 @@
 
 ### Sprint 2-E：ClawRouter.sol + 跨模块集成（W9–W10）
 
-- [ ] **T-2.14** 实现 ClawRouter.sol
+- [x] **T-2.14** 实现 ClawRouter.sol ✅ ~220 lines, REGISTRAR_ROLE, 8 well-known keys, multicall/staticMulticall, batchRegister, UUPS
   - 功能：
     - 注册/查询各模块合约地址
     - 统一入口（可选，用于前端 multicall 便利）
   - 工时：1.5 天
 
-- [ ] **T-2.15** 跨模块集成测试
+- [x] **T-2.15** 跨模块集成测试 ✅ 5 scenarios, 15 tests passing, full E2E
   - 文件：`test/integration/full-cycle.test.ts`
   - 场景：
     1. 注册 DID + 质押成为节点
@@ -658,7 +658,7 @@
   - 工时：3 天
   - 前置：全部合约
 
-- [ ] **T-2.16** 权限矩阵验证测试
+- [x] **T-2.16** 权限矩阵验证测试 ✅ 36 tests, §11 matrix fully verified
   - 验证 on-chain-plan.md §11 权限矩阵中每个允许/禁止的调用
   - 工时：2 天
 
