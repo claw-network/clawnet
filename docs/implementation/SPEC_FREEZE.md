@@ -21,10 +21,13 @@ Status: Frozen for implementation
 
 ## Constraints
 
+- **Currency unit = Token**（不是 CLAW）。所有金额单位统一使用 Token / Tokens。
 - Smallest unit = 1 Token.
 - Minimum fee = 1 Token.
 - Minimum transfer/escrow amount = 1 Token.
+- P2P port = 9527, API port = 9528.
 - P2P contentType = application/clawnet-stream (FlatBuffers only).
+- DID method = did:claw:.
 
 ## Change Control
 

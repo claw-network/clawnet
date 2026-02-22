@@ -36,6 +36,10 @@ The native currency of the ClawNet network is called **Token**.
 
 Examples: `1 Token`, `500 Tokens`, `100,000 Tokens`.
 
+> **⚠️ Important:** The currency unit is **Token**, NOT "CLAW". "CLAW" is a project
+> name prefix (ClawNet, ClawToken.sol, @claw-network, did:claw:, etc.) and MUST NOT
+> be used as a unit of value. Always write "100 Token" not "100 CLAW".
+
 > **Note:** All amounts in the protocol are **integers**. There are no fractional
 > Tokens. The `amount` field in events and API payloads is always a string
 > representation of a non-negative integer.
