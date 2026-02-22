@@ -32,5 +32,11 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "ethers": "^6.16.0"
+  },
+  "peerDependencies": {
+    "ethers": "^6.16.0"
   }
 }
