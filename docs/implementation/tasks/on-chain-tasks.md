@@ -664,17 +664,17 @@
 
 ### Sprint 2-F：全量测试网部署 + SDK（W10–W11）
 
-- [ ] **T-2.17** 编写完整部署脚本
+- [x] **T-2.17** 编写完整部署脚本 ✅ scripts/deploy-all.ts, 9 contracts in order, role grants, ParamRegistry defaults
   - 文件：`scripts/deploy-all.ts`
   - 按顺序部署 8 个合约 + 设置角色 + 初始化 ParamRegistry 默认参数
   - 输出：`deployments/<network>.json`
   - 工时：2 天
 
-- [ ] **T-2.18** ClawNet Chain 测试网全量部署
+- [ ] **T-2.18** ClawNet Chain 测试网全量部署 ⏳ blocked on cloud infra (same as T-0.12/T-1.17)
   - 验收：8 个合约全部部署成功 + 源码验证
   - 工时：1 天
 
-- [ ] **T-2.19** SDK 新增 DAO / Contracts / Reputation / Staking 链上适配
+- [x] **T-2.19** SDK 新增 DAO / Contracts / Reputation / Staking 链上适配 ✅ 4 adapters + readOnly + index exports
   - 新增文件：
     - `packages/sdk/src/dao-onchain.ts`
     - `packages/sdk/src/contracts-onchain.ts`
@@ -683,7 +683,7 @@
   - 验收：SDK 完整 API onChain 模式可用
   - 工时：5 天
 
-- [ ] **T-2.20** CLI 新增链上命令
+- [x] **T-2.20** CLI 新增链上命令 ✅ cli-onchain.ts, `clawnet onchain dao|stake|contract|reputation|balance`
   - 新增命令：
     - `claw dao propose / vote / execute`
     - `claw stake / unstake / claim-rewards`

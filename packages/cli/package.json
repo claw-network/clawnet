@@ -14,6 +14,8 @@
   "dependencies": {
     "@claw-network/core": "workspace:^0.1.0",
     "@claw-network/protocol": "workspace:^0.1.0",
-    "@claw-network/node": "workspace:^0.1.0"
+    "@claw-network/node": "workspace:^0.1.0",
+    "@claw-network/sdk": "workspace:^0.2.0",
+    "ethers": "^6.13.0"
   }
 }

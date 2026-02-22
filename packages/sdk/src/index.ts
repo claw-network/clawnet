@@ -53,6 +53,33 @@ export {
   type OnChainKeyRecord,
   type AddPlatformLinkResult,
 } from './identity-onchain.js';
+export {
+  StakingOnChainApi,
+  type OnChainStakingConfig,
+  NodeType,
+} from './staking-onchain.js';
+export {
+  DaoOnChainApi,
+  type OnChainDaoConfig,
+  ProposalType,
+  ProposalStatus,
+  VoteSupport,
+} from './dao-onchain.js';
+export {
+  ContractsOnChainApi,
+  type OnChainContractsConfig,
+  ContractStatus,
+  MilestoneStatus,
+  DisputeResolution,
+} from './contracts-onchain.js';
+export {
+  ReputationOnChainApi,
+  type OnChainReputationConfig,
+  ReputationDimension,
+  type ReputationSnapshot,
+  type ReviewAnchor,
+  type ReputationSummary,
+} from './reputation-onchain.js';
 
 // ── Shared types ─────────────────────────────────────────────────────────
 export * from './types.js';
@@ -75,7 +102,9 @@ const DEFAULT_BASE_URL = 'http://127.0.0.1:9528';
  * Top-level client that exposes all ClawNet APIs via REST.
  *
  * Each property is a module that maps 1-to-1 with the REST API tags.
- * For on-chain mode, use `WalletOnChainApi` and `IdentityOnChainApi` directly.
+ * For on-chain mode, use `WalletOnChainApi`, `IdentityOnChainApi`,
+ * `StakingOnChainApi`, `DaoOnChainApi`, `ContractsOnChainApi`,
+ * and `ReputationOnChainApi` directly.
  */
 export class ClawNetClient {
   readonly http: HttpClient;

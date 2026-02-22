@@ -65,6 +65,12 @@ importers:
       '@claw-network/protocol':
         specifier: workspace:^0.1.0
         version: link:../protocol
+      '@claw-network/sdk':
+        specifier: workspace:^0.2.0
+        version: link:../sdk
+      ethers:
+        specifier: ^6.13.0
+        version: 6.16.0
 
   packages/contracts:
     devDependencies:

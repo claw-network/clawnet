@@ -96,6 +96,18 @@ export class WalletOnChainApi {
     this.escrow = new Contract(config.escrowAddress, ESCROW_ABI, signer);
   }
 
+  /**
+   * Create a read-only instance (no signer needed, just a provider).
+   */
+  static readOnly(provider: Provider, config: OnChainWalletConfig): WalletOnChainApi {
+    const api = Object.create(WalletOnChainApi.prototype) as WalletOnChainApi;
+    (api as any).config = config;
+    (api as any).signer = null;
+    (api as any).token = new Contract(config.tokenAddress, ERC20_ABI, provider);
+    (api as any).escrow = new Contract(config.escrowAddress, ESCROW_ABI, provider);
+    return api;
+  }
+
   // -----------------------------------------------------------------------
   // Balance & Transfer
   // -----------------------------------------------------------------------

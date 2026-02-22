@@ -374,6 +374,11 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     }
     fail(`unknown escrow subcommand: ${subcommand ?? ''}`);
   }
+  if (command === 'onchain') {
+    const { runOnChain } = await import('./cli-onchain.js');
+    await runOnChain(argv.slice(1));
+    return;
+  }
   if (command === 'dao') {
     const subcommand = argv[1];
     const subArgs = argv.slice(2);
@@ -3372,6 +3377,12 @@ clawnet market capability list|get|publish|lease|lease-get|invoke|pause|resume|t
 clawnet market dispute open|respond|resolve [options]
 clawnet contract list|get|create|sign|fund|complete|milestone-complete|milestone-approve|milestone-reject|dispute|dispute-resolve|settlement [options]
 clawnet dao proposals|proposal|create-proposal|advance|vote|votes|delegate|revoke-delegation|delegations|treasury|deposit|timelock|execute|cancel|params [options]
+clawnet onchain dao propose|vote|queue|execute|cancel|proposal|status [options]
+clawnet onchain stake|unstake|request-unstake|claim-rewards|info|validators [options]
+clawnet onchain contract create|sign|activate|complete|cancel|milestone-*|dispute|resolve|get|fee [options]
+clawnet onchain reputation anchor|review|link|trust-score|info|epoch [options]
+clawnet onchain balance [options]
+clawnet onchain help
 
 Daemon options:
   --data-dir <path>              Override storage root
