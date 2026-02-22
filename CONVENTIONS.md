@@ -85,43 +85,44 @@
 
 ## 7. SDK 文件与类命名（SDK File & Class Naming）
 
-### 7.1 文件命名——禁止 `-onchain` 后缀
+### 7.1 SDK 仅包含 REST 客户端
 
-SDK 模块文件 **不得** 使用 `-onchain` 后缀。链上合约类与 REST 客户端类 **必须** 共存于同一模块文件中，体现"一套系统"原则。
+SDK 只暴露 REST 客户端类（`*Api`），所有链上合约交互由 Node 服务层在内部完成。SDK **不包含** `ethers.js` 依赖或任何直接的合约调用代码。
 
 | ✅ 正确 | ❌ 错误 |
 |---------|---------|
-| `wallet.ts`（导出 `WalletApi` + `WalletChainApi`） | `wallet-onchain.ts`（独立文件） |
-| `identity.ts`（导出 `IdentityApi` + `IdentityChainApi`） | `identity-onchain.ts`（独立文件） |
-| `staking.ts`（导出 `StakingChainApi`） | `staking-onchain.ts`（独立文件） |
+| `wallet.ts`（仅导出 `WalletApi`） | `wallet-onchain.ts`（链上代码不属于 SDK） |
+| `identity.ts`（仅导出 `IdentityApi`） | `identity-onchain.ts`（链上代码不属于 SDK） |
 
-### 7.2 类名与接口命名
+### 7.2 类命名
 
-| 角色 | 命名模式 | 示例 |
-|------|---------|------|
-| REST 客户端类 | `*Api` | `WalletApi`, `IdentityApi` |
-| 链上合约类 | `*ChainApi` | `WalletChainApi`, `IdentityChainApi` |
-| 链上配置接口 | `*ChainConfig` | `WalletChainConfig`, `IdentityChainConfig` |
-| 链上数据接口 | `Chain*` | `ChainServiceContract`, `ChainMilestone` |
+| 角色 | 命名模式 | 示例 | 所属包 |
+|------|---------|------|--------|
+| REST 客户端类 | `*Api` | `WalletApi`, `IdentityApi` | `packages/sdk` |
+| Node chain service | `*Service` | `WalletService`, `IdentityService` | `packages/node` |
 
 ### ⚠️ 常见错误
 
-> **禁止在类名、接口名、文件名中使用 `OnChain` 前缀或后缀。**
+> **SDK 中禁止包含链上合约调用类或 `ethers.js` 相关代码。**
+> **禁止在任何包中使用 `OnChain` 前缀或后缀。**
 >
-> - ✅ 正确：`WalletChainApi`, `IdentityChainConfig`, `wallet.ts`
-> - ❌ 错误：`WalletOnChainApi`, `OnChainIdentityConfig`, `wallet-onchain.ts`
+> - ✅ 正确：`WalletApi`（SDK）, `WalletService`（Node）, `wallet.ts`
+> - ❌ 错误：`WalletOnChainApi`, `WalletChainApi`（SDK 中）, `wallet-onchain.ts`
 
 ### 7.3 CLI 子命令
 
+所有 CLI 操作通过 REST API 完成，不提供直连链上的子命令。
+
 | ✅ 正确 | ❌ 错误 |
 |---------|---------|
-| `clawnet chain wallet balance` | `clawnet onchain wallet balance` |
+| `clawnet wallet balance` | `clawnet onchain wallet balance` |
+| `clawnet contract create` | `clawnet chain contract create` |
 
 ### 7.4 测试文件
 
 | ✅ 正确 | ❌ 错误 |
 |---------|---------|
-| `wallet.chain.test.ts` | `wallet-onchain.test.ts` |
+| `test/services/wallet-service.test.ts`（Node 包） | `test/wallet-onchain.test.ts` |
 | `p0-integration.test.ts` | `p0-onchain.test.ts` |
 
 ---

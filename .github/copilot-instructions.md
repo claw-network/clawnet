@@ -32,18 +32,18 @@ When discussing amounts, transfers, balances, fees, staking, rewards, or any mon
 
 ### SDK File & Class Naming: No "OnChain"
 
-SDK module files must NOT use `-onchain` suffix. Chain contract classes and REST client classes coexist in the same module file.
+SDK only contains REST client classes. All chain contract interaction is handled by the Node service layer internally. SDK does NOT depend on `ethers.js`.
 
-- ✅ Correct: `wallet.ts` (exports `WalletApi` + `WalletChainApi`)
-- ❌ Wrong: `wallet-onchain.ts` (separate file)
+- ✅ Correct: `wallet.ts` (exports `WalletApi` only)
+- ❌ Wrong: `wallet-onchain.ts` (chain code does not belong in SDK)
 
 Class naming pattern:
-- REST client: `*Api` (e.g., `WalletApi`)
-- Chain contract: `*ChainApi` (e.g., `WalletChainApi`)
-- Chain config: `*ChainConfig` (e.g., `WalletChainConfig`)
+- REST client (SDK): `*Api` (e.g., `WalletApi`)
+- Node chain service: `*Service` (e.g., `WalletService`)
 - **Never** use `OnChain` prefix/suffix: ~~`WalletOnChainApi`~~, ~~`OnChainWalletConfig`~~
+- **Never** put chain classes in SDK: ~~`WalletChainApi` in SDK~~
 
-CLI subcommand: `clawnet chain` (NOT `clawnet onchain`)
+CLI subcommand: `clawnet wallet balance` (NOT `clawnet onchain wallet balance`)
 
 ## Reference Documents
 

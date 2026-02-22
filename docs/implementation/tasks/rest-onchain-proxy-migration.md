@@ -130,10 +130,10 @@
 
 | 原则 | 说明 |
 |------|------|
-| **写操作 → 链上** | 所有 POST 端点内部调用 `*ChainApi`，等待 tx receipt 后返回 |
+| **写操作 → 链上** | 所有 POST 端点内部调用 Node chain service（ethers.js），等待 tx receipt 后返回 |
 | **读操作 → indexer 优先，链上兜底** | `GET /api/wallet/balance` 可直接调链上 view；分页/列表类走 indexer |
 | **Event indexer 是节点内部组件** | 监听链上 events，写入本地 SQLite/LevelDB，为 REST 查询提供分页能力 |
-| **SDK 不变** | `HttpClient` + `*Api` 类保持不变，消费者无感知 |
+| **SDK 不变** | `HttpClient` + `*Api` 类保持不变，消费者无感知。SDK 不包含任何 ethers.js 依赖 |
 
 ---
 
@@ -145,21 +145,20 @@
 
 | REST 端点 | 当前实现 | 迁移后实现 |
 |-----------|---------|-----------|
-| `POST /api/identity` (注册) | 节点本地创建 event → P2P 广播 | 调用 `ClawIdentity.registerDID()` → 返回 txHash |
-| — | — | `IdentityChainApi.register()` 已实现 |
+| `POST /api/identity` (注册) | 节点本地创建 event → P2P 广播 | Node `IdentityService` 调用 `ClawIdentity.registerDID()` → 返回 txHash |
 
 #### 读操作迁移
 
 | REST 端点 | 迁移后实现 |
 |-----------|-----------|
 | `GET /api/identity` | 链上 `getActiveKey()` + `getController()` 组合 |
-| `GET /api/identity/:did` | 链上 `resolve()` — 已在 `IdentityChainApi` 实现 |
+| `GET /api/identity/:did` | 链上 `resolve()` — Node `IdentityService` 调用 |
 | `GET /api/identity/capabilities` | **保留 P2P/链下** — Capability 是 Verifiable Credential，不适合全量上链 |
 | `POST /api/identity/capabilities` | **保留 P2P/链下** |
 
 #### 待实施项
 
-- [ ] **Node 层**: 在 `packages/node/src/api/server.ts` 中，identity 写操作路由内部调用 `IdentityChainApi`
+- [ ] **Node 层**: 在 `packages/node/src/api/server.ts` 中，identity 写操作路由内部调用 `IdentityService`（ethers.js → `ClawIdentity.sol`）
 - [ ] **Capability 决策**: Capability 凭证保持链下 P2P 存储，不迁移到链上（体量大、更新频繁，不适合链上存储）
 - [ ] **Indexer**: 监听 `DIDRegistered`, `KeyRotated`, `DIDRevoked` 事件，维护本地 DID 缓存
 
@@ -171,12 +170,12 @@
 
 | REST 端点 | 迁移后实现 |
 |-----------|-----------|
-| `POST /api/wallet/transfer` | `ClawToken.transfer()` via `WalletChainApi.transfer()` |
-| `POST /api/wallet/escrow` | `ClawEscrow.createEscrow()` via `WalletChainApi.createEscrow()` |
-| `POST /api/wallet/escrow/:id/release` | `ClawEscrow.release()` via `WalletChainApi.releaseEscrow()` |
-| `POST /api/wallet/escrow/:id/fund` | `ClawEscrow.fund()` — **需在 `WalletChainApi` 中新增 `fundEscrow()` 方法** |
-| `POST /api/wallet/escrow/:id/refund` | `ClawEscrow.refund()` via `WalletChainApi.refundEscrow()` |
-| `POST /api/wallet/escrow/:id/expire` | `ClawEscrow.expire()` — **需在 `WalletChainApi` 中新增 `expireEscrow()` 方法** |
+| `POST /api/wallet/transfer` | Node `WalletService` 调用 `ClawToken.transfer()` |
+| `POST /api/wallet/escrow` | Node `WalletService` 调用 `ClawEscrow.createEscrow()` |
+| `POST /api/wallet/escrow/:id/release` | Node `WalletService` 调用 `ClawEscrow.release()` |
+| `POST /api/wallet/escrow/:id/fund` | Node `WalletService` 调用 `ClawEscrow.fund()` |
+| `POST /api/wallet/escrow/:id/refund` | Node `WalletService` 调用 `ClawEscrow.refund()` |
+| `POST /api/wallet/escrow/:id/expire` | Node `WalletService` 调用 `ClawEscrow.expire()` |
 
 #### 读操作迁移
 
@@ -189,8 +188,7 @@
 
 #### 待实施项
 
-- [ ] **WalletChainApi**: 新增 `fundEscrow(escrowId: string, amount: number)` 方法
-- [ ] **WalletChainApi**: 新增 `expireEscrow(escrowId: string)` 方法
+- [ ] **Node `WalletService`**: 实现全部钱包写操作（transfer, escrow CRUD），包括 `fundEscrow()` 和 `expireEscrow()`
 - [ ] **Node 层**: balance 查询增加 DID → address 解析逻辑 (`did` 参数通过 `ClawIdentity.getController()` 转换为 `address`)
 - [ ] **Indexer**: 监听 `Transfer`, `EscrowCreated`, `EscrowReleased`, `EscrowRefunded`, `EscrowExpired` 事件
 
@@ -213,7 +211,7 @@
 
 #### 待实施项
 
-- [ ] **Node 层**: record 路由调用 `ReputationChainApi.recordReview()` + `anchorReputation()`
+- [ ] **Node `ReputationService`**: record 路由调用 `ClawReputation.recordReview()` + `anchorReputation()`
 - [ ] **Indexer**: 监听 `ReputationAnchored`, `ReviewRecorded` 事件，维护可搜索的 review 列表
 - [ ] **Indexer 查询**: 支持按 `subjectDIDHash` 分页查询 reviews
 
@@ -225,15 +223,15 @@
 
 | REST 端点 | 迁移后实现 |
 |-----------|-----------|
-| `POST /api/contracts` | `ContractsChainApi.createContract()` |
-| `POST /api/contracts/:id/sign` | `ContractsChainApi.signContract()` |
-| `POST /api/contracts/:id/fund` | `ContractsChainApi.activateContract()` (含 token approve) |
-| `POST /api/contracts/:id/complete` | `ContractsChainApi.completeContract()` |
-| `POST /api/contracts/:id/milestones/:mid/complete` | `ContractsChainApi.submitMilestone()` |
-| `POST /api/contracts/:id/milestones/:mid/approve` | `ContractsChainApi.approveMilestone()` |
-| `POST /api/contracts/:id/milestones/:mid/reject` | `ContractsChainApi.rejectMilestone()` |
-| `POST /api/contracts/:id/dispute` | `ContractsChainApi.disputeContract()` |
-| `POST /api/contracts/:id/dispute/resolve` | `ContractsChainApi.resolveDispute()` |
+| `POST /api/contracts` | Node `ContractsService` 调用 `ClawContracts.createContract()` |
+| `POST /api/contracts/:id/sign` | Node `ContractsService` 调用 `ClawContracts.signContract()` |
+| `POST /api/contracts/:id/fund` | Node `ContractsService` 调用 `ClawContracts.activateContract()` (含 token approve) |
+| `POST /api/contracts/:id/complete` | Node `ContractsService` 调用 `ClawContracts.completeContract()` |
+| `POST /api/contracts/:id/milestones/:mid/complete` | Node `ContractsService` 调用 `ClawContracts.submitMilestone()` |
+| `POST /api/contracts/:id/milestones/:mid/approve` | Node `ContractsService` 调用 `ClawContracts.approveMilestone()` |
+| `POST /api/contracts/:id/milestones/:mid/reject` | Node `ContractsService` 调用 `ClawContracts.rejectMilestone()` |
+| `POST /api/contracts/:id/dispute` | Node `ContractsService` 调用 `ClawContracts.disputeContract()` |
+| `POST /api/contracts/:id/dispute/resolve` | Node `ContractsService` 调用 `ClawContracts.resolveDispute()` |
 | `POST /api/contracts/:id/settlement` | **评估**: 可能由 `completeContract` 隐含，或需在 Solidity 合约中新增 |
 
 #### 读操作迁移
@@ -257,14 +255,14 @@
 
 | REST 端点 | 迁移后实现 |
 |-----------|-----------|
-| `POST /api/dao/proposals` | `DaoChainApi.propose()` |
-| `POST /api/dao/proposals/:id/advance` | 映射到 `queue()` 或 `execute()` (根据 target status) |
-| `POST /api/dao/vote` | `DaoChainApi.vote()` |
+| `POST /api/dao/proposals` | Node `DaoService` 调用 `ClawDAO.propose()` |
+| `POST /api/dao/proposals/:id/advance` | Node `DaoService` 映射到 `queue()` 或 `execute()` (根据 target status) |
+| `POST /api/dao/vote` | Node `DaoService` 调用 `ClawDAO.vote()` |
 | `POST /api/dao/delegate` | **需在 Solidity 合约中新增 delegation 功能，或使用 ERC-20 votes 的 `delegate()`** |
 | `POST /api/dao/delegate/revoke` | 同上 |
 | `POST /api/dao/treasury/deposit` | **需评估是否通过 ClawToken.transfer() 到 DAO 地址实现** |
-| `POST /api/dao/timelock/:id/execute` | `DaoChainApi.execute()` |
-| `POST /api/dao/timelock/:id/cancel` | `DaoChainApi.cancel()` |
+| `POST /api/dao/timelock/:id/execute` | Node `DaoService` 调用 `ClawDAO.execute()` |
+| `POST /api/dao/timelock/:id/cancel` | Node `DaoService` 调用 `ClawDAO.cancel()` |
 
 #### 读操作迁移
 
@@ -282,7 +280,7 @@
 
 - [ ] **Solidity 评估**: `ClawDAO.sol` 是否已有 delegation 逻辑；如果没有，需新增 `delegate(address)` + `undelegate()` + `getDelegatee()` 方法
 - [ ] **Solidity 评估**: `ParamRegistry.sol` 是否已暴露 DAO 治理参数的 view 函数
-- [ ] **DaoChainApi**: 新增 `advanceProposal()` 适配方法（内部判断 status → 调 `queue()` 或 `execute()`）
+- [ ] **Node `DaoService`**: 新增 `advanceProposal()` 适配方法（内部判断 status → 调 `queue()` 或 `execute()`）
 - [ ] **Indexer**: 监听 `ProposalCreated`, `VoteCast`, `ProposalQueued`, `ProposalExecuted` 事件
 
 ---
@@ -293,7 +291,7 @@
 
 | 任务 | 文件/包 | 说明 |
 |------|--------|------|
-| **P0.0** 文件合并与命名统一 | `packages/sdk/src/` | 将 6 个 `*-onchain.ts` 文件合并到对应的主模块文件中，`*OnChainApi` 重命名为 `*ChainApi`，`OnChain*Config` 重命名为 `*ChainConfig`；`cli-onchain.ts` 合并入 `cli.ts`；更新 `index.ts` 导出。详见 [§7 SDK 改造](#7-sdk-改造) |
+| **P0.0** SDK 清理（已完成 ✅） | `packages/sdk/src/` | 删除 6 个 `*-onchain.ts` 文件及 `cli-onchain.ts`；清除 `index.ts` 中 on-chain 导出；移除 `cli.ts` 中 `onchain` 子命令。详见 [§7 SDK 清理](#7-sdk-清理) |
 | **P0.1** 设计 Node 层 chain service 抽象 | `packages/node/src/services/` | 创建 `ChainProvider` 抽象类/接口，封装 ethers Provider + Signer 管理 |
 | **P0.2** 配置管理 | `packages/node/src/config.ts` | 新增链上配置项：RPC URL、合约地址表、Signer 密钥路径 |
 | **P0.3** Event Indexer 核心 | `packages/node/src/indexer/` | 实现基于 ethers.js `provider.on('block', ...)` 的事件监听 + SQLite 存储 |
@@ -395,9 +393,9 @@ Wallet 是最核心、最简单的模块，先迁移可以建立信心和模式�
 
 | 任务 | 说明 |
 |------|------|
-| **P1.1** 补齐 `WalletChainApi` | 新增 `fundEscrow()` 和 `expireEscrow()` 方法 |
-| **P1.2** Node wallet 路由改造 | `POST /api/wallet/transfer` 内部调用 `WalletChainApi.transfer()` |
-| **P1.3** Node escrow 路由改造 | 所有 escrow POST 路由调用 `WalletChainApi.*` |
+| **P1.1** Node `WalletService` 实现 | 实现全部钱包写操作（transfer, escrow CRUD），直接通过 ethers.js 调用 `ClawToken.sol` / `ClawEscrow.sol` |
+| **P1.2** Node wallet 路由改造 | `POST /api/wallet/transfer` 内部调用 `WalletService.transfer()` |
+| **P1.3** Node escrow 路由改造 | 所有 escrow POST 路由调用 `WalletService.*` |
 | **P1.4** Balance 读操作改造 | `GET /api/wallet/balance` 调用 `ClawToken.balanceOf()`；DID 参数通过 `ClawIdentity.getController()` 解析 |
 | **P1.5** History indexer | 实现 `Transfer` event 监听 → `wallet_transfers` 表 |
 | **P1.6** History 查询路由 | `GET /api/wallet/history` 从 indexer 查询 |
@@ -409,7 +407,7 @@ Wallet 是最核心、最简单的模块，先迁移可以建立信心和模式�
 
 | 任务 | 说明 |
 |------|------|
-| **P2.1** Node identity 写路由改造 | 注册/密钥轮换/吊销操作调用 `IdentityChainApi.*` |
+| **P2.1** Node identity 写路由改造 | 注册/密钥轮换/吊销操作调用 Node `IdentityService`（ethers.js → `ClawIdentity.sol`） |
 | **P2.2** Identity 读操作改造 | `resolve()` 调链上 `getActiveKey()` + `getController()` |
 | **P2.3** Capability 保留 | Capability CRUD 路由保持现有 P2P/链下逻辑不变 |
 | **P2.4** DID indexer | 监听 `DIDRegistered`, `KeyRotated`, `DIDRevoked` → 本地 DID 缓存 |
@@ -421,7 +419,7 @@ Wallet 是最核心、最简单的模块，先迁移可以建立信心和模式�
 
 | 任务 | 说明 |
 |------|------|
-| **P3.1** Node reputation 写路由改造 | `record` 路由调用 `ReputationChainApi.recordReview()` + `anchorReputation()` |
+| **P3.1** Node reputation 写路由改造 | `record` 路由调用 Node `ReputationService`（ethers.js → `ClawReputation.sol`） |
 | **P3.2** Profile 读操作 | `getProfile` 调链上 `getReputation()` + `getLatestSnapshot()` |
 | **P3.3** Reviews indexer | 监听 `ReviewRecorded` → `reviews` 表 |
 | **P3.4** Reviews 分页查询 | `GET /api/reputation/:did/reviews` 从 indexer 按 `subject_did` 分页返回 |
@@ -434,7 +432,7 @@ Wallet 是最核心、最简单的模块，先迁移可以建立信心和模式�
 | 任务 | 说明 |
 |------|------|
 | **P4.1** 评估 `settlement` | 确认 `ClawContracts.sol` 中 settle 逻辑 → 决定是否需新增合约方法 |
-| **P4.2** Node contracts 写路由改造 | 所有生命周期/里程碑/争议路由调用 `ContractsChainApi.*` |
+| **P4.2** Node contracts 写路由改造 | 所有生命周期/里程碑/争议路由调用 Node `ContractsService`（ethers.js → `ClawContracts.sol`） |
 | **P4.3** 单合约读操作 | `GET /api/contracts/:id` 调链上 `getContract()` + `getMilestones()` |
 | **P4.4** Contracts indexer | 监听合约生命周期事件 → `service_contracts` 表 |
 | **P4.5** 列表查询 | `GET /api/contracts` 从 indexer 支持 `status/party/limit/offset` |
@@ -450,7 +448,7 @@ DAO 是最复杂的模块，需要先确认 Solidity 合约是否支持 delegati
 |------|------|
 | **P5.1** Solidity 审计 | 审计 `ClawDAO.sol` + `ParamRegistry.sol`，确认 delegation / treasury / params 的实现状态 |
 | **P5.2** 合约补齐（如需要） | 若 delegation 缺失 → 在 `ClawDAO.sol` 新增 `delegate()`/`undelegate()`；或考虑 OpenZeppelin `ERC20Votes` 模式 |
-| **P5.3** `DaoChainApi` 扩展 | 新增 `advanceProposal()` 适配（status → queue/execute 映射） |
+| **P5.3** Node `DaoService` 扩展 | 新增 `advanceProposal()` 适配（status → queue/execute 映射） |
 | **P5.4** Node DAO 写路由改造 | proposals/vote/delegation/treasury/timelock 路由改调链上 |
 | **P5.5** DAO indexer | 监听所有 DAO events → `proposals` + `votes` 表 |
 | **P5.6** 列表 / 聚合查询 | proposals 列表、votes 聚合、delegations 查询从 indexer 读取 |
@@ -464,126 +462,66 @@ DAO 是最复杂的模块，需要先确认 Solidity 合约是否支持 delegati
 
 | 任务 | 说明 |
 |------|------|
-| **P6.1** 废弃标记 | 在 `index.ts` 中保留旧名称 re-export 并添加 `@deprecated` 标注（如 `export { WalletChainApi as WalletOnChainApi }`），给现有消费者 1–2 个版本的过渡期 |
-| **P6.2** 更新文档 | 按 [§12 文档更新计划](#12-文档更新计划) 中的完整清单逐一更新所有受影响文档 |
-| **P6.3** Examples 更新 | 示例代码无需改动（REST 接口没变），但更新注释说明底层走链上 |
-| **P6.4** Python SDK | 无需改动（REST 接口不变） |
-| **P6.5** CI/CD | 集成测试中加入链上回归测试 (hardhat local node) |
-| **P6.6** 性能基准 | 所有迁移后的路由做延迟/吞吐量基准测试，与迁移前对比 |
+| **P6.1** 文档更新 | 按 [§12 文档更新计划](#12-文档更新计划) 中的完整清单逐一更新所有受影响文档 |
+| **P6.2** Examples 更新 | 示例代码无需改动（REST 接口没变），但更新注释说明底层走链上 |
+| **P6.3** Python SDK | 无需改动（REST 接口不变） |
+| **P6.4** CI/CD | 集成测试中加入链上回归测试 (hardhat local node) |
+| **P6.5** 性能基准 | 所有迁移后的路由做延迟/吞吐量基准测试，与迁移前对比 |
 
 ---
 
-## 7. SDK 改造
+## 7. SDK 清理
 
-### 7.1 文件合并策略
+既然 REST API 是链上合约的薄代理，SDK 只需 REST 客户端类——所有链上合约交互由 Node 服务层在内部完成。SDK 不再包含 `ethers.js` 依赖或任何直接的合约调用代码。
 
-现有 6 个独立的 `*-onchain.ts` 文件 **必须合并到对应的主模块文件中**，不再保留独立的 `-onchain` 文件。这是 [G5](#2-架构目标) 的直接体现——我们是一套系统，链上合约调用是系统的原生能力，不是额外粘合的组件。
+### 7.1 已删除文件（✅ 已完成）
 
-#### SDK 文件合并映射
+| 已删除的 SDK 文件 | 原导出 | 说明 |
+|------------------|--------|------|
+| `wallet-onchain.ts` | `WalletOnChainApi`, `OnChainWalletConfig` | 链上逻辑移至 Node `WalletService` |
+| `identity-onchain.ts` | `IdentityOnChainApi`, `OnChainIdentityConfig`, `KeyPurpose` 等 | 链上逻辑移至 Node `IdentityService` |
+| `reputation-onchain.ts` | `ReputationOnChainApi`, `OnChainReputationConfig`, `ReputationDimension` 等 | 链上逻辑移至 Node `ReputationService` |
+| `contracts-onchain.ts` | `ContractsOnChainApi`, `OnChainContractsConfig`, `ContractStatus` 等 | 链上逻辑移至 Node `ContractsService` |
+| `dao-onchain.ts` | `DaoOnChainApi`, `OnChainDaoConfig`, `ProposalType` 等 | 链上逻辑移至 Node `DaoService` |
+| `staking-onchain.ts` | `StakingOnChainApi`, `OnChainStakingConfig`, `NodeType` 等 | 链上逻辑移至 Node `StakingService` |
 
-| 待删除文件 | 内容合并到 | 合并后导出 |
-|-----------|-----------|-----------|
-| `wallet-onchain.ts` | `wallet.ts` | `WalletApi` (REST) + `WalletChainApi` (chain) + `WalletChainConfig` |
-| `identity-onchain.ts` | `identity.ts` | `IdentityApi` (REST) + `IdentityChainApi` (chain) + `IdentityChainConfig` + `KeyPurpose` 等 |
-| `reputation-onchain.ts` | `reputation.ts` | `ReputationApi` (REST) + `ReputationChainApi` (chain) + `ReputationChainConfig` + `ReputationDimension` 等 |
-| `contracts-onchain.ts` | `contracts.ts` | `ContractsApi` (REST) + `ContractsChainApi` (chain) + `ContractsChainConfig` + `ContractStatus` 等 |
-| `dao-onchain.ts` | `dao.ts` | `DaoApi` (REST) + `DaoChainApi` (chain) + `DaoChainConfig` + `ProposalType` 等 |
-| `staking-onchain.ts` | **新建** `staking.ts` | `StakingChainApi` + `StakingChainConfig` + `NodeType` 等 |
+### 7.2 已删除 CLI 文件（✅ 已完成）
 
-#### CLI 文件合并
+| 已删除文件 | 说明 |
+|-----------|------|
+| `cli-onchain.ts` | `clawnet onchain` 子命令已移除；所有操作通过 REST CLI 命令完成 |
 
-| 待删除文件 | 内容合并到 | 说明 |
-|-----------|-----------|------|
-| `cli-onchain.ts` | `cli.ts` | `clawnet onchain` 子命令重命名为 `clawnet chain`；内部导入相应调整 |
+`cli.ts` 中的 `onchain` 子命令分发和帮助文本已同步清除。
 
-#### 测试文件重命名
+### 7.3 index.ts 清理（✅ 已完成）
 
-| 当前文件 | 重命名为 |
-|---------|---------|
-| `p0-onchain.test.ts` | `p0-integration.test.ts` |
+移除了全部 on-chain API 导出（原 37 行 re-export），更新 JSDoc 模块文档。
 
-### 7.2 类名与类型重命名
-
-所有包含 `OnChain` 的标识符统一重命名：
-
-| 旧名称 | 新名称 | 类型 |
-|--------|--------|------|
-| `WalletOnChainApi` | `WalletChainApi` | class |
-| `IdentityOnChainApi` | `IdentityChainApi` | class |
-| `ReputationOnChainApi` | `ReputationChainApi` | class |
-| `ContractsOnChainApi` | `ContractsChainApi` | class |
-| `DaoOnChainApi` | `DaoChainApi` | class |
-| `StakingOnChainApi` | `StakingChainApi` | class |
-| `OnChainWalletConfig` | `WalletChainConfig` | interface |
-| `OnChainIdentityConfig` | `IdentityChainConfig` | interface |
-| `OnChainReputationConfig` | `ReputationChainConfig` | interface |
-| `OnChainContractsConfig` | `ContractsChainConfig` | interface |
-| `OnChainDaoConfig` | `DaoChainConfig` | interface |
-| `OnChainStakingConfig` | `StakingChainConfig` | interface |
-| `OnChainServiceContract` | `ChainServiceContract` | interface |
-| `OnChainMilestone` | `ChainMilestone` | interface |
-| `OnChainKeyRecord` | `ChainKeyRecord` | interface |
-| `OnChainProposal` | `ChainProposal` | interface |
-
-### 7.3 index.ts 导出调整
-
-合并前（分离文件）：
+**清理后的 index.ts 导出结构**：
 ```typescript
-// ── On-chain APIs ────────────────────────────────────────────────────────
-export { WalletOnChainApi, OnChainWalletConfig } from './wallet-onchain.js';
-export { IdentityOnChainApi, OnChainIdentityConfig, ... } from './identity-onchain.js';
+// ── REST APIs ────────────────────────────────────────────────────────────
+export { HttpClient, HttpClientConfig, RequestOptions, ClawNetError } from './http.js';
+export { NodeApi } from './node.js';
+export { IdentityApi } from './identity.js';
+export { WalletApi } from './wallet.js';
+export { ReputationApi } from './reputation.js';
+export { MarketsApi, ... } from './markets.js';
+export { ContractsApi } from './contracts.js';
+export { DaoApi } from './dao.js';
+
+// ── Shared types ─────────────────────────────────────────────────────────
+export * from './types.js';
 ```
 
-合并后（统一文件）：
-```typescript
-// ── Chain APIs (direct contract access) ──────────────────────────────────
-export { WalletChainApi, WalletChainConfig } from './wallet.js';
-export { IdentityChainApi, IdentityChainConfig, KeyPurpose, ... } from './identity.js';
-export { ReputationChainApi, ReputationChainConfig, ReputationDimension, ... } from './reputation.js';
-export { ContractsChainApi, ContractsChainConfig, ContractStatus, ... } from './contracts.js';
-export { DaoChainApi, DaoChainConfig, ProposalType, ProposalStatus, VoteSupport, ... } from './dao.js';
-export { StakingChainApi, StakingChainConfig, NodeType, ... } from './staking.js';
+> `types.ts` 已包含所有域类型的 REST 友好定义（字符串联合类型而非数字枚举），如 `ContractStatus`, `DaoProposalType`, `DaoProposalStatus`, `DaoVoteOption` 等。原 onchain 文件中的数字枚举是 Solidity ABI 特定的，SDK 消费者不需要。
 
-// ── Backward compatibility (deprecated, remove in next major) ────────────
-/** @deprecated Use WalletChainApi */
-export { WalletChainApi as WalletOnChainApi } from './wallet.js';
-// ... 其他旧名称同理
-```
-
-### 7.4 REST 类（无需改动）
-
-以下 REST 客户端类保持原样不变——它们现在与 Chain 类共存于同一文件中：
+### 7.4 SDK 保留部分（无需改动）
 
 - `WalletApi`, `IdentityApi`, `ReputationApi`, `ContractsApi`, `DaoApi` — REST 客户端
 - `MarketsApi` — 纯 REST（无链上对应）
 - `NodeApi` — 纯 REST（无链上对应）
 - `HttpClient`, `ClawNetClient` — 基础设施
-
-### 7.5 Chain 类（补齐方法）
-
-| 文件 | 类 | 改动 |
-|------|-----|------|
-| `wallet.ts` | `WalletChainApi` | 新增 `fundEscrow()`, `expireEscrow()` |
-| `dao.ts` | `DaoChainApi` | 新增 `advanceProposal()` 适配方法 |
-| `dao.ts` | `DaoChainApi` | 新增 delegation 方法（待合约确认后） |
-
-### 7.6 SDK 新增导出（可选）
-
-考虑新增一个 `ClawNetChainClient` 统一类（类似 `ClawNetClient` 但组合所有 `*ChainApi`），方便 DApp 场景使用：
-
-```typescript
-// 可选——仅供直接调链场景使用
-export class ClawNetChainClient {
-  readonly identity: IdentityChainApi;
-  readonly wallet: WalletChainApi;
-  readonly reputation: ReputationChainApi;
-  readonly contracts: ContractsChainApi;
-  readonly dao: DaoChainApi;
-  readonly staking: StakingChainApi;
-
-  constructor(signer: Signer, contracts: ContractAddresses) { ... }
-}
-```
+- `types.ts` — 全部共享类型
 
 ---
 
@@ -594,8 +532,8 @@ export class ClawNetChainClient {
 | 层 | 测试重点 | 工具 |
 |----|---------|------|
 | SDK REST 类 | HTTP mock → 验证请求格式和响应解析 | vitest + MSW 或手写 mock（现有测试保留） |
-| SDK Chain 类 | ethers mock → 验证合约调用参数 | vitest + hardhat ethers mock |
-| Node 路由 | 路由 → Chain Service mock → 验证转发逻辑 | vitest |
+| Node chain service | ethers mock → 验证合约调用参数 | vitest + hardhat ethers mock |
+| Node 路由 | 路由 → chain service mock → 验证转发逻辑 | vitest |
 | Indexer | 模拟 events → 验证 DB 写入和查询 | vitest + in-memory SQLite |
 
 ### 8.2 集成测试
@@ -623,7 +561,8 @@ Hardhat Local Node (chainId 31337)
 | `test/markets.test.ts` | **保留** — Markets 不涉及此次迁移 |
 | `test/node.test.ts` | **保留** — Node 不涉及此次迁移 |
 | `test/http.test.ts` | **保留** |
-| *(新增)* `test/*.chain.test.ts` | **新增** — 每个 Chain 类的单元测试 |
+| *(Node 新增)* `test/services/*.test.ts` | **新增** — Node chain service 的单元测试 |
+| *(Node 新增)* `test/integration/chain-*.test.ts` | **新增** — REST → 链上全链路集成测试 |
 
 ---
 
@@ -635,7 +574,7 @@ Hardhat Local Node (chainId 31337)
 - [ ] 所有 GET（读操作）路由从链上 view 或 indexer 获取数据
 - [ ] REST 接口的请求/响应格式与迁移前**完全一致**（JSON schema 不变）
 - [ ] 现有 SDK 单元测试全部通过
-- [ ] 新增 Chain 类单元测试覆盖所有新逻辑
+- [ ] 新增 Node chain service 单元测试覆盖所有新逻辑
 - [ ] 集成测试通过（SDK → REST → 链 → 查询完整链路）
 - [ ] `clawnet/scenarios/` 中对应场景测试通过
 - [ ] 无 TypeScript 编译错误
@@ -882,13 +821,11 @@ Hardhat Local Node (chainId 31337)
 ```
 packages/contracts (Solidity)
     ↓ typechain + ABI
-packages/sdk/src/*.ts (REST + Chain 类共存于同一文件)
-    ↓ import
-packages/node/src/services/ (Node 内部 chain service)
+packages/node/src/services/ (Node chain service，使用 ethers.js 调用合约)
     ↓ 被调用
 packages/node/src/api/server.ts (REST 路由)
     ↓ HTTP
-packages/sdk/src/*.ts (仅 REST API 封装) ← 外部调用者使用
+packages/sdk/src/*.ts (纯 REST API 封装) ← 外部调用者使用
 ```
 
 ## 附录 B: 合约地址管理
@@ -926,15 +863,15 @@ deployments/
 | 新增文件 | 所属包 | 用途 |
 |---------|--------|------|
 | `src/services/chain-provider.ts` | `node` | ethers Provider/Signer 管理 |
-| `src/services/wallet-service.ts` | `node` | Wallet 路由 → 链上调用桥接 |
-| `src/services/identity-service.ts` | `node` | Identity 路由 → 链上调用桥接 |
-| `src/services/reputation-service.ts` | `node` | Reputation 路由 → 链上调用桥接 |
-| `src/services/contracts-service.ts` | `node` | Contracts 路由 → 链上调用桥接 |
-| `src/services/dao-service.ts` | `node` | DAO 路由 → 链上调用桥接 |
+| `src/services/wallet-service.ts` | `node` | Wallet 路由 → 链上调用（ethers.js → `ClawToken.sol` / `ClawEscrow.sol`） |
+| `src/services/identity-service.ts` | `node` | Identity 路由 → 链上调用（ethers.js → `ClawIdentity.sol`） |
+| `src/services/reputation-service.ts` | `node` | Reputation 路由 → 链上调用（ethers.js → `ClawReputation.sol`） |
+| `src/services/contracts-service.ts` | `node` | Contracts 路由 → 链上调用（ethers.js → `ClawContracts.sol`） |
+| `src/services/dao-service.ts` | `node` | DAO 路由 → 链上调用（ethers.js → `ClawDAO.sol`） |
 | `src/indexer/indexer.ts` | `node` | Event Indexer 核心调度 |
 | `src/indexer/store.ts` | `node` | SQLite 存储层 |
 | `src/indexer/query.ts` | `node` | 分页/筛选查询层 |
 | `src/indexer/handlers/*.ts` | `node` | 各合约事件处理器 |
 | `src/config.ts` | `node` | 链上配置解析 |
-| `test/*.chain.test.ts` | `sdk` | Chain 类单元测试 |
+| `test/services/*.test.ts` | `node` | Node chain service 单元测试 |
 | `test/integration/chain-*.test.ts` | `node` | 集成测试 |
