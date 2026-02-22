@@ -95,34 +95,39 @@
 - [ ] **T-0.10** 编写多网络部署配置
   - 在 `hardhat.config.ts` 配置：
     - `hardhat` (本地)
-    - `clawnetDevnet` (L3 本地 devnet)
-    - `clawnetTestnet` (L3 测试网)
+    - `clawnetDevnet` (本地 devnet，Reth/Geth PoA)
+    - `clawnetTestnet` (ClawNet Chain 测试网)
     - `clawnetMainnet` (主网，预留)
-  - 产出：`.env.example` 含 `DEPLOYER_PRIVATE_KEY`, `CLAWNET_L3_RPC_URL`, `L3_EXPLORER_API_KEY`
+  - 产出：`.env.example` 含 `DEPLOYER_PRIVATE_KEY`, `CLAWNET_RPC_URL`, `CHAIN_EXPLORER_API_KEY`
   - 验收：`npx hardhat --network clawnetDevnet status` 可连接
   - 工时：0.5 天
 
 - [ ] **T-0.11** 编写合约验证脚本
   - 产出：`scripts/verify.ts`
-  - 验收：可对 L3 测试网上的合约自动提交源码验证（L3 浏览器）
+  - 验收：可对 ClawNet Chain 测试网上的合约自动提交源码验证（链浏览器）
   - 工时：0.5 天
 
-### Sprint 0-D：OP Stack L3 搭建 + Ed25519 兼容性研究（W4）
+### Sprint 0-D：链节点软件搭建 + Ed25519 预编译（W4）
 
-- [ ] **T-0.12** 搭建 ClawNet L3 本地 devnet
-  - 基于 OP Stack 搭建 L3 应用链（结算到 Base L2）
+- [ ] **T-0.12** 搭建 ClawNet Chain 本地 devnet
+  - 基于 Reth (Rust) 或 Geth (Go) Fork 搭建独立 EVM 链
   - 配置：
-    - 排序器：本地单节点
-    - Gas 代币：Token (ERC-20)
-    - 出块时间：1 秒
-  - 产出：`infra/l3-devnet/` 配置文件 + docker-compose
-  - 验收：本地 L3 可启动，可部署合约 + 执行交易
-  - 工时：3 天
+    - 共识：PoA (Clique)，授权节点 = 本地开发节点
+    - Gas 代币：Token（原生代币，非 ERC-20）
+    - 出块时间：2 秒
+    - 创世配置：预分配 Token 给开发账户
+    - Ed25519 自定义预编译（如可行，在此阶段集成）
+  - 产出：`infra/chain-devnet/` 配置文件 + docker-compose
+    - `genesis.json` — 创世块配置
+    - `chain.toml` — Reth 链参数
+    - `docker-compose.yml` — 本地节点启动
+  - 验收：本地链可启动，可部署合约 + 执行交易，零外部依赖
+  - 工时：4 天
 
-- [ ] **T-0.13** 调研 L3 Ed25519 预编译支持
-  - L3 可自行添加预编译（EIP-7212）
+- [ ] **T-0.13** 调研并实现 Ed25519 自定义预编译
+  - 独立链可自由添加自定义预编译，无需 EIP 审批
   - 产出：`docs/implementation/tasks/ed25519-research.md`
-  - 内容：方案对比（L3 自定义预编译 / 纯 Solidity 库 / 链下验证+链上提交）
+  - 内容：方案对比（Reth 自定义预编译 / 纯 Solidity 库 / 链下验证+链上提交）
   - 推荐方案 + PoC 代码
   - 工时：2 天
 
@@ -148,7 +153,7 @@
 □ 覆盖率工具可用
 □ UUPS 部署脚本可用
 □ Ed25519 兼容方案确定并有 PoC
-□ ClawNet L3 本地 devnet 可启动 + 部署合约
+□ ClawNet Chain 本地 devnet 可启动 + 部署合约（零外部依赖）
 □ DID → EVM address 映射工具通过测试
 ```
 
@@ -361,15 +366,15 @@
     5. 授予角色：Escrow 获得 ClawToken 的 transferFrom 授权
     6. 授予角色：Staking 获得 ClawToken 的 transferFrom 授权
     7. 输出部署地址 JSON 文件
-  - 验收：Hardhat 本地 + ClawNet L3 测试网部署成功
+  - 验收：Hardhat 本地 + ClawNet Chain 测试网部署成功
   - 工时：2 天
   - 前置：T-1.1, T-1.5, T-1.9, T-1.13
 
-- [ ] **T-1.17** ClawNet L3 测试网部署
+- [ ] **T-1.17** ClawNet Chain 测试网部署
   - 操作：
-    1. 启动 L3 测试网排序器（云服务器 / 本地 devnet）
+    1. 启动 ClawNet Chain 测试网节点（云服务器 / 本地 devnet）
     2. 执行 `deploy-all-p0.ts --network clawnetTestnet`
-    3. 在 L3 浏览器验证所有合约源码
+    3. 在链浏览器验证所有合约源码
     4. 记录合约地址到 `packages/contracts/deployments/clawnetTestnet.json`
   - 验收：所有 4 个合约部署成功 + 已验证
   - 工时：1 天
@@ -424,7 +429,7 @@
 □ ClawEscrow.sol 测试覆盖率 > 95%，包含重入防护测试
 □ ClawIdentity.sol 测试覆盖率 > 95%，DID 映射正确
 □ ClawStaking.sol 测试覆盖率 > 95%，质押/slash 逻辑正确
-□ ClawNet L3 测试网 4 个合约部署成功 + 源码验证
+□ ClawNet Chain 测试网 4 个合约部署成功 + 源码验证
 □ SDK onChain 模式可用（wallet + identity）
 □ P0 集成测试全部通过
 □ Slither 无 High/Medium 级别告警
@@ -619,7 +624,7 @@
   - 输出：`deployments/<network>.json`
   - 工时：2 天
 
-- [ ] **T-2.18** ClawNet L3 测试网全量部署
+- [ ] **T-2.18** ClawNet Chain 测试网全量部署
   - 验收：8 个合约全部部署成功 + 源码验证
   - 工时：1 天
 
@@ -676,7 +681,7 @@
 □ ParamRegistry.sol DAO 修改参数 e2e 通过
 □ ClawRouter.sol 模块注册正确
 □ 全量跨模块集成测试通过
-□ ClawNet L3 测试网 8 个合约全部部署成功 + 已验证
+□ ClawNet Chain 测试网 8 个合约全部部署成功 + 已验证
 □ SDK + CLI 链上模式完整可用
 □ Slither 无 High/Medium 级别告警
 □ 外部审计公司已签约
@@ -773,12 +778,12 @@
   - 操作：
     1. 确认外部审计报告无 Critical/High 未修复
     2. 准备主网 deployer 多签钱包
-    3. 准备足够 Token (gas)（L3 使用 Token 作 Gas 代币）
+    3. 准备足够 Token (gas)（ClawNet Chain 使用 Token 作原生 Gas 代币）
     4. 社区公示迁移计划 + 时间表
   - 工时：1 天
 
-- [ ] **T-3.12** ClawNet L3 主网部署
-  - 启动 L3 主网排序器（高可用部署）
+- [ ] **T-3.12** ClawNet Chain 主网部署
+  - 启动 ClawNet Chain 主网节点（高可用 PoA 部署，多授权节点）
   - 执行 `deploy-all.ts --network clawnetMainnet`
   - 验证所有合约源码
   - 记录地址到 `deployments/clawnetMainnet.json`
@@ -821,7 +826,7 @@
 □ 数据迁移成功，链上链下对账 0 差异
 □ 双轨运行 7 天无异常
 □ 主网 8 个合约部署成功 + 源码验证
-□ L3 排序器稳定运行
+□ ClawNet Chain 节点稳定运行
 □ 节点 onchain 模式稳定运行
 □ SDK + CLI 默认走链上
 □ Bug Bounty 已启动
