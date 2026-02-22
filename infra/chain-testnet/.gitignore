@@ -1,0 +1,7 @@
+# Real .env files contain secrets — never commit
+.env
+*.key
+*.pem
+
+# Runtime data
+data/

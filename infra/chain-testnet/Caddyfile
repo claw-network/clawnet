@@ -1,0 +1,101 @@
+# ClawNet Chain — Caddy Reverse Proxy Configuration
+# ==============================================================================
+# Location: Server A (/etc/caddy/Caddyfile)
+# Purpose:  TLS termination + API gateway for clawnetd REST API and Reth RPC
+# ==============================================================================
+
+# ── clawnetd REST API ────────────────────────────────────────────────────────
+api.clawnetd.com {
+    # Require API key for write operations (POST/PUT/DELETE)
+    @write_ops {
+        method POST PUT DELETE PATCH
+        not header X-API-Key {env.CLAW_API_KEY}
+    }
+    respond @write_ops 401 {
+        body "Unauthorized: X-API-Key required"
+        close
+    }
+
+    # Allow GET requests without API key (public read access)
+    # To require API key for ALL requests, uncomment below:
+    # @nokey not header X-API-Key {env.CLAW_API_KEY}
+    # respond @nokey 401
+
+    # Reverse proxy to clawnetd
+    reverse_proxy localhost:9528 {
+        # Timeout settings
+        transport http {
+            read_timeout  30s
+            write_timeout 30s
+        }
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains"
+        X-Content-Type-Options    nosniff
+        X-Frame-Options           DENY
+        Referrer-Policy           no-referrer
+        -Server
+    }
+
+    # Rate limiting (optional, requires caddy-ratelimit plugin)
+    # rate_limit {remote.host} 60r/m
+
+    # Access log
+    log {
+        output file /var/log/caddy/api-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
+
+# ── Chain JSON-RPC ───────────────────────────────────────────────────────────
+rpc.clawnetd.com {
+    # Only allow POST (JSON-RPC is always POST)
+    @not_post not method POST
+    respond @not_post 405 {
+        body "Method Not Allowed: JSON-RPC requires POST"
+        close
+    }
+
+    # Optional: Require API key for RPC too
+    # @nokey not header X-API-Key {env.CLAW_API_KEY}
+    # respond @nokey 401
+
+    # Block dangerous RPC methods
+    @dangerous_methods {
+        method POST
+        body_regexp `"method"\s*:\s*"(personal_|admin_|debug_sendRawTransaction|miner_)`
+    }
+    respond @dangerous_methods 403 {
+        body "Forbidden: This RPC method is not allowed"
+        close
+    }
+
+    # Reverse proxy to Reth JSON-RPC
+    reverse_proxy localhost:8545 {
+        transport http {
+            read_timeout  30s
+            write_timeout 30s
+        }
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains"
+        X-Content-Type-Options    nosniff
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "POST, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, X-API-Key"
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/rpc-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}

@@ -1,0 +1,92 @@
+# ==============================================================================
+# ClawNet Chain — Server A (Primary: Validator + Bootstrap + API Gateway)
+# ==============================================================================
+# Usage:
+#   cd /opt/clawnet
+#   docker compose up -d            # Start all services
+#   docker compose logs -f          # Follow logs
+#   docker compose down             # Stop all
+#   docker compose restart reth     # Restart chain node only
+# ==============================================================================
+
+services:
+  # ── Reth Validator Node ───────────────────────────────────────────────────
+  reth:
+    image: ghcr.io/paradigmxyz/reth:latest
+    container_name: clawnet-reth
+    restart: unless-stopped
+    ports:
+      - "30303:30303/tcp"     # P2P TCP
+      - "30303:30303/udp"     # P2P Discovery
+      # 8545 不对外暴露，仅通过 Caddy 反向代理
+    volumes:
+      - /opt/clawnet/chain-data:/data
+      - /opt/clawnet/config/genesis.json:/genesis.json:ro
+    environment:
+      - RUST_LOG=info
+    command: >
+      node
+        --datadir /data
+        --chain /genesis.json
+        --http
+        --http.addr 0.0.0.0
+        --http.port 8545
+        --http.api eth,net,web3,txpool,debug
+        --http.corsdomain "*"
+        --port 30303
+        --authrpc.port 8551
+        --miner.etherbase ${RETH_VALIDATOR_ADDRESS:-0x0000000000000000000000000000000000000000}
+        --unlock ${RETH_VALIDATOR_ADDRESS:-0x0000000000000000000000000000000000000000}
+        --mine
+        --bootnodes "${RETH_BOOTNODES:-}"
+    healthcheck:
+      test: >
+        wget -qO- --post-data='{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+        --header='Content-Type: application/json'
+        http://127.0.0.1:8545 || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ── clawnetd P2P Node (Bootstrap) ─────────────────────────────────────────
+  clawnetd:
+    build:
+      context: https://github.com/claw-network/clawnet.git
+      # 或者使用预构建镜像:
+      # image: claw-network/clawnet:latest
+    container_name: clawnet-daemon
+    restart: unless-stopped
+    ports:
+      - "9527:9527/tcp"      # P2P libp2p
+      # 9528 不对外暴露，仅通过 Caddy 反向代理
+    volumes:
+      - /opt/clawnet/clawnetd-data:/data
+    environment:
+      - CLAW_PASSPHRASE=${CLAW_PASSPHRASE}
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - NODE_ENV=production
+    command: >
+      node packages/node/dist/daemon.js
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --listen /ip4/0.0.0.0/tcp/9527
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
