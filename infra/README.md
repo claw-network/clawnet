@@ -524,8 +524,67 @@ curl -s https://rpc.clawnetd.com \
 # 期望：chainId = "0x1dc9" (7625)
 ```
 
-### 6.5 检查清单
+### 6.5 合约部署验证
 
+在基础设施就绪并通过 6.1–6.4 检查后，使用部署脚本将合约部署到链上，然后验证：
+
+```bash
+# --- 前置：在开发机上执行部署 ---
+# cd packages/contracts
+# DEPLOYER_PRIVATE_KEY=<deployer私钥> npx hardhat run scripts/deploy-all-p0.ts --network clawnet-testnet
+# DEPLOYER_PRIVATE_KEY=<deployer私钥> TOKEN_ADDRESS=<token代理地址> npx hardhat run scripts/deploy-dao.ts --network clawnet-testnet
+
+# 部署完成后记录各 Proxy 地址，下面用 <ADDR> 占位
+
+RPC="https://rpc.clawnetd.com"
+
+# 1) ClawToken — 验证名称和符号
+cast call <ClawToken_PROXY> "name()(string)" --rpc-url $RPC
+# 期望: "ClawToken"
+cast call <ClawToken_PROXY> "symbol()(string)" --rpc-url $RPC
+# 期望: "CLAW"
+cast call <ClawToken_PROXY> "decimals()(uint8)" --rpc-url $RPC
+# 期望: 0
+
+# 2) ClawEscrow — 验证 token 地址绑定
+cast call <ClawEscrow_PROXY> "token()(address)" --rpc-url $RPC
+# 期望: <ClawToken_PROXY> 地址
+
+# 3) ClawIdentity — 验证管理员角色
+cast call <ClawIdentity_PROXY> \
+  "hasRole(bytes32,address)(bool)" \
+  0x0000000000000000000000000000000000000000000000000000000000000000 \
+  <DEPLOYER_ADDRESS> --rpc-url $RPC
+# 期望: true (DEFAULT_ADMIN_ROLE)
+
+# 4) ClawStaking — 验证 token 地址绑定 + ParamRegistry
+cast call <ClawStaking_PROXY> "token()(address)" --rpc-url $RPC
+# 期望: <ClawToken_PROXY> 地址
+cast call <ClawStaking_PROXY> "paramRegistry()(address)" --rpc-url $RPC
+# 期望: <ParamRegistry_PROXY> 地址（非零）
+
+# 5) ParamRegistry — 验证关键参数
+cast call <ParamRegistry_PROXY> \
+  "get(bytes32)(uint256)" \
+  $(cast keccak "MIN_NODE_STAKE") --rpc-url $RPC
+# 期望: 1000（默认最低质押量）
+
+# 6) ClawDAO — 验证 token 和 multisig 配置
+cast call <ClawDAO_PROXY> "token()(address)" --rpc-url $RPC
+# 期望: <ClawToken_PROXY> 地址
+cast call <ClawDAO_PROXY> "requiredSigs()(uint256)" --rpc-url $RPC
+# 期望: 5
+
+# 7) Proxy 升级保护 — 验证 implementation 非零
+cast storage <ClawToken_PROXY> \
+  0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc \
+  --rpc-url $RPC
+# 期望: 非零32字节（EIP-1967 implementation slot）
+```
+
+### 6.6 检查清单
+
+**基础设施层**
 ```
 □ Server A Reth 出块中（区块号增长）
 □ Server B Reth 同步中（区块号一致）
@@ -536,6 +595,19 @@ curl -s https://rpc.clawnetd.com \
 □ rpc.clawnetd.com JSON-RPC 可访问
 □ chainId = 7625
 □ 每 2 秒新区块
+```
+
+**合约部署层**
+```
+□ ClawToken Proxy 已部署，name/symbol/decimals 正确
+□ ClawEscrow Proxy 已部署，绑定 ClawToken 地址正确
+□ ClawIdentity Proxy 已部署，DEFAULT_ADMIN_ROLE 授予 deployer
+□ ClawStaking Proxy 已部署，绑定 ClawToken + ParamRegistry 正确
+□ ParamRegistry Proxy 已部署，MIN_NODE_STAKE 等参数已设置
+□ ClawDAO Proxy 已部署，token 绑定正确，requiredSigs = 5
+□ 所有 Proxy 的 EIP-1967 implementation slot 非零
+□ deployer 账户有足够 Gas Token 用于后续操作
+□ treasury 地址已记录并安全备份
 ```
 
 ---
