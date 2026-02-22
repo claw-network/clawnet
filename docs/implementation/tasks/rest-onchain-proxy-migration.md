@@ -14,7 +14,7 @@
 4. [目标架构](#4-目标架构)
 5. [模块逐一迁移方案](#5-模块逐一迁移方案)
 6. [实施阶段](#6-实施阶段)
-7. [SDK 改造](#7-sdk-改造)
+7. [SDK 清理](#7-sdk-清理)
 8. [测试策略](#8-测试策略)
 9. [迁移检查清单](#9-迁移检查清单)
 10. [风险与缓解](#10-风险与缓解)
@@ -79,7 +79,7 @@
 | `services/reputation-service.ts` | `ClawReputation.sol` | REST 写路由 → 链上调用 |
 | `services/contracts-service.ts` | `ClawContracts.sol` | REST 写路由 → 链上调用 |
 | `services/dao-service.ts` | `ClawDAO.sol` | REST 写路由 → 链上调用 |
-| `services/staking-service.ts` | `ClawStaking.sol` | REST 写路由 → 链上调用 |
+| `services/staking-service.ts` | `ClawStaking.sol` | *(本次迁移不在范围内——暂无 REST 端点，见 [§11](#11-不在范围内))* |
 
 ### 3.2 各模块缺口总表
 
@@ -291,7 +291,7 @@
 
 | 任务 | 文件/包 | 说明 |
 |------|--------|------|
-| **P0.0** SDK 清理（已完成 ✅） | `packages/sdk/src/` | 删除 6 个 `*-onchain.ts` 文件及 `cli-onchain.ts`；清除 `index.ts` 中 on-chain 导出；移除 `cli.ts` 中 `onchain` 子命令。详见 [§7 SDK 清理](#7-sdk-清理) |
+| **P0.0** SDK 清理（已完成 ✅） | `packages/sdk/src/` | 删除 6 个 `*-onchain.ts` 文件及 `cli-onchain.ts`；清除 `index.ts` 中 on-chain 导出；移除 `cli.ts` 中 `onchain` 子命令；移除 `sdk/package.json` 中残留的 `ethers` 依赖。详见 [§7 SDK 清理](#7-sdk-清理) |
 | **P0.1** 设计 Node 服务层抽象 | `packages/node/src/services/` | 创建 `ContractProvider` 抽象类/接口，封装 ethers Provider + Signer 管理 |
 | **P0.2** 配置管理 | `packages/node/src/config.ts` | 新增链上配置项：RPC URL、合约地址表、Signer 密钥路径 |
 | **P0.3** Event Indexer 核心 | `packages/node/src/indexer/` | 实现基于 ethers.js `provider.on('block', ...)` 的事件监听 + SQLite 存储 |
@@ -497,7 +497,7 @@ DAO 是最复杂的模块，需要先确认 Solidity 合约是否支持 delegati
 
 移除了全部 on-chain API 导出（原 37 行 re-export），更新 JSDoc 模块文档。
 
-**清理后的 index.ts 导出结构**：
+**清理后的 index.ts 导出结构**（80 行）：
 ```typescript
 // ── REST APIs ────────────────────────────────────────────────────────────
 export { HttpClient, HttpClientConfig, RequestOptions, ClawNetError } from './http.js';
@@ -505,17 +505,24 @@ export { NodeApi } from './node.js';
 export { IdentityApi } from './identity.js';
 export { WalletApi } from './wallet.js';
 export { ReputationApi } from './reputation.js';
-export { MarketsApi, ... } from './markets.js';
+export { MarketsApi, InfoMarketApi, TaskMarketApi, CapabilityMarketApi, MarketDisputeApi } from './markets.js';
 export { ContractsApi } from './contracts.js';
 export { DaoApi } from './dao.js';
 
 // ── Shared types ─────────────────────────────────────────────────────────
 export * from './types.js';
+
+// ── Top-level Facade ─────────────────────────────────────────────────────
+export class ClawNetClient { ... }   // 组合 node / identity / wallet / reputation / markets / contracts / dao
 ```
+
+### 7.4 ethers 依赖移除（✅ 已完成）
+
+从 `packages/sdk/package.json` 中移除 `ethers` 的 `devDependencies` 和 `peerDependencies` 条目。SDK 不再有任何 ethers.js 相关依赖。
 
 > `types.ts` 已包含所有域类型的 REST 友好定义（字符串联合类型而非数字枚举），如 `ContractStatus`, `DaoProposalType`, `DaoProposalStatus`, `DaoVoteOption` 等。原 onchain 文件中的数字枚举是 Solidity ABI 特定的，SDK 消费者不需要。
 
-### 7.4 SDK 保留部分（无需改动）
+### 7.5 SDK 保留部分（无需改动）
 
 - `WalletApi`, `IdentityApi`, `ReputationApi`, `ContractsApi`, `DaoApi` — REST 客户端
 - `MarketsApi` — 纯 REST（无链上对应）
@@ -603,7 +610,7 @@ Hardhat Local Node (chainId 31337)
 |-----------|------|
 | **Markets** (`markets.ts`) | 纯 P2P 链下逻辑，无对应链上合约 |
 | **Node** (`node.ts`) | P2P 网络层，不涉及链上状态 |
-| **Staking** | 已经只有 on-chain 实现，无需迁移 |
+| **Staking** | 暂无 REST 端点（原 `staking-onchain.ts` 已删除，SDK 无 `StakingApi`）；未来如需 REST 接口，由 Node `StakingService` 新建 |
 | **Python SDK** (`sdk-python`) | REST 接口不变，Python SDK 自动兼容 |
 | **CLI** (`packages/cli`) | 通过 REST 调用，无需改动 |
 | **Identity Capabilities** | 保持链下 P2P 存储 |
