@@ -30,6 +30,21 @@ When discussing amounts, transfers, balances, fees, staking, rewards, or any mon
 
 `did:claw:` + multibase(base58btc(Ed25519 public key))
 
+### SDK File & Class Naming: No "OnChain"
+
+SDK module files must NOT use `-onchain` suffix. Chain contract classes and REST client classes coexist in the same module file.
+
+- ✅ Correct: `wallet.ts` (exports `WalletApi` + `WalletChainApi`)
+- ❌ Wrong: `wallet-onchain.ts` (separate file)
+
+Class naming pattern:
+- REST client: `*Api` (e.g., `WalletApi`)
+- Chain contract: `*ChainApi` (e.g., `WalletChainApi`)
+- Chain config: `*ChainConfig` (e.g., `WalletChainConfig`)
+- **Never** use `OnChain` prefix/suffix: ~~`WalletOnChainApi`~~, ~~`OnChainWalletConfig`~~
+
+CLI subcommand: `clawnet chain` (NOT `clawnet onchain`)
+
 ## Reference Documents
 
 - [CONVENTIONS.md](../../CONVENTIONS.md) — Full canonical conventions

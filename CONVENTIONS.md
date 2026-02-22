@@ -83,6 +83,49 @@
 
 ---
 
+## 7. SDK 文件与类命名（SDK File & Class Naming）
+
+### 7.1 文件命名——禁止 `-onchain` 后缀
+
+SDK 模块文件 **不得** 使用 `-onchain` 后缀。链上合约类与 REST 客户端类 **必须** 共存于同一模块文件中，体现"一套系统"原则。
+
+| ✅ 正确 | ❌ 错误 |
+|---------|---------|
+| `wallet.ts`（导出 `WalletApi` + `WalletChainApi`） | `wallet-onchain.ts`（独立文件） |
+| `identity.ts`（导出 `IdentityApi` + `IdentityChainApi`） | `identity-onchain.ts`（独立文件） |
+| `staking.ts`（导出 `StakingChainApi`） | `staking-onchain.ts`（独立文件） |
+
+### 7.2 类名与接口命名
+
+| 角色 | 命名模式 | 示例 |
+|------|---------|------|
+| REST 客户端类 | `*Api` | `WalletApi`, `IdentityApi` |
+| 链上合约类 | `*ChainApi` | `WalletChainApi`, `IdentityChainApi` |
+| 链上配置接口 | `*ChainConfig` | `WalletChainConfig`, `IdentityChainConfig` |
+| 链上数据接口 | `Chain*` | `ChainServiceContract`, `ChainMilestone` |
+
+### ⚠️ 常见错误
+
+> **禁止在类名、接口名、文件名中使用 `OnChain` 前缀或后缀。**
+>
+> - ✅ 正确：`WalletChainApi`, `IdentityChainConfig`, `wallet.ts`
+> - ❌ 错误：`WalletOnChainApi`, `OnChainIdentityConfig`, `wallet-onchain.ts`
+
+### 7.3 CLI 子命令
+
+| ✅ 正确 | ❌ 错误 |
+|---------|---------|
+| `clawnet chain wallet balance` | `clawnet onchain wallet balance` |
+
+### 7.4 测试文件
+
+| ✅ 正确 | ❌ 错误 |
+|---------|---------|
+| `wallet.chain.test.ts` | `wallet-onchain.test.ts` |
+| `p0-integration.test.ts` | `p0-onchain.test.ts` |
+
+---
+
 ## 变更控制
 
 以上约定属于 **Spec Freeze** 范围。任何变更需要：
