@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./ParamRegistry.sol";
 
 /**
  * @title ClawEscrow
@@ -62,6 +63,11 @@ contract ClawEscrow is
     uint256 public baseRate;
     uint256 public holdingRate;
     uint256 public minEscrowFee;
+
+    /// @notice Optional ParamRegistry for governance-controlled params.
+    ///         When set (non-zero), fee params are read from the registry;
+    ///         local storage variables act as fallback defaults.
+    ParamRegistry public paramRegistry;
 
     mapping(bytes32 => EscrowRecord) public escrows;
 
@@ -346,17 +352,39 @@ contract ClawEscrow is
         treasury = treasuryAddress;
     }
 
+    /**
+     * @notice Set the ParamRegistry for governance-controlled fee parameters.
+     *         Pass address(0) to disable registry and use local storage only.
+     */
+    function setParamRegistry(address registryAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        paramRegistry = ParamRegistry(registryAddress);
+    }
+
     // ─── Internal ────────────────────────────────────────────────────
 
     /**
      * @dev fee = max(minEscrowFee, ceil(amount * baseRate / 10000 + amount * holdingRate * days / 10000))
+     *      If paramRegistry is set, reads params from it (falling back to local storage).
      */
     function _calculateFee(uint256 amount, uint256 holdingDays) internal view returns (uint256) {
-        // ceil division helper: (a + b - 1) / b
-        uint256 baseFee = _ceilDiv(amount * baseRate, 10000);
-        uint256 holdFee = _ceilDiv(amount * holdingRate * holdingDays, 10000);
+        uint256 br;
+        uint256 hr;
+        uint256 mf;
+
+        if (address(paramRegistry) != address(0)) {
+            br = paramRegistry.getParamWithDefault(paramRegistry.ESCROW_BASE_RATE(), baseRate);
+            hr = paramRegistry.getParamWithDefault(paramRegistry.ESCROW_HOLDING_RATE(), holdingRate);
+            mf = paramRegistry.getParamWithDefault(paramRegistry.ESCROW_MIN_FEE(), minEscrowFee);
+        } else {
+            br = baseRate;
+            hr = holdingRate;
+            mf = minEscrowFee;
+        }
+
+        uint256 baseFee = _ceilDiv(amount * br, 10000);
+        uint256 holdFee = _ceilDiv(amount * hr * holdingDays, 10000);
         uint256 totalFee = baseFee + holdFee;
-        return totalFee < minEscrowFee ? minEscrowFee : totalFee;
+        return totalFee < mf ? mf : totalFee;
     }
 
     function _ceilDiv(uint256 a, uint256 b) internal pure returns (uint256) {

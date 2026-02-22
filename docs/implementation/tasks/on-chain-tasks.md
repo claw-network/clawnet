@@ -154,24 +154,26 @@
   - 前置：T-0.12
   - 月费：¥92（2× Contabo VPS S €5.99）
 
-- [ ] **T-0.13** 调研并实现 Ed25519 自定义预编译
+- [x] **T-0.13** 调研并实现 Ed25519 自定义预编译
   - 独立链可自由添加自定义预编译，无需 EIP 审批
   - 产出：`docs/implementation/tasks/ed25519-research.md`
   - 内容：方案对比（Reth 自定义预编译 / 纯 Solidity 库 / 链下验证+链上提交）
   - 推荐方案 + PoC 代码
+  - 结论：采用方案 C（链下验证 + 链上提交），Phase 2 可升级到方案 A（Reth 预编译）
   - 工时：2 天
 
-- [ ] **T-0.14** 实现 Ed25519Verifier.sol（或确定链下验证方案）
+- [x] **T-0.14** 实现 Ed25519Verifier.sol（或确定链下验证方案）
   - 根据 T-0.13 结论实现
-  - 如果用链下验证方案：编写 `verifyOffChain()` 辅助函数 + 签名提交逻辑
-  - 验收：测试用例通过 — 用 `@noble/ed25519` 生成签名 → 合约验证
+  - 实现内容：domain-separated payload builders (rotation/registration/link/revocation)
+  - 预留 Phase 2 预编译 verify() 接口（地址 0x0100）
+  - 验收：18 个测试通过（payload 确定性、链上链下一致性、域分离、预编译 stub）
   - 工时：3 天
 
-- [ ] **T-0.15** 编写 DID ↔ EVM Address 映射工具
-  - 产出：`packages/contracts/scripts/did-to-address.ts`
-  - 功能：`did:claw:z6Mk...` → Ed25519 公钥 → `keccak256(pubkey)[12:]` → EVM address
-  - 在 `packages/core` 中也增加相同函数供 SDK 使用
-  - 验收：与链下现有 DID 导出地址一致
+- [x] **T-0.15** 编写 DID ↔ EVM Address 映射工具
+  - 产出：`packages/contracts/scripts/did-address.ts`
+  - 功能：did:claw: ↔ Ed25519 pubkey ↔ ClawNet native address ↔ EVM address ↔ didHash
+  - 包含 base58 编解码、multibase 编解码、地址校验和验证
+  - 验收：测试向量地址 `claw1K1Zon...` 精确匹配 ✅
   - 工时：1 天
 
 ### Phase 0 验收门槛
@@ -182,10 +184,10 @@
 ■ Gas Reporter 生成报告
 ■ 覆盖率工具可用
 ■ UUPS 部署脚本可用
-□ Ed25519 兼容方案确定并有 PoC
+■ Ed25519 兼容方案确定并有 PoC（方案 C + Ed25519Verifier.sol 18 测试通过）
 □ ClawNet Chain 本地 devnet 可启动 + 部署合约（零外部依赖）
 □ ClawNet Chain 3 节点测试网上线（api.clawnetd.com / rpc.clawnetd.com 可访问）
-□ DID → EVM address 映射工具通过测试
+■ DID → EVM address 映射工具通过测试（test vector 精确匹配）
 ```
 
 ---
@@ -481,7 +483,7 @@
 
 ### Sprint 2-A：ParamRegistry.sol（W1）
 
-- [ ] **T-2.1** 实现 ParamRegistry.sol
+- [x] **T-2.1** 实现 ParamRegistry.sol
   - 功能：
     - 存储所有可治理参数（key-value uint256）
     - `setParam(bytes32 key, uint256 value)` — 仅 GOVERNOR_ROLE（ClawDAO）
@@ -501,14 +503,16 @@
   - 验收：合约编译通过
   - 工时：1.5 天
 
-- [ ] **T-2.2** 编写 ParamRegistry 单元测试
-  - 用例：设置/读取参数、权限控制、升级保留
-  - 验收：覆盖率 > 95%
+- [x] **T-2.2** 编写 ParamRegistry 单元测试
+  - 用例：设置/读取参数、批量设置、权限控制、20 个 key 常量、升级保留、边界值
+  - 验收：35 个测试通过，覆盖率 > 95% ✅
   - 工时：1 天
 
-- [ ] **T-2.3** 重构 ClawEscrow / ClawStaking 接入 ParamRegistry
-  - 修改手续费计算和质押参数从 ParamRegistry 读取
-  - 验收：原有测试不受影响 + 参数变更测试通过
+- [x] **T-2.3** 重构 ClawEscrow / ClawStaking 接入 ParamRegistry
+  - 新增 `setParamRegistry(address)` + 内部 getter 函数
+  - Registry 设置时从 ParamRegistry 读取，回退到本地 storage
+  - 验收：原有 124 测试全部通过 + 13 个集成测试通过 ✅
+  - 全量 290 passing (34s)
   - 工时：1 天
 
 ### Sprint 2-B：ClawDAO.sol（W2–W5）

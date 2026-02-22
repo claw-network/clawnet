@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./ParamRegistry.sol";
 
 /**
  * @title ClawStaking
@@ -65,6 +66,10 @@ contract ClawStaking is
     uint64  public unstakeCooldown;    // Cooldown period in seconds
     uint256 public rewardPerEpoch;     // Reward per epoch (informational)
     uint256 public slashPerViolation;  // Default slash per violation
+
+    /// @notice Optional ParamRegistry for governance-controlled params.
+    ///         When set, staking params are read from registry (with local fallbacks).
+    ParamRegistry public paramRegistry;
 
     mapping(address => StakeInfo) public stakes;
 
@@ -145,7 +150,8 @@ contract ClawStaking is
      */
     function stake(uint256 amount, NodeType nodeType) external whenNotPaused nonReentrant {
         if (stakes[msg.sender].active) revert AlreadyStaked();
-        if (amount < minStake) revert InsufficientStake(amount, minStake);
+        uint256 _minStake = _getMinStake();
+        if (amount < _minStake) revert InsufficientStake(amount, _minStake);
 
         token.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -181,7 +187,7 @@ contract ClawStaking is
         // Remove from active list
         _removeFromActiveList(msg.sender);
 
-        uint64 unlockAt = uint64(block.timestamp) + unstakeCooldown;
+        uint64 unlockAt = uint64(block.timestamp) + _getUnstakeCooldown();
         emit UnstakeRequested(msg.sender, unlockAt);
     }
 
@@ -193,7 +199,7 @@ contract ClawStaking is
         if (s.amount == 0) revert NotStaked();
         if (s.unstakeRequestAt == 0) revert UnstakeNotRequested();
 
-        uint64 unlockAt = s.unstakeRequestAt + unstakeCooldown;
+        uint64 unlockAt = s.unstakeRequestAt + _getUnstakeCooldown();
         if (block.timestamp < unlockAt) {
             revert CooldownNotElapsed(unlockAt, block.timestamp);
         }
@@ -333,7 +339,39 @@ contract ClawStaking is
         slashPerViolation = slashPerViolation_;
     }
 
+    /**
+     * @notice Set the ParamRegistry for governance-controlled staking parameters.
+     *         Pass address(0) to disable registry and use local storage only.
+     */
+    function setParamRegistry(address registryAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        paramRegistry = ParamRegistry(registryAddress);
+    }
+
     // ─── Internal ────────────────────────────────────────────────────
+
+    /// @dev Read minStake from ParamRegistry if set, otherwise use local storage.
+    function _getMinStake() internal view returns (uint256) {
+        if (address(paramRegistry) != address(0)) {
+            return paramRegistry.getParamWithDefault(paramRegistry.MIN_NODE_STAKE(), minStake);
+        }
+        return minStake;
+    }
+
+    /// @dev Read unstakeCooldown from ParamRegistry if set, otherwise use local storage.
+    function _getUnstakeCooldown() internal view returns (uint64) {
+        if (address(paramRegistry) != address(0)) {
+            return uint64(paramRegistry.getParamWithDefault(paramRegistry.UNSTAKE_COOLDOWN(), uint256(unstakeCooldown)));
+        }
+        return unstakeCooldown;
+    }
+
+    /// @dev Read slashPerViolation from ParamRegistry if set, otherwise use local storage.
+    function _getSlashPerViolation() internal view returns (uint256) {
+        if (address(paramRegistry) != address(0)) {
+            return paramRegistry.getParamWithDefault(paramRegistry.SLASH_PER_VIOLATION(), slashPerViolation);
+        }
+        return slashPerViolation;
+    }
 
     /**
      * @dev Remove an address from _activeValidators using swap-and-pop.
