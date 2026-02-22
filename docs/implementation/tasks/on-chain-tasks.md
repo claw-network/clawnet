@@ -17,7 +17,7 @@
 
 ### Sprint 0-A：项目初始化（W1）
 
-- [ ] **T-0.1** 创建 `packages/contracts/` Hardhat 项目
+- [x] **T-0.1** 创建 `packages/contracts/` Hardhat 项目
   - 产出：`packages/contracts/package.json`, `hardhat.config.ts`, `tsconfig.json`
   - 依赖：`hardhat`, `@nomicfoundation/hardhat-toolbox`, `@openzeppelin/contracts-upgradeable`
   - 验收：`pnpm --filter contracts compile` 成功
@@ -28,7 +28,7 @@
   - 验收：`forge build` 成功
   - 工时：0.5 天
 
-- [ ] **T-0.3** 集成 monorepo 构建
+- [x] **T-0.3** 集成 monorepo 构建
   - 操作：
     1. 在 `pnpm-workspace.yaml` 确认 `packages/*` 已覆盖
     2. 在根 `package.json` 的 scripts 增加 `"contracts:compile"`, `"contracts:test"`
@@ -36,7 +36,7 @@
   - 验收：根目录 `pnpm run contracts:compile` 成功
   - 工时：0.5 天
 
-- [ ] **T-0.4** 编写合约目录骨架
+- [x] **T-0.4** 编写合约目录骨架
   - 创建空 `.sol` 文件（含 SPDX header + pragma）：
     ```
     contracts/ClawToken.sol
@@ -73,26 +73,26 @@
   - 验收：`slither .` 可在合约目录运行并生成报告
   - 工时：0.5 天
 
-- [ ] **T-0.7** 配置 Hardhat Gas Reporter
+- [x] **T-0.7** 配置 Hardhat Gas Reporter
   - 安装 `hardhat-gas-reporter`
   - 配置输出到 `gas-report.txt`
   - 验收：`pnpm --filter contracts test` 后生成 gas 报告
   - 工时：0.5 天
 
-- [ ] **T-0.8** 配置测试覆盖率 (solidity-coverage)
+- [x] **T-0.8** 配置测试覆盖率 (solidity-coverage)
   - 安装 `solidity-coverage`
   - 验收：`pnpm --filter contracts coverage` 生成 HTML 报告
   - 工时：0.5 天
 
 ### Sprint 0-C：OpenZeppelin + 部署基础（W3）
 
-- [ ] **T-0.9** 编写 UUPS 代理部署工具函数
+- [x] **T-0.9** 编写 UUPS 代理部署工具函数
   - 产出：`scripts/deploy-helpers.ts`
   - 功能：`deployProxy(contractName, initArgs)` → 部署 UUPS 代理 + 实现
   - 验收：单元测试通过 — 部署一个简单的可升级合约并调用初始化
   - 工时：1 天
 
-- [ ] **T-0.10** 编写多网络部署配置
+- [x] **T-0.10** 编写多网络部署配置
   - 在 `hardhat.config.ts` 配置：
     - `hardhat` (本地)
     - `clawnetDevnet` (本地 devnet，Reth/Geth PoA)
@@ -177,11 +177,11 @@
 ### Phase 0 验收门槛
 
 ```
-□ packages/contracts/ 编译成功
+■ packages/contracts/ 编译成功
 □ CI 流水线全绿（compile + test + slither）
-□ Gas Reporter 生成报告
-□ 覆盖率工具可用
-□ UUPS 部署脚本可用
+■ Gas Reporter 生成报告
+■ 覆盖率工具可用
+■ UUPS 部署脚本可用
 □ Ed25519 兼容方案确定并有 PoC
 □ ClawNet Chain 本地 devnet 可启动 + 部署合约（零外部依赖）
 □ ClawNet Chain 3 节点测试网上线（api.clawnetd.com / rpc.clawnetd.com 可访问）
@@ -196,7 +196,7 @@
 
 ### Sprint 1-A：ClawToken.sol（W1–W2）
 
-- [ ] **T-1.1** 实现 ClawToken.sol 核心逻辑
+- [x] **T-1.1** 实现 ClawToken.sol 核心逻辑
   - 继承：ERC20Upgradeable + AccessControlUpgradeable + UUPSUpgradeable + PausableUpgradeable
   - 功能：
     - `initialize(name, symbol, admin)`
@@ -208,26 +208,26 @@
   - 工时：2 天
   - 前置：T-0.1
 
-- [ ] **T-1.2** 编写 IClawToken.sol 接口
+- [x] **T-1.2** 编写 IClawToken.sol 接口
   - 供其他合约引用
   - 工时：0.5 天
 
-- [ ] **T-1.3** 编写 ClawToken 单元测试
+- [x] **T-1.3** 编写 ClawToken 单元测试
   - 文件：`test/ClawToken.test.ts`
   - 用例清单：
-    - [ ] 初始化正确（name, symbol, decimals=0, admin 角色）
-    - [ ] mint 权限控制（有/无 MINTER_ROLE）
-    - [ ] burn 权限控制（有/无 BURNER_ROLE）
-    - [ ] 普通 transfer 功能
-    - [ ] approve + transferFrom
-    - [ ] pause/unpause 阻止转账
-    - [ ] 升级测试：部署 V1 → 升级到 V2 → 状态保留
-    - [ ] 非 admin 不能升级
+    - [x] 初始化正确（name, symbol, decimals=0, admin 角色）
+    - [x] mint 权限控制（有/无 MINTER_ROLE）
+    - [x] burn 权限控制（有/无 BURNER_ROLE）
+    - [x] 普通 transfer 功能
+    - [x] approve + transferFrom
+    - [x] pause/unpause 阻止转账
+    - [x] 升级测试：部署 V1 → 升级到 V2 → 状态保留
+    - [x] 非 admin 不能升级
   - 验收：所有用例通过 + 覆盖率 > 95%
   - 工时：3 天
   - 前置：T-1.1
 
-- [ ] **T-1.4** ClawToken 部署脚本
+- [x] **T-1.4** ClawToken 部署脚本
   - 文件：`scripts/deploy-token.ts`
   - 功能：部署 UUPS 代理 → 初始化 → 授予角色 → 验证
   - 验收：Hardhat 本地网络部署成功，打印合约地址

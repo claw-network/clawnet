@@ -1,0 +1,18 @@
+# Artifacts
+artifacts/
+cache/
+typechain-types/
+
+# Coverage
+coverage/
+coverage.json
+
+# Gas
+gas-report.txt
+
+# Environment
+.env
+
+# Node
+node_modules/
+dist/

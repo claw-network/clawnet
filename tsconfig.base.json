@@ -20,7 +20,8 @@
       "@claw-network/protocol": ["packages/protocol/src/index.ts"],
       "@claw-network/protocol/*": ["packages/protocol/src/*"],
       "@claw-network/node": ["packages/node/src/index.ts"],
-      "@claw-network/sdk": ["packages/sdk/src/index.ts"]
+      "@claw-network/sdk": ["packages/sdk/src/index.ts"],
+      "@claw-network/contracts": ["packages/contracts/typechain-types"]
     }
   }
 }
