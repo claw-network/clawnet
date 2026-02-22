@@ -130,7 +130,7 @@
 
 | 原则 | 说明 |
 |------|------|
-| **写操作 → 链上** | 所有 POST 端点内部调用 Node chain service（ethers.js），等待 tx receipt 后返回 |
+| **写操作 → 链上** | 所有 POST 端点内部调用 Node 服务层（ethers.js），等待 tx receipt 后返回 |
 | **读操作 → indexer 优先，链上兜底** | `GET /api/wallet/balance` 可直接调链上 view；分页/列表类走 indexer |
 | **Event indexer 是节点内部组件** | 监听链上 events，写入本地 SQLite/LevelDB，为 REST 查询提供分页能力 |
 | **SDK 不变** | `HttpClient` + `*Api` 类保持不变，消费者无感知。SDK 不包含任何 ethers.js 依赖 |
@@ -292,7 +292,7 @@
 | 任务 | 文件/包 | 说明 |
 |------|--------|------|
 | **P0.0** SDK 清理（已完成 ✅） | `packages/sdk/src/` | 删除 6 个 `*-onchain.ts` 文件及 `cli-onchain.ts`；清除 `index.ts` 中 on-chain 导出；移除 `cli.ts` 中 `onchain` 子命令。详见 [§7 SDK 清理](#7-sdk-清理) |
-| **P0.1** 设计 Node 层 chain service 抽象 | `packages/node/src/services/` | 创建 `ChainProvider` 抽象类/接口，封装 ethers Provider + Signer 管理 |
+| **P0.1** 设计 Node 服务层抽象 | `packages/node/src/services/` | 创建 `ContractProvider` 抽象类/接口，封装 ethers Provider + Signer 管理 |
 | **P0.2** 配置管理 | `packages/node/src/config.ts` | 新增链上配置项：RPC URL、合约地址表、Signer 密钥路径 |
 | **P0.3** Event Indexer 核心 | `packages/node/src/indexer/` | 实现基于 ethers.js `provider.on('block', ...)` 的事件监听 + SQLite 存储 |
 | **P0.4** Indexer 通用查询 | `packages/node/src/indexer/query.ts` | 分页、筛选的通用查询层 |
@@ -532,8 +532,8 @@ export * from './types.js';
 | 层 | 测试重点 | 工具 |
 |----|---------|------|
 | SDK REST 类 | HTTP mock → 验证请求格式和响应解析 | vitest + MSW 或手写 mock（现有测试保留） |
-| Node chain service | ethers mock → 验证合约调用参数 | vitest + hardhat ethers mock |
-| Node 路由 | 路由 → chain service mock → 验证转发逻辑 | vitest |
+| Node 服务层 | ethers mock → 验证合约调用参数 | vitest + hardhat ethers mock |
+| Node 路由 | 路由 → 服务层 mock → 验证转发逻辑 | vitest |
 | Indexer | 模拟 events → 验证 DB 写入和查询 | vitest + in-memory SQLite |
 
 ### 8.2 集成测试
@@ -561,8 +561,8 @@ Hardhat Local Node (chainId 31337)
 | `test/markets.test.ts` | **保留** — Markets 不涉及此次迁移 |
 | `test/node.test.ts` | **保留** — Node 不涉及此次迁移 |
 | `test/http.test.ts` | **保留** |
-| *(Node 新增)* `test/services/*.test.ts` | **新增** — Node chain service 的单元测试 |
-| *(Node 新增)* `test/integration/chain-*.test.ts` | **新增** — REST → 链上全链路集成测试 |
+| *(Node 新增)* `test/services/*.test.ts` | **新增** — Node 服务层单元测试（如 `wallet-service.test.ts`） |
+| *(Node 新增)* `test/integration/*.test.ts` | **新增** — REST → 链上全链路集成测试（如 `wallet-integration.test.ts`） |
 
 ---
 
@@ -574,7 +574,7 @@ Hardhat Local Node (chainId 31337)
 - [ ] 所有 GET（读操作）路由从链上 view 或 indexer 获取数据
 - [ ] REST 接口的请求/响应格式与迁移前**完全一致**（JSON schema 不变）
 - [ ] 现有 SDK 单元测试全部通过
-- [ ] 新增 Node chain service 单元测试覆盖所有新逻辑
+- [ ] 新增 Node 服务层单元测试覆盖所有新逻辑
 - [ ] 集成测试通过（SDK → REST → 链 → 查询完整链路）
 - [ ] `clawnet/scenarios/` 中对应场景测试通过
 - [ ] 无 TypeScript 编译错误
@@ -627,7 +627,7 @@ Hardhat Local Node (chainId 31337)
 | 7 | `docs/implementation/on-chain-plan.md` | **P1** | 中等 | Phase 0 | 架构图缺少 REST 薄代理模式和 Indexer；SDK 双模式策略需与本计划对齐 |
 | 8 | `docs/implementation/README.md` | **P1** | 中等 | Phase 0 | 索引需新增迁移任务引用；Review Checklist 需修正 P2P 重建状态的表述 |
 | 9 | `docs/ARCHITECTURE.md` | **P1** | 重大 | Phase 6 | 核心架构图、数据流图、技术栈表、去中心化路线图均需修订 |
-| 10 | `docs/IMPLEMENTATION.md` | **P1** | 中高 | Phase 6 | 组件架构新增 On-Chain Service + Indexer；依赖关系图 / 代码结构需更新 |
+| 10 | `docs/IMPLEMENTATION.md` | **P1** | 中高 | Phase 6 | 组件架构新增 Contract Service Layer + Indexer；依赖关系图 / 代码结构需更新 |
 | 11 | `docs/DECENTRALIZATION.md` | **P1** | 中高 | Phase 6 | 五阶段去中心化路线图提前；数据层架构从 IPFS → EVM Chain |
 | 12 | `docs/DEPLOYMENT.md` | **P1** | 中高 | Phase 6 | 新增链配置、Docker 环境变量、生产安全、Indexer 存储、故障排查 |
 | 13 | `docs/WALLET.md` | **P1** | 中等 | Phase 1 | 架构层引入 EVM Chain；交易 / Escrow 状态映射到链上 |
@@ -723,14 +723,14 @@ Hardhat Local Node (chainId 31337)
 #### 12.3.4 `docs/ARCHITECTURE.md`
 
 - **核心架构图**：基础设施层的"可选：区块链锚定层"改为"必选：EVM Chain（写操作 source of truth）"
-- **数据流架构**：写操作路径改为 `SDK → REST → Node On-Chain Service → EVM Chain`；读操作 `SDK → REST → Chain view / Event Indexer`
+- **数据流架构**：写操作路径改为 `SDK → REST → Node Service Layer → EVM Chain`；读操作 `SDK → REST → Chain view / Event Indexer`
 - **技术栈表**：区块链从"Ethereum (可选)"改为"ClawNet EVM Chain (必选)"
 - **去中心化路线图**：Phase 表与时间线与 `DECENTRALIZATION.md` 对齐
 
 #### 12.3.5 `docs/IMPLEMENTATION.md`
 
-- **组件架构**：HTTP API Server 下新增组件"On-Chain Service Layer"（ethers.js → EVM）+ "Event Indexer"（SQLite）
-- **依赖关系图**：更新为 `HTTP API → On-Chain Services → EVM / Indexer → Protocol Layer (P2P-only)`
+- **组件架构**：HTTP API Server 下新增组件“Contract Service Layer”（ethers.js → EVM）+ “Event Indexer”（SQLite）
+- **依赖关系图**：更新为 `HTTP API → Contract Services → EVM / Indexer → Protocol Layer (P2P-only)`
 - **代码结构**：新增 `packages/node/src/services/` 和 `packages/node/src/indexer/` 目录说明
 
 #### 12.3.6 `docs/DECENTRALIZATION.md`
@@ -782,7 +782,7 @@ Hardhat Local Node (chainId 31337)
 
 #### 12.3.13 `docs/AGENT_RUNTIME.md`
 
-- **架构图**：新增"On-Chain Service (ethers.js → EVM Chain)"组件
+- **架构图**：新增“Contract Service Layer (ethers.js → EVM Chain)”组件
 - **Node 定位**：说明节点现同时连接 P2P 网络和 EVM 链
 - **配置文件**：新增 `chain:` 区块（rpcUrl, chainId, contracts 地址表）
 
@@ -821,7 +821,7 @@ Hardhat Local Node (chainId 31337)
 ```
 packages/contracts (Solidity)
     ↓ typechain + ABI
-packages/node/src/services/ (Node chain service，使用 ethers.js 调用合约)
+packages/node/src/services/ (Node 服务层，使用 ethers.js 调用合约)
     ↓ 被调用
 packages/node/src/api/server.ts (REST 路由)
     ↓ HTTP
@@ -862,7 +862,7 @@ deployments/
 
 | 新增文件 | 所属包 | 用途 |
 |---------|--------|------|
-| `src/services/chain-provider.ts` | `node` | ethers Provider/Signer 管理 |
+| `src/services/contract-provider.ts` | `node` | ethers Provider/Signer 管理 |
 | `src/services/wallet-service.ts` | `node` | Wallet 路由 → 链上调用（ethers.js → `ClawToken.sol` / `ClawEscrow.sol`） |
 | `src/services/identity-service.ts` | `node` | Identity 路由 → 链上调用（ethers.js → `ClawIdentity.sol`） |
 | `src/services/reputation-service.ts` | `node` | Reputation 路由 → 链上调用（ethers.js → `ClawReputation.sol`） |
@@ -873,5 +873,5 @@ deployments/
 | `src/indexer/query.ts` | `node` | 分页/筛选查询层 |
 | `src/indexer/handlers/*.ts` | `node` | 各合约事件处理器 |
 | `src/config.ts` | `node` | 链上配置解析 |
-| `test/services/*.test.ts` | `node` | Node chain service 单元测试 |
-| `test/integration/chain-*.test.ts` | `node` | 集成测试 |
+| `test/services/*.test.ts` | `node` | Node 服务层单元测试 |
+| `test/integration/*.test.ts` | `node` | 集成测试 |

@@ -94,20 +94,25 @@ SDK 只暴露 REST 客户端类（`*Api`），所有链上合约交互由 Node �
 | `wallet.ts`（仅导出 `WalletApi`） | `wallet-onchain.ts`（链上代码不属于 SDK） |
 | `identity.ts`（仅导出 `IdentityApi`） | `identity-onchain.ts`（链上代码不属于 SDK） |
 
-### 7.2 类命名
+### 7.2 类命名——自然命名，禁止标记词
+
+链上逻辑是系统的原生能力，不是外挂组件。命名应自然，不应使用 `OnChain` / `Chain` 等标记词作为前后缀。
 
 | 角色 | 命名模式 | 示例 | 所属包 |
 |------|---------|------|--------|
 | REST 客户端类 | `*Api` | `WalletApi`, `IdentityApi` | `packages/sdk` |
-| Node chain service | `*Service` | `WalletService`, `IdentityService` | `packages/node` |
+| Node 服务类 | `*Service` | `WalletService`, `IdentityService` | `packages/node` |
+| 配置接口 | `*Config` / `*ServiceConfig` | `WalletConfig`, `DaoServiceConfig` | 各包 |
+| 数据接口 | 正常语义命名 | `ServiceContract`, `Milestone`, `Proposal` | 各包 |
 
 ### ⚠️ 常见错误
 
-> **SDK 中禁止包含链上合约调用类或 `ethers.js` 相关代码。**
-> **禁止在任何包中使用 `OnChain` 前缀或后缀。**
+> **禁止在类名、接口名、文件名中使用 `OnChain` 或 `Chain` 作为前缀/后缀。**
+> 链上逻辑融入正常文件中，用自然的名字。
 >
-> - ✅ 正确：`WalletApi`（SDK）, `WalletService`（Node）, `wallet.ts`
-> - ❌ 错误：`WalletOnChainApi`, `WalletChainApi`（SDK 中）, `wallet-onchain.ts`
+> - ✅ 正确：`WalletApi`, `WalletService`, `WalletConfig`, `ServiceContract`
+> - ❌ 错误：`WalletOnChainApi`, `WalletChainApi`, `WalletChainConfig`, `ChainServiceContract`
+> - ❌ 错误：`wallet-onchain.ts`, `wallet.chain.test.ts`
 
 ### 7.3 CLI 子命令
 
@@ -120,9 +125,12 @@ SDK 只暴露 REST 客户端类（`*Api`），所有链上合约交互由 Node �
 
 ### 7.4 测试文件
 
+测试文件用正常名称。若已存在同名测试文件，链上相关测试应写入已有文件中，不单独创建。
+
 | ✅ 正确 | ❌ 错误 |
 |---------|---------|
-| `test/services/wallet-service.test.ts`（Node 包） | `test/wallet-onchain.test.ts` |
+| `test/services/wallet-service.test.ts` | `test/wallet-onchain.test.ts`, `test/wallet.chain.test.ts` |
+| `wallet.test.ts`（合并入已有文件） | `wallet.chain.test.ts`（单独新建） |
 | `p0-integration.test.ts` | `p0-onchain.test.ts` |
 
 ---

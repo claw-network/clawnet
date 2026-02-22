@@ -30,7 +30,7 @@ When discussing amounts, transfers, balances, fees, staking, rewards, or any mon
 
 `did:claw:` + multibase(base58btc(Ed25519 public key))
 
-### SDK File & Class Naming: No "OnChain"
+### SDK File & Class Naming: No "OnChain" / "Chain" markers
 
 SDK only contains REST client classes. All chain contract interaction is handled by the Node service layer internally. SDK does NOT depend on `ethers.js`.
 
@@ -39,9 +39,11 @@ SDK only contains REST client classes. All chain contract interaction is handled
 
 Class naming pattern:
 - REST client (SDK): `*Api` (e.g., `WalletApi`)
-- Node chain service: `*Service` (e.g., `WalletService`)
-- **Never** use `OnChain` prefix/suffix: ~~`WalletOnChainApi`~~, ~~`OnChainWalletConfig`~~
-- **Never** put chain classes in SDK: ~~`WalletChainApi` in SDK~~
+- Node service: `*Service` (e.g., `WalletService`)
+- Config: `*Config` (e.g., `WalletConfig`) — NOT `WalletChainConfig`
+- Data types: natural names (e.g., `ServiceContract`, `Milestone`) — NOT `ChainServiceContract`
+- **Never** use `OnChain` or `Chain` as prefix/suffix: ~~`WalletOnChainApi`~~, ~~`WalletChainApi`~~, ~~`WalletChainConfig`~~
+- Tests go into natural-named files: `wallet.test.ts` (merge if exists), NOT `wallet.chain.test.ts`
 
 CLI subcommand: `clawnet wallet balance` (NOT `clawnet onchain wallet balance`)
 
