@@ -910,6 +910,7 @@ const DaoTreasuryDepositSchema = z
 import type { WalletService } from '../services/wallet-service.js';
 import type { IdentityService } from '../services/identity-service.js';
 import type { ReputationService } from '../services/reputation-service.js';
+import type { ContractsService } from '../services/contracts-service.js';
 
 export class ApiServer {
   private server?: Server;
@@ -927,6 +928,7 @@ export class ApiServer {
       walletService?: WalletService;
       identityService?: IdentityService;
       reputationService?: ReputationService;
+      contractsService?: ContractsService;
       searchMarkets?: (query: SearchQuery) => SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
@@ -2705,6 +2707,28 @@ export class ApiServer {
     res: ServerResponse,
     url: URL,
   ): Promise<void> {
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const address = url.searchParams.get('address') ?? undefined;
+        const statusParam = url.searchParams.get('status');
+        const status = statusParam != null ? Number(statusParam) : undefined;
+        const limit = parsePagination(url.searchParams.get('limit'), 20, 100);
+        const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000);
+        const result = this.runtime.contractsService.listContracts({ address, status, limit, offset });
+        if (!result) {
+          sendError(res, 500, 'INTERNAL_ERROR', 'indexer unavailable');
+          return;
+        }
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -2769,6 +2793,51 @@ export class ApiServer {
       sendError(res, 400, 'DID_INVALID', 'invalid provider did');
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const contractId = body.contractId ?? `contract-${randomUUID()}`;
+        const milestoneAmounts = Array.isArray(body.milestones)
+          ? body.milestones.map((m) => {
+            const rec = m as Record<string, unknown> | null;
+            return Number(rec?.amount ?? 0);
+          })
+          : [];
+        const milestoneDeadlines = Array.isArray(body.milestones)
+          ? body.milestones.map((m) => {
+            const rec = m as Record<string, unknown> | null;
+            const dl = rec?.deadline;
+            return typeof dl === 'number' ? dl : Math.floor(Date.now() / 1000) + 86400 * 30;
+          })
+          : [];
+        const payment = body.payment as Record<string, unknown> | undefined;
+        const totalAmount = Number(payment?.totalAmount ?? payment?.amount ?? 0);
+        const timeline = body.timeline as Record<string, unknown> | undefined;
+        const deadline = Number(timeline?.deadline ?? Math.floor(Date.now() / 1000) + 86400 * 90);
+        const terms = body.terms as Record<string, unknown>;
+        const termsHash = JSON.stringify(terms);
+        const arbiter = (body.parties as Record<string, unknown> | undefined)?.arbiter as string ?? body.provider;
+
+        const result = await this.runtime.contractsService.createContract({
+          contractId,
+          provider: body.provider,
+          arbiter,
+          totalAmount,
+          termsHash,
+          deadline,
+          milestoneAmounts,
+          milestoneDeadlines,
+        });
+        sendJson(res, 201, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -2867,6 +2936,24 @@ export class ApiServer {
     res: ServerResponse,
     contractId: string,
   ): Promise<void> {
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const view = await this.runtime.contractsService.getContract(contractId);
+        if (!view) {
+          sendError(res, 404, 'CONTRACT_NOT_FOUND', 'contract not found');
+          return;
+        }
+        const milestones = await this.runtime.contractsService.getMilestones(contractId);
+        sendJson(res, 200, { ...view, milestones });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -2890,6 +2977,20 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const result = await this.runtime.contractsService.signContract(contractId);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -2955,6 +3056,20 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const result = await this.runtime.contractsService.activateContract(contractId);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -3059,6 +3174,26 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const index = Number(milestoneId.replace(/^milestone-/, '')) - 1;
+        const deliverable = body.submissionId ?? `submission-${randomUUID()}`;
+        const result = await this.runtime.contractsService.submitMilestone(
+          contractId,
+          index >= 0 ? index : 0,
+          deliverable,
+        );
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -3180,6 +3315,24 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const index = Number(milestoneId.replace(/^milestone-/, '')) - 1;
+        const result = await this.runtime.contractsService.approveMilestone(
+          contractId,
+          index >= 0 ? index : 0,
+        );
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -3263,6 +3416,26 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const index = Number(milestoneId.replace(/^milestone-/, '')) - 1;
+        const reason = body.notes ?? body.feedback ?? 'rejected';
+        const result = await this.runtime.contractsService.rejectMilestone(
+          contractId,
+          index >= 0 ? index : 0,
+          reason,
+        );
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -3345,6 +3518,20 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const result = await this.runtime.contractsService.completeContract(contractId);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -3409,6 +3596,21 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const evidence = body.reason + (body.description ? ` ${body.description}` : '');
+        const result = await this.runtime.contractsService.disputeContract(contractId, evidence);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -3500,6 +3702,27 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    if (this.runtime.contractsService) {
+      try {
+        const { DisputeResolution } = await import('../services/contracts-service.js');
+        const resolutionMap: Record<string, number> = {
+          favor_provider: DisputeResolution.FavorProvider,
+          favor_client: DisputeResolution.FavorClient,
+          resume: DisputeResolution.Resume,
+        };
+        const resolution = resolutionMap[body.resolution] ?? DisputeResolution.Resume;
+        const result = await this.runtime.contractsService.resolveDispute(contractId, resolution);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -3586,6 +3809,22 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ContractsService available) ──────────────────
+    // Settlement maps to terminateContract on-chain (refunds remaining).
+    if (this.runtime.contractsService) {
+      try {
+        const reason = body.notes ?? 'settlement';
+        const result = await this.runtime.contractsService.terminateContract(contractId, reason);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');

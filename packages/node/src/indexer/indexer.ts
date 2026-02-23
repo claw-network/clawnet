@@ -399,6 +399,20 @@ export class EventIndexer {
       case 'ContractDisputed':
         this.store.updateServiceContractStatus(args['contractId'] ?? '', 4, timestamp);
         break;
+      case 'ContractTerminated':
+        this.store.updateServiceContractStatus(args['contractId'] ?? '', 5, timestamp);
+        break;
+      case 'ContractCancelled':
+        this.store.updateServiceContractStatus(args['contractId'] ?? '', 6, timestamp);
+        break;
+      case 'DisputeResolved': {
+        // Resolution: 0=FavorProvider→Completed(3), 1=FavorClient→Terminated(5), 2=Resume→Active(2)
+        const resolution = Number(args['resolution'] ?? 2);
+        const statusMap: Record<number, number> = { 0: 3, 1: 5, 2: 2 };
+        const newStatus = statusMap[resolution] ?? 2;
+        this.store.updateServiceContractStatus(args['contractId'] ?? '', newStatus, timestamp);
+        break;
+      }
       default:
         break;
     }

@@ -52,6 +52,7 @@ import { type ChainConfig, ContractProvider } from './services/index.js';
 import { WalletService } from './services/wallet-service.js';
 import { IdentityService } from './services/identity-service.js';
 import { ReputationService } from './services/reputation-service.js';
+import { ContractsService } from './services/contracts-service.js';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 
 export interface NodeRuntimeConfig {
@@ -122,6 +123,7 @@ export class ClawNetNode {
   private walletService?: WalletService;
   private identityService?: IdentityService;
   private reputationService?: ReputationService;
+  private contractsService?: ContractsService;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
   private startedAt?: number;
@@ -245,6 +247,7 @@ export class ClawNetNode {
           this.walletService = new WalletService(this.contractProvider, this.indexerQuery);
           this.identityService = new IdentityService(this.contractProvider, this.indexerQuery);
           this.reputationService = new ReputationService(this.contractProvider, this.indexerQuery);
+          this.contractsService = new ContractsService(this.contractProvider, this.indexerQuery);
           this.eventIndexer = new EventIndexer(
             this.contractProvider,
             this.indexerStore,
@@ -270,6 +273,7 @@ export class ClawNetNode {
           walletService: this.walletService,
           identityService: this.identityService,
           reputationService: this.reputationService,
+          contractsService: this.contractsService,
           searchMarkets: (query) => {
             if (!this.marketSearchStore) {
               throw new Error('market search unavailable');
@@ -341,6 +345,7 @@ export class ClawNetNode {
     this.walletService = undefined;
     this.identityService = undefined;
     this.reputationService = undefined;
+    this.contractsService = undefined;
     this.peerId = undefined;
     this.peerPrivateKey = undefined;
     this.stopping = undefined;

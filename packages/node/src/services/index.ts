@@ -50,3 +50,17 @@ export type {
   ReviewListResult,
   ReviewItem,
 } from './reputation-service.js';
+
+export { ContractsService } from './contracts-service.js';
+export type {
+  ContractStatus,
+  MilestoneStatus,
+  DisputeResolution,
+  ServiceContractView,
+  MilestoneView,
+  ContractCreateResult,
+  ContractTxResult,
+  MilestoneTxResult,
+  ContractListResult,
+  ServiceContractListItem,
+} from './contracts-service.js';
