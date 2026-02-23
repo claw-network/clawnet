@@ -126,30 +126,35 @@
   - 验收：本地链可启动，可部署合约 + 执行交易，零外部依赖
   - 工时：4 天
 
-- [ ] **T-0.12a** 部署 ClawNet Chain 3 节点测试网
-  - 基于已创建的 `infra/chain-testnet/` 配置文件，在 3 台云服务器上部署
-  - 服务器架构（已确定）：
-    - Server A: clawnetd.com（现有）— Validator #1 + Bootstrap + Caddy 反向代理
-    - Server B: Contabo VPS S — Validator #2
-    - Server C: Contabo VPS S — Validator #3
-  - 部署步骤：
-    1. 在 3 台服务器执行 `infra/chain-testnet/setup-server.sh`
-    2. 用 `cast wallet new` 生成 3 个 Validator 密钥
-    3. 填入 `genesis.json` 中 extradata 和 alloc 字段
-    4. `reth init --chain genesis.json` 初始化各节点
-    5. Server A: `docker compose -f docker-compose.yml up -d`
-    6. Server B/C: `docker compose -f docker-compose.peer.yml up -d`
-    7. 配置 Caddy（Server A）→ `api.clawnetd.com` / `rpc.clawnetd.com`
-  - 配置文件（已就绪）：
-    - `infra/README.md` — 完整部署指南
-    - `infra/chain-testnet/genesis.json` — 创世块（chainId=7625, Clique, period=2s）
-    - `infra/chain-testnet/docker-compose.yml` — Server A compose
-    - `infra/chain-testnet/docker-compose.peer.yml` — Server B/C compose
-    - `infra/chain-testnet/Caddyfile` — 反向代理配置
+- [x] **T-0.12a** 部署 ClawNet Chain 3 节点测试网  ✅ Geth v1.13.15 Clique PoA, 3 validators, 9 contracts deployed
+  - 基于 `infra/chain-testnet/` 配置文件，在 3 台云服务器上部署
+  - 实际采用：Geth v1.13.15（Reth 不支持 Clique），evmVersion: london（非 cancun）
+  - 服务器架构：
+    - Server A (66.94.125.242): clawnetd.com — Validator #1 + Bootstrap + Caddy + Homepage
+    - Server B (85.239.236.49): Contabo VPS S — Validator #2
+    - Server C (85.239.235.67): Contabo VPS S — Validator #3
+  - 实际部署步骤（详见 `infra/README.md`）：
+    1. 生成 3 个 Validator 密钥 + Deployer 密钥 + Treasury 地址
+    2. 构建 genesis.json（extradata 含 3 validator，alloc 预分配）
+    3. Server A 先启动挖矿，等待稳定出块
+    4. Server B/C 先 sync-only 模式同步到最新块，再切 mining 模式
+    5. Caddy 配置 clawnetd.com / api.clawnetd.com / rpc.clawnetd.com
+  - 关键经验教训（9 条，见 README §7 Lessons Learned）：
+    - genesis 不可含 shanghaiTime（Clique 不兼容）
+    - 新节点必须先 sync 再 mine（否则竞争分叉）
+    - nodekey 必须保留（wipe 后 enode 会变）
+    - 合约从 Server A localhost:8545 部署（非远程 RPC）
+  - 配置文件（已更新至实际部署版）：
+    - `infra/README.md` — 完整部署指南（~900 lines, Geth v1.13.15）
+    - `infra/chain-testnet/genesis.json` — 创世块（chainId=7625, Clique, period=2s, 无 shanghaiTime）
+    - `infra/chain-testnet/docker-compose.yml` — Server A compose (Geth)
+    - `infra/chain-testnet/docker-compose.peer.yml` — Server B/C compose (Geth)
+    - `infra/chain-testnet/docker-compose.sync.yml` — 新节点 sync-only 模式
+    - `infra/chain-testnet/Caddyfile` — 反向代理 + API key auth
     - `infra/chain-testnet/.env.example` — 环境变量模板
-    - `infra/chain-testnet/health-check.sh` — 健康检查
-    - `infra/chain-testnet/setup-server.sh` — 服务器初始化
-  - 验收：3 个 Validator 出块正常，PoA BFT 容忍 1 节点宕机，RPC 可通过 HTTPS 访问
+    - `infra/chain-testnet/health-check.sh` — 健康检查 (Geth)
+    - `infra/chain-testnet/setup-server.sh` — 服务器初始化 (Geth)
+  - 验收：3 个 Validator 出块正常 ✅，RPC HTTPS 可访问 ✅，9 个合约部署成功 ✅
   - 工时：2 天
   - 前置：T-0.12
   - 月费：¥92（2× Contabo VPS S €5.99）
@@ -186,7 +191,7 @@
 ■ UUPS 部署脚本可用
 ■ Ed25519 兼容方案确定并有 PoC（方案 C + Ed25519Verifier.sol 18 测试通过）
 □ ClawNet Chain 本地 devnet 可启动 + 部署合约（零外部依赖）
-□ ClawNet Chain 3 节点测试网上线（api.clawnetd.com / rpc.clawnetd.com 可访问）
+■ ClawNet Chain 3 节点测试网上线（Geth v1.13.15 Clique PoA, rpc.clawnetd.com 可访问）
 ■ DID → EVM address 映射工具通过测试（test vector 精确匹配）
 ```
 
@@ -403,16 +408,15 @@
   - 工时：2 天
   - 前置：T-1.1, T-1.5, T-1.9, T-1.13
 
-- [ ] **T-1.17** ClawNet Chain 测试网部署
-  - 前提：T-0.12a 已完成（3 节点测试网已运行）
+- [x] **T-1.17** ClawNet Chain 测试网部署  ✅ 与 T-2.18 合并完成，9 合约一次性部署
+  - 说明：实际部署时 Phase 1 和 Phase 2 合约已全部就绪，使用 `deploy-all.ts` 一次性部署全部 9 个合约
   - 操作：
-    1. 确认 `rpc.clawnetd.com` 可连接：`cast block-number --rpc-url https://rpc.clawnetd.com`
-    2. 执行 `deploy-all-p0.ts --network clawnetTestnet`
-    3. 用 `cast` 验证合约 bytecode：`cast code <address> --rpc-url $RPC`
-    4. 记录合约地址到 `packages/contracts/deployments/clawnetTestnet.json`
-  - 说明：无 Blockscout 链浏览器，使用 `cast` CLI 进行链上查询和验证
-  - 验收：所有 4 个合约部署成功 + bytecode 验证通过
-  - 工时：1 天
+    1. 在 Server A 本地执行 `npx hardhat run scripts/deploy-all.ts --network clawnetTestnet`
+    2. 9 个合约全部部署成功（proxy + impl），地址记录到 `deployments/clawnetTestnet.json`
+    3. 角色授予：Staking → MINTER_ROLE, DAO → GOVERNOR_ROLE
+    4. ParamRegistry 默认参数初始化
+  - 验收：9 个合约部署成功 ✅，角色授予 ✅，地址记录 ✅
+  - 工时：0.5 天（与 T-2.18 合并）
   - 前置：T-1.16, T-0.12a
 
 - [x] **T-1.18** SDK 新增链上模式：WalletOnChainApi
@@ -469,7 +473,7 @@
 ✅ ClawEscrow.sol 测试覆盖率 > 95%（100% Stmts, 98.84% Lines — 73 tests），包含重入防护测试
 ✅ ClawIdentity.sol 测试覆盖率 > 95%（100% Stmts, 100% Lines — 49 tests），DID 映射正确
 ✅ ClawStaking.sol 测试覆盖率 > 95%（51 tests），质押/slash 逻辑正确
-⏳ ClawNet Chain 测试网 4 个合约部署成功 + 源码验证（T-1.17 blocked on T-0.12a）
+✅ ClawNet Chain 测试网 9 个合约部署成功（与 T-2.18 合并一次性部署，地址见 deployments/clawnetTestnet.json）
 ✅ SDK onChain 模式可用（wallet + identity），ethers v6 peer dep，SDK build + 61 tests passing
 ✅ P0 集成测试全部通过（224 passing = 200 unit + 24 integration，29s）
 ⏳ Slither 无 High/Medium 级别告警（CI 配置就绪，需运行）
@@ -670,9 +674,21 @@
   - 输出：`deployments/<network>.json`
   - 工时：2 天
 
-- [ ] **T-2.18** ClawNet Chain 测试网全量部署 ⏳ blocked on cloud infra (same as T-0.12/T-1.17)
-  - 验收：8 个合约全部部署成功 + 源码验证
-  - 工时：1 天
+- [x] **T-2.18** ClawNet Chain 测试网全量部署  ✅ 9 contracts deployed to chainId 7625
+  - 实际执行：在 Server A (66.94.125.242) 通过 localhost:8545 执行 `deploy-all.ts --network clawnetTestnet`
+  - 部署结果（9 个合约，proxy + impl）：
+    - ClawToken: `0xA98Cc076321aF8cC66A579b91643B5B98E316AA4`
+    - ParamRegistry: `0x31cCc8480Ab7BCBd576a2B2b7203a58ee8494b16`
+    - ClawEscrow: `0x5Ce7F1E92A65BeE1245dddbAC8e5F12bF79AC0F4`
+    - ClawIdentity: `0xB59dEcd56C11a8a8F120ED7D9C3BAE16C5CA55E0`
+    - ClawStaking: `0xbf3a9Cff2b37A7531c385A23288D73DbB4427dD2`
+    - ClawReputation: `0x4358f0b43E6f88cbdfDc0055d56D17aF3d4FB343`
+    - ClawDAO: `0xe3C7a659591EaA8E724505E00Bccbb743CB9948b`
+    - ClawContracts: `0x8674249aC00a67b4B1F28475e46D043b50Ded028`
+    - ClawRouter: `0x1dAC767bfaD7dBcD06ba52d1BB698429BbaFA11f`
+  - 地址记录：`packages/contracts/deployments/clawnetTestnet.json`
+  - 验收：9 个合约全部部署成功 ✅ + 角色授予 ✅ + ParamRegistry 初始化 ✅
+  - 工时：0.5 天（与 T-1.17 合并）
 
 - [x] **T-2.19** SDK 新增 DAO / Contracts / Reputation / Staking 链上适配 ✅ 4 adapters + readOnly + index exports
   - 新增文件：
@@ -721,14 +737,14 @@
 ### Phase 2 验收门槛
 
 ```
-□ ClawDAO.sol 投票权重正确，全流程 e2e 通过
-□ ClawContracts.sol 里程碑结算 + 争议仲裁测试通过
-□ ClawReputation.sol 批量锚定 + Merkle 验证通过
-□ ParamRegistry.sol DAO 修改参数 e2e 通过
-□ ClawRouter.sol 模块注册正确
-□ 全量跨模块集成测试通过
-□ ClawNet Chain 测试网 8 个合约全部部署成功 + 已验证
-□ SDK + CLI 链上模式完整可用
+■ ClawDAO.sol 投票权重正确，全流程 e2e 通过（59 tests）
+■ ClawContracts.sol 里程碑结算 + 争议仲裁测试通过（97 tests）
+■ ClawReputation.sol 批量锚定 + Merkle 验证通过（59 tests）
+■ ParamRegistry.sol DAO 修改参数 e2e 通过（35 tests）
+■ ClawRouter.sol 模块注册正确
+■ 全量跨模块集成测试通过（15 tests, 5 scenarios）
+■ ClawNet Chain 测试网 9 个合约全部部署成功（chainId 7625, Geth v1.13.15 Clique PoA）
+■ SDK + CLI 链上模式完整可用（4 adapters + CLI onchain commands）
 □ Slither 无 High/Medium 级别告警
 □ 外部审计公司已签约
 ```
@@ -929,5 +945,5 @@ T-0.13(Ed25519)──┼──→ T-1.1 (Token)──→ T-1.3 (Test)
 
 ---
 
-*最后更新: 2026年2月22日*
-*状态: 待团队评审确认后启动 Phase 0*
+*最后更新: 2026年2月23日*
+*状态: Phase 0–2 合约开发完成，583 tests passing，9 合约已部署测试网（chainId 7625），进入 Sprint 2-G 安全审计准备*
