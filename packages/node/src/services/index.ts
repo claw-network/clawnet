@@ -40,3 +40,13 @@ export type {
   PlatformLinkResult,
   DIDDocument,
 } from './identity-service.js';
+
+export { ReputationService } from './reputation-service.js';
+export type {
+  ReputationDimensionName,
+  ReputationProfile,
+  ReviewRecordResult,
+  AnchorResult,
+  ReviewListResult,
+  ReviewItem,
+} from './reputation-service.js';

@@ -909,6 +909,7 @@ const DaoTreasuryDepositSchema = z
 
 import type { WalletService } from '../services/wallet-service.js';
 import type { IdentityService } from '../services/identity-service.js';
+import type { ReputationService } from '../services/reputation-service.js';
 
 export class ApiServer {
   private server?: Server;
@@ -925,6 +926,7 @@ export class ApiServer {
       infoContentStore?: InfoContentStore;
       walletService?: WalletService;
       identityService?: IdentityService;
+      reputationService?: ReputationService;
       searchMarkets?: (query: SearchQuery) => SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
@@ -1780,6 +1782,34 @@ export class ApiServer {
       sendError(res, 400, 'DID_INVALID', 'invalid did');
       return;
     }
+    // ── On-chain path (ReputationService available) ──────────────────
+    if (this.runtime.reputationService) {
+      try {
+        const profile = await this.runtime.reputationService.getProfile(did);
+        if (!profile) {
+          sendError(res, 404, 'REPUTATION_NOT_FOUND', 'reputation not found');
+          return;
+        }
+        sendJson(res, 200, {
+          did,
+          score: profile.score,
+          level: 'anchored',
+          levelNumber: 0,
+          dimensions: profile.dimensions,
+          totalTransactions: 0,
+          successRate: 0,
+          averageRating: 0,
+          badges: [],
+          updatedAt: profile.epoch,
+        });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (P2P stores / event replay) ───────────────────────
     const source = parseReputationSource(url.searchParams.get('source'));
     if (source === 'invalid') {
       sendError(res, 400, 'INVALID_REQUEST', 'invalid source');
@@ -1866,13 +1896,40 @@ export class ApiServer {
       sendError(res, 400, 'DID_INVALID', 'invalid did');
       return;
     }
+
+    const limit = parsePagination(url.searchParams.get('limit'), 20, 100);
+    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000);
+
+    // ── On-chain path (ReputationService available) ──────────────────
+    if (this.runtime.reputationService) {
+      try {
+        const result = await this.runtime.reputationService.getReviews(did, { limit, offset });
+        const reviews = result?.reviews ?? [];
+        const total = result?.total ?? 0;
+        sendJson(res, 200, {
+          reviews,
+          total,
+          averageRating: 0,
+          pagination: {
+            total,
+            limit,
+            offset,
+            hasMore: offset + limit < total,
+          },
+        });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (P2P stores / event replay) ───────────────────────
     const source = parseReputationSource(url.searchParams.get('source'));
     if (source === 'invalid') {
       sendError(res, 400, 'INVALID_REQUEST', 'invalid source');
       return;
     }
-    const limit = parsePagination(url.searchParams.get('limit'), 20, 100);
-    const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000);
 
     const store = this.runtime.reputationStore;
     if (source !== 'log' && store) {
@@ -1956,6 +2013,30 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path (ReputationService available) ──────────────────
+    if (this.runtime.reputationService) {
+      try {
+        const reviewId = `${body.did}:${body.target}:${body.nonce}`;
+        const result = await this.runtime.reputationService.recordReview(
+          reviewId,
+          body.did,
+          body.target,
+          body.ref,
+        );
+        sendJson(res, 200, {
+          txHash: result.txHash,
+          status: 'confirmed',
+          timestamp: Date.now(),
+        });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (P2P envelope broadcast) ──────────────────────────
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
       sendError(res, 400, 'REPUTATION_INVALID', 'key unavailable');
