@@ -5,14 +5,13 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getBytes, keccak256, toUtf8Bytes } from 'ethers';
+import { keccak256, toUtf8Bytes } from 'ethers';
 import { IdentityService } from '../../src/services/identity-service.js';
 import {
   createMockProvider,
   createMockIndexer,
   mockTxResponse,
   TX_HASH,
-  SIGNER_ADDRESS,
 } from './_mock-contracts.js';
 
 describe('IdentityService', () => {
@@ -46,6 +45,7 @@ describe('IdentityService', () => {
       },
     });
     indexer = createMockIndexer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     service = new IdentityService(provider as any, indexer as any);
   });
 

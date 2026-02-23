@@ -39,7 +39,9 @@ export function mockTxResponse(receiptOverrides: Record<string, unknown> = {}) {
 
 export function mockContract(
   stubs: Record<string, unknown> = {},
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Record<string, any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contract: any = new Proxy(stubs, {
     get(target, prop: string) {
       if (prop in target) return target[prop];
@@ -55,15 +57,18 @@ export function mockContract(
 // Mock ContractProvider
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MockContract = Record<string, any>;
+
 export interface MockProviderContracts {
-  token: Record<string, any>;
-  escrow: Record<string, any>;
-  identity: Record<string, any>;
-  reputation: Record<string, any>;
-  serviceContracts: Record<string, any>;
-  dao: Record<string, any>;
-  staking: Record<string, any>;
-  paramRegistry: Record<string, any>;
+  token: MockContract;
+  escrow: MockContract;
+  identity: MockContract;
+  reputation: MockContract;
+  serviceContracts: MockContract;
+  dao: MockContract;
+  staking: MockContract;
+  paramRegistry: MockContract;
 }
 
 const SIGNER_ADDRESS = '0x' + '11'.repeat(20);
@@ -90,7 +95,7 @@ export function createMockProvider(
 
   return {
     ...contracts,
-    get: vi.fn((key: string) => (contracts as any)[key]),
+    get: vi.fn((key: string) => (contracts as Record<string, MockContract>)[key]),
     signerAddress: SIGNER_ADDRESS,
     getBlockNumber: vi.fn().mockResolvedValue(100),
     destroy: vi.fn(),

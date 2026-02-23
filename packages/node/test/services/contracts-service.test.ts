@@ -5,14 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { keccak256, toUtf8Bytes } from 'ethers';
-import { ContractsService, ContractStatus, MilestoneStatus, DisputeResolution } from '../../src/services/contracts-service.js';
+import { ContractsService, MilestoneStatus, DisputeResolution } from '../../src/services/contracts-service.js';
 import {
   createMockProvider,
   createMockIndexer,
   mockTxResponse,
   TX_HASH,
-  SIGNER_ADDRESS,
 } from './_mock-contracts.js';
 
 describe('ContractsService', () => {
@@ -77,6 +75,7 @@ describe('ContractsService', () => {
       },
     });
     indexer = createMockIndexer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     service = new ContractsService(provider as any, indexer as any);
   });
 
@@ -109,6 +108,7 @@ describe('ContractsService', () => {
 
   describe('listContracts', () => {
     it('returns null when no indexer', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const noIndexer = new ContractsService(provider as any);
       const result = noIndexer.listContracts();
       expect(result).toBeNull();

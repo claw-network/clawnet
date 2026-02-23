@@ -8,9 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { keccak256, toUtf8Bytes } from 'ethers';
 import {
   DaoService,
-  ProposalType,
   ProposalStatus,
-  VoteSupport,
 } from '../../src/services/dao-service.js';
 import {
   createMockProvider,
@@ -92,6 +90,7 @@ describe('DaoService', () => {
       },
     });
     indexer = createMockIndexer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     service = new DaoService(provider as any, indexer as any);
   });
 
@@ -118,6 +117,7 @@ describe('DaoService', () => {
     });
 
     it('returns empty when no indexer', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const noIndexer = new DaoService(provider as any);
       const result = await noIndexer.listProposals();
       expect(result.proposals).toEqual([]);

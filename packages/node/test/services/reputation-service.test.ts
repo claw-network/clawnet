@@ -52,6 +52,7 @@ describe('ReputationService', () => {
       },
     });
     indexer = createMockIndexer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     service = new ReputationService(provider as any, indexer as any);
   });
 
@@ -76,6 +77,7 @@ describe('ReputationService', () => {
 
   describe('getReviews (indexer)', () => {
     it('returns null when no indexer', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const noIndexer = new ReputationService(provider as any);
       const result = noIndexer.getReviews(DID);
       expect(result).toBeNull();

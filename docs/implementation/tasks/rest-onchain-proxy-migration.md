@@ -585,7 +585,7 @@ Hardhat Local Node (chainId 31337)
 - [x] 集成测试通过（SDK → REST → 链 → 查询完整链路）— integration harness + wallet-chain E2E test 已建立
 - [x] `clawnet/scenarios/` 中对应场景测试通过（104 passed, 0 failed — 见 clawnet/test-output.txt）
 - [x] 无 TypeScript 编译错误（tsc --noEmit 通过）
-- [ ] 无 ESLint 警告
+- [x] 无 ESLint 警告（services + indexer + test/services + benchmark 全部 0 errors）
 
 ---
 
