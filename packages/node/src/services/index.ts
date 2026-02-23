@@ -20,3 +20,13 @@ export {
 } from './chain-config.js';
 
 export { ContractProvider } from './contract-provider.js';
+
+export { WalletService } from './wallet-service.js';
+export type {
+  TransferResult,
+  BalanceResult,
+  EscrowView,
+  EscrowActionResult,
+  EscrowCreateResult,
+  TransactionHistoryResult,
+} from './wallet-service.js';

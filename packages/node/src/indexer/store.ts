@@ -1,12 +1,12 @@
 /**
- * IndexerStore — SQLite persistence for the Event Indexer.
+ * IndexerStore �?SQLite persistence for the Event Indexer.
  *
  * Manages all on-chain event data:
  * - Generic `events` table (raw event log)
- * - Module-specific materialized tables (transfers, contracts, proposals, …)
+ * - Module-specific materialized tables (transfers, contracts, proposals, �?
  * - Indexer metadata (last indexed block, etc.)
  *
- * Uses `better-sqlite3` for synchronous, single-connection access —
+ * Uses `better-sqlite3` for synchronous, single-connection access �?
  * ideal for a single-node daemon where reads and writes are serialised.
  */
 
@@ -188,26 +188,31 @@ CREATE TABLE IF NOT EXISTS did_cache (
 // ---------------------------------------------------------------------------
 
 export class IndexerStore {
-  private readonly db: Database.Database;
+  private readonly _db: Database.Database;
 
   constructor(dbPath: string) {
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
-    this.db.exec(SCHEMA_SQL);
+    this._db = new Database(dbPath);
+    this._db.pragma('journal_mode = WAL');
+    this._db.pragma('foreign_keys = ON');
+    this._db.exec(SCHEMA_SQL);
+  }
+
+  /** Expose the underlying Database instance (for IndexerQuery). */
+  get database(): Database.Database {
+    return this._db;
   }
 
   // ── Metadata ────────────────────────────────────────────────────────────
 
   getMeta(key: string): string | undefined {
-    const row = this.db
+    const row = this._db
       .prepare('SELECT value FROM indexer_meta WHERE key = ?')
       .get(key) as { value: string } | undefined;
     return row?.value;
   }
 
   setMeta(key: string, value: string): void {
-    this.db
+    this._db
       .prepare(
         'INSERT INTO indexer_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       )
@@ -226,7 +231,7 @@ export class IndexerStore {
   // ── Generic events ──────────────────────────────────────────────────────
 
   insertEvent(event: RawEvent): void {
-    this.db
+    this._db
       .prepare(
         `INSERT OR IGNORE INTO events (block, tx_hash, log_index, contract, event_name, args, timestamp)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -245,7 +250,7 @@ export class IndexerStore {
   // ── Wallet transfers ────────────────────────────────────────────────────
 
   insertTransfer(t: WalletTransfer): void {
-    this.db
+    this._db
       .prepare(
         `INSERT INTO wallet_transfers (block, tx_hash, from_addr, to_addr, amount, timestamp)
          VALUES (?, ?, ?, ?, ?, ?)`,
@@ -256,7 +261,7 @@ export class IndexerStore {
   // ── Escrows ─────────────────────────────────────────────────────────────
 
   upsertEscrow(e: EscrowRecord): void {
-    this.db
+    this._db
       .prepare(
         `INSERT INTO escrows (escrow_id, depositor, beneficiary, arbiter, amount, status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -278,7 +283,7 @@ export class IndexerStore {
   }
 
   updateEscrowStatus(escrowId: string, status: number, updatedAt: number): void {
-    this.db
+    this._db
       .prepare('UPDATE escrows SET status = ?, updated_at = ? WHERE escrow_id = ?')
       .run(status, updatedAt, escrowId);
   }
@@ -286,7 +291,7 @@ export class IndexerStore {
   // ── Service contracts ───────────────────────────────────────────────────
 
   upsertServiceContract(c: IndexedServiceContract): void {
-    this.db
+    this._db
       .prepare(
         `INSERT INTO service_contracts (contract_id, client, provider, status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?)
@@ -309,7 +314,7 @@ export class IndexerStore {
     status: number,
     updatedAt: number,
   ): void {
-    this.db
+    this._db
       .prepare(
         'UPDATE service_contracts SET status = ?, updated_at = ? WHERE contract_id = ?',
       )
@@ -319,7 +324,7 @@ export class IndexerStore {
   // ── DAO proposals ───────────────────────────────────────────────────────
 
   upsertProposal(p: IndexedProposal): void {
-    this.db
+    this._db
       .prepare(
         `INSERT INTO proposals (proposal_id, proposer, p_type, status, created_at)
          VALUES (?, ?, ?, ?, ?)
@@ -330,7 +335,7 @@ export class IndexerStore {
   }
 
   updateProposalStatus(proposalId: number, status: number): void {
-    this.db
+    this._db
       .prepare('UPDATE proposals SET status = ? WHERE proposal_id = ?')
       .run(status, proposalId);
   }
@@ -338,7 +343,7 @@ export class IndexerStore {
   // ── DAO votes ───────────────────────────────────────────────────────────
 
   insertVote(v: IndexedVote): void {
-    this.db
+    this._db
       .prepare(
         `INSERT OR IGNORE INTO votes (proposal_id, voter, support, weight, timestamp)
          VALUES (?, ?, ?, ?, ?)`,
@@ -349,7 +354,7 @@ export class IndexerStore {
   // ── Reputation reviews ──────────────────────────────────────────────────
 
   insertReview(r: IndexedReview): void {
-    this.db
+    this._db
       .prepare(
         `INSERT OR IGNORE INTO reviews (review_hash, reviewer_did, subject_did, related_tx_hash, timestamp)
          VALUES (?, ?, ?, ?, ?)`,
@@ -372,7 +377,7 @@ export class IndexerStore {
     isActive: boolean,
     updatedAt: number,
   ): void {
-    this.db
+    this._db
       .prepare(
         `INSERT INTO did_cache (did_hash, controller, active_key, is_active, updated_at)
          VALUES (?, ?, ?, ?, ?)
@@ -389,12 +394,12 @@ export class IndexerStore {
 
   /** Execute a batch of operations inside a single SQLite transaction. */
   transaction<T>(fn: () => T): T {
-    return this.db.transaction(fn)();
+    return this._db.transaction(fn)();
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
   close(): void {
-    this.db.close();
+    this._db.close();
   }
 }

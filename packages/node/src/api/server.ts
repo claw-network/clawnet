@@ -884,6 +884,8 @@ const DaoTreasuryDepositSchema = z
   })
   .passthrough();
 
+import type { WalletService } from '../services/wallet-service.js';
+
 export class ApiServer {
   private server?: Server;
 
@@ -897,6 +899,7 @@ export class ApiServer {
       daoStore?: DaoStore;
       marketStore?: MarketSearchStore;
       infoContentStore?: InfoContentStore;
+      walletService?: WalletService;
       searchMarkets?: (query: SearchQuery) => SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
@@ -1838,11 +1841,6 @@ export class ApiServer {
     res: ServerResponse,
     url: URL,
   ): Promise<void> {
-    const eventStore = this.runtime.eventStore;
-    if (!eventStore) {
-      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
-      return;
-    }
     const query = parseWalletQuery(url, res);
     if (!query) {
       return;
@@ -1850,6 +1848,25 @@ export class ApiServer {
     const resolved = resolveAddressFromQuery(query);
     if (!resolved) {
       sendError(res, 400, 'INVALID_REQUEST', 'missing address');
+      return;
+    }
+
+    // ── On-chain path (WalletService available) ───────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const balance = await this.runtime.walletService.getBalance(resolved);
+        sendJson(res, 200, balance);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
       return;
     }
     const state = await buildWalletState(eventStore);
@@ -1872,11 +1889,6 @@ export class ApiServer {
     res: ServerResponse,
     url: URL,
   ): Promise<void> {
-    const eventStore = this.runtime.eventStore;
-    if (!eventStore) {
-      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
-      return;
-    }
     const query = parseWalletQuery(url, res);
     if (!query) {
       return;
@@ -1890,6 +1902,28 @@ export class ApiServer {
     const limit = parsePagination(url.searchParams.get('limit'), 20, 100);
     const offset = parsePagination(url.searchParams.get('offset'), 0, 10_000);
 
+    // ── On-chain path (WalletService + indexer) ───────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const result = this.runtime.walletService.getHistory(resolved, {
+          limit,
+          offset,
+          type: typeFilter,
+        });
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (event replay) ────────────────────────────────────
+    const eventStore = this.runtime.eventStore;
+    if (!eventStore) {
+      sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
+      return;
+    }
     const state = await buildWalletState(eventStore);
     const transactions = buildWalletTransactions(state, resolved).filter((tx) =>
       filterWalletTransaction(typeFilter, resolved, tx),
@@ -1914,6 +1948,25 @@ export class ApiServer {
       return;
     }
     const from = addressFromDid(body.did);
+
+    // ── On-chain path (WalletService available) ───────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const result = await this.runtime.walletService.transfer(
+          from,
+          to,
+          Number(body.amount),
+          body.memo,
+        );
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (P2P envelope) ────────────────────────────────────
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
       sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
@@ -1964,13 +2017,33 @@ export class ApiServer {
       sendError(res, 400, 'INVALID_REQUEST', 'invalid beneficiary');
       return;
     }
+    const escrowId = body.escrowId ?? `escrow-${Date.now()}`;
+
+    // ── On-chain path ────────────────────────────────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const result = await this.runtime.walletService.createEscrow({
+          escrowId,
+          beneficiary,
+          arbiter: body.arbiter ? resolveAddress(body.arbiter) ?? undefined : undefined,
+          amount: Number(body.amount),
+          expiresAt: body.expiresAt,
+        });
+        sendJson(res, 201, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path (P2P envelope) ───────────────────────────────────
     const depositor = addressFromDid(body.did);
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
       sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
       return;
     }
-    const escrowId = body.escrowId ?? `escrow-${Date.now()}`;
 
     let createEnvelope: Record<string, unknown>;
     try {
@@ -2032,6 +2105,23 @@ export class ApiServer {
     res: ServerResponse,
     escrowId: string,
   ): Promise<void> {
+    // ── On-chain path ────────────────────────────────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const escrow = await this.runtime.walletService.getEscrow(escrowId);
+        if (!escrow) {
+          sendError(res, 404, 'ESCROW_NOT_FOUND', 'escrow not found');
+          return;
+        }
+        sendJson(res, 200, escrow);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path ──────────────────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');
@@ -2071,6 +2161,23 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path ────────────────────────────────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const result = await this.runtime.walletService.fundEscrow(
+          escrowId,
+          Number(body.amount),
+        );
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path ──────────────────────────────────────────────────
     const privateKey = await resolvePrivateKey(this.config.dataDir, body.did, body.passphrase);
     if (!privateKey) {
       sendError(res, 400, 'INVALID_REQUEST', 'key unavailable');
@@ -2114,6 +2221,20 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path ────────────────────────────────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const result = await this.runtime.walletService.releaseEscrow(escrowId);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path ──────────────────────────────────────────────────
     if (!body.ruleId) {
       sendError(res, 400, 'INVALID_REQUEST', 'missing rule id');
       return;
@@ -2162,6 +2283,20 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path ────────────────────────────────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const result = await this.runtime.walletService.refundEscrow(escrowId);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path ──────────────────────────────────────────────────
     if (!body.reason) {
       sendError(res, 400, 'INVALID_REQUEST', 'missing reason');
       return;
@@ -2211,6 +2346,20 @@ export class ApiServer {
     if (!body) {
       return;
     }
+
+    // ── On-chain path ────────────────────────────────────────────────
+    if (this.runtime.walletService) {
+      try {
+        const result = await this.runtime.walletService.expireEscrow(escrowId);
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy path ──────────────────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'event store unavailable');

@@ -48,6 +48,9 @@ import {
 } from '@claw-network/protocol';
 import { P2PSync, P2PSyncConfig } from './p2p/sync.js';
 import { ApiServer, ApiServerConfig } from './api/server.js';
+import { type ChainConfig, ContractProvider } from './services/index.js';
+import { WalletService } from './services/wallet-service.js';
+import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 
 export interface NodeRuntimeConfig {
   dataDir?: string;
@@ -71,6 +74,10 @@ export interface NodeRuntimeConfig {
   }) => Promise<SnapshotRecord | null>;
   snapshotPolicy?: Partial<SnapshotSchedulePolicy>;
   resolveControllerPublicKey?: (controllerDid: string) => Promise<Uint8Array | null>;
+  /** On-chain configuration. When provided, enables chain read/write via ContractProvider + WalletService. */
+  chain?: ChainConfig;
+  /** Optional overrides for the event indexer polling behaviour. */
+  indexer?: EventIndexerConfig;
 }
 
 export const DEFAULT_SYNC_RUNTIME_CONFIG = {
@@ -106,6 +113,11 @@ export class ClawNetNode {
   private snapshotTimer?: NodeJS.Timeout;
   private meshAmplifierTimer?: NodeJS.Timeout;
   private apiServer?: ApiServer;
+  private contractProvider?: ContractProvider;
+  private indexerStore?: IndexerStore;
+  private eventIndexer?: EventIndexer;
+  private indexerQuery?: IndexerQuery;
+  private walletService?: WalletService;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
   private startedAt?: number;
@@ -218,6 +230,24 @@ export class ClawNetNode {
       this.startMeshAmplifier();
 
       if (this.config.api?.enabled !== false) {
+        // ── On-chain infrastructure (optional) ─────────────────────────
+        if (this.config.chain) {
+          const storagePaths = resolveStoragePaths(this.config.dataDir);
+          const dbPath = join(storagePaths.root, 'indexer.sqlite');
+
+          this.contractProvider = new ContractProvider(this.config.chain);
+          this.indexerStore = new IndexerStore(dbPath);
+          this.indexerQuery = new IndexerQuery(this.indexerStore.database);
+          this.walletService = new WalletService(this.contractProvider, this.indexerQuery);
+          this.eventIndexer = new EventIndexer(
+            this.contractProvider,
+            this.indexerStore,
+            this.config.indexer,
+          );
+          // Start indexer in background (non-blocking).
+          void this.eventIndexer.start();
+        }
+
         const apiConfig: ApiServerConfig = {
           host: this.config.api?.host ?? '127.0.0.1',
           port: this.config.api?.port ?? 9528,
@@ -231,6 +261,7 @@ export class ClawNetNode {
           daoStore: this.daoStore,
           marketStore: this.marketSearchStore,
           infoContentStore: this.infoContentStore,
+          walletService: this.walletService,
           searchMarkets: (query) => {
             if (!this.marketSearchStore) {
               throw new Error('market search unavailable');
@@ -266,6 +297,8 @@ export class ClawNetNode {
 
     const tasks: Array<() => Promise<void>> = [
       async () => this.apiServer?.stop(),
+      async () => this.eventIndexer?.stop(),
+      async () => this.contractProvider?.destroy(),
       async () => this.sync?.stop(),
       async () => this.p2p?.stop(),
       async () => this.eventDb?.close(),
@@ -280,6 +313,9 @@ export class ClawNetNode {
       }
     }
 
+    // Synchronous cleanup (SQLite)
+    try { this.indexerStore?.close(); } catch { /* ignore */ }
+
     this.apiServer = undefined;
     this.sync = undefined;
     this.p2p = undefined;
@@ -290,6 +326,11 @@ export class ClawNetNode {
     this.snapshotScheduler = undefined;
     this.reputationStore = undefined;
     this.marketSearchStore = undefined;
+    this.contractProvider = undefined;
+    this.indexerStore = undefined;
+    this.eventIndexer = undefined;
+    this.indexerQuery = undefined;
+    this.walletService = undefined;
     this.peerId = undefined;
     this.peerPrivateKey = undefined;
     this.stopping = undefined;
