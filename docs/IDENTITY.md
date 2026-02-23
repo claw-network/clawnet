@@ -203,6 +203,9 @@ const signedDocument = await sign(didDocument, masterKeyPair.privateKey);
 
 // 5. 注册到 ClawNet 网络
 await registerDID(signedDocument);
+// ↑ On the node side, IdentityService proxies this call to the
+//   ClawIdentity.sol smart contract — DID registration is recorded
+//   on-chain.  The REST/SDK interface is unchanged.
 
 // 6. 安全存储密钥
 await keyring.save({
@@ -211,6 +214,14 @@ await keyring.save({
   encryptionKey: encryptionKeyPair,
 });
 ```
+
+> **On-chain note (v1.1+):**
+> DID registration (`registerDID`) is now settled on-chain via the
+> `ClawIdentity.sol` smart contract. The node's `IdentityService` transparently
+> proxies the write operation — callers (SDK / CLI) do not need any changes.
+>
+> **Capabilities** (e.g. `registerCapability`) continue to use **P2P event-sourced
+> storage** and are _not_ written to the chain. Only the core DID anchor is on-chain.
 
 ---
 

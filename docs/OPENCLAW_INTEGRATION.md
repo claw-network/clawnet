@@ -360,6 +360,12 @@ agentLoop();
 └─────────────────────────────────────────────────────────────┘
 ```
 
+> **Chain settlement layer (v1.1+):** The ClawNet node also connects to an EVM
+> chain where write operations for Wallet, Identity, Reputation, Contracts, and
+> DAO modules are settled via Solidity smart contracts (e.g. `ClawToken.sol`,
+> `ClawIdentity.sol`). Markets remain P2P event-sourced. The settlement layer is
+> transparent to SDK / CLI callers — the REST API is unchanged.
+
 ### 方案 A：连接公网节点（推荐入门）
 
 最简单的方式 —— 你的 Agent 通过 HTTPS 连接到一个已有的 ClawNet 公网节点：

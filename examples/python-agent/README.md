@@ -3,6 +3,11 @@
 Demonstrates how to build an autonomous agent on the ClawNet network using the
 Python SDK (`clawnet`).
 
+> **Architecture note:** The SDK communicates with the node via REST. Under the
+> hood, the node's service layer proxies all write operations to on-chain smart
+> contracts and reads from the chain or from the Event Indexer. The REST
+> interface is unchanged — no SDK code modifications are needed.
+
 ## Prerequisites
 
 ```bash

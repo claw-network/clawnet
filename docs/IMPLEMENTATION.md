@@ -315,6 +315,46 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Layer 2.5: Contract Service Layer (链代理层)
+
+**将写操作代理到 EVM Chain，将链上事件索引为本地可查询数据**
+
+Wallet / Identity / Reputation / Contracts / DAO 的写操作通过 Node Service 类（ethers.js v6）提交到链上合约；读操作使用链 view 函数或 Event Indexer (SQLite)。Markets / Node 仍经 P2P 事件溯源。REST API 保持不变——SDK 与 CLI 无需修改。
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       Contract Service Layer                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Contract Services (写操作代理)                                      │    │
+│  │                                                                      │    │
+│  │  依赖: ethers.js v6, ContractProvider, ChainConfig                    │    │
+│  │                                                                      │    │
+│  │  ┌───────────────┐ ┌────────────────┐ ┌──────────────────┐     │    │
+│  │  │ WalletService │ │ IdentityService│ │ ReputationService│     │    │
+│  │  └───────────────┘ └────────────────┘ └──────────────────┘     │    │
+│  │  ┌─────────────────┐ ┌───────────────┐                            │    │
+│  │  │ ContractsService│ │  DaoService    │                            │    │
+│  │  └─────────────────┘ └───────────────┘                            │    │
+│  │                                                                      │    │
+│  │  ─────────────────────────────────────── ▼ EVM Chain                │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Event Indexer (读操作索引)                                           │    │
+│  │                                                                      │    │
+│  │  依赖: SQLite (IndexerStore / EventIndexer / IndexerQuery)             │    │
+│  │                                                                      │    │
+│  │  • 监听链上合约事件，写入本地 SQLite                                 │    │
+│  │  • 提供聚合查询、分页、历史记录等读操作                          │    │
+│  │  • Chain view 函数用于获取实时状态 (balance, score 等)             │    │
+│  │                                                                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
 ### Layer 3: Interface Layer (接口层)
 
 对应规范文档：
@@ -392,7 +432,35 @@
                     │                               │                               │
                     └───────────────────────────────┴───────────────────────────────┘
                                                     │
-                                                    ▼
+                               ┌────────────────────┼────────────────────┐
+                               │                    │                    │
+                               ▼                    ▼                    ▼
+              ┌─────────────────────────┐  ┌────────────────┐  ┌─────────────────┐
+              │  Contract Services      │  │  Event Indexer │  │ Protocol Layer  │
+              │  (ethers.js → EVM)     │  │  (SQLite)      │  │ (P2P-only)      │
+              │                         │  │                │  │                 │
+              │  WalletService          │  │  IndexerStore  │  │  Markets Module │
+              │  IdentityService        │  │  EventIndexer  │  │  (Gossipsub)    │
+              │  ReputationService      │  │  IndexerQuery  │  │                 │
+              │  ContractsService       │  │                │  │                 │
+              │  DaoService             │  │                │  │                 │
+              └────────────┬────────────┘  └───────┬────────┘  └────────┬────────┘
+                           │                       │                    │
+                           ▼                       ▼                    ▼
+              ┌─────────────────────────┐               ┌───────────────────────┐
+              │  EVM Chain              │               │  Core Layer           │
+              │  (smart contracts)      │               │  (P2P / Storage /     │
+              └─────────────────────────┘               │   Crypto)             │
+                                                        └───────────────────────┘
+
+  写操作: HTTP API → Contract Services → EVM Chain
+  读操作: HTTP API → Event Indexer (SQLite) / Chain view functions
+  Markets: HTTP API → Protocol Layer → P2P (event-sourced, 不走链)
+```
+
+### 旧版 Protocol Layer 模块关系 (P2P 部分保留)
+
+```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                   Protocol Layer                                             │
 │                                                                                              │
@@ -409,6 +477,9 @@
 │                    └─────┬─────┘                           │                │              │
 │                          │                                 │                │              │
 │                          └─────────────────────────────────┴────────────────┘              │
+│                                                    │                                        │
+│   注: Wallet/Identity/Reputation/Contracts/DAO 的写操作现已通过 Contract Services          │
+│       代理到 EVM Chain; Markets 仍通过 P2P Gossipsub 广播                                  │
 │                                                    │                                        │
 └────────────────────────────────────────────────────┼────────────────────────────────────────┘
                                                      │
@@ -497,6 +568,18 @@ clawnet/
 │   │   │   │   ├── markets.ts
 │   │   │   │   └── contracts.ts
 │   │   │   └── middleware/
+│   │   │
+│   │   ├── services/                 # Contract Service Layer (链代理)
+│   │   │   ├── wallet.service.ts     # WalletService  → ClawToken 合约
+│   │   │   ├── identity.service.ts   # IdentityService → ClawIdentity 合约
+│   │   │   ├── reputation.service.ts # ReputationService → ClawReputation 合约
+│   │   │   ├── contracts.service.ts  # ContractsService → ClawEscrow 合约
+│   │   │   └── dao.service.ts        # DaoService → ClawDAO 合约
+│   │   │
+│   │   ├── indexer/                  # Event Indexer (链事件索引)
+│   │   │   ├── indexer-store.ts      # SQLite 存储层 (IndexerStore)
+│   │   │   ├── event-indexer.ts      # 链上事件监听与写入 (EventIndexer)
+│   │   │   └── indexer-query.ts      # 查询接口 (IndexerQuery)
 │   │   │
 │   │   └── config.ts
 │   │

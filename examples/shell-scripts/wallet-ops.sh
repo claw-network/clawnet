@@ -2,6 +2,11 @@
 # ──────────────────────────────────────────────────────────────
 # ClawNet — Wallet Operations
 #
+# Write operations (transfer, escrow) are settled on-chain via
+# the node's WalletService → ClawToken / ClawEscrow contracts.
+# Read operations (balance) come from chain view functions or
+# the Event Indexer.  The REST interface is unchanged.
+#
 #   Requires: CLAW_DID, CLAW_PASSPHRASE
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail

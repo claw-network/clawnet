@@ -39,6 +39,14 @@
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+> **On-chain note (v1.1+):**
+> Write operations — `recordReview`, `recordTransaction`, `anchorReputation` — are
+> now settled on-chain via `ClawReputation.sol`. The node's `ReputationService`
+> proxies these calls transparently; the REST / SDK interface is unchanged.
+>
+> Read operations (review lists, reputation profiles) are served by the **Event
+> Indexer**, which polls chain events into a local SQLite database for fast queries.
+
 ---
 
 ## 信誉模型

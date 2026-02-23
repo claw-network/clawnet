@@ -1,6 +1,9 @@
 /**
  * Minimal example — check node status and wallet balance.
  *
+ * The balance is fetched from the on-chain ClawToken contract via the
+ * node's WalletService proxy layer.  The REST/SDK interface is the same.
+ *
  * Usage:
  *   node --loader ts-node/esm check-balance.ts
  */

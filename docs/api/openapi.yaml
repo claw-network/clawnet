@@ -2814,7 +2814,9 @@ components:
           description: 是否已同步
         blockHeight:
           type: integer
-          description: 当前区块高度
+          description: |
+            当前区块高度 — 即所连接 EVM 链的最新 block number。
+            当链结算未启用时此字段可能为 0。
         peers:
           type: integer
           description: 连接的节点数
@@ -3002,6 +3004,10 @@ components:
       properties:
         txHash:
           type: string
+          description: |
+            EVM transaction hash (0x-prefixed, 66 chars) for on-chain
+            settled write operations. For chain module responses this is
+            the hash of the mined transaction on the connected EVM chain.
         from:
           type: string
         to:

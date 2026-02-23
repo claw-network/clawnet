@@ -2,6 +2,8 @@
 
 > 所有模块从链下 P2P 协议迁移至区块链的详细技术方案与实施路线
 
+> **实施状态更新**: 上链迁移已通过 REST 代理模型完成。详见 [tasks/rest-onchain-proxy-migration.md](tasks/rest-onchain-proxy-migration.md)，该文档记录了最终采用的迁移方案与各模块实施细节。
+
 ## 目录
 
 1. [现状分析](#1-现状分析)
@@ -231,6 +233,29 @@
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Event Indexer（事件索引器）
+
+实际实施中，链上状态的读取通过 **Event Indexer** 辅助完成。Event Indexer 监听链上合约事件，将数据写入本地 SQLite，提供高效的索引与查询支持。
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                  Event Indexer 架构                            │
+│                                                               │
+│  链上合约事件 ─→ EventIndexer(监听) ─→ IndexerStore(SQLite)  │
+│                                                               │
+│  REST 读请求  ─→ IndexerQuery(SQLite) ─→ JSON 响应           │
+│                     或                                        │
+│                  ContractProvider ─→ 链上 view 函数           │
+└───────────────────────────────────────────────────────────────┘
+```
+
+关键组件：
+- **ContractProvider** — 封装 ethers.js v6，提供合约实例和签名能力
+- **EventIndexer** — 监听链上事件，解析日志并写入 SQLite
+- **IndexerStore** — SQLite 存储层，管理 schema 与写入
+- **IndexerQuery** — 高效查询接口，支持分页、过滤等
+- **ChainConfig** — 链连接配置（RPC URL、合约地址、链 ID 等）
 
 ### 智能合约清单
 
@@ -1422,6 +1447,8 @@ infra/                              # 新增 — 链节点基础设施
 ```
 
 ## 附录 B：SDK 变更概览
+
+> **注意（实施更新）**: 下方描述的 SDK 双适配器策略（`WalletApi` / `WalletOnChainApi`）已被最终实施方案取代。实际采用的是 **REST 代理模型** — SDK 保持不变，仅通过 HTTP 调用 Node REST API；Node 内部由 Service 类（如 WalletService、IdentityService 等）通过 ContractProvider (ethers.js v6) 路由到链上合约。SDK 不依赖 ethers.js，无需感知链上/链下区别。详见 [tasks/rest-onchain-proxy-migration.md](tasks/rest-onchain-proxy-migration.md)。
 
 ```typescript
 // packages/sdk/src/index.ts 变更

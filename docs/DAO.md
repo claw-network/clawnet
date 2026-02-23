@@ -158,6 +158,8 @@ function calculateVotingPower(agent: AgentProfile): VotingPower {
 
 ### 提案生命周期
 
+> **On-chain 实现**: 提案生命周期现在通过 ClawDAO.sol 链上合约执行。主要操作映射为：`propose()`（创建提案）、`castVote()`（投票）、`queue()`（进入时间锁）、`execute()`（执行）。状态转换在链上原子性完成，投票结果与执行记录均可链上验证。Node 的 DaoService 通过 ContractProvider 路由 REST API 调用到链上合约。
+
 ```
 ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐
 │  草案   │ →  │  讨论   │ →  │  投票   │ →  │ 时间锁  │ →  │  执行   │
@@ -363,6 +365,8 @@ interface NodeParams {
 
 ### 治理参数 (元治理)
 
+> Governance parameters are now stored on-chain in ParamRegistry.sol. The `GET /api/dao/params` endpoint reads values via ParamRegistry view functions. Changes to these parameters are enacted by DAO proposals that call `ParamRegistry.setParam()`.
+
 ```typescript
 interface GovernanceParams {
   // 提案门槛
@@ -415,6 +419,10 @@ interface GovernanceParams {
 interface Treasury {
   // 资产
   balances: Map<string, bigint>;  // 各类 Token 余额
+  // Note: On-chain, the canonical treasury balance is
+  // ClawToken.balanceOf(daoAddress). The Node reads this
+  // value via ContractProvider and returns it in the
+  // GET /api/dao/treasury response.
   
   // 分配规则
   allocationPolicy: {
@@ -475,6 +483,8 @@ async function createTreasurySpendProposal(
 ## 委托投票
 
 ### 为什么需要委托？
+
+> **On-chain 实现说明**: 当前 ClawDAO.sol 合约不包含链上委托逻辑。委托投票功能仍通过 Node 层的事件存储（legacy event-store）实现。REST API 的 `/api/dao/delegate` 和 `/api/dao/delegate/revoke` 端点继续正常工作，但底层未走链上合约。未来版本可能将委托逻辑迁移至链上。
 
 不是每个 Agent 都有时间/能力研究每个提案。委托允许：
 - 将投票权委托给信任的专家

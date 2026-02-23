@@ -26,15 +26,26 @@
 
 ```
 ┌─────────────────────────────────────────┐
-│      协调方/社区运营者（可替换）         │
+│      节点 (Node Service Layer)           │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
 │  │ 市场服务 │ │ 信誉服务 │ │ 合约服务 │   │
 │  └────┬────┘ └────┬────┘ └────┬────┘   │
-│       └───────────┼───────────┘         │
-│                   ▼                     │
-│           ┌─────────────┐               │
-│           │ 引导数据库(可替换) │          │
-│           └─────────────┘               │
+│       │           │           │         │
+│       ├───────────┼───────────┘         │
+│       │           │ (P2P)               │
+│       ▼           ▼                       │
+│  ┌─────────┐  ┌───────────────────┐  │
+│  │P2P事件溯源│  │ EVM Chain            │  │
+│  │(Markets) │  │ (写操作 source of   │  │
+│  └─────────┘  │  truth: Wallet/     │  │
+│               │  Identity/Rep/     │  │
+│               │  Contracts/DAO)    │  │
+│               └─────────┬─────────┘  │
+│                         │               │
+│               ┌─────────▼────────┐  │
+│               │ Event Indexer       │  │
+│               │ (SQLite 本地索引)    │  │
+│               └──────────────────┘  │
 └─────────────────────────────────────────┘
               │
               ▼
@@ -48,29 +59,34 @@
 - ✅ 快速迭代，验证市场需求
 - ✅ 建立初始用户基础
 - ✅ 收集数据优化算法
-- ✅ **所有中心化组件必须可替换、可退出、可审计**
-- ⚠️ 仍存在潜在单点风险（必须在后续阶段消除）
+- ✅ **链上迁移已完成**：Wallet / Identity / Reputation / Contracts / DAO 写操作通过 Node Service 代理到 EVM Chain，读操作通过 chain view 函数或 Event Indexer (SQLite)
+- ✅ Markets 仍使用 P2P 事件溯源，保持低延迟去中心化广播
+- ✅ REST API 不变 — SDK / CLI 无需任何修改
+- ⚠️ 暂时依赖单一 RPC 节点（后续阶段迁移到去中心化 RPC 层）
 
 ---
 
 ## 第二阶段：数据层去中心化
 
 ### 目标
-将交易记录和信誉数据从引导期数据库迁移到分布式存储。
+将 Markets 的 P2P 事件数据补充链下索引，并进一步优化 EVM Chain + Event Indexer 架构的高可用性。
+
+> **注意**：原计划中的 "交易记录 → IPFS + Filecoin" 和 "信誉快照 → Ceramic Network" 已在 Phase 1 提前由 EVM Chain + Event Indexer 替代实现。Phase 2 的重心转向多节点 RPC 分布与索引层冗余。
 
 ### 技术选型
 
 | 组件 | 方案 | 原因 |
 |------|------|------|
-| 交易记录 | IPFS + Filecoin | 不可篡改，永久存储 |
-| 信誉快照 | Ceramic Network | 可更新的去中心化数据 |
-| 索引服务 | The Graph / 自托管索引 | 可替换、高效查询 |
+| 交易记录 | EVM Chain + Event Indexer (SQLite) | 链上不可篡改，本地索引高效查询 |
+| 信誉快照 | EVM Chain + Event Indexer (SQLite) | 链上状态可验证，索引层可替换 |
+| Markets 数据 | P2P 事件溯源 + 可替换索引 | 保持低延迟广播，索引可自托管 |
+| 索引服务 | 多节点 Event Indexer / 自托管索引 | 可替换、高效查询 |
 
 ### 架构
 
 ```
 ┌─────────────────────────────────────────┐
-│           ClawNet 核心团队             │
+│           ClawNet 节点服务层             │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
 │  │ 市场服务 │ │ 信誉服务 │ │ 合约服务 │   │
 │  └────┬────┘ └────┬────┘ └────┬────┘   │
@@ -78,60 +94,42 @@
         │           │           │
         ▼           ▼           ▼
 ┌─────────────────────────────────────────┐
-│          分布式数据层                    │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐   │
-│  │  IPFS   │ │ Ceramic │ │可替换索引│  │
-│  │(交易记录)│ │ (信誉)  │ │ (索引)  │   │
-│  └─────────┘ └─────────┘ └─────────┘   │
+│           数据层 (已迁移至链上)          │
+│  ┌─────────────────┐ ┌───────────────┐  │
+│  │  EVM Chain      │ │ Event Indexer │  │
+│  │  (写+状态)      │ │ (SQLite 索引) │  │
+│  └─────────────────┘ └───────────────┘  │
+│  ┌─────────────────┐                    │
+│  │ P2P事件溯源     │  (仅 Markets)      │
+│  └─────────────────┘                    │
 └─────────────────────────────────────────┘
 ```
 
 ### 实现步骤
 
 ```typescript
-// 1. 交易记录上链
-interface TransactionRecord {
-  id: string;
-  type: 'info_trade' | 'task_complete' | 'capability_use';
-  buyer: AgentDID;
-  seller: AgentDID;
-  amount: bigint;
-  timestamp: number;
-  // 内容哈希，不存原文（隐私）
-  contentHash: string;
-}
+// 1. 交易记录写入 EVM Chain (由 Node Service 自动处理)
+// Agent 调用 REST API → WalletService → ClawToken 合约
+// 例: POST /api/wallet/transfer → WalletService.transfer()
+//     → ethers.js v6 → ClawToken.transfer(to, amount)
 
-// 存储到 IPFS
-async function recordTransaction(tx: TransactionRecord): Promise<CID> {
-  const cid = await ipfs.dag.put(tx);
-  // 同时锚定到区块链（可选，增加安全性）
-  await anchor.pin(cid);
-  return cid;
-}
+// 2. Event Indexer 监听链上事件，写入本地 SQLite
+// EventIndexer 自动订阅合约事件并索引:
+//   Transfer, IdentityRegistered, ReputationUpdated, ContractCreated, ProposalCreated ...
+// IndexerQuery 提供聚合查询、分页、历史记录等读操作
 
-// 2. 信誉数据使用 Ceramic Stream
-const reputationSchema = {
-  type: 'object',
-  properties: {
-    agentId: { type: 'string' },
-    score: { type: 'number' },
-    history: { type: 'array' },
-    lastUpdated: { type: 'number' },
-  },
-};
-
-// Agent 控制自己的信誉流（但只能追加，不能删除历史）
-const stream = await ceramic.createStream(reputationSchema, {
-  controllers: [agentDID],
-  family: 'clawnet-reputation',
-});
+// 3. 信誉数据同样存储在 EVM Chain
+// ReputationService → ClawReputation 合约
+// 评分记录不可篡改，只能追加
+// Event Indexer 将评分事件索引为本地可查询数据
 ```
 
 ### 好处
 
-- ✅ 数据不可篡改
+- ✅ 数据不可篡改（链上存储）
 - ✅ 任何人可验证交易历史
 - ✅ 核心团队无法伪造信誉
+- ✅ Event Indexer 可由任何节点独立重建，无中心化依赖
 - ⚠️ 服务层仍部分中心化（需持续最小化并确保可替换）
 
 ---
@@ -337,7 +335,7 @@ interface GovernableParams {
 │                              ▼                               │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │                    分布式数据层                        │  │
-│  │      IPFS + Ceramic + 可替换索引 + 链上锚定           │  │
+│  │      EVM Chain + Event Indexer + P2P 事件溯源         │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                              │                               │
 │                              ▼                               │
@@ -367,15 +365,18 @@ interface GovernableParams {
 ## 实施时间线
 
 ```
-2026 Q1-Q2: Phase 1 - 最小化中心化引导
+2026 Q1-Q2: Phase 1 - 最小化中心化引导 + 链上迁移 ✅
             ├── 验证产品需求
             ├── 建立用户基础
-            └── 收集数据（保证组件可替换/可退出）
+            ├── EVM Chain 部署完成（原计划 Phase 2，已提前）
+            ├── Contract Services 代理写操作到链上
+            ├── Event Indexer (SQLite) 提供本地读索引
+            └── REST API 不变，SDK/CLI 无需修改
 
 2026 Q3:    Phase 2 - 数据层去中心化
-            ├── 迁移到 IPFS
-            ├── 信誉上 Ceramic
-            └── 部署可替换索引（The Graph / 自托管）
+            ├── 多节点 RPC 分布与冗余
+            ├── Markets P2P 索引层开放自托管
+            └── Event Indexer 可由社区独立重建
 
 2026 Q4:    Phase 3 - 计算层去中心化
             ├── 发布节点软件

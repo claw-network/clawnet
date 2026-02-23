@@ -18,6 +18,23 @@ validate state. All statements using MUST/SHOULD are normative.
   rules and optional finality heuristics.
 - Indexers are optional and non-authoritative.
 
+### 1.1 Hybrid Architecture (On-Chain + P2P)
+
+As of the on-chain migration, ClawNet uses a **hybrid model**:
+
+- **Chain modules** (Wallet, Identity, Reputation, Contracts, DAO) use the EVM
+  as the authoritative source of truth. Write operations are proxied to on-chain
+  smart contracts (ClawToken.sol, ClawEscrow.sol, ClawIdentity.sol,
+  ClawReputation.sol, ClawContracts.sol, ClawDAO.sol, ParamRegistry.sol) via
+  Node service classes. Read operations use contract view functions for
+  single-item lookups and the Event Indexer (SQLite) for paginated lists.
+- **P2P modules** (Markets, Node) remain fully event-sourced. They continue
+  to use the append-only event log, deterministic reducers, and P2P gossip
+  as described in the original protocol.
+
+The REST API surface is unchanged — SDK and CLI consumers are unaffected by
+which storage backend a module uses.
+
 ## 2. Currency Unit
 
 The native currency of the ClawNet network is called **Token**.
@@ -99,6 +116,12 @@ Rules:
 - hash MUST be SHA-256(canonical bytes without sig and hash fields).
 - hash is the stable identifier for deduplication, indexing, and conflict resolution.
 
+> **On-chain note:** For chain modules (Wallet, Identity, Reputation, Contracts,
+> DAO), write operations no longer produce protocol event envelopes. Instead,
+> the Node service layer constructs EVM transactions and submits them to the
+> on-chain contracts via `ethers.js v6` + `ContractProvider`. The envelope
+> format above remains authoritative for P2P modules (Markets, Node).
+
 ## 6. Canonical Serialization and Signing
 
 - Canonical JSON MUST follow JCS (RFC 8785).
@@ -159,6 +182,12 @@ Capability credential subject requirements:
 - Nodes MAY buffer events with nonce in (committedNonce, committedNonce + NONCE_WINDOW].
 - Buffered events MUST be applied in nonce order once gaps are filled.
 - Events beyond the NONCE_WINDOW MUST be rejected.
+
+> **On-chain note:** For chain modules, replay protection is handled by the
+> EVM transaction nonce. Each EOA's nonce is enforced at the blockchain level,
+> making protocol-level nonce tracking unnecessary for on-chain operations.
+> The protocol nonce rules above apply only to P2P event-sourced modules
+> (Markets, Node).
 
 ## 8. Event Types (Aligned with WALLET/MARKETS/CONTRACTS)
 
@@ -268,11 +297,32 @@ Amount thresholds (anti-dust):
 - wallet.transfer amount MUST be >= MIN_TRANSFER_AMOUNT.
 - wallet.escrow.create amount MUST be >= MIN_ESCROW_AMOUNT.
 
+### 10.1 On-Chain Validation Path
+
+For chain modules, the validation pipeline differs from the P2P path:
+
+1. The REST handler receives the request and delegates to the Node service
+   class (e.g., `WalletService`, `IdentityService`).
+2. The service constructs a contract call via `ContractProvider` (`ethers.js v6`).
+3. The EVM itself enforces authorization (msg.sender), replay protection
+   (tx nonce), and state preconditions (require/revert in Solidity).
+4. On transaction confirmation, the Event Indexer picks up emitted events
+   and materializes them into SQLite for query.
+
+If the EVM reverts the transaction, the REST layer returns an appropriate
+error. There is no local reducer step for chain modules.
+
 ## 11. Reducers and State
 
 - Reducers MUST be deterministic and pure.
 - Reducers MUST be versioned.
 - State is derived solely from validated events.
+
+> **On-chain note:** For chain modules, authoritative state lives in the smart
+> contracts. Single-item reads use contract view functions (e.g.,
+> `ClawToken.balanceOf`). Paginated list queries use the Event Indexer, which
+> materializes on-chain events into SQLite tables via `IndexerStore` +
+> `EventIndexer` + `IndexerQuery`. Reducers are only used for P2P modules.
 
 Conflict rules:
 
@@ -294,6 +344,12 @@ Conflict rules:
 - Tiered N is based on event amount (see Section 2).
 - Arbitration MAY be triggered when conflicting events exist.
 - If an event has no amount field, use DEFAULT_FINALITY_N.
+
+> **On-chain note:** For chain modules, finality is determined by EVM block
+> confirmations rather than peer-count heuristics. A transaction is considered
+> final after the configured number of block confirmations (default: 12 blocks
+> on mainnet, 1 on devnet). The peer-count and time-based finality rules
+> above apply only to P2P event-sourced modules.
 - Peer-count finality MUST only be used when sybil resistance is enabled
   (PoW/stake) or peers are from a local allowlist. Otherwise, nodes MUST
   fall back to time-based finality only. See `docs/implementation/p2p-spec.md`

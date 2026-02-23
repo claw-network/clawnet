@@ -40,6 +40,7 @@ fee = max(min_escrow_fee, ceil(amount * base_rate + amount * holding_rate * days
 
 Notes:
 - Escrow fees are not subject to market_min_fee/market_max_fee.
+- Protocol escrow fees are now auto-deducted on-chain by ClawEscrow.sol during the `release()` call. The contract calculates the fee using the formula above, deducts it from the released amount, and forwards it to the Treasury address — no off-chain fee calculation is required.
 
 ### 2.3 Transaction Fees
 
@@ -48,6 +49,10 @@ Notes:
 
 Notes:
 - Transaction fees are fixed values and not subject to market fee caps.
+
+#### Gas Fees vs Protocol Fees
+
+On the ClawNet EVM chain, every write transaction incurs a **Gas fee** (paid in Token as the native gas currency) in addition to the **protocol fee** described above. Gas fees compensate validators for executing the transaction; protocol fees are application-level charges that flow to the Treasury. During the PoA phase, 100% of Gas revenue goes to the protocol treasury. In the PoS phase, Gas revenue is split between validators and the treasury at a DAO-controlled ratio.
 
 ### 2.4 Market Fee Caps
 
@@ -81,11 +86,15 @@ Distribution:
   If relay rewards are enabled, they MUST be paid off-chain or via a deterministic
   on-chain rule defined by DAO.
 
+On-chain implementation: Validator rewards are distributed via `ClawStaking.distributeRewards()`. The contract tracks each validator's stake weight and distributes proceeds proportionally at the end of each epoch. Reward amounts are DAO-configurable through ParamRegistry.
+
 ## 5. Slashing
 
 - Propagating invalid events: slash 1 Token
 - Repeated invalid events (3 in 24h): temporary peer ban
 - Persistent misbehavior: DAO-controlled blacklist
+
+Slashing is enforced on-chain via `ClawStaking.slash(nodeAddress, amount, reason)`. When a slashing condition is detected (by any authorized reporter), the staked Token balance of the offending node is reduced atomically. Slashed funds are forwarded to the Treasury. Slashing thresholds and cooldown periods are DAO-controlled through ParamRegistry.
 
 ## 6. Reputation Effects
 

@@ -22,11 +22,11 @@ Traditional financial systems don't support agent-to-agent transactions. ClawNet
 
 ### Is ClawNet a blockchain?
 
-Not exactly. ClawNet uses an **event-sourced** architecture where every state change is a signed, immutable event propagated via a P2P gossipsub mesh. It shares many properties with blockchains (immutability, cryptographic verification, decentralization) but is purpose-built for agent economies rather than general-purpose smart contracts.
+ClawNet uses a **hybrid architecture**. Core financial modules — Wallet, Identity, Reputation, Service Contracts, and DAO — are backed by an independent EVM chain (ClawNet Chain) where state is finalized by smart contracts (ClawToken.sol, ClawEscrow.sol, ClawIdentity.sol, ClawReputation.sol, ClawContracts.sol, ClawDAO.sol). Markets and Node discovery remain **event-sourced** and propagated via a P2P gossipsub mesh. This gives ClawNet blockchain-grade guarantees (immutability, atomic transactions, cryptographic verification) for asset-critical operations while preserving high-throughput P2P communication for latency-sensitive workflows.
 
 ### What consensus mechanism does ClawNet use?
 
-ClawNet uses a deterministic event-sourcing model where events are cryptographically signed and ordered. The protocol ensures consistency through nonce-based ordering and conflict detection rather than traditional PoW/PoS consensus. See the [ARCHITECTURE](ARCHITECTURE.md) doc for details.
+ClawNet uses a deterministic event-sourcing model where events are cryptographically signed and ordered. The protocol ensures consistency through nonce-based ordering and conflict detection rather than traditional PoW/PoS consensus. For on-chain modules, the ClawNet EVM chain provides **deterministic finality** — initially via PoA (Clique) consensus with ~2-second block times, with a planned transition to PoS backed by ClawStaking.sol. See the [ARCHITECTURE](ARCHITECTURE.md) doc for details.
 
 ---
 
@@ -75,7 +75,7 @@ Token is the native currency unit of the ClawNet network. All amounts are **inte
 
 ### What is escrow?
 
-Escrow locks tokens in a smart hold that can only be released when conditions are met (e.g., milestone completion). Neither party can unilaterally withdraw escrowed funds. This protects both the client and provider in service contracts.
+Escrow locks tokens in a smart hold that can only be released when conditions are met (e.g., milestone completion). Neither party can unilaterally withdraw escrowed funds. This protects both the client and provider in service contracts. Escrow is executed on-chain by the **ClawEscrow.sol** smart contract, which handles creation, conditional release, refund, expiry, and dispute resolution atomically. Protocol fees are auto-deducted during the `release()` call.
 
 ### What are transaction fees?
 
@@ -172,7 +172,7 @@ libp2p with TCP transport, Noise encryption, Yamux multiplexing, and GossipSub f
 
 ### What database does ClawNet use?
 
-LevelDB (via the `level` npm package) for local event storage and state snapshots.
+LevelDB (via the `level` npm package) for local event storage and state snapshots (used by P2P modules such as Markets). Chain-backed modules additionally use **SQLite** through the Event Indexer, which indexes on-chain contract events for efficient querying (transaction history, contract listings, reputation records, etc.).
 
 ### Can I run multiple nodes on one machine?
 

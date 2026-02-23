@@ -462,11 +462,11 @@ DAO 是最复杂的模块，需要先确认 Solidity 合约是否支持 delegati
 
 | 任务 | 说明 |
 |------|------|
-| **P6.1** 文档更新 | 按 [§12 文档更新计划](#12-文档更新计划) 中的完整清单逐一更新所有受影响文档 |
-| **P6.2** Examples 更新 | 示例代码无需改动（REST 接口没变），但更新注释说明底层走链上 |
-| **P6.3** Python SDK | 无需改动（REST 接口不变） |
-| **P6.4** CI/CD | 集成测试中加入链上回归测试 (hardhat local node) |
-| **P6.5** 性能基准 | 所有迁移后的路由做延迟/吞吐量基准测试，与迁移前对比 |
+| **P6.1** 文档更新 ✅ | 按 [§12 文档更新计划](#12-文档更新计划) 中的完整清单逐一更新所有 27 份受影响文档（P0 规范 5 份 + P1 模块/架构 13 份 + P2 补充 9 份） |
+| **P6.2** Examples 更新 ✅ | 示例代码无需改动（REST 接口没变），已更新注释说明底层走链上（nodejs-agent, python-agent, shell-scripts） |
+| **P6.3** Python SDK ✅ | 无需改动（REST 接口不变） |
+| **P6.4** CI/CD ✅ | 集成测试中加入链上回归测试 (hardhat local node)。5 套服务层单元测试 (75 tests)；integration harness + wallet-chain E2E test；CI workflow 新增 integration job |
+| **P6.5** 性能基准 ✅ | `scripts/benchmark-routes.mjs` — 9 条迁移路由延迟/吞吐量基准测试，输出 Markdown 表格 + JSON |
 
 ---
 
@@ -577,14 +577,14 @@ Hardhat Local Node (chainId 31337)
 
 每个模块迁移完成后，需满足以下所有条件：
 
-- [ ] 所有 POST（写操作）路由内部调用链上合约
-- [ ] 所有 GET（读操作）路由从链上 view 或 indexer 获取数据
-- [ ] REST 接口的请求/响应格式与迁移前**完全一致**（JSON schema 不变）
-- [ ] 现有 SDK 单元测试全部通过
-- [ ] 新增 Node 服务层单元测试覆盖所有新逻辑
-- [ ] 集成测试通过（SDK → REST → 链 → 查询完整链路）
+- [x] 所有 POST（写操作）路由内部调用链上合约（Wallet/Identity/Reputation/Contracts/DAO 全部完成，delegation 除外——无链上实现）
+- [x] 所有 GET（读操作）路由从链上 view 或 indexer 获取数据
+- [x] REST 接口的请求/响应格式与迁移前**完全一致**（JSON schema 不变）
+- [x] 现有 SDK 单元测试全部通过
+- [x] 新增 Node 服务层单元测试覆盖所有新逻辑（75 tests across 5 services: wallet 19, contracts 17, dao 22, identity 10, reputation 7）
+- [x] 集成测试通过（SDK → REST → 链 → 查询完整链路）— integration harness + wallet-chain E2E test 已建立
 - [ ] `clawnet/scenarios/` 中对应场景测试通过
-- [ ] 无 TypeScript 编译错误
+- [x] 无 TypeScript 编译错误（tsc --noEmit 通过）
 - [ ] 无 ESLint 警告
 
 ---

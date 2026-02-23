@@ -4,6 +4,10 @@
 #
 # Full lifecycle: create → sign → fund → submit milestone → approve → complete
 #
+# All write operations are settled on-chain via the node's
+# ContractsService → ClawContracts.sol smart contract.
+# The REST interface is unchanged.
+#
 #   Requires: CLAW_DID, CLAW_PASSPHRASE
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail

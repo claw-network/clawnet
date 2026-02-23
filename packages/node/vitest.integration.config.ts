@@ -4,6 +4,12 @@ import { defineConfig } from 'vitest/config';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
 
+/**
+ * Vitest config for integration tests.
+ *
+ * These tests require a running hardhat node and deployed contracts.
+ * Run via: pnpm --filter @claw-network/node test:integration
+ */
 export default defineConfig({
   resolve: {
     alias: [
@@ -15,7 +21,8 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['test/**/*.test.ts'],
-    exclude: ['test/integration/**'],
+    include: ['test/integration/**/*.test.ts'],
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
   },
 });

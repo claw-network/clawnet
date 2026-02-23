@@ -33,6 +33,8 @@
     "build": "tsc -b tsconfig.json",
     "package": "pnpm build && pkg . --output dist/pkg/clawnetd && node ../../scripts/rename-pkg.js",
     "test": "vitest run --passWithNoTests",
+    "test:services": "vitest run --passWithNoTests test/services/",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "lint": "eslint src --max-warnings=0"
   },
   "pkg": {

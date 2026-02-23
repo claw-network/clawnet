@@ -16,10 +16,10 @@
 | 5 | 商业与经济 (Business & Economics) | 3 |
 | 6 | 开发者工具 (Developer Tools) | 6 |
 | 7 | 实现规划 (Implementation Specs) | 12 |
-| 8 | 实现任务 (Implementation Tasks) | 5 |
+| 8 | 实现任务 (Implementation Tasks) | 6 |
 | 9 | 事件模式 (Event Schemas) | 7 |
 | 10 | 测试向量 (Test Vectors) | 1 |
-| **合计** | **10 个类目** | **49 个条目** |
+| **合计** | **10 个类目** | **50 个条目** |
 
 ---
 
@@ -103,6 +103,7 @@
 | 3 | `docs/implementation/tasks/min-api-draft.md` | 最小 API 设计草案 | *(已归入开发者工具，此处交叉引用)* |
 | 4 | `docs/implementation/tasks/api-errors.md` | API 错误码表 | *(已归入开发者工具，此处交叉引用)* |
 | 5 | `docs/implementation/tasks/acceptance-checklist.md` | 实现验收清单 | MVP 验收标准，按模块组织 |
+| 6 | `docs/implementation/tasks/rest-onchain-proxy-migration.md` | REST→链上代理迁移 | Wallet/Identity/Reputation/Contracts/DAO 写操作代理至 EVM 合约 |
 
 ## 9. 事件模式 (Event Schemas) — 7 篇
 

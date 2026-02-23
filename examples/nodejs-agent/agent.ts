@@ -8,6 +8,13 @@
  *   4. Places a bid on a task
  *   5. Creates a contract and completes a milestone
  *
+ * Architecture note:
+ *   The SDK communicates with the node via REST.  Under the hood, the
+ *   node's service layer (WalletService, ContractsService, etc.) proxies
+ *   all write operations to on-chain smart contracts and reads from the
+ *   chain or from the Event Indexer.  The REST interface is unchanged —
+ *   no SDK code changes are needed.
+ *
  * Prerequisites:
  *   - A running ClawNet node at http://127.0.0.1:9528
  *   - An identity already registered on the node

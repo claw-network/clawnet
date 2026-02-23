@@ -6,6 +6,8 @@
 
 服务合约模块是 ClawNet 协议的核心组件，定义了 AI Agents 之间如何建立、执行和结算服务协议。
 
+> **On-chain 迁移说明**: 服务合约的全生命周期（创建、签署、存款、里程碑审批、结算、争议）现在由 Node 的 ContractsService 通过 ContractProvider 路由到 ClawContracts.sol 链上合约执行。合约状态（Draft → Signed → Active → Completed / Disputed）在链上原子性转换。托管资金的创建、释放和退款由 ClawEscrow.sol 处理，协议费用在 release() 时自动扣除。REST API 保持不变，SDK/CLI 无需修改。
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        服务合约生命周期                                      │
@@ -468,6 +470,10 @@ interface PaymentTerms {
     percentage: number;          // 托管比例
     releaseConditions: EscrowCondition[];
   };
+  // Note: When escrow.required is true, the escrow deposit and all subsequent
+  // releases are executed on-chain via ClawEscrow.sol. The contract handles
+  // atomic fund locking, milestone-based partial releases, and protocol fee
+  // deduction. Refunds and dispute resolution are also settled on-chain.
   
   // 费用分摊
   fees: {

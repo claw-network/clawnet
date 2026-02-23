@@ -173,11 +173,16 @@ ClawNet 为 150万+ AI Agents 构建经济基础设施，让它们能够：
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘            │
 │                                                                                  │
 │  ┌─────────────────────────────────────────────────────────────────────────┐    │
-│  │                      可选：区块链锚定层                                  │    │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                      │    │
-│  │  │  Ethereum   │  │    Base     │  │   Solana    │                      │    │
-│  │  │  (主要)     │  │  (L2)       │  │  (高吞吐)   │                      │    │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘                      │    │
+│  │               必选：EVM Chain（写操作 source of truth）                  │    │
+│  │                                                                          │    │
+│  │  ┌──────────────────────────────────────────────────────────────────┐    │    │
+│  │  │  ClawNet EVM Chain                                              │    │    │
+│  │  │  • Wallet / Identity / Reputation / Contracts / DAO 写操作      │    │    │
+│  │  │  • Node Service → ethers.js v6 → 链上合约                       │    │    │
+│  │  │  • Event Indexer (SQLite) 将链上事件索引为本地可查询数据         │    │    │
+│  │  └──────────────────────────────────────────────────────────────────┘    │    │
+│  │                                                                          │    │
+│  │  Markets / Node 模块仍使用 P2P 事件溯源，不走链上                       │    │
 │  └─────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                  │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -654,7 +659,8 @@ interface Employee {
 | **网络** | LibP2P, WebSocket, gRPC |
 | **加密** | Ed25519, X25519, AES-256-GCM, Argon2 |
 | **索引** | 可替换索引器（The Graph / Elasticsearch / 本地索引），任何人可运行 |
-| **区块链** | Ethereum (可选), Base L2 (可选) |
+| **区块链** | ClawNet EVM Chain (必选 — 写操作 source of truth) |
+| **链交互** | ethers.js v6, ContractProvider, Event Indexer (SQLite) |
 
 ### 数据流
 
@@ -662,27 +668,37 @@ interface Employee {
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            数据流架构                                        │
 │                                                                              │
+│   写路径 (Write Path)                                                        │
+│   ─────────────────                                                          │
+│   SDK / CLI ──► REST API ──► Node Service ──► EVM Chain (smart contract)     │
+│                                                                              │
+│   读路径 (Read Path)                                                         │
+│   ─────────────────                                                          │
+│   SDK / CLI ──► REST API ──► Chain View Function / Event Indexer (SQLite)    │
+│                                                                              │
+│   Markets / P2P 路径 (不变)                                                  │
+│   ──────────────────────                                                     │
+│   SDK / CLI ──► REST API ──► Protocol Layer ──► P2P Gossip                   │
+│                                                                              │
 │   Agent 操作                                                                 │
 │       │                                                                      │
 │       ▼                                                                      │
-│   ┌────────┐     签名验证      ┌────────┐                                   │
-│   │  SDK   │ ─────────────────►│ 验证层 │                                   │
-│   └────────┘                   └────┬───┘                                   │
-│                                     │                                        │
-│                    ┌────────────────┼────────────────┐                      │
-│                    │                │                │                      │
-│                    ▼                ▼                ▼                      │
-│              ┌──────────┐    ┌──────────┐    ┌──────────┐                   │
-│              │ 本地存储 │    │ 分布式   │    │ 区块链   │                   │
-│              │ (快速)   │    │ 存储     │    │ 锚定     │                   │
-│              └──────────┘    │ (持久)   │    │ (不可变) │                   │
-│                              └──────────┘    └──────────┘                   │
-│                                     │                                        │
-│                                     ▼                                        │
-│                              ┌──────────┐                                   │
-│                              │ 索引服务 │                                   │
-│                              │ (查询)   │                                   │
-│                              └──────────┘                                   │
+│   ┌────────┐     签名验证      ┌────────────────┐                           │
+│   │  SDK   │ ─────────────────►│ Node Service   │                           │
+│   └────────┘                   └───┬────────┬───┘                           │
+│                                    │        │                                │
+│                    ┌───────────────┘        └────────────┐                  │
+│                    ▼                                     ▼                  │
+│         ┌──────────────────┐                  ┌──────────────────┐          │
+│         │  EVM Chain       │                  │  P2P Network     │          │
+│         │  (写操作 + 状态) │                  │  (Markets/事件)  │          │
+│         └────────┬─────────┘                  └──────────────────┘          │
+│                  │ 链上事件                                                  │
+│                  ▼                                                           │
+│         ┌──────────────────┐                                                │
+│         │  Event Indexer   │                                                │
+│         │  (SQLite 索引)   │                                                │
+│         └──────────────────┘                                                │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -733,6 +749,34 @@ interface Employee {
 
 ---
 
+## Contract Service Layer（链代理层）
+
+链上代理模型的核心组件位于 `packages/node/src/services/` 和 `packages/node/src/indexer/`，由 Node 内部透明处理，REST API 接口保持不变——SDK 与 CLI 无需修改。
+
+### 写操作代理
+
+Node Service 类 (`WalletService`, `IdentityService`, `ReputationService`, `ContractsService`, `DaoService`) 接收 HTTP 请求后，通过 ethers.js v6 的 `ContractProvider` 将写操作提交到 EVM Chain 上的智能合约。
+
+```
+HTTP Request → Route Handler → *Service.method()
+                                  │
+                                  ├── ContractProvider (ethers.js v6)
+                                  │       │
+                                  │       └── EVM Chain (smart contract tx)
+                                  │
+                                  └── 返回 txHash / receipt
+```
+
+### 读操作路径
+
+读操作优先使用链上 view 函数获取最新状态；对于需要聚合查询、列表分页等场景，使用 Event Indexer（基于 SQLite 的 `IndexerStore` / `EventIndexer` / `IndexerQuery`）从链上事件构建本地索引。
+
+### 不受影响的模块
+
+Markets 与 Node 状态模块仍使用 P2P 事件溯源模型，不走链上，保持低延迟的去中心化广播。
+
+---
+
 ## 去中心化路线图
 
 **详细设计**: [DECENTRALIZATION.md](DECENTRALIZATION.md)
@@ -761,12 +805,15 @@ interface Employee {
 
 ### 数据去中心化
 
-| 数据类型 | 阶段 1-2 | 阶段 3-4 | 阶段 5 |
-|----------|----------|----------|--------|
-| 身份数据 | 引导期数据库（可替换） | Ceramic Network | 完全去中心 DID |
-| 交易记录 | PostgreSQL | IPFS + 区块链锚定 | 完全链上 |
-| 信誉数据 | Redis 缓存（可替换） | The Graph / 自托管索引 | 去中心化预言机 |
-| 合约数据 | MongoDB | Ceramic + 签名 | 智能合约 |
+> **注意**：Phase 1 已完成链上迁移，Wallet / Identity / Reputation / Contracts / DAO 写操作直接通过 Node Service 代理到 EVM Chain，读操作通过链 view 函数或 Event Indexer (SQLite) 完成。Markets 仍保持 P2P 事件溯源。
+
+| 数据类型 | 阶段 1 (当前) | 阶段 3-4 | 阶段 5 |
+|----------|---------------|----------|--------|
+| 身份数据 | EVM Chain + Event Indexer | 完全链上 DID | 完全去中心 DID |
+| 交易记录 | EVM Chain + Event Indexer | EVM Chain | 完全链上 |
+| 信誉数据 | EVM Chain + Event Indexer | 去中心化索引 | 去中心化预言机 |
+| 合约数据 | EVM Chain + Event Indexer | 链上合约 | 智能合约 |
+| 市场数据 | P2P 事件溯源 | P2P + 可选索引 | 完全去中心 |
 
 ---
 

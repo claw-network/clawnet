@@ -10,10 +10,10 @@ This skill describes the full procedure to build and deploy the ClawNet homepage
 
 | Item | Value |
 |------|-------|
-| **IP** | `38.47.238.72` |
+| **IP** | `66.94.125.242` |
 | **OS** | Ubuntu 24.04 |
 | **Domain** | `clawnetd.com` |
-| **SSH** | `ssh root@38.47.238.72` (key-based auth) |
+| **SSH** | `ssh root@66.94.125.242` (key-based auth) |
 | **Code path** | `/opt/clawnet` |
 | **Homepage source** | `/opt/clawnet/packages/homepage` |
 | **Homepage dist** | `/opt/clawnet/packages/homepage/dist` |
@@ -72,7 +72,7 @@ Key points:
 ## Prerequisites
 
 1. All homepage changes are committed and pushed to `origin/main`
-2. SSH key access to `root@38.47.238.72` is configured
+2. SSH key access to `root@66.94.125.242` is configured
 3. The homepage builds locally (`cd packages/homepage && pnpm exec vite build`)
 
 ---
@@ -100,7 +100,7 @@ git log --oneline -1
 ### Step 2: Check current server state
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && git log --oneline -1 && systemctl is-active caddy"
+ssh root@66.94.125.242 "cd /opt/clawnet && git log --oneline -1 && systemctl is-active caddy"
 ```
 
 Verify that Caddy is `active` and note the current commit.
@@ -108,20 +108,20 @@ Verify that Caddy is `active` and note the current commit.
 ### Step 3: Pull latest code on the server
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && git pull origin main 2>&1"
+ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1"
 ```
 
 Verify the output shows `packages/homepage/` files changed.
 
 > **Note**: The remote on the server uses HTTPS (`https://github.com/claw-network/clawnet.git`). If it fails with "Permission denied (publickey)", fix:
 > ```bash
-> ssh root@38.47.238.72 "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
+> ssh root@66.94.125.242 "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
 > ```
 
 ### Step 4: Install dependencies (if needed)
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && pnpm install 2>&1 | tail -5"
+ssh root@66.94.125.242 "cd /opt/clawnet && pnpm install 2>&1 | tail -5"
 ```
 
 Only needed if `package.json` or `pnpm-lock.yaml` changed. Safe to always run.
@@ -129,7 +129,7 @@ Only needed if `package.json` or `pnpm-lock.yaml` changed. Safe to always run.
 ### Step 5: Build the homepage
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet/packages/homepage && pnpm exec vite build 2>&1"
+ssh root@66.94.125.242 "cd /opt/clawnet/packages/homepage && pnpm exec vite build 2>&1"
 ```
 
 Expected output:
@@ -144,7 +144,7 @@ dist/assets/main-XXXXXXXX.js      3.07 kB │ gzip:  1.55 kB
 
 Verify the dist directory:
 ```bash
-ssh root@38.47.238.72 "ls -la /opt/clawnet/packages/homepage/dist/"
+ssh root@66.94.125.242 "ls -la /opt/clawnet/packages/homepage/dist/"
 ```
 
 Expected files:
@@ -163,7 +163,7 @@ No Caddy reload is needed — Caddy serves files directly from the `dist/` direc
 
 **From the server:**
 ```bash
-ssh root@38.47.238.72 "curl -s https://clawnetd.com | head -5"
+ssh root@66.94.125.242 "curl -s https://clawnetd.com | head -5"
 ```
 
 Expected:
@@ -183,10 +183,10 @@ Expected:
 
 **Also verify sub-paths:**
 ```bash
-ssh root@38.47.238.72 "curl -sI https://clawnetd.com/install.sh 2>&1 | head -3"
+ssh root@66.94.125.242 "curl -sI https://clawnetd.com/install.sh 2>&1 | head -3"
 # Should return: HTTP/2 200 with content-type: text/x-shellscript
 
-ssh root@38.47.238.72 "curl -sI https://clawnetd.com/.well-known/ai-plugin.json 2>&1 | head -3"
+ssh root@66.94.125.242 "curl -sI https://clawnetd.com/.well-known/ai-plugin.json 2>&1 | head -3"
 # Should return: HTTP/2 200 with content-type: application/json
 ```
 
@@ -197,7 +197,7 @@ ssh root@38.47.238.72 "curl -sI https://clawnetd.com/.well-known/ai-plugin.json 
 For a fast homepage deploy when you know the code is already pushed:
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm install 2>&1 | tail -3 && cd packages/homepage && pnpm exec vite build 2>&1 && echo '--- Deployed! ---' && curl -s https://clawnetd.com | head -3"
+ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm install 2>&1 | tail -3 && cd packages/homepage && pnpm exec vite build 2>&1 && echo '--- Deployed! ---' && curl -s https://clawnetd.com | head -3"
 ```
 
 ---
@@ -209,7 +209,7 @@ If you need to change the Caddy configuration (e.g., add headers, new routes):
 ### Step 1: Back up the current config
 
 ```bash
-ssh root@38.47.238.72 "cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak"
+ssh root@66.94.125.242 "cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak"
 ```
 
 ### Step 2: Write the new Caddyfile
@@ -218,30 +218,30 @@ Create the Caddyfile locally and SCP it to the server. **Do not try to write mul
 
 ```powershell
 # From Windows PowerShell:
-scp path\to\Caddyfile root@38.47.238.72:/etc/caddy/Caddyfile
+scp path\to\Caddyfile root@66.94.125.242:/etc/caddy/Caddyfile
 ```
 
 ```bash
 # From macOS / Ubuntu:
-scp path/to/Caddyfile root@38.47.238.72:/etc/caddy/Caddyfile
+scp path/to/Caddyfile root@66.94.125.242:/etc/caddy/Caddyfile
 ```
 
 ### Step 3: Validate and reload
 
 ```bash
-ssh root@38.47.238.72 "caddy validate --config /etc/caddy/Caddyfile 2>&1 | tail -3"
+ssh root@66.94.125.242 "caddy validate --config /etc/caddy/Caddyfile 2>&1 | tail -3"
 # Must show: Valid configuration
 
-ssh root@38.47.238.72 "caddy fmt --overwrite /etc/caddy/Caddyfile; systemctl reload caddy"
+ssh root@66.94.125.242 "caddy fmt --overwrite /etc/caddy/Caddyfile; systemctl reload caddy"
 
-ssh root@38.47.238.72 "systemctl status caddy 2>&1 | head -10"
+ssh root@66.94.125.242 "systemctl status caddy 2>&1 | head -10"
 # ExecReload should show status=0/SUCCESS
 ```
 
 ### Step 4: Rollback if Caddy fails
 
 ```bash
-ssh root@38.47.238.72 "cp /etc/caddy/Caddyfile.bak /etc/caddy/Caddyfile && systemctl reload caddy"
+ssh root@66.94.125.242 "cp /etc/caddy/Caddyfile.bak /etc/caddy/Caddyfile && systemctl reload caddy"
 ```
 
 ---
@@ -265,10 +265,10 @@ Invoke-WebRequest -Uri "https://clawnetd.com" -MaximumRedirection 0 -UseBasicPar
 
 ```bash
 # Check Node.js and pnpm versions
-ssh root@38.47.238.72 "node -v && pnpm -v"
+ssh root@66.94.125.242 "node -v && pnpm -v"
 
 # Clean and rebuild
-ssh root@38.47.238.72 "cd /opt/clawnet/packages/homepage && rm -rf dist node_modules/.vite && pnpm exec vite build 2>&1"
+ssh root@66.94.125.242 "cd /opt/clawnet/packages/homepage && rm -rf dist node_modules/.vite && pnpm exec vite build 2>&1"
 ```
 
 ### CSS/JS not updating (stale assets)
@@ -277,7 +277,7 @@ Vite uses content-hashed filenames (`main-XXXXXXXX.css`), so browsers always fet
 
 ```bash
 # Verify the dist has new hashes
-ssh root@38.47.238.72 "ls /opt/clawnet/packages/homepage/dist/assets/"
+ssh root@66.94.125.242 "ls /opt/clawnet/packages/homepage/dist/assets/"
 
 # Force clear browser cache (or hard reload)
 ```
@@ -287,20 +287,20 @@ ssh root@38.47.238.72 "ls /opt/clawnet/packages/homepage/dist/assets/"
 The install script is served from `/var/www/clawnetd/install.sh`, not from the homepage dist. Verify:
 
 ```bash
-ssh root@38.47.238.72 "ls -la /var/www/clawnetd/install.sh"
+ssh root@66.94.125.242 "ls -la /var/www/clawnetd/install.sh"
 ```
 
 If missing, copy it:
 ```bash
-ssh root@38.47.238.72 "mkdir -p /var/www/clawnetd && cp /opt/clawnet/install.sh /var/www/clawnetd/install.sh"
+ssh root@66.94.125.242 "mkdir -p /var/www/clawnetd && cp /opt/clawnet/install.sh /var/www/clawnetd/install.sh"
 ```
 
 ### Caddy won't start or reload
 
 ```bash
-ssh root@38.47.238.72 "systemctl status caddy"
-ssh root@38.47.238.72 "journalctl -u caddy --no-pager -n 20"
-ssh root@38.47.238.72 "caddy validate --config /etc/caddy/Caddyfile 2>&1"
+ssh root@66.94.125.242 "systemctl status caddy"
+ssh root@66.94.125.242 "journalctl -u caddy --no-pager -n 20"
+ssh root@66.94.125.242 "caddy validate --config /etc/caddy/Caddyfile 2>&1"
 ```
 
 ### SPA routes return 404
@@ -308,7 +308,7 @@ ssh root@38.47.238.72 "caddy validate --config /etc/caddy/Caddyfile 2>&1"
 The `try_files {path} /index.html` directive handles client-side routing. If it's missing from the Caddyfile, deep links will 404. Verify:
 
 ```bash
-ssh root@38.47.238.72 "curl -sI https://clawnetd.com/some-nonexistent-path 2>&1 | head -3"
+ssh root@66.94.125.242 "curl -sI https://clawnetd.com/some-nonexistent-path 2>&1 | head -3"
 # Should return HTTP/2 200 (serves index.html as fallback)
 ```
 

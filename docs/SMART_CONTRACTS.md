@@ -18,6 +18,14 @@ B → 交付 → A                      ├──► C (子承包)
                                IF 争议 THEN 仲裁
 ```
 
+> **On-chain execution (v1.1+):**
+> ClawNet "service contracts" (the business-logic objects described in this
+> document) are now **executed and enforced by the `ClawContracts.sol` Solidity
+> smart contract** on an EVM chain. The node's `ContractsService` proxies every
+> write operation (create, sign, fund, submitMilestone, openDispute, …) to the
+> chain. Read operations are served by the Event Indexer (SQLite). The REST API
+> surface remains unchanged — SDK / CLI callers do not need modifications.
+
 ---
 
 ## 合约类型

@@ -94,6 +94,17 @@ services:
     environment:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
+      - CHAIN_RPC_URL=${CHAIN_RPC_URL}
+      - CHAIN_CHAIN_ID=${CHAIN_CHAIN_ID:-31337}
+      - CHAIN_CONTRACTS_TOKEN=${CHAIN_CONTRACTS_TOKEN}
+      - CHAIN_CONTRACTS_ESCROW=${CHAIN_CONTRACTS_ESCROW}
+      - CHAIN_CONTRACTS_IDENTITY=${CHAIN_CONTRACTS_IDENTITY}
+      - CHAIN_CONTRACTS_REPUTATION=${CHAIN_CONTRACTS_REPUTATION}
+      - CHAIN_CONTRACTS_DAO=${CHAIN_CONTRACTS_DAO}
+    volumes:
+      - clawnet-data:/data
+      # Optional: mount chain deploy config
+      # - ./deploy-config.json:/app/deploy-config.json:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
@@ -142,7 +153,8 @@ export CLAW_DATA_DIR=/opt/clawnet/data
 ~/.clawnet/
 ├── config.yaml          # Node configuration
 ├── keystore/            # Encrypted Ed25519 keys
-└── data/                # LevelDB store (events, state, snapshots)
+├── data/                # LevelDB store (events, state, snapshots)
+└── indexer.sqlite       # Event Indexer database (chain events)
 ```
 
 ### API Configuration
@@ -199,6 +211,49 @@ For **Docker**, pass it as an environment variable:
 docker run -e CLAW_PASSPHRASE="my-secure-passphrase" ...
 ```
 
+---
+
+## Chain Configuration
+
+Write operations for Wallet, Identity, Reputation, Contracts, and DAO are proxied to EVM smart contracts via the Node service layer. The REST API is unchanged — SDK and CLI need no modifications.
+
+### ChainConfig
+
+| Parameter | Environment Variable | Description |
+|-----------|---------------------|-------------|
+| `rpcUrl` | `CHAIN_RPC_URL` | JSON-RPC endpoint for the EVM chain |
+| `chainId` | `CHAIN_CHAIN_ID` | EVM chain ID (default: `31337` for local) |
+| `contracts.token` | `CHAIN_CONTRACTS_TOKEN` | ClawToken contract address |
+| `contracts.escrow` | `CHAIN_CONTRACTS_ESCROW` | ClawEscrow contract address |
+| `contracts.identity` | `CHAIN_CONTRACTS_IDENTITY` | ClawIdentity contract address |
+| `contracts.reputation` | `CHAIN_CONTRACTS_REPUTATION` | ClawReputation contract address |
+| `contracts.dao` | `CHAIN_CONTRACTS_DAO` | ClawDAO contract address |
+
+### config.yaml
+
+```yaml
+chain:
+  rpcUrl: "http://127.0.0.1:8545"        # or wss://... for WebSocket
+  chainId: 31337
+  contracts:
+    token: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    escrow: "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    identity: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+    reputation: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+    dao: "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+```
+
+Environment variables override `config.yaml` values.
+
+### Signer Management
+
+The node uses the Ed25519 identity key to derive an EVM-compatible signer through `ContractProvider`. The passphrase (`CLAW_PASSPHRASE`) that decrypts the identity key is also used to unlock the chain signer. No separate private key file is required.
+
+For **production**, consider:
+- Using a hardware security module (HSM) or external signer
+- Restricting signer permissions via contract roles
+- Setting transaction gas limits in config
+
 ### P2P Configuration
 
 | Flag | Default | Description |
@@ -227,6 +282,9 @@ clawnetd \
 - [ ] Firewall: allow P2P port (9529), restrict API port (9528)
 - [ ] Backup mnemonic phrase securely
 - [ ] Regular key rotation schedule
+- [ ] **Signer key protection**: `CLAW_PASSPHRASE` stored in secret manager (Vault, AWS Secrets Manager), never in plain-text config files
+- [ ] **RPC TLS**: `CHAIN_RPC_URL` should use `https://` or `wss://` in production; never expose an unencrypted RPC endpoint to the internet
+- [ ] **Gas management**: monitor the node’s on-chain balance; set up alerts when gas balance drops below a threshold to prevent transaction failures
 
 ### Reverse Proxy (nginx)
 
@@ -273,7 +331,8 @@ clawnetd init --recover
 
 - LevelDB grows with event log size
 - Snapshots compact historical state
-- Monitor disk usage: `du -sh ~/.clawnet/data/`
+- **Event Indexer** (`indexer.sqlite`) stores chain event data locally for fast queries; grows proportionally with on-chain activity
+- Monitor disk usage: `du -sh ~/.clawnet/data/ ~/.clawnet/indexer.sqlite`
 - Recommended: SSD with ≥ 10 GB free space for testnet
 
 ---
@@ -491,3 +550,6 @@ The protocol maintains backward compatibility for 1 minor version. Emergency rol
 | High memory usage | Large event log | Enable snapshot compaction |
 | Slow API responses | Too many peers | Limit connections in config |
 | Key decryption failed | Wrong passphrase | Verify passphrase or recover from mnemonic |
+| `CHAIN_RPC_URL connection refused` | Chain node unreachable | Verify RPC URL, check firewall / VPN; ensure the EVM node is running |
+| `insufficient funds for gas` | Node signer has no gas | Fund the signer address with native chain tokens; check `CHAIN_RPC_URL` points to the correct network |
+| `Indexer sync delay` / stale reads | Event Indexer behind chain head | Restart the node to trigger re-sync; check RPC WebSocket connection; inspect `indexer.sqlite` for corruption |

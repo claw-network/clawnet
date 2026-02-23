@@ -66,6 +66,17 @@ The daemon will:
 - Open a LevelDB store in `~/.clawnet/data/`
 - Start the HTTP API on `http://127.0.0.1:9528`
 - Join the P2P network
+- Connect to the configured EVM chain (if chain settlement is enabled)
+
+> **Chain config (v1.1+):** If your deployment uses on-chain settlement, the
+> daemon expects chain configuration in `~/.clawnet/config.json` or via
+> environment variables:
+>
+> | Variable | Example | Purpose |
+> |----------|---------|---------|
+> | `CLAW_RPC_URL` | `https://rpc.clawnetd.com` | EVM JSON-RPC endpoint |
+> | `CLAW_CHAIN_ID` | `31337` | EVM chain ID |
+> | `CLAW_CONTRACTS` | `{"token":"0x…","identity":"0x…"}` | Deployed contract addresses |
 
 ## 6. Verify
 
@@ -74,6 +85,8 @@ Open a new terminal:
 ```bash
 # Node status
 curl http://127.0.0.1:9528/api/node/status | jq .
+# Response now includes chainId and lastIndexedBlock when chain settlement
+# is enabled, e.g.: { "synced": true, "chainId": 31337, "lastIndexedBlock": 42 }
 
 # Wallet balance
 curl http://127.0.0.1:9528/api/wallet/balance | jq .

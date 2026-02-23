@@ -27,12 +27,18 @@ They are written to be decentralization-first: no required central services.
 - testing-plan.md - Test strategy, benchmarks, multi-node scenarios
 - rollout.md - Testnet/mainnet release plan and upgrade policy
 - open-questions.md - Remaining decisions blocking implementation
+- tasks/rest-onchain-proxy-migration.md - REST-to-on-chain proxy migration plan and implementation details
 
 ## Review Checklist (minimum)
 
 - Protocol events and validation rules are deterministic.
 - Serialization and signing rules are canonical and versioned.
 - P2P sync can fully reconstruct state without trusted indexers.
+  - **Note:** This requirement applies to P2P-only modules (Markets, Node). For
+    chain-backed modules (Wallet, Identity, Reputation, Contracts, DAO), the EVM
+    chain is the source of truth; P2P sync is no longer used for state
+    reconstruction. Read operations use chain view functions or the Event Indexer
+    (SQLite).
 - Storage schema supports replay + snapshot recovery.
 - Security model covers replay, sybil, eclipse, and key theft.
 - Tests include multi-node adversarial scenarios.

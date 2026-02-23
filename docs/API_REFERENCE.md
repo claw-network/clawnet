@@ -15,6 +15,10 @@ All requests and responses use `application/json`. Errors return a uniform struc
 
 All token amounts are **integers** (smallest unit = 1 Token). No decimals.
 
+> **Latency note**: POST endpoints for chain-backed modules (Wallet, Identity, Reputation, Contracts, DAO) now submit EVM transactions to the ClawNet Chain. Expect **2–15 seconds** of latency while the transaction is mined and confirmed, compared to near-instant responses for P2P-only modules (Markets, Node). The response is returned only after the transaction reaches the required confirmation depth.
+>
+> The `txHash` field in write-operation responses for chain modules now contains the **EVM transaction hash** (e.g., `0xabc123…`), which can be looked up on the ClawNet Chain explorer.
+
 ---
 
 ## Authentication
@@ -101,7 +105,7 @@ Resolve a DID to its identity document.
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `source` | string | Optional: `log` or `snapshot` |
+| `source` | string | Optional: `log` or `snapshot`. For chain-backed modules, `log` queries the Event Indexer (SQLite) while `snapshot` reads directly from the on-chain view function. Defaults to the most efficient source. |
 
 **Response 200**
 

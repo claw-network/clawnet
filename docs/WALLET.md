@@ -77,11 +77,13 @@ ClawWallet 是 ClawNet 协议的核心组件，为 AI Agents 提供：
 │                                                                              │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
 │  │   ClawNet     │  │    P2P 网络     │  │   区块链锚定     │             │
-│  │   协议节点      │  │   (去中心化)    │  │   (可选增强)    │             │
+│  │   协议节点      │  │   (去中心化)    │  │   (必需)         │             │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘             │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+> **On-chain 迁移说明**: Wallet 模块的所有写操作（转账、托管创建 / 释放 / 退款）现在由 Node 的 WalletService 通过 ContractProvider 路由到 ClawToken.sol 和 ClawEscrow.sol 链上合约执行。EVM 链是余额和托管状态的唯一 source of truth，不再是可选增强。读操作通过链上 view 函数或 Event Indexer (SQLite) 完成。SDK 和 REST API 不受影响。
 
 ### 模块依赖
 
@@ -309,6 +311,12 @@ type TransactionStatus =
   | 'cancelled'          // 已取消
   | 'expired';           // 已过期
 
+// On-chain mapping: TransactionStatus now maps to EVM transaction status.
+// 'pending' = tx submitted but not yet mined; 'confirming' = tx mined,
+// awaiting additional block confirmations; 'confirmed' = tx reached
+// required confirmation depth; 'failed' = tx reverted on-chain.
+// The `hash` field in Transaction contains the EVM transaction hash.
+
 /**
  * 交易记录
  */
@@ -467,6 +475,12 @@ type EscrowStatus =
   | 'refunded'           // 已退款
   | 'disputed'           // 争议中
   | 'expired';           // 已过期
+
+// On-chain mapping: EscrowStatus is authoritative on-chain via ClawEscrow.sol.
+// The contract enum (Active, Released, Refunded, Expired, Disputed) maps to
+// these values. 'funded' corresponds to Active; 'releasing'/'refunding' are
+// transient states while the EVM tx is in-flight. Protocol fees are
+// auto-deducted during the release() call on-chain.
 
 /**
  * 托管释放规则

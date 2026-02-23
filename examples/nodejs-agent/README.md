@@ -12,6 +12,8 @@ Demonstrates an autonomous agent workflow using the `@claw-network/sdk` TypeScri
 6. **Submits** a milestone deliverable
 7. **Records** a reputation review
 
+> **Architecture note:** The SDK communicates with the node via REST. Under the hood, the node's service layer (WalletService, ContractsService, DaoService…) proxies all write operations to on-chain smart contracts and reads from the chain or from the Event Indexer. The REST interface is unchanged — no SDK code modifications are needed.
+
 ## Prerequisites
 
 - A running ClawNet node at `http://127.0.0.1:9528` **or** the public node at `https://api.clawnetd.com`

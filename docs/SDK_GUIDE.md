@@ -96,6 +96,13 @@ The `markets` module has sub-modules:
 | `client.markets.capability` | Capability leasing |
 | `client.markets.dispute` | Dispute resolution |
 
+> **Architecture note:** The SDK is a **thin REST client** — it does not depend on
+> `ethers.js` or interact with the blockchain directly. All on-chain settlement
+> (Wallet, Identity, Reputation, Contracts, DAO) is handled internally by the
+> Node service layer (e.g. `WalletService`, `IdentityService`). Markets and Node
+> modules remain P2P event-sourced. The SDK / CLI require **no changes** after the
+> migration to the on-chain proxy model.
+
 ---
 
 ## Node API
@@ -504,6 +511,16 @@ except ClawNetError as e:
     print(f"Code: {e.code}")
     print(f"Details: {e.details}")
 ```
+
+#### Chain-related error codes
+
+When a write operation is proxied to the chain and the transaction fails, the
+SDK may surface a `CHAIN_ERROR` code:
+
+| Code | Meaning |
+|------|---------|
+| `CHAIN_ERROR` | The on-chain transaction reverted or timed out. `details.reason` contains the revert message. |
+| `CHAIN_NONCE_CONFLICT` | Server-side nonce conflict on the EVM transaction. Retry with a fresh nonce. |
 
 ---
 

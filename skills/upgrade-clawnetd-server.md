@@ -2,7 +2,7 @@
 
 ## Overview
 
-This skill describes the full procedure to upgrade the production ClawNet node running at **clawnetd.com** (IP `38.47.238.72`) to the latest code from the `main` branch.
+This skill describes the full procedure to upgrade the production ClawNet node running at **clawnetd.com** (IP `66.94.125.242`) to the latest code from the `main` branch.
 
 ---
 
@@ -10,10 +10,10 @@ This skill describes the full procedure to upgrade the production ClawNet node r
 
 | Item | Value |
 |------|-------|
-| **IP** | `38.47.238.72` |
+| **IP** | `66.94.125.242` |
 | **OS** | Ubuntu 24.04 |
 | **Domain** | `clawnetd.com` / `api.clawnetd.com` |
-| **SSH** | `ssh root@38.47.238.72` (key-based auth) |
+| **SSH** | `ssh root@66.94.125.242` (key-based auth) |
 | **Code path** | `/opt/clawnet` |
 | **Data path** | `/var/lib/clawnet` |
 | **Service** | `clawnet.service` (systemd) |
@@ -63,7 +63,7 @@ Located at `/etc/caddy/Caddyfile`:
 ## Prerequisites
 
 1. All changes are committed and pushed to `origin/main`
-2. SSH key access to `root@38.47.238.72` is configured
+2. SSH key access to `root@66.94.125.242` is configured
 3. The build passes locally (`pnpm build` succeeds)
 
 ---
@@ -92,7 +92,7 @@ git log --oneline -1          # note the commit hash
 
 **All platforms (same SSH command):**
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && git log --oneline -1 && systemctl is-active clawnet"
+ssh root@66.94.125.242 "cd /opt/clawnet && git log --oneline -1 && systemctl is-active clawnet"
 ```
 
 This shows the commit currently deployed and whether the service is running.
@@ -100,18 +100,18 @@ This shows the commit currently deployed and whether the service is running.
 ### Step 3: Pull latest code on the server
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && git pull origin main 2>&1"
+ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1"
 ```
 
 > **Note**: The remote on the server is set to HTTPS (`https://github.com/claw-network/clawnet.git`). If it was previously SSH and fails with "Permission denied (publickey)", fix it with:
 > ```bash
-> ssh root@38.47.238.72 "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
+> ssh root@66.94.125.242 "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
 > ```
 
 ### Step 4: Install dependencies (if needed)
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && pnpm install 2>&1 | tail -5"
+ssh root@66.94.125.242 "cd /opt/clawnet && pnpm install 2>&1 | tail -5"
 ```
 
 This is only needed if `package.json` or `pnpm-lock.yaml` changed. It's safe to always run — it will report "Already up to date" if nothing changed.
@@ -119,7 +119,7 @@ This is only needed if `package.json` or `pnpm-lock.yaml` changed. It's safe to 
 ### Step 5: Rebuild
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && pnpm build 2>&1 | tail -10"
+ssh root@66.94.125.242 "cd /opt/clawnet && pnpm build 2>&1 | tail -10"
 ```
 
 Verify the output shows all packages built successfully:
@@ -134,13 +134,13 @@ packages/cli build: Done
 If you encounter stale `tsbuildinfo` errors like `TS6305: Output file ... has not been built from source file`, clean and rebuild:
 
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && find packages -name dist -type d -exec rm -rf {} + 2>/dev/null; find packages -name tsconfig.tsbuildinfo -delete 2>/dev/null; pnpm build 2>&1 | tail -10"
+ssh root@66.94.125.242 "cd /opt/clawnet && find packages -name dist -type d -exec rm -rf {} + 2>/dev/null; find packages -name tsconfig.tsbuildinfo -delete 2>/dev/null; pnpm build 2>&1 | tail -10"
 ```
 
 ### Step 6: Restart the service
 
 ```bash
-ssh root@38.47.238.72 "systemctl restart clawnet"
+ssh root@66.94.125.242 "systemctl restart clawnet"
 ```
 
 ### Step 7: Verify the upgrade
@@ -148,7 +148,7 @@ ssh root@38.47.238.72 "systemctl restart clawnet"
 Wait a few seconds for startup, then verify:
 
 ```bash
-ssh root@38.47.238.72 "sleep 3 && curl -s http://127.0.0.1:9528/api/node/status | python3 -m json.tool"
+ssh root@66.94.125.242 "sleep 3 && curl -s http://127.0.0.1:9528/api/node/status | python3 -m json.tool"
 ```
 
 Expected output (example):
@@ -186,7 +186,7 @@ curl -s https://api.clawnetd.com/api/node/status | python3 -m json.tool
 ### Step 8: Check service logs (optional)
 
 ```bash
-ssh root@38.47.238.72 "journalctl -u clawnet --no-pager -n 20"
+ssh root@66.94.125.242 "journalctl -u clawnet --no-pager -n 20"
 ```
 
 Look for the startup banner:
@@ -209,7 +209,7 @@ For a fast upgrade when you know the code is already pushed:
 
 **All platforms (same SSH command):**
 ```bash
-ssh root@38.47.238.72 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm install 2>&1 | tail -3 && pnpm build 2>&1 | tail -10 && systemctl restart clawnet && sleep 3 && curl -s http://127.0.0.1:9528/api/node/status | python3 -m json.tool"
+ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm install 2>&1 | tail -3 && pnpm build 2>&1 | tail -10 && systemctl restart clawnet && sleep 3 && curl -s http://127.0.0.1:9528/api/node/status | python3 -m json.tool"
 ```
 
 ---

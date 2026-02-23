@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Quick helper: check wallet balance from the command line."""
+"""Quick helper: check wallet balance from the command line.
+
+The balance is fetched from the on-chain ClawToken contract via the
+node's WalletService proxy layer.  The REST/SDK interface is the same.
+"""
 
 from __future__ import annotations
 
