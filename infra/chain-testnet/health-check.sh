@@ -15,8 +15,7 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-RETH_RPC="${RETH_RPC:-http://127.0.0.1:8545}"
-CLAW_API="${CLAW_API:-http://127.0.0.1:9528}"
+GETH_RPC="${GETH_RPC:-http://127.0.0.1:8545}"
 ALERT_WEBHOOK="${ALERT_WEBHOOK_URL:-}"
 HOSTNAME=$(hostname)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -37,23 +36,23 @@ ok()   { echo -e "  ${GREEN}✓${NC} $1"; }
 warn() { echo -e "  ${YELLOW}⚠${NC} $1"; ERRORS+=("WARN: $1"); }
 fail() { echo -e "  ${RED}✗${NC} $1"; ERRORS+=("FAIL: $1"); }
 
-# ── Check Reth ────────────────────────────────────────────────────────────────
-echo "=== Reth (EVM Chain) ==="
+# ── Check Geth ────────────────────────────────────────────────────────────────
+echo "=== Geth (EVM Chain) ==="
 
-# 1. Reth reachable?
-BLOCK_HEX=$(curl -sf -X POST "$RETH_RPC" \
+# 1. Geth reachable?
+BLOCK_HEX=$(curl -sf -X POST "$GETH_RPC" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
   | jq -r '.result // empty' 2>/dev/null || true)
 
 if [ -z "$BLOCK_HEX" ]; then
-  fail "Reth unreachable at $RETH_RPC"
+  fail "Geth unreachable at $GETH_RPC"
 else
   BLOCK_NUM=$((16#${BLOCK_HEX#0x}))
   ok "Block height: $BLOCK_NUM"
 
   # 2. Block freshness
-  BLOCK_DATA=$(curl -sf -X POST "$RETH_RPC" \
+  BLOCK_DATA=$(curl -sf -X POST "$GETH_RPC" \
     -H "Content-Type: application/json" \
     -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"latest\",false],\"id\":2}" \
     2>/dev/null || echo "{}")
@@ -71,7 +70,7 @@ else
   fi
 
   # 3. Peer count
-  PEER_HEX=$(curl -sf -X POST "$RETH_RPC" \
+  PEER_HEX=$(curl -sf -X POST "$GETH_RPC" \
     -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":3}' \
     | jq -r '.result // empty' 2>/dev/null || true)
@@ -79,14 +78,14 @@ else
   if [ -n "$PEER_HEX" ]; then
     PEER_COUNT=$((16#${PEER_HEX#0x}))
     if [ "$PEER_COUNT" -lt "$MIN_PEER_COUNT" ]; then
-      warn "Reth peer count: $PEER_COUNT (min: $MIN_PEER_COUNT)"
+      warn "Geth peer count: $PEER_COUNT (min: $MIN_PEER_COUNT)"
     else
-      ok "Reth peers: $PEER_COUNT"
+      ok "Geth peers: $PEER_COUNT"
     fi
   fi
 
   # 4. Mining status (Clique)
-  MINING=$(curl -sf -X POST "$RETH_RPC" \
+  MINING=$(curl -sf -X POST "$GETH_RPC" \
     -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","method":"eth_mining","params":[],"id":4}' \
     | jq -r '.result // empty' 2>/dev/null || true)
@@ -100,38 +99,18 @@ fi
 
 echo ""
 
-# ── Check clawnetd ───────────────────────────────────────────────────────────
-echo "=== clawnetd (P2P Protocol) ==="
-
-# 1. clawnetd reachable?
-CLAW_STATUS=$(curl -sf "$CLAW_API/api/v1/node/info" 2>/dev/null || echo "")
-
-if [ -z "$CLAW_STATUS" ]; then
-  fail "clawnetd unreachable at $CLAW_API"
-else
-  # Parse node info
-  NODE_ID=$(echo "$CLAW_STATUS" | jq -r '.peerId // .nodeId // "unknown"' 2>/dev/null || echo "unknown")
-  ok "Node ID: ${NODE_ID:0:16}..."
-
-  # 2. Peer count
-  CLAW_PEERS=$(echo "$CLAW_STATUS" | jq -r '.peerCount // .peers // 0' 2>/dev/null || echo "0")
-  if [ "$CLAW_PEERS" -lt "$MIN_PEER_COUNT" ]; then
-    warn "clawnetd peer count: $CLAW_PEERS (min: $MIN_PEER_COUNT)"
-  else
-    ok "clawnetd peers: $CLAW_PEERS"
-  fi
-
-  # 3. Sync status
-  SYNC_STATUS=$(echo "$CLAW_STATUS" | jq -r '.synced // .syncStatus // "unknown"' 2>/dev/null || echo "unknown")
-  ok "Sync: $SYNC_STATUS"
-fi
-
+# ── Check clawnetd (skip if not deployed) ────────────────────────────────────
+# clawnetd P2P node is not yet deployed. Uncomment when ready.
+# echo "=== clawnetd (P2P Protocol) ==="
+# CLAW_API="${CLAW_API:-http://127.0.0.1:9528}"
+# CLAW_STATUS=$(curl -sf "$CLAW_API/api/v1/node/info" 2>/dev/null || echo "")
+# ...
 echo ""
 
 # ── Check Docker Containers ──────────────────────────────────────────────────
 echo "=== Docker Containers ==="
 
-for CONTAINER in reth clawnetd caddy; do
+for CONTAINER in clawnet-geth caddy; do
   STATUS=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "not found")
   if [ "$STATUS" = "running" ]; then
     UPTIME=$(docker inspect --format='{{.State.StartedAt}}' "$CONTAINER" 2>/dev/null || echo "")
@@ -158,10 +137,10 @@ else
   ok "Disk usage: ${DISK_USAGE}%"
 fi
 
-DATA_DIR="/data"
+DATA_DIR="/opt/clawnet/chain-data"
 if [ -d "$DATA_DIR" ]; then
   DATA_USAGE=$(du -sh "$DATA_DIR" 2>/dev/null | awk '{print $1}')
-  ok "Data dir size: $DATA_USAGE"
+  ok "Chain data size: $DATA_USAGE"
 fi
 
 echo ""

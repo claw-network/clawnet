@@ -100,24 +100,18 @@ echo ""
 # ── Step 3: Create Data Directories ──────────────────────────────────────────
 info "Step 3/7: Creating data directories..."
 
-mkdir -p /data/reth
-mkdir -p /data/clawnetd
-mkdir -p /data/caddy
-mkdir -p /opt/clawnet
+mkdir -p /opt/clawnet/chain-data
+mkdir -p /opt/clawnet/config
 mkdir -p /var/log/caddy
 
 # Set permissions
-chmod 750 /data/reth
-chmod 750 /data/clawnetd
-chmod 750 /data/caddy
-chmod 750 /opt/clawnet
+chmod 750 /opt/clawnet/chain-data
+chmod 750 /opt/clawnet/config
 
 info "Data directories created:"
-info "  /data/reth       — Reth chain data"
-info "  /data/clawnetd   — clawnetd protocol data"
-info "  /data/caddy      — Caddy TLS certs + config"
-info "  /opt/clawnet     — Docker Compose files + scripts"
-info "  /var/log/caddy   — Caddy access logs"
+info "  /opt/clawnet/chain-data  — Geth chain data"
+info "  /opt/clawnet/config      — genesis.json + password.txt"
+info "  /var/log/caddy           — Caddy access logs"
 echo ""
 
 # ── Step 4: Firewall (UFW) ───────────────────────────────────────────────────
@@ -131,9 +125,9 @@ if command -v ufw &>/dev/null; then
   # SSH (IMPORTANT: don't lock yourself out)
   ufw allow 22/tcp comment "SSH"
 
-  # Reth P2P (devp2p)
-  ufw allow 30303/tcp comment "Reth P2P TCP"
-  ufw allow 30303/udp comment "Reth P2P UDP (discovery)"
+  # Geth P2P (devp2p)
+  ufw allow 30303/tcp comment "Geth P2P TCP"
+  ufw allow 30303/udp comment "Geth P2P UDP (discovery)"
 
   # clawnetd libp2p
   ufw allow 9527/tcp comment "clawnetd P2P"
@@ -213,7 +207,7 @@ else
 fi
 
 # Set ownership
-chown -R clawnet:clawnet /data/reth /data/clawnetd /data/caddy /opt/clawnet
+chown -R clawnet:clawnet /opt/clawnet
 
 echo ""
 

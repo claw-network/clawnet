@@ -1,40 +1,51 @@
 # ==============================================================================
-# ClawNet Chain — Server B/C (Peer: Validator + P2P Node, no public HTTP)
+# ClawNet Chain — Server B/C (Peer: Validator, no public HTTP)
 # ==============================================================================
 # Usage:
 #   cd /opt/clawnet
-#   docker compose up -d
-#   docker compose logs -f
+#   cp infra/chain-testnet/docker-compose.peer.yml docker-compose.chain.yml
+#   # Edit VALIDATOR_ADDRESS in .env
+#   # Edit --bootnodes to point to Server A (and optionally B) enode URLs
+#   docker compose -f docker-compose.chain.yml up -d
+#
+# IMPORTANT: Do NOT start with --mine until the node has synced to the
+#            current chain height! Use docker-compose.sync.yml first.
+#            See README.md "sync-first-then-mine" strategy.
+# ==============================================================================
+# Geth v1.13.15 — DO NOT upgrade to v1.14+ (Clique PoA removed)
 # ==============================================================================
 
 services:
-  # ── Reth Validator Node ───────────────────────────────────────────────────
-  reth:
-    image: ghcr.io/paradigmxyz/reth:latest
-    container_name: clawnet-reth
+  geth:
+    image: ethereum/client-go:v1.13.15
+    container_name: clawnet-geth
     restart: unless-stopped
     ports:
-      - "30303:30303/tcp"
-      - "30303:30303/udp"
+      - "30303:30303/tcp"           # P2P TCP
+      - "30303:30303/udp"           # P2P Discovery
+      - "127.0.0.1:8545:8545/tcp"   # JSON-RPC (local only)
     volumes:
       - /opt/clawnet/chain-data:/data
-      - /opt/clawnet/config/genesis.json:/genesis.json:ro
-    environment:
-      - RUST_LOG=info
-    command: >
-      node
+      - /opt/clawnet/config:/config:ro
+    entrypoint: >
+      geth
         --datadir /data
-        --chain /genesis.json
+        --networkid 7625
         --http
-        --http.addr 127.0.0.1
+        --http.addr 0.0.0.0
         --http.port 8545
-        --http.api eth,net,web3,txpool
+        --http.api eth,net,web3,txpool,clique,admin
+        --http.corsdomain "*"
+        --http.vhosts "*"
         --port 30303
-        --authrpc.port 8551
-        --miner.etherbase ${RETH_VALIDATOR_ADDRESS:-0x0000000000000000000000000000000000000000}
-        --unlock ${RETH_VALIDATOR_ADDRESS:-0x0000000000000000000000000000000000000000}
         --mine
-        --bootnodes "${RETH_BOOTNODES}"
+        --miner.etherbase ${VALIDATOR_ADDRESS}
+        --unlock ${VALIDATOR_ADDRESS}
+        --password /config/password.txt
+        --allow-insecure-unlock
+        --syncmode full
+        --gcmode archive
+        --bootnodes "enode://<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303"
     healthcheck:
       test: >
         wget -qO- --post-data='{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
@@ -44,43 +55,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "5"
-
-  # ── clawnetd P2P Node (Peer) ──────────────────────────────────────────────
-  clawnetd:
-    build:
-      context: https://github.com/claw-network/clawnet.git
-      # 或者使用预构建镜像:
-      # image: claw-network/clawnet:latest
-    container_name: clawnet-daemon
-    restart: unless-stopped
-    ports:
-      - "9527:9527/tcp"      # P2P libp2p
-    volumes:
-      - /opt/clawnet/clawnetd-data:/data
-    environment:
-      - CLAW_PASSPHRASE=${CLAW_PASSPHRASE}
-      - CLAW_API_HOST=127.0.0.1
-      - CLAW_API_PORT=9528
-      - CLAW_DATA_DIR=/data
-      - NODE_ENV=production
-    command: >
-      node packages/node/dist/daemon.js
-        --data-dir /data
-        --api-host 127.0.0.1
-        --api-port 9528
-        --listen /ip4/0.0.0.0/tcp/9527
-        --bootstrap ${CLAW_BOOTSTRAP}
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/node/status"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
     logging:
       driver: json-file
       options:
