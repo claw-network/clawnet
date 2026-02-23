@@ -10,6 +10,9 @@ coverage.json
 # Gas
 gas-report.txt
 
+# Security tools
+slither-report.json
+
 # Environment
 .env
 

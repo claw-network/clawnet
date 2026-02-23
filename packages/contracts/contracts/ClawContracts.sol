@@ -641,7 +641,7 @@ contract ClawContracts is
             revert InvalidMilestones();
         }
 
-        uint256 sum;
+        uint256 sum = 0;
         for (uint256 i; i < len; i++) {
             if (amounts[i] == 0) revert InvalidAmount();
             if (deadlines[i] > deadline) revert InvalidDeadline();

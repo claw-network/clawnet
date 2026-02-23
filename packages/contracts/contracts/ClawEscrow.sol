@@ -88,6 +88,7 @@ contract ClawEscrow is
     event EscrowExpired(bytes32 indexed escrowId, address indexed caller);
     event EscrowDisputed(bytes32 indexed escrowId, address indexed disputedBy);
     event EscrowResolved(bytes32 indexed escrowId, address indexed arbiter, bool releasedToBeneficiary);
+    event FeeParamsInitialized(uint256 baseRate, uint256 holdingRate, uint256 minEscrowFee);
 
     // ─── Errors ──────────────────────────────────────────────────────
 
@@ -137,6 +138,8 @@ contract ClawEscrow is
         baseRate = baseRate_;
         holdingRate = holdingRate_;
         minEscrowFee = minEscrowFee_;
+
+        emit FeeParamsInitialized(baseRate_, holdingRate_, minEscrowFee_);
     }
 
     // ─── Core functions ──────────────────────────────────────────────

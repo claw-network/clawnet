@@ -136,6 +136,7 @@ contract ClawDAO is
     event ProposalCancelled(uint256 indexed proposalId);
     event EmergencyExecuted(uint256 indexed proposalId, address[] signers);
     event EmergencySignersUpdated(address[9] newSigners);
+    event GovernanceParamsInitialized(uint256 proposalThreshold, uint64 discussionPeriod, uint64 votingPeriod, uint64 timelockDelay, uint256 quorumBps);
 
     // ─── Errors ──────────────────────────────────────────────────────
 
@@ -193,6 +194,8 @@ contract ClawDAO is
         quorumBps = quorumBps_;
 
         _setEmergencySigners(signers);
+
+        emit GovernanceParamsInitialized(proposalThreshold_, discussionPeriod_, votingPeriod_, timelockDelay_, quorumBps_);
     }
 
     // ─── Proposal Lifecycle ──────────────────────────────────────────
@@ -474,10 +477,12 @@ contract ClawDAO is
     }
 
     function setReputationContract(address addr) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (addr == address(0)) revert InvalidAddress();
         reputationContract = addr;
     }
 
     function setStakingContract(address addr) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (addr == address(0)) revert InvalidAddress();
         stakingContract = addr;
     }
 

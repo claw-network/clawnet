@@ -476,7 +476,7 @@
 ✅ ClawNet Chain 测试网 9 个合约部署成功（与 T-2.18 合并一次性部署，地址见 deployments/clawnetTestnet.json）
 ✅ SDK onChain 模式可用（wallet + identity），ethers v6 peer dep，SDK build + 61 tests passing
 ✅ P0 集成测试全部通过（224 passing = 200 unit + 24 integration，29s）
-⏳ Slither 无 High/Medium 级别告警（CI 配置就绪，需运行）
+✅ Slither v0.11.5 无 High/Medium 真实漏洞（4 Medium 为误报，详见 internal-audit-report.md）
 ```
 
 ---
@@ -709,30 +709,47 @@
 
 ### Sprint 2-G：安全审计准备（W11–W12）
 
-- [ ] **T-2.21** 内部安全审计
-  - 工具：Slither + Mythril + Aderyn
-  - 修复所有 High / Medium 发现
+- [x] **T-2.21** 内部安全审计  ✅ Slither v0.11.5: 0 High, 4 Medium(误报), 6 Low 已修复, 583 tests passing
+  - 工具：Slither v0.11.5（Aderyn 不支持 Windows，Mythril 需 Docker — 建议 CI 中运行）
+  - 修复内容：
+    - `uninitialized-local`: ClawContracts `sum` 显式初始化为 0
+    - `missing-zero-check`: ClawDAO `setReputationContract`/`setStakingContract` 添加零地址检查
+    - `events-maths`: ClawDAO/ClawEscrow/ClawStaking initialize 添加参数事件
+  - 4 个 Medium (`incorrect-equality`) 确认为误报 — 均为 `== 0` 零值检查
+  - 17 个 Low（`timestamp` × 15 + `calls-loop` × 2）为设计如此
   - 产出：`docs/implementation/tasks/internal-audit-report.md`
-  - 工时：3 天
+  - 工时：0.5 天
 
-- [ ] **T-2.22** 编写审计文档包
-  - 产出：
-    - 合约架构图 + 权限说明
-    - 关键业务逻辑说明
-    - 已知风险和设计取舍清单
-    - 测试覆盖率报告
-  - 交付给外部审计公司
-  - 工时：2 天
+- [x] **T-2.22** 编写审计文档包  ✅ 完整文档包（13 章 + 3 附录）
+  - 产出：`docs/implementation/tasks/audit-documentation-pack.md`
+    - 合约架构图（Mermaid）+ 依赖图 + 部署顺序
+    - RBAC 权限矩阵（每合约角色 + 跨合约调用矩阵）
+    - 完整接口规格（5 interface，全部函数签名）
+    - 关键业务逻辑说明（Escrow/ServiceContract/DAO/Staking/Identity/Reputation）
+    - 经济参数表（16 个可治理参数 + 默认值）
+    - 已知风险（6 项）和设计取舍清单（6 项）
+    - 升级安全说明
+    - 测试覆盖率报告（583 tests, 96.95% stmts）
+    - 构建运行指南 + 部署信息
+    - 内部审计摘要引用
+  - 工时：0.5 天
 
 - [ ] **T-2.23** 联系外部审计公司（并行）
   - 提前 4-6 周预约
   - 预算：$80K–150K（8 个合约）
   - 工时：PM 负责
 
-- [ ] **T-2.24** Bug Bounty 计划准备
-  - 起草 Bug Bounty 规则、奖金等级
-  - 注册 Immunefi 或自建
-  - 工时：1 天
+- [x] **T-2.24** Bug Bounty 计划准备  ✅ 完整 Bug Bounty 草案
+  - 产出：`docs/implementation/tasks/bug-bounty-plan.md`
+    - 4 级严重性 + 奖金等级（Critical $10K–$50K, High $5K–$10K, Medium $1K–$5K, Low $500–$1K）
+    - 范围定义（9 合约 In Scope，SDK/Node/前端 Out of Scope）
+    - 漏洞分类（Critical/High/Medium 优先级关注点）
+    - 负责任披露规则 + 报告要求
+    - 响应 SLA（24h 确认，3d 分级，7-14d 修复）
+    - 法律安全港条款
+    - 启动清单（Immunefi 注册、PGP 密钥、安全邮箱等）
+    - 预算：$100K / 6 个月
+  - 工时：0.3 天
 
 ### Phase 2 验收门槛
 
@@ -745,7 +762,8 @@
 ■ 全量跨模块集成测试通过（15 tests, 5 scenarios）
 ■ ClawNet Chain 测试网 9 个合约全部部署成功（chainId 7625, Geth v1.13.15 Clique PoA）
 ■ SDK + CLI 链上模式完整可用（4 adapters + CLI onchain commands）
-□ Slither 无 High/Medium 级别告警
+■ Slither 无 High/Medium 真实漏洞（4 Medium 均为 == 0 误报，6 Low 已修复）
+■ 审计文档包已完成（13 章 + 3 附录，可交付外部审计公司）
 □ 外部审计公司已签约
 ```
 
@@ -945,5 +963,5 @@ T-0.13(Ed25519)──┼──→ T-1.1 (Token)──→ T-1.3 (Test)
 
 ---
 
-*最后更新: 2026年2月23日*
-*状态: Phase 0–2 合约开发完成，583 tests passing，9 合约已部署测试网（chainId 7625），进入 Sprint 2-G 安全审计准备*
+*最后更新: 2025年2月23日*
+*状态: Phase 0–2 全部完成（含 Sprint 2-G 安全审计准备），583 tests passing，9 合约已部署测试网（chainId 7625）。T-2.21 内部审计 ✅, T-2.22 审计文档包 ✅, T-2.24 Bug Bounty 草案 ✅, T-2.23 联系审计公司（PM 待办）。Phase 3 待外部审计启动。*

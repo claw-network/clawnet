@@ -87,6 +87,7 @@ contract ClawStaking is
     event RewardClaimed(address indexed node, uint256 amount);
     event Slashed(address indexed node, uint256 amount, bytes32 reason);
     event RewardsDistributed(uint256 totalAmount, uint256 validatorCount);
+    event StakingParamsInitialized(uint256 minStake, uint64 unstakeCooldown, uint256 slashPerViolation);
 
     // ─── Errors ──────────────────────────────────────────────────────
 
@@ -139,6 +140,8 @@ contract ClawStaking is
         unstakeCooldown = unstakeCooldown_;
         rewardPerEpoch = rewardPerEpoch_;
         slashPerViolation = slashPerViolation_;
+
+        emit StakingParamsInitialized(minStake_, unstakeCooldown_, slashPerViolation_);
     }
 
     // ─── Core functions ──────────────────────────────────────────────
