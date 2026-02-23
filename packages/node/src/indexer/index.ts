@@ -32,6 +32,7 @@ export type {
   VoteFilter,
   ReviewRow,
   ReviewFilter,
+  DidCacheRow,
   EventRow,
   EventFilter,
 } from './query.js';

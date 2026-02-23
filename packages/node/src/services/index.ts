@@ -30,3 +30,13 @@ export type {
   EscrowCreateResult,
   TransactionHistoryResult,
 } from './wallet-service.js';
+
+export { IdentityService } from './identity-service.js';
+export type {
+  KeyPurpose,
+  DIDRegistrationResult,
+  KeyRotationResult,
+  DIDRevocationResult,
+  PlatformLinkResult,
+  DIDDocument,
+} from './identity-service.js';

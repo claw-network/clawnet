@@ -137,6 +137,29 @@ const CapabilityRegisterSchema = z
   })
   .passthrough();
 
+const IdentityRegisterSchema = z
+  .object({
+    did: z.string().min(1),
+    publicKey: z.string().min(1),
+    purpose: z.enum(['authentication', 'assertion', 'keyAgreement', 'recovery']).optional(),
+    evmAddress: z.string().optional(),
+  })
+  .passthrough();
+
+const IdentityRotateKeySchema = z
+  .object({
+    did: z.string().min(1),
+    newPublicKey: z.string().min(1),
+    rotationProof: z.string().optional(),
+  })
+  .passthrough();
+
+const IdentityRevokeSchema = z
+  .object({
+    did: z.string().min(1),
+  })
+  .passthrough();
+
 const WalletTransferSchema = z
   .object({
     did: z.string().min(1),
@@ -885,6 +908,7 @@ const DaoTreasuryDepositSchema = z
   .passthrough();
 
 import type { WalletService } from '../services/wallet-service.js';
+import type { IdentityService } from '../services/identity-service.js';
 
 export class ApiServer {
   private server?: Server;
@@ -900,6 +924,7 @@ export class ApiServer {
       marketStore?: MarketSearchStore;
       infoContentStore?: InfoContentStore;
       walletService?: WalletService;
+      identityService?: IdentityService;
       searchMarkets?: (query: SearchQuery) => SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
@@ -971,6 +996,21 @@ export class ApiServer {
 
       if (method === 'POST' && url?.pathname === '/api/identity/capabilities') {
         await this.handleCapabilityRegister(req, res);
+        return;
+      }
+
+      if (method === 'POST' && url?.pathname === '/api/identity/register') {
+        await this.handleIdentityRegister(req, res);
+        return;
+      }
+
+      if (method === 'POST' && url?.pathname === '/api/identity/rotate-key') {
+        await this.handleIdentityRotateKey(req, res);
+        return;
+      }
+
+      if (method === 'POST' && url?.pathname === '/api/identity/revoke') {
+        await this.handleIdentityRevoke(req, res);
         return;
       }
 
@@ -1461,6 +1501,39 @@ export class ApiServer {
       sendError(res, 404, 'DID_NOT_FOUND', 'local identity not initialized');
       return;
     }
+
+    // ── On-chain path: enrich with chain data ──────────────────────────
+    if (this.runtime.identityService) {
+      try {
+        const doc = await this.runtime.identityService.resolve(identity.did);
+        if (doc) {
+          // Merge on-chain data with local identity
+          const eventStore = this.runtime.eventStore;
+          const capabilities = eventStore
+            ? await buildIdentityCapabilities(eventStore, identity.did)
+            : [];
+          sendJson(res, 200, {
+            did: identity.did,
+            publicKey: doc.publicKey,
+            controller: doc.controller,
+            keyPurpose: doc.keyPurpose,
+            isActive: doc.isActive,
+            created: doc.createdAt,
+            updated: doc.updatedAt,
+            displayName: identity.displayName,
+            avatar: identity.avatar,
+            bio: identity.bio,
+            platformLinks: doc.platformLinks,
+            capabilities,
+          });
+          return;
+        }
+      } catch {
+        // Fall through to legacy path.
+      }
+    }
+
+    // ── Legacy path (event-sourced) ────────────────────────────────────
     const eventStore = this.runtime.eventStore;
     if (!eventStore) {
       sendJson(res, 200, identity);
@@ -1491,6 +1564,36 @@ export class ApiServer {
       sendError(res, 400, 'DID_INVALID', 'invalid did');
       return;
     }
+
+    // ── On-chain path ───────────────────────────────────────────────────────
+    if (this.runtime.identityService) {
+      try {
+        const doc = await this.runtime.identityService.resolve(did);
+        if (doc) {
+          const eventStore = this.runtime.eventStore;
+          const capabilities = eventStore
+            ? await buildIdentityCapabilities(eventStore, did)
+            : [];
+          sendJson(res, 200, {
+            did,
+            publicKey: doc.publicKey,
+            controller: doc.controller,
+            keyPurpose: doc.keyPurpose,
+            isActive: doc.isActive,
+            created: doc.createdAt,
+            updated: doc.updatedAt,
+            platformLinks: doc.platformLinks,
+            capabilities,
+          });
+          return;
+        }
+        // DID not found on-chain — fall through to legacy.
+      } catch {
+        // Fall through to legacy path.
+      }
+    }
+
+    // ── Legacy path (event-sourced) ────────────────────────────────────────
     const local = await resolveLocalIdentity(this.config.dataDir);
     if (local && local.did === did) {
       const eventStore = this.runtime.eventStore;
@@ -1602,6 +1705,68 @@ export class ApiServer {
       sendJson(res, 201, response);
     } catch {
       sendError(res, 500, 'INTERNAL_ERROR', 'publish failed');
+    }
+  }
+
+  // ── Identity write handlers (on-chain) ────────────────────────────────
+
+  private async handleIdentityRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.runtime.identityService) {
+      sendError(res, 501, 'NOT_IMPLEMENTED', 'chain identity service unavailable');
+      return;
+    }
+    const body = await parseBody(req, res, IdentityRegisterSchema);
+    if (!body) return;
+
+    try {
+      const result = await this.runtime.identityService.registerDID(
+        body.did,
+        body.publicKey,
+        body.purpose ?? 'authentication',
+        body.evmAddress,
+      );
+      sendJson(res, 201, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'register failed';
+      sendError(res, 500, 'INTERNAL_ERROR', msg);
+    }
+  }
+
+  private async handleIdentityRotateKey(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.runtime.identityService) {
+      sendError(res, 501, 'NOT_IMPLEMENTED', 'chain identity service unavailable');
+      return;
+    }
+    const body = await parseBody(req, res, IdentityRotateKeySchema);
+    if (!body) return;
+
+    try {
+      const result = await this.runtime.identityService.rotateKey(
+        body.did,
+        body.newPublicKey,
+        body.rotationProof ?? '0x',
+      );
+      sendJson(res, 200, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'rotate key failed';
+      sendError(res, 500, 'INTERNAL_ERROR', msg);
+    }
+  }
+
+  private async handleIdentityRevoke(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (!this.runtime.identityService) {
+      sendError(res, 501, 'NOT_IMPLEMENTED', 'chain identity service unavailable');
+      return;
+    }
+    const body = await parseBody(req, res, IdentityRevokeSchema);
+    if (!body) return;
+
+    try {
+      const result = await this.runtime.identityService.revokeDID(body.did);
+      sendJson(res, 200, result);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'revoke failed';
+      sendError(res, 500, 'INTERNAL_ERROR', msg);
     }
   }
 

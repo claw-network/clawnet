@@ -129,6 +129,15 @@ export interface ReviewFilter extends PaginationOpts {
   reviewerDid?: string;
 }
 
+// -- DID cache queries ------------------------------------------------------
+
+export interface DidCacheRow {
+  controller: string;
+  activeKey: string;
+  isActive: boolean;
+  updatedAt: number;
+}
+
 // -- Generic event queries --------------------------------------------------
 
 export interface EventRow {
@@ -346,6 +355,33 @@ export class IndexerQuery {
       .all(...params, limit, offset) as ReviewRow[];
 
     return { items: rows, total, limit, offset };
+  }
+
+  // ── DID cache ───────────────────────────────────────────────────────────
+
+  /**
+   * Look up a single DID record from the indexer cache.
+   *
+   * @param didHash  The keccak256 hash of the full DID string.
+   * @returns Cached record, or `null` if not found.
+   */
+  getDid(didHash: string): DidCacheRow | null {
+    const row = this.db
+      .prepare(
+        `SELECT controller, active_key AS activeKey,
+                is_active AS isActive, updated_at AS updatedAt
+         FROM did_cache
+         WHERE did_hash = ?`,
+      )
+      .get(didHash) as { controller: string; activeKey: string; isActive: number; updatedAt: number } | undefined;
+
+    if (!row) return null;
+    return {
+      controller: row.controller,
+      activeKey: row.activeKey,
+      isActive: row.isActive === 1,
+      updatedAt: row.updatedAt,
+    };
   }
 
   // ── Generic events ──────────────────────────────────────────────────────
