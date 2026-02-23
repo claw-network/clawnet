@@ -1,0 +1,67 @@
+{
+  "network": "clawnetTestnet",
+  "chainId": 7625,
+  "deployer": "0x22D8C1C06610137091EfeCB948aEE263EeeE0590",
+  "timestamp": "2026-02-23T14:57:10.271Z",
+  "contracts": {
+    "ClawToken": {
+      "proxy": "0xA98Cc076321aF8cC66A579b91643B5B98E316AA4",
+      "impl": "0xCafB4006eEA8A37825a647E6f870eAf3A8d2e893"
+    },
+    "ParamRegistry": {
+      "proxy": "0x31cCc8480Ab7BCBd576a2B2b7203a58ee8494b16",
+      "impl": "0x8013161A2C762786C2Fc5F7f379b6A5e4D6b0F2B"
+    },
+    "ClawEscrow": {
+      "proxy": "0x5Ce7F1E92A65BeE1245dddbAC8e5F12bF79AC0F4",
+      "impl": "0xBce69A433447d6e1f33CA03e7667ae643DefE941"
+    },
+    "ClawIdentity": {
+      "proxy": "0xB59dEcd56C11a8a8F120ED7D9C3BAE16C5CA55E0",
+      "impl": "0xf803fbE0e871aC87D38b5edCF012262B53e8b845"
+    },
+    "ClawStaking": {
+      "proxy": "0xbf3a9Cff2b37A7531c385A23288D73DbB4427dD2",
+      "impl": "0x7EF078F2eC4374e09F08f433Dbb2DC559416A309"
+    },
+    "ClawReputation": {
+      "proxy": "0x4358f0b43E6f88cbdfDc0055d56D17aF3d4FB343",
+      "impl": "0xef62518Da44b1F9C46DB2B1d2317de3bE3B0fd00"
+    },
+    "ClawDAO": {
+      "proxy": "0xe3C7a659591EaA8E724505E00Bccbb743CB9948b",
+      "impl": "0xA971a5Ad7720724965f9ec86BF77EbB163915619"
+    },
+    "ClawContracts": {
+      "proxy": "0x8674249aC00a67b4B1F28475e46D043b50Ded028",
+      "impl": "0xDE571f23df423878aD710C1164dBe88eDe0Ea667"
+    },
+    "ClawRouter": {
+      "proxy": "0x1dAC767bfaD7dBcD06ba52d1BB698429BbaFA11f",
+      "impl": "0xE267B7f41dF6c41121aA44686f0C6C91901a3457"
+    }
+  },
+  "roles": {
+    "minterToStaking": "0xbf3a9Cff2b37A7531c385A23288D73DbB4427dD2",
+    "governorToDao": "0xe3C7a659591EaA8E724505E00Bccbb743CB9948b",
+    "anchorAddress": null,
+    "arbiterAddress": null
+  },
+  "params": {
+    "treasury": "0x838C5c42918CEbb88a7B9E867c4646F225AA3ba0",
+    "escrowBaseRate": 100,
+    "escrowHoldingRate": 5,
+    "escrowMinFee": 1,
+    "minStake": 10000,
+    "unstakeCooldown": 604800,
+    "rewardPerEpoch": 1,
+    "slashPerViolation": 1,
+    "epochDuration": 86400,
+    "proposalThreshold": 100,
+    "discussionPeriod": 172800,
+    "votingPeriod": 259200,
+    "timelockDelay": 86400,
+    "quorumBps": 400,
+    "platformFeeBps": 100
+  }
+}
