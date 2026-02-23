@@ -19,7 +19,7 @@ const config: HardhatUserConfig = {
         enabled: true,
         runs: 200,
       },
-      evmVersion: "cancun",
+      evmVersion: "london",
     },
   },
   networks: {
@@ -35,6 +35,7 @@ const config: HardhatUserConfig = {
       url: process.env.CLAWNET_RPC_URL || "https://rpc.clawnetd.com",
       chainId: 7625,
       accounts: [DEPLOYER_PRIVATE_KEY],
+      timeout: 120_000,
     },
     clawnetMainnet: {
       url: process.env.CLAWNET_MAINNET_RPC_URL || "https://rpc.clawnet.io",
