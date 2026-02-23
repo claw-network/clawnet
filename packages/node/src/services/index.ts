@@ -64,3 +64,22 @@ export type {
   ContractListResult,
   ServiceContractListItem,
 } from './contracts-service.js';
+
+export { DaoService } from './dao-service.js';
+export type {
+  ProposalType,
+  ProposalStatus,
+  VoteSupport,
+  ProposalView,
+  VoteReceipt,
+  VotingPowerResult,
+  ProposalCreateResult,
+  ProposalTxResult,
+  VoteCastResult,
+  TreasuryView,
+  TreasuryDepositResult,
+  GovParam,
+  GovParamsResult,
+  ProposalListResult,
+  VoteListResult,
+} from './dao-service.js';

@@ -431,7 +431,7 @@ export class EventIndexer {
           proposalId: Number(args['proposalId'] ?? 0),
           proposer: args['proposer'] ?? '',
           pType: Number(args['pType'] ?? 0),
-          status: 0, // Created
+          status: 0, // Discussion
           createdAt: timestamp,
         });
         break;
@@ -444,14 +444,27 @@ export class EventIndexer {
           timestamp,
         });
         break;
+      case 'ProposalAdvanced': {
+        // ProposalAdvanced(uint256 proposalId, ProposalStatus newStatus)
+        const newStatus = Number(args['newStatus'] ?? 0);
+        this.store.updateProposalStatus(Number(args['proposalId'] ?? 0), newStatus);
+        break;
+      }
       case 'ProposalQueued':
-        this.store.updateProposalStatus(Number(args['proposalId'] ?? 0), 1);
+        // Timelocked = 4
+        this.store.updateProposalStatus(Number(args['proposalId'] ?? 0), 4);
         break;
       case 'ProposalExecuted':
-        this.store.updateProposalStatus(Number(args['proposalId'] ?? 0), 2);
+        // Executed = 5
+        this.store.updateProposalStatus(Number(args['proposalId'] ?? 0), 5);
         break;
       case 'ProposalCancelled':
-        this.store.updateProposalStatus(Number(args['proposalId'] ?? 0), 3);
+        // Cancelled = 6
+        this.store.updateProposalStatus(Number(args['proposalId'] ?? 0), 6);
+        break;
+      case 'EmergencyExecuted':
+        // Emergency execution → Executed = 5
+        this.store.updateProposalStatus(Number(args['proposalId'] ?? 0), 5);
         break;
       default:
         break;

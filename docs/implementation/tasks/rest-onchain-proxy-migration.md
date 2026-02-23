@@ -278,10 +278,10 @@
 
 #### 待实施项
 
-- [ ] **Solidity 评估**: `ClawDAO.sol` 是否已有 delegation 逻辑；如果没有，需新增 `delegate(address)` + `undelegate()` + `getDelegatee()` 方法
-- [ ] **Solidity 评估**: `ParamRegistry.sol` 是否已暴露 DAO 治理参数的 view 函数
-- [ ] **Node `DaoService`**: 新增 `advanceProposal()` 适配方法（内部判断 status → 调 `queue()` 或 `execute()`）
-- [ ] **Indexer**: 监听 `ProposalCreated`, `VoteCast`, `ProposalQueued`, `ProposalExecuted` 事件
+- [x] **Solidity 评估**: `ClawDAO.sol` 无 delegation 逻辑；delegation 路由保留 event-store fallback，待未来 ERC20Votes 升级
+- [x] **Solidity 评估**: `ParamRegistry.sol` 已暴露 `getAllParams()` / `getParam()` view 函数 → 在 `DaoService` 中调用
+- [x] **Node `DaoService`**: 新增 `advanceProposal()` 适配方法（内部判断 status → 调 `queue()` 或 `execute()`）
+- [x] **Indexer**: 监听 `ProposalCreated`, `VoteCast`, `ProposalAdvanced`, `ProposalQueued`, `ProposalExecuted`, `ProposalCancelled`, `EmergencyExecuted` 事件；修正 status 映射匹配 Solidity enum
 
 ---
 
@@ -446,14 +446,14 @@ DAO 是最复杂的模块，需要先确认 Solidity 合约是否支持 delegati
 
 | 任务 | 说明 |
 |------|------|
-| **P5.1** Solidity 审计 | 审计 `ClawDAO.sol` + `ParamRegistry.sol`，确认 delegation / treasury / params 的实现状态 |
-| **P5.2** 合约补齐（如需要） | 若 delegation 缺失 → 在 `ClawDAO.sol` 新增 `delegate()`/`undelegate()`；或考虑 OpenZeppelin `ERC20Votes` 模式 |
-| **P5.3** Node `DaoService` 扩展 | 新增 `advanceProposal()` 适配（status → queue/execute 映射） |
-| **P5.4** Node DAO 写路由改造 | proposals/vote/delegation/treasury/timelock 路由改调链上 |
-| **P5.5** DAO indexer | 监听所有 DAO events → `proposals` + `votes` 表 |
-| **P5.6** 列表 / 聚合查询 | proposals 列表、votes 聚合、delegations 查询从 indexer 读取 |
-| **P5.7** Treasury 读操作 | `GET /api/dao/treasury` = `ClawToken.balanceOf(daoAddress)` + indexer 历史 |
-| **P5.8** Params 读操作 | `GET /api/dao/params` = `ParamRegistry` view functions |
+| **P5.1** Solidity 审计 ✅ | 审计 `ClawDAO.sol` + `ParamRegistry.sol`，确认 delegation / treasury / params 的实现状态 |
+| **P5.2** 合约补齐（delegation 无需新增，保留 legacy） ✅ | ClawDAO.sol 无 delegation 逻辑，delegation 路由保留 event-store fallback；待未来 ERC20Votes 升级 |
+| **P5.3** Node `DaoService` 扩展 ✅ | 新增 `advanceProposal()` 适配（status → queue/execute 映射） |
+| **P5.4** Node DAO 写路由改造 ✅ | proposals/vote/treasury/timelock 路由改调链上；delegation 保留 legacy fallback |
+| **P5.5** DAO indexer ✅ | 监听所有 DAO events → `proposals` + `votes` 表；修正 status 映射匹配 Solidity enum |
+| **P5.6** 列表 / 聚合查询 ✅ | proposals 列表、votes 聚合从 indexer 读取；delegations 保留 legacy |
+| **P5.7** Treasury 读操作 ✅ | `GET /api/dao/treasury` = `ClawToken.balanceOf(daoAddress)` via DaoService |
+| **P5.8** Params 读操作 ✅ | `GET /api/dao/params` = `ParamRegistry.getAllParams()` via DaoService |
 | **P5.9** 集成测试 | |
 
 ---

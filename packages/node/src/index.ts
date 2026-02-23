@@ -53,6 +53,7 @@ import { WalletService } from './services/wallet-service.js';
 import { IdentityService } from './services/identity-service.js';
 import { ReputationService } from './services/reputation-service.js';
 import { ContractsService } from './services/contracts-service.js';
+import { DaoService } from './services/dao-service.js';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 
 export interface NodeRuntimeConfig {
@@ -124,6 +125,7 @@ export class ClawNetNode {
   private identityService?: IdentityService;
   private reputationService?: ReputationService;
   private contractsService?: ContractsService;
+  private daoService?: DaoService;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
   private startedAt?: number;
@@ -248,6 +250,7 @@ export class ClawNetNode {
           this.identityService = new IdentityService(this.contractProvider, this.indexerQuery);
           this.reputationService = new ReputationService(this.contractProvider, this.indexerQuery);
           this.contractsService = new ContractsService(this.contractProvider, this.indexerQuery);
+          this.daoService = new DaoService(this.contractProvider, this.indexerQuery);
           this.eventIndexer = new EventIndexer(
             this.contractProvider,
             this.indexerStore,
@@ -274,6 +277,7 @@ export class ClawNetNode {
           identityService: this.identityService,
           reputationService: this.reputationService,
           contractsService: this.contractsService,
+          daoService: this.daoService,
           searchMarkets: (query) => {
             if (!this.marketSearchStore) {
               throw new Error('market search unavailable');
@@ -346,6 +350,7 @@ export class ClawNetNode {
     this.identityService = undefined;
     this.reputationService = undefined;
     this.contractsService = undefined;
+    this.daoService = undefined;
     this.peerId = undefined;
     this.peerPrivateKey = undefined;
     this.stopping = undefined;

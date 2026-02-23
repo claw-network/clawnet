@@ -911,6 +911,7 @@ import type { WalletService } from '../services/wallet-service.js';
 import type { IdentityService } from '../services/identity-service.js';
 import type { ReputationService } from '../services/reputation-service.js';
 import type { ContractsService } from '../services/contracts-service.js';
+import type { DaoService } from '../services/dao-service.js';
 
 export class ApiServer {
   private server?: Server;
@@ -929,6 +930,7 @@ export class ApiServer {
       identityService?: IdentityService;
       reputationService?: ReputationService;
       contractsService?: ContractsService;
+      daoService?: DaoService;
       searchMarkets?: (query: SearchQuery) => SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
@@ -6263,6 +6265,28 @@ export class ApiServer {
     res: ServerResponse,
     url: URL,
   ): Promise<void> {
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const statusParam = url.searchParams.get('status');
+        const proposerParam = url.searchParams.get('proposer');
+        const limitParam = url.searchParams.get('limit');
+        const offsetParam = url.searchParams.get('offset');
+        const result = await this.runtime.daoService.listProposals({
+          status: statusParam ? Number(statusParam) : undefined,
+          proposer: proposerParam ?? undefined,
+          limit: limitParam ? Number(limitParam) : undefined,
+          offset: offsetParam ? Number(offsetParam) : undefined,
+        });
+        sendJson(res, 200, result);
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     const daoStore = this.runtime.daoStore;
     if (!daoStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
@@ -6286,6 +6310,31 @@ export class ApiServer {
       sendError(res, 400, 'DAO_INVALID', 'key unavailable');
       return;
     }
+
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const target = (body.actions?.[0] as Record<string, unknown>)?.target as string ?? '0x0000000000000000000000000000000000000000';
+        const callData = (body.actions?.[0] as Record<string, unknown>)?.callData as string ?? '0x';
+        const result = await this.runtime.daoService.propose(
+          body.type,
+          body.description,
+          target,
+          callData,
+        );
+        sendJson(res, 200, {
+          proposalId: result.proposalId,
+          txHash: result.txHash,
+          status: result.status,
+        });
+        return;
+      } catch (err) {
+        sendError(res, 400, 'DAO_INVALID', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     try {
       const proposalId = body.proposalId ?? `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const defaults = PROPOSAL_THRESHOLDS[body.type];
@@ -6317,6 +6366,28 @@ export class ApiServer {
     res: ServerResponse,
     proposalId: string,
   ): Promise<void> {
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const numericId = Number(proposalId);
+        if (Number.isNaN(numericId)) {
+          sendError(res, 400, 'DAO_INVALID', 'proposalId must be numeric');
+          return;
+        }
+        const proposal = await this.runtime.daoService.getProposal(numericId);
+        if (!proposal) {
+          sendError(res, 404, 'NOT_FOUND', 'proposal not found');
+          return;
+        }
+        sendJson(res, 200, { proposal });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     const daoStore = this.runtime.daoStore;
     if (!daoStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
@@ -6342,6 +6413,25 @@ export class ApiServer {
       sendError(res, 400, 'DAO_INVALID', 'key unavailable');
       return;
     }
+
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const numericId = Number(proposalId);
+        const result = await this.runtime.daoService.advanceProposal(numericId, body.newStatus);
+        sendJson(res, 200, {
+          proposalId: result.proposalId,
+          txHash: result.txHash,
+          newStatus: result.status,
+        });
+        return;
+      } catch (err) {
+        sendError(res, 400, 'DAO_INVALID', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     try {
       const envelope = await createDaoProposalAdvanceEnvelope({
         issuer: body.did,
@@ -6365,6 +6455,24 @@ export class ApiServer {
     res: ServerResponse,
     proposalId: string,
   ): Promise<void> {
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const numericId = Number(proposalId);
+        if (Number.isNaN(numericId)) {
+          sendError(res, 400, 'DAO_INVALID', 'proposalId must be numeric');
+          return;
+        }
+        const result = await this.runtime.daoService.listVotes({ proposalId: numericId });
+        sendJson(res, 200, { proposalId: numericId, ...result });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     const daoStore = this.runtime.daoStore;
     if (!daoStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
@@ -6382,6 +6490,26 @@ export class ApiServer {
       sendError(res, 400, 'DAO_INVALID', 'key unavailable');
       return;
     }
+
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const numericId = Number(body.proposalId);
+        const result = await this.runtime.daoService.vote(numericId, body.option);
+        sendJson(res, 200, {
+          txHash: result.txHash,
+          proposalId: result.proposalId,
+          option: body.option,
+          status: 'confirmed',
+        });
+        return;
+      } catch (err) {
+        sendError(res, 400, 'DAO_INVALID', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     try {
       const envelope = await createDaoVoteCastEnvelope({
         issuer: body.did,
@@ -6476,6 +6604,19 @@ export class ApiServer {
     _req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const treasury = await this.runtime.daoService.getTreasuryBalance();
+        sendJson(res, 200, { treasury });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     const daoStore = this.runtime.daoStore;
     if (!daoStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
@@ -6496,6 +6637,26 @@ export class ApiServer {
       sendError(res, 400, 'DAO_INVALID', 'key unavailable');
       return;
     }
+
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const result = await this.runtime.daoService.treasuryDeposit(
+          typeof body.amount === 'string' ? Number(body.amount) : body.amount,
+        );
+        sendJson(res, 200, {
+          txHash: result.txHash,
+          amount: result.amount,
+          status: 'confirmed',
+        });
+        return;
+      } catch (err) {
+        sendError(res, 400, 'DAO_INVALID', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     try {
       const envelope = await createDaoTreasuryDepositEnvelope({
         issuer: body.did,
@@ -6517,6 +6678,20 @@ export class ApiServer {
     _req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
+    // ── On-chain path ──────────────────────────────────────────────────
+    // Timelocked proposals are those with status = 4 (Timelocked).
+    if (this.runtime.daoService) {
+      try {
+        const result = await this.runtime.daoService.listProposals({ status: 4 });
+        sendJson(res, 200, { entries: result.proposals });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     const daoStore = this.runtime.daoStore;
     if (!daoStore) {
       sendError(res, 500, 'INTERNAL_ERROR', 'dao store unavailable');
@@ -6538,6 +6713,25 @@ export class ApiServer {
       sendError(res, 400, 'DAO_INVALID', 'key unavailable');
       return;
     }
+
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const numericId = Number(body.actionId || actionId);
+        const result = await this.runtime.daoService.execute(numericId);
+        sendJson(res, 200, {
+          txHash: result.txHash,
+          actionId,
+          status: 'executed',
+        });
+        return;
+      } catch (err) {
+        sendError(res, 400, 'DAO_INVALID', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     try {
       const envelope = await createDaoTimelockExecuteEnvelope({
         issuer: body.did,
@@ -6566,6 +6760,25 @@ export class ApiServer {
       sendError(res, 400, 'DAO_INVALID', 'key unavailable');
       return;
     }
+
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const numericId = Number(body.actionId || actionId);
+        const result = await this.runtime.daoService.cancel(numericId);
+        sendJson(res, 200, {
+          txHash: result.txHash,
+          actionId,
+          status: 'cancelled',
+        });
+        return;
+      } catch (err) {
+        sendError(res, 400, 'DAO_INVALID', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     try {
       const envelope = await createDaoTimelockCancelEnvelope({
         issuer: body.did,
@@ -6587,6 +6800,19 @@ export class ApiServer {
     _req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
+    // ── On-chain path ──────────────────────────────────────────────────
+    if (this.runtime.daoService) {
+      try {
+        const result = await this.runtime.daoService.getAllParams();
+        sendJson(res, 200, { params: result.params, count: result.count });
+        return;
+      } catch (err) {
+        sendError(res, 500, 'CHAIN_ERROR', (err as Error).message);
+        return;
+      }
+    }
+
+    // ── Legacy fallback ────────────────────────────────────────────────
     sendJson(res, 200, {
       thresholds: PROPOSAL_THRESHOLDS,
     });
