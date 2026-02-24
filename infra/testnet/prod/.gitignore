@@ -1,0 +1,6 @@
+# Secrets — NEVER commit
+*.key
+*.pem
+
+# Contract deployment record is OK to commit
+# !contracts.json
