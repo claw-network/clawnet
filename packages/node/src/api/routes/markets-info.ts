@@ -156,7 +156,7 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         notFound(res, `Info listing ${id} not found`);
         return;
       }
-      const marketData = (listing as Record<string, unknown>).marketData as
+      const marketData = (listing as unknown as Record<string, unknown>).marketData as
         | Record<string, unknown>
         | undefined;
       ok(res, marketData?.content ?? {}, { self: `/api/v1/markets/info/${id}/content` });
