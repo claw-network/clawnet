@@ -14,6 +14,7 @@ import {
   HDNodeWallet,
   InterfaceAbi,
   JsonRpcProvider,
+  NonceManager,
   Wallet,
 } from 'ethers';
 
@@ -52,7 +53,8 @@ function loadAbi(contractName: string, artifactsDir: string): InterfaceAbi {
 
 export class ContractProvider {
   readonly provider: JsonRpcProvider;
-  readonly signer: Wallet;
+  readonly signer: NonceManager;
+  private readonly _signerAddress: string;
 
   private readonly instances = new Map<ContractKey, Contract>();
 
@@ -62,7 +64,9 @@ export class ContractProvider {
       name: 'clawnet',
     });
 
-    this.signer = this.resolveSigner();
+    const resolved = this.resolveSigner();
+    this.signer = resolved.signer;
+    this._signerAddress = resolved.address;
     this.initContracts();
   }
 
@@ -129,7 +133,7 @@ export class ContractProvider {
 
   /** Returns the address of the node's signer. */
   get signerAddress(): string {
-    return this.signer.address;
+    return this._signerAddress;
   }
 
   /** Tear down provider connection. */
@@ -139,8 +143,13 @@ export class ContractProvider {
 
   // ── Internal helpers ────────────────────────────────────────────────────
 
-  private resolveSigner(): Wallet {
+  private resolveSigner(): { signer: NonceManager; address: string } {
     const { signer: cfg } = this.config;
+
+    const wrapWallet = (wallet: Wallet): { signer: NonceManager; address: string } => ({
+      signer: new NonceManager(wallet),
+      address: wallet.address,
+    });
 
     switch (cfg.type) {
       case 'keyfile': {
@@ -153,7 +162,7 @@ export class ContractProvider {
         } catch {
           privateKey = raw;
         }
-        return new Wallet(privateKey, this.provider);
+        return wrapWallet(new Wallet(privateKey, this.provider));
       }
 
       case 'env': {
@@ -164,19 +173,17 @@ export class ContractProvider {
               'Set it to a hex-encoded private key (with 0x prefix).',
           );
         }
-        return new Wallet(pk, this.provider);
+        return wrapWallet(new Wallet(pk, this.provider));
       }
 
       case 'mnemonic': {
         const phrase = process.env[cfg.envVar];
         if (!phrase) {
-          throw new Error(
-            `Mnemonic env var "${cfg.envVar}" is not set.`,
-          );
+          throw new Error(`Mnemonic env var "${cfg.envVar}" is not set.`);
         }
         const path = `m/44'/60'/0'/0/${cfg.index}`;
         const hd = HDNodeWallet.fromPhrase(phrase, undefined, path);
-        return new Wallet(hd.privateKey, this.provider);
+        return wrapWallet(new Wallet(hd.privateKey, this.provider));
       }
     }
   }
@@ -196,9 +203,7 @@ export class ContractProvider {
         // ABI not found — contract will be unavailable at runtime.
         // This is acceptable for partially-deployed environments.
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(
-          `[ContractProvider] Skipping ${contractName}: ABI not loaded (${msg})`,
-        );
+        console.warn(`[ContractProvider] Skipping ${contractName}: ABI not loaded (${msg})`);
       }
     }
   }

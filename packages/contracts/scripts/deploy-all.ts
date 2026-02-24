@@ -1,6 +1,6 @@
-import { ethers, upgrades } from "hardhat";
-import * as fs from "fs";
-import * as path from "path";
+import { ethers, upgrades } from 'hardhat';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Unified deployment script for ALL 9 ClawNet contracts.
@@ -41,7 +41,7 @@ import * as path from "path";
  *   TIMELOCK_DELAY      — seconds, default 86400 (1 day)
  *   QUORUM_BPS          — basis points, default 400 (4%)
  *   PLATFORM_FEE_BPS    — basis points, default 100 (1%)
- *   EMERGENCY_SIGNERS   — comma-separated 9 addresses (defaults to deployer×9)
+ *   EMERGENCY_SIGNERS   — comma-separated 9 addresses (defaults to first 9 signers)
  *   ANCHOR_ADDRESS      — optional: grant ANCHOR_ROLE on Reputation
  *   ARBITER_ADDRESS     — optional: grant ARBITER_ROLE on Contracts
  *
@@ -94,8 +94,8 @@ async function deployOne(
   console.log(`\n[${step}] Deploying ${name}...`);
   const factory = await ethers.getContractFactory(name);
   const proxyContract = await upgrades.deployProxy(factory, initArgs, {
-    kind: "uups",
-    initializer: "initialize",
+    kind: 'uups',
+    initializer: 'initialize',
   });
   await proxyContract.waitForDeployment();
   const proxy = await proxyContract.getAddress();
@@ -120,65 +120,64 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   const network = await ethers.provider.getNetwork();
 
-  console.log("=".repeat(60));
-  console.log("ClawNet — Full Deployment (9 Contracts)");
-  console.log("=".repeat(60));
+  console.log('='.repeat(60));
+  console.log('ClawNet — Full Deployment (9 Contracts)');
+  console.log('='.repeat(60));
   console.log(`Network   : ${network.name} (chainId ${network.chainId})`);
   console.log(`Deployer  : ${deployer.address}`);
   console.log(`Timestamp : ${new Date().toISOString()}`);
-  console.log("=".repeat(60));
+  console.log('='.repeat(60));
 
   // ── Parameters ──────────────────────────────────────────────────
 
-  const treasury = env("TREASURY_ADDRESS", deployer.address);
-  const escrowBaseRate = envInt("ESCROW_BASE_RATE", 100);
-  const escrowHoldingRate = envInt("ESCROW_HOLDING_RATE", 5);
-  const escrowMinFee = envInt("ESCROW_MIN_FEE", 1);
-  const minStake = envInt("MIN_STAKE", 10_000);
-  const unstakeCooldown = envInt("UNSTAKE_COOLDOWN", 604_800);
-  const rewardPerEpoch = envInt("REWARD_PER_EPOCH", 1);
-  const slashPerViolation = envInt("SLASH_PER_VIOLATION", 1);
-  const epochDuration = envInt("EPOCH_DURATION", 86_400);
-  const proposalThreshold = envInt("PROPOSAL_THRESHOLD", 100);
-  const discussionPeriod = envInt("DISCUSSION_PERIOD", 172_800);
-  const votingPeriod = envInt("VOTING_PERIOD", 259_200);
-  const timelockDelay = envInt("TIMELOCK_DELAY", 86_400);
-  const quorumBps = envInt("QUORUM_BPS", 400);
-  const platformFeeBps = envInt("PLATFORM_FEE_BPS", 100);
+  const treasury = env('TREASURY_ADDRESS', deployer.address);
+  const escrowBaseRate = envInt('ESCROW_BASE_RATE', 100);
+  const escrowHoldingRate = envInt('ESCROW_HOLDING_RATE', 5);
+  const escrowMinFee = envInt('ESCROW_MIN_FEE', 1);
+  const minStake = envInt('MIN_STAKE', 10_000);
+  const unstakeCooldown = envInt('UNSTAKE_COOLDOWN', 604_800);
+  const rewardPerEpoch = envInt('REWARD_PER_EPOCH', 1);
+  const slashPerViolation = envInt('SLASH_PER_VIOLATION', 1);
+  const epochDuration = envInt('EPOCH_DURATION', 86_400);
+  const proposalThreshold = envInt('PROPOSAL_THRESHOLD', 100);
+  const discussionPeriod = envInt('DISCUSSION_PERIOD', 172_800);
+  const votingPeriod = envInt('VOTING_PERIOD', 259_200);
+  const timelockDelay = envInt('TIMELOCK_DELAY', 86_400);
+  const quorumBps = envInt('QUORUM_BPS', 400);
+  const platformFeeBps = envInt('PLATFORM_FEE_BPS', 100);
   const anchorAddress = process.env.ANCHOR_ADDRESS ?? null;
   const arbiterAddress = process.env.ARBITER_ADDRESS ?? null;
 
-  // Emergency signers — 9 addresses (defaults to deployer repeated)
-  const signersRaw = process.env.EMERGENCY_SIGNERS ?? "";
+  // Emergency signers — 9 addresses (defaults to first 9 available signers)
+  const signersRaw = process.env.EMERGENCY_SIGNERS ?? '';
   let signersList = signersRaw
-    .split(",")
+    .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
   if (signersList.length === 0) {
-    console.log("\n⚠  EMERGENCY_SIGNERS not set — using deployer address ×9 (dev only!)");
-    signersList = Array(9).fill(deployer.address);
+    const defaultSigners = (await ethers.getSigners()).slice(0, 9).map((s) => s.address);
+    console.log('\n⚠  EMERGENCY_SIGNERS not set — using first 9 signer addresses (dev default)');
+    signersList = defaultSigners;
   }
   if (signersList.length !== 9) {
-    throw new Error(
-      `EMERGENCY_SIGNERS must have exactly 9 addresses (got ${signersList.length}).`,
-    );
+    throw new Error(`EMERGENCY_SIGNERS must have exactly 9 addresses (got ${signersList.length}).`);
   }
 
   // ── 1. ClawToken ────────────────────────────────────────────────
 
-  const tokenDeploy = await deployOne("ClawToken", "1/9", [
-    "ClawNet Token",
-    "TOKEN",
+  const tokenDeploy = await deployOne('ClawToken', '1/9', [
+    'ClawNet Token',
+    'TOKEN',
     deployer.address,
   ]);
 
   // ── 2. ParamRegistry ───────────────────────────────────────────
 
-  const paramDeploy = await deployOne("ParamRegistry", "2/9", [deployer.address]);
+  const paramDeploy = await deployOne('ParamRegistry', '2/9', [deployer.address]);
 
   // ── 3. ClawEscrow ──────────────────────────────────────────────
 
-  const escrowDeploy = await deployOne("ClawEscrow", "3/9", [
+  const escrowDeploy = await deployOne('ClawEscrow', '3/9', [
     tokenDeploy.proxy,
     treasury,
     escrowBaseRate,
@@ -188,11 +187,11 @@ async function main() {
 
   // ── 4. ClawIdentity ────────────────────────────────────────────
 
-  const identityDeploy = await deployOne("ClawIdentity", "4/9", [deployer.address]);
+  const identityDeploy = await deployOne('ClawIdentity', '4/9', [deployer.address]);
 
   // ── 5. ClawStaking ─────────────────────────────────────────────
 
-  const stakingDeploy = await deployOne("ClawStaking", "5/9", [
+  const stakingDeploy = await deployOne('ClawStaking', '5/9', [
     tokenDeploy.proxy,
     minStake,
     unstakeCooldown,
@@ -202,14 +201,14 @@ async function main() {
 
   // ── 6. ClawReputation ──────────────────────────────────────────
 
-  const reputationDeploy = await deployOne("ClawReputation", "6/9", [
+  const reputationDeploy = await deployOne('ClawReputation', '6/9', [
     deployer.address,
     epochDuration,
   ]);
 
   // ── 7. ClawDAO ─────────────────────────────────────────────────
 
-  const daoDeploy = await deployOne("ClawDAO", "7/9", [
+  const daoDeploy = await deployOne('ClawDAO', '7/9', [
     tokenDeploy.proxy,
     paramDeploy.proxy,
     proposalThreshold,
@@ -222,7 +221,7 @@ async function main() {
 
   // ── 8. ClawContracts ───────────────────────────────────────────
 
-  const contractsDeploy = await deployOne("ClawContracts", "8/9", [
+  const contractsDeploy = await deployOne('ClawContracts', '8/9', [
     tokenDeploy.proxy,
     treasury,
     platformFeeBps,
@@ -231,30 +230,46 @@ async function main() {
 
   // ── 9. ClawRouter ─────────────────────────────────────────────
 
-  const routerDeploy = await deployOne("ClawRouter", "9/9", [deployer.address]);
+  const routerDeploy = await deployOne('ClawRouter', '9/9', [deployer.address]);
 
   // ── Cross-contract Role Grants ─────────────────────────────────
 
-  console.log("\n" + "-".repeat(60));
-  console.log("[Roles] Setting up cross-contract permissions...");
+  console.log('\n' + '-'.repeat(60));
+  console.log('[Roles] Setting up cross-contract permissions...');
 
   const keccak = ethers.keccak256;
   const toUtf8 = ethers.toUtf8Bytes;
 
   // 1. ClawToken MINTER_ROLE → ClawStaking
-  const tokenContract = (await ethers.getContractFactory("ClawToken")).attach(tokenDeploy.proxy);
-  const MINTER_ROLE = keccak(toUtf8("MINTER_ROLE"));
+  const tokenContract = (await ethers.getContractFactory('ClawToken')).attach(tokenDeploy.proxy);
+
+  // Local integration convenience: seed deployer with test tokens.
+  if (Number(network.chainId) === 31337) {
+    const localMintAmount = 1_000_000;
+    const localSigners = await ethers.getSigners();
+    const localRecipients = [deployer.address, localSigners[1]?.address].filter(
+      (addr): addr is string => typeof addr === 'string' && addr.length > 0,
+    );
+    for (const recipient of localRecipients) {
+      await (await tokenContract.mint(recipient, localMintAmount)).wait();
+      console.log(`  ✓ Minted ${localMintAmount} TOKEN to ${recipient} (local chain)`);
+    }
+  }
+
+  const MINTER_ROLE = keccak(toUtf8('MINTER_ROLE'));
   await (await tokenContract.grantRole(MINTER_ROLE, stakingDeploy.proxy)).wait();
   console.log(`  ✓ ClawToken.MINTER_ROLE → ClawStaking`);
 
   // 2. ParamRegistry GOVERNOR_ROLE → ClawDAO
-  const paramContract = (await ethers.getContractFactory("ParamRegistry")).attach(paramDeploy.proxy);
-  const GOVERNOR_ROLE = keccak(toUtf8("GOVERNOR_ROLE"));
+  const paramContract = (await ethers.getContractFactory('ParamRegistry')).attach(
+    paramDeploy.proxy,
+  );
+  const GOVERNOR_ROLE = keccak(toUtf8('GOVERNOR_ROLE'));
   await (await paramContract.grantRole(GOVERNOR_ROLE, daoDeploy.proxy)).wait();
   console.log(`  ✓ ParamRegistry.GOVERNOR_ROLE → ClawDAO`);
 
   // 3. ClawDAO.setReputationContract → ClawReputation
-  const daoContract = (await ethers.getContractFactory("ClawDAO")).attach(daoDeploy.proxy);
+  const daoContract = (await ethers.getContractFactory('ClawDAO')).attach(daoDeploy.proxy);
   await (await daoContract.setReputationContract(reputationDeploy.proxy)).wait();
   console.log(`  ✓ ClawDAO.reputationContract → ClawReputation`);
 
@@ -264,24 +279,28 @@ async function main() {
 
   // 5. Optional: ANCHOR_ROLE on Reputation
   if (anchorAddress) {
-    const repContract = (await ethers.getContractFactory("ClawReputation")).attach(reputationDeploy.proxy);
-    const ANCHOR_ROLE = keccak(toUtf8("ANCHOR_ROLE"));
+    const repContract = (await ethers.getContractFactory('ClawReputation')).attach(
+      reputationDeploy.proxy,
+    );
+    const ANCHOR_ROLE = keccak(toUtf8('ANCHOR_ROLE'));
     await (await repContract.grantRole(ANCHOR_ROLE, anchorAddress)).wait();
     console.log(`  ✓ ClawReputation.ANCHOR_ROLE → ${anchorAddress}`);
   }
 
   // 6. Optional: ARBITER_ROLE on Contracts
   if (arbiterAddress) {
-    const contractsContract = (await ethers.getContractFactory("ClawContracts")).attach(contractsDeploy.proxy);
-    const ARBITER_ROLE = keccak(toUtf8("ARBITER_ROLE"));
+    const contractsContract = (await ethers.getContractFactory('ClawContracts')).attach(
+      contractsDeploy.proxy,
+    );
+    const ARBITER_ROLE = keccak(toUtf8('ARBITER_ROLE'));
     await (await contractsContract.grantRole(ARBITER_ROLE, arbiterAddress)).wait();
     console.log(`  ✓ ClawContracts.ARBITER_ROLE → ${arbiterAddress}`);
   }
 
   // ── Router Registration ────────────────────────────────────────
 
-  console.log("\n[Router] Registering all modules...");
-  const routerContract = (await ethers.getContractFactory("ClawRouter")).attach(routerDeploy.proxy);
+  console.log('\n[Router] Registering all modules...');
+  const routerContract = (await ethers.getContractFactory('ClawRouter')).attach(routerDeploy.proxy);
 
   const moduleKeys = [
     await routerContract.MODULE_TOKEN(),
@@ -309,22 +328,22 @@ async function main() {
 
   // ── Initialize Default ParamRegistry Values ────────────────────
 
-  console.log("\n[ParamRegistry] Setting default parameters...");
+  console.log('\n[ParamRegistry] Setting default parameters...');
   const defaultParams: [string, number][] = [
-    ["ESCROW_BASE_RATE", escrowBaseRate],
-    ["ESCROW_HOLDING_RATE", escrowHoldingRate],
-    ["ESCROW_MIN_FEE", escrowMinFee],
-    ["PLATFORM_FEE_BPS", platformFeeBps],
-    ["MIN_STAKE", minStake],
-    ["UNSTAKE_COOLDOWN", unstakeCooldown],
-    ["REWARD_PER_EPOCH", rewardPerEpoch],
-    ["SLASH_PER_VIOLATION", slashPerViolation],
-    ["EPOCH_DURATION", epochDuration],
-    ["PROPOSAL_THRESHOLD", proposalThreshold],
-    ["DISCUSSION_PERIOD", discussionPeriod],
-    ["VOTING_PERIOD", votingPeriod],
-    ["TIMELOCK_DELAY", timelockDelay],
-    ["QUORUM_BPS", quorumBps],
+    ['ESCROW_BASE_RATE', escrowBaseRate],
+    ['ESCROW_HOLDING_RATE', escrowHoldingRate],
+    ['ESCROW_MIN_FEE', escrowMinFee],
+    ['PLATFORM_FEE_BPS', platformFeeBps],
+    ['MIN_STAKE', minStake],
+    ['UNSTAKE_COOLDOWN', unstakeCooldown],
+    ['REWARD_PER_EPOCH', rewardPerEpoch],
+    ['SLASH_PER_VIOLATION', slashPerViolation],
+    ['EPOCH_DURATION', epochDuration],
+    ['PROPOSAL_THRESHOLD', proposalThreshold],
+    ['DISCUSSION_PERIOD', discussionPeriod],
+    ['VOTING_PERIOD', votingPeriod],
+    ['TIMELOCK_DELAY', timelockDelay],
+    ['QUORUM_BPS', quorumBps],
   ];
 
   for (const [name, value] of defaultParams) {
@@ -376,23 +395,22 @@ async function main() {
     },
   };
 
-  const deploymentsDir = path.resolve(__dirname, "..", "deployments");
+  const deploymentsDir = path.resolve(__dirname, '..', 'deployments');
   if (!fs.existsSync(deploymentsDir)) {
     fs.mkdirSync(deploymentsDir, { recursive: true });
   }
 
-  const networkName =
-    network.name === "unknown" ? `chain-${network.chainId}` : network.name;
+  const networkName = network.name === 'unknown' ? `chain-${network.chainId}` : network.name;
   const outPath = path.join(deploymentsDir, `${networkName}.json`);
-  fs.writeFileSync(outPath, JSON.stringify(record, null, 2) + "\n");
+  fs.writeFileSync(outPath, JSON.stringify(record, null, 2) + '\n');
 
   // ── Summary ────────────────────────────────────────────────────
 
-  console.log("\n" + "=".repeat(60));
-  console.log("Deployment complete! All 9 contracts deployed.");
-  console.log("=".repeat(60));
+  console.log('\n' + '='.repeat(60));
+  console.log('Deployment complete! All 9 contracts deployed.');
+  console.log('='.repeat(60));
   console.log(`Record saved to: ${outPath}`);
-  console.log("\nContract addresses:");
+  console.log('\nContract addresses:');
   console.log(`  ClawToken       : ${tokenDeploy.proxy}`);
   console.log(`  ParamRegistry   : ${paramDeploy.proxy}`);
   console.log(`  ClawEscrow      : ${escrowDeploy.proxy}`);
@@ -402,7 +420,7 @@ async function main() {
   console.log(`  ClawDAO         : ${daoDeploy.proxy}`);
   console.log(`  ClawContracts   : ${contractsDeploy.proxy}`);
   console.log(`  ClawRouter      : ${routerDeploy.proxy}`);
-  console.log("\nRole grants:");
+  console.log('\nRole grants:');
   console.log(`  Token.MINTER  → Staking : ${stakingDeploy.proxy}`);
   console.log(`  Param.GOVERNOR → DAO    : ${daoDeploy.proxy}`);
   console.log(`  DAO.reputation           : ${reputationDeploy.proxy}`);

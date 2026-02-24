@@ -28,8 +28,9 @@ const HARDHAT_RPC = 'http://127.0.0.1:8545';
 const HARDHAT_CHAIN_ID = 31337;
 
 // Hardhat default account #0 private key
-const DEPLOYER_KEY =
-  '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+const DEPLOYER_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+
+const HARDHAT_MNEMONIC = 'test test test test test test test test test test test junk';
 
 // ---------------------------------------------------------------------------
 // Hardhat node lifecycle
@@ -94,22 +95,19 @@ export function stopHardhatNode(): void {
  * Returns the deployment record (contract addresses).
  */
 export function deployContracts(): Record<string, string> {
-  const output = execSync(
-    'npx hardhat run scripts/deploy-all.ts --network hardhat',
-    {
-      cwd: CONTRACTS_DIR,
-      encoding: 'utf-8',
-      timeout: 120_000,
-      env: {
-        ...process.env,
-        DEPLOYER_PRIVATE_KEY: DEPLOYER_KEY,
-      },
+  const output = execSync('npx hardhat run scripts/deploy-all.ts --network localhost', {
+    cwd: CONTRACTS_DIR,
+    encoding: 'utf-8',
+    timeout: 120_000,
+    env: {
+      ...process.env,
+      DEPLOYER_PRIVATE_KEY: DEPLOYER_KEY,
     },
-  );
+  });
 
   // Parse addresses from deploy output or read deployment file
   // Deploy script writes to deployments/<network>.json
-  const deploymentPath = join(CONTRACTS_DIR, 'deployments', 'hardhat.json');
+  const deploymentPath = join(CONTRACTS_DIR, 'deployments', 'localhost.json');
   const { readFileSync } = require('node:fs');
 
   try {
@@ -121,8 +119,7 @@ export function deployContracts(): Record<string, string> {
     return addresses;
   } catch {
     throw new Error(
-      `Failed to read deployment addresses from ${deploymentPath}.\n` +
-      `Deploy output: ${output}`,
+      `Failed to read deployment addresses from ${deploymentPath}.\n` + `Deploy output: ${output}`,
     );
   }
 }
@@ -144,13 +141,12 @@ export interface IntegrationChainConfig {
     staking: string;
     paramRegistry: string;
   };
-  signer: { type: 'env'; envVar: string };
+  signer: { type: 'env'; envVar: string } | { type: 'mnemonic'; envVar: string; index: number };
   artifactsDir: string;
 }
 
 export function buildChainConfig(addresses: Record<string, string>): IntegrationChainConfig {
-  // Set signer key in env so ContractProvider can pick it up
-  process.env.INTEGRATION_TEST_SIGNER = DEPLOYER_KEY;
+  process.env.INTEGRATION_TEST_MNEMONIC = HARDHAT_MNEMONIC;
 
   return {
     rpcUrl: HARDHAT_RPC,
@@ -165,7 +161,7 @@ export function buildChainConfig(addresses: Record<string, string>): Integration
       staking: addresses.ClawStaking,
       paramRegistry: addresses.ParamRegistry,
     },
-    signer: { type: 'env', envVar: 'INTEGRATION_TEST_SIGNER' },
+    signer: { type: 'mnemonic', envVar: 'INTEGRATION_TEST_MNEMONIC', index: 1 },
     artifactsDir: join(CONTRACTS_DIR, 'artifacts'),
   };
 }
@@ -186,4 +182,4 @@ export async function removeTempDir(dir: string): Promise<void> {
 // Re-exports
 // ---------------------------------------------------------------------------
 
-export { HARDHAT_RPC, HARDHAT_CHAIN_ID, DEPLOYER_KEY, CONTRACTS_DIR };
+export { HARDHAT_RPC, HARDHAT_CHAIN_ID, DEPLOYER_KEY, CONTRACTS_DIR, HARDHAT_MNEMONIC };
