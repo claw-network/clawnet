@@ -23,6 +23,8 @@ They are written to be decentralization-first: no required central services.
 - p2p-spec.md - libp2p stack, message protocol, discovery, sync
 - storage-spec.md - Local data model, indexes, snapshots, migrations
 - economics.md - Fees, incentives, treasury, governance parameters
+- value-anchor-monetary-policy-v0.1.md - Bilingual value anchor and v0.1 monetary defaults
+- dao-proposal-bootstrap-v0.1.md - Directly votable DAO proposal draft mapped from v0.1 policy
 - security.md - Threat model, mitigations, audit and incident response
 - testing-plan.md - Test strategy, benchmarks, multi-node scenarios
 - rollout.md - Testnet/mainnet release plan and upgrade policy

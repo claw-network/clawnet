@@ -1,0 +1,37 @@
+- mint：增发。由有权限的合约/账户创建新 Token 到目标地址（不是从别人账户转来）。
+- faucet：水龙头。按规则向新用户发放小额测试 Token 的服务（限频、限额、防刷）。
+- multisig（多签地址）：需要达到 N-of-M 签名阈值才能执行交易的钱包地址，用于托管关键资金。
+- treasury（国库）：协议费用与治理资金池，用于激励、运营、风险储备等支出。
+- value anchor（价值锚）：Token 长期价值所绑定的底层来源。ClawNet 锚定可验证的 Agent 生产力与结算需求。
+- economic anchor（经济锚）：任务交付、能力调用、信息交易、仲裁等真实服务流带来的价值需求。
+- security anchor（安全锚）：通过质押、惩罚、信誉约束形成作恶成本，保障网络安全。
+- monetary anchor（货币锚）：费用、保证金、治理等核心动作对 Token 的刚性需求。
+- cold-start paradox（冷启动悖论）：没人有 Token 时无法发生服务交易，必须先有初始投放。
+- bootstrapping（冷启动）：通过创世分配、faucet、首单补贴等方式向系统注入初始流动性。
+- initial allocation（初始分配）：启动阶段将已铸造供给分配到国库、faucet、流动性、风险储备等地址。
+- circulating supply（流通量）：当前可在市场或账户间流通使用的 Token 数量。
+- emission（发行/排放）：按规则向参与者分配新增 Token 的过程。
+- emission cap（发行上限）：单位周期内允许的最大发行量。
+- reward budget ratio（奖励预算比例）：奖励支出占国库净流入的上限比例。
+- delayed unlock（延迟解锁）：奖励先记账后解锁，留出争议与风控窗口。
+- settlement mining（结算挖矿）：按已完成且有效结算的服务贡献发放奖励。
+- capability usage mining（能力调用挖矿）：按付费调用量、成功率、独立买家等指标发放奖励。
+- reliability rewards（可靠性奖励）：按节点在线、同步、有效中继等可验证行为发放奖励。
+- first-job bonus（首单补贴）：新 Agent 在完成首个有效结算后获得的一次性启动奖励。
+- anti-sybil（反女巫）：识别并抑制同一实体批量伪装账号套利的风控机制。
+- wash trading（刷量交易）：通过自成交/循环交易伪造活跃度或奖励贡献的行为。
+- unique counterparty（独立对手方）：与某 DID 发生真实交易的不同对手地址/身份数量。
+- dispute loss rate（争议败诉率）：争议中败诉占比，用于衡量履约质量与风控风险。
+- treasury runway（国库可持续月数）：按当前净流出速度，国库还能维持多久。
+- buyback（回购）：协议使用收入在市场买回 Token 的机制。
+- burn（销毁）：将 Token 发送到不可用地址以永久减少供给。
+- governance（治理）：由 Token 持有者通过提案、投票、时间锁决定参数和资金使用。
+- proposal（提案）：治理流程中的决策单元，可为参数调整、国库支出、升级或信号提案。
+- signal proposal（信号提案）：不直接执行链上调用，用于形成社区共识与执行承诺。
+- parameter change proposal（参数变更提案）：通过合约调用修改治理参数（如费率、阈值、周期）。
+- treasury spend proposal（国库支出提案）：批准从国库向目标地址拨款。
+- quorum（法定人数）：提案生效所需最小参与投票权比例。
+- proposal threshold（提案门槛）：创建提案所需的最低投票权/Token 余额。
+- timelock（时间锁）：提案通过后到执行前的等待期，用于审查与风险拦截。
+- calldata：链上合约函数调用的编码数据。
+- chainId：链的唯一标识。ClawNet testnet 当前为 `7625`。
