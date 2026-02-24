@@ -42,7 +42,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
       },
     });
     assertOk(status, 'publish');
-    researchListingId = data?.id || data?.listingId;
+    researchListingId = data?.listingId || data?.id;
     assert(researchListingId, 'listing created');
     vlog(`Research listing: ${researchListingId}`);
   });
@@ -108,7 +108,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
       },
     });
     assertOk(status, 'publish capability');
-    capabilityListingId = data?.id || data?.listingId;
+    capabilityListingId = data?.listingId || data?.id;
     assert(capabilityListingId, 'capability listed');
     vlog(`Translation API: ${capabilityListingId}`);
   });
@@ -159,7 +159,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
       },
     });
     assertOk(status, 'publish task');
-    taskId = data?.id || data?.listingId;
+    taskId = data?.listingId || data?.id;
     assert(taskId, 'task created');
     vlog(`Translation task: ${taskId}`);
   });
@@ -253,7 +253,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
       }],
     });
     assertOk(status, 'contract');
-    contractId = data?.id;
+    contractId = data?.contractId || data?.id;
     assert(contractId, 'contract created');
     vlog(`Bob-Charlie contract: ${contractId}`);
   });
@@ -265,7 +265,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     await sleep(500);
     let r2 = await charlie.signContract(contractId);
     if (r2.status === 404) {
-      await waitForResource(charlie, '/api/contracts/' + contractId);
+      await waitForResource(charlie, '/api/v1/contracts/' + contractId);
       r2 = await charlie.signContract(contractId);
     }
     vlog(`Sign: Bob=${r1.status}, Charlie=${r2.status}`);

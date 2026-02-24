@@ -46,7 +46,7 @@ export default async function run({ alice, bob, charlie }) {
       tags: ['translation', 'chinese', 'research'],
     });
     assertOk(status, 'publish task');
-    taskId = data.listingId;
+    taskId = data?.listingId;
     assert(taskId, 'should return listingId');
     vlog(`Task ID: ${taskId}`);
   });
@@ -63,7 +63,6 @@ export default async function run({ alice, bob, charlie }) {
 
   // ── 3.3 Bob submits a bid ─────────────────────────────────────────────
   await test('Bob submits a bid for the task', async () => {
-    // Bob bids on his own node
     let result = await bob.submitBid(taskId, {
       price: 750,
       timeline: 48,
@@ -74,9 +73,7 @@ export default async function run({ alice, bob, charlie }) {
       ],
     });
     if (result.status === 404) {
-      vlog('Task not on Bob\'s node, submitting bid via Alice\'s node as proxy read');
-      // Bob's key only exists on Bob's node — cannot sign on Alice's node
-      // This is a known P2P limitation; log and soft-pass
+      vlog('Task not on Bob\'s node, P2P limitation');
     }
     assert(result.status >= 200 && result.status < 500, `bid status: ${result.status}`);
     if (result.status >= 200 && result.status < 300) {
@@ -105,16 +102,16 @@ export default async function run({ alice, bob, charlie }) {
   // ── 3.5 Alice views bids on her node ──────────────────────────────────
   await test('Alice views bids for her task', async () => {
     await sleep(500);
-    const { status, data } = await alice.get(
-      '/api/markets/tasks/' + encodeURIComponent(taskId) + '/bids',
-    );
+    const { status, data } = await alice.getTaskBids(taskId);
     assertOk(status, 'get bids');
-    const bids = data.bids || data;
+    // v1 API returns array directly (unwrapped by client)
+    const bids = Array.isArray(data) ? data : (data?.bids || []);
     vlog(`Bids: ${JSON.stringify(bids).slice(0, 300)}`);
   });
 
   // ── 3.6 Alice accepts Bob's bid ───────────────────────────────────────
   await test('Alice accepts Bob\'s bid', async () => {
+    // acceptBid now requires bidId in the URL path: /tasks/:id/bids/:bidId/actions/accept
     const { status, data } = await alice.acceptBid(taskId, bobBidId || 'bid-placeholder');
     // Accept may fail if bid didn't propagate — soft-pass
     assert(status >= 200 && status < 500, `accept status: ${status}`);

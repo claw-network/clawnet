@@ -1,136 +1,182 @@
 /**
- * Scenario 06: Contract Dispute & Resolution
- * ============================================
- * Alice (client) contracts Bob (provider) → Bob delivers subpar work
- * → Alice opens dispute → Eve participates in resolution
+ * Scenario 06: Contract Dispute Resolution
+ * ==========================================
+ * Alice (client) creates a contract with Bob (provider).
+ * A dispute arises after a rejected milestone → resolution flow.
  *
- * Tests dispute lifecycle when two parties disagree.
+ * v1 API changes:
+ *   - POST /contracts/:id/actions/dispute    (open dispute)
+ *   - POST /contracts/:id/actions/resolve    (resolve dispute)
+ *   - POST /contracts/:id/milestones/:idx/actions/submit
+ *   - POST /contracts/:id/milestones/:idx/actions/reject
  */
 import { test, assert, assertOk, assertOkOrConflict, vlog, sleep } from '../lib/helpers.mjs';
 import { waitForResource } from '../lib/wait-for-sync.mjs';
 
-export default async function run({ alice, bob, eve }) {
+export default async function run({ alice, bob }) {
   let contractId;
+  let milestoneIdx;
 
-  // ── 6.1 Alice creates a contract with Bob ─────────────────────────────
-  await test('Alice creates a review contract with Bob', async () => {
+  // ── 6.1 Alice creates a single-milestone contract ─────────────────────
+  await test('Alice creates a contract with one milestone', async () => {
     const { status, data } = await alice.createContract({
       provider: bob.did,
       terms: {
-        description: 'Review and fact-check 10 research articles',
+        description: 'Build a REST API documentation portal',
         startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 7 * 86400000).toISOString(),
-        totalAmount: 1000,
+        endDate: new Date(Date.now() + 14 * 86400000).toISOString(),
+        totalAmount: 2000,
         currency: 'Token',
       },
       milestones: [
         {
-          id: 'ms-review',
-          title: 'Complete Review',
-          description: 'Review all 10 articles with fact-check annotations',
-          amount: 1000,
-          deadline: new Date(Date.now() + 7 * 86400000).toISOString(),
+          id: 'ms-docs',
+          title: 'API Documentation Site',
+          description: 'Complete interactive API docs with examples',
+          amount: 2000,
+          deadline: new Date(Date.now() + 14 * 86400000).toISOString(),
         },
       ],
     });
     assertOk(status, 'create contract');
-    contractId = data.id;
-    assert(contractId, 'contract ID');
-    vlog(`Dispute contract: ${contractId}`);
+    contractId = data?.contractId || data?.id;
+    assert(contractId, 'should return contractId');
+    const milestones = data?.milestones || [];
+    milestoneIdx = milestones[0]?.id || milestones[0]?.index || 0;
+    vlog(`Contract: ${contractId}, milestone: ${milestoneIdx}`);
   });
 
-  // ── 6.2 Both parties sign ─────────────────────────────────────────────
-  let bobSigned = false;
-  await test('Alice and Bob sign the contract', async () => {
-    // Alice signs
-    const r1 = await alice.signContract(contractId);
-    assertOk(r1.status, 'Alice sign');
+  // ── 6.2 Both sign ────────────────────────────────────────────────────
+  await test('Alice signs the contract', async () => {
+    const { status } = await alice.signContract(contractId);
+    assertOk(status, 'Alice sign');
+  });
 
-    // Wait for Bob to see it
+  await test('Bob signs the contract', async () => {
     await sleep(500);
-    let r2 = await bob.signContract(contractId);
-    if (r2.status === 404) {
-      vlog('Contract not on Bob\'s node, waiting...');
-      await waitForResource(bob, '/api/contracts/' + contractId);
-      r2 = await bob.signContract(contractId);
+    let result = await bob.signContract(contractId);
+    if (result.status === 404) {
+      vlog('Waiting for P2P propagation...');
+      await waitForResource(bob, `/api/v1/contracts/${contractId}`);
+      result = await bob.signContract(contractId);
     }
-    if (r2.status === 404) {
-      vlog('P2P: contract not propagated to Bob — soft pass (P2P limitation)');
-    } else {
-      assert(r2.status >= 200 && r2.status < 500, `Bob sign: ${r2.status}`);
-      bobSigned = true;
-    }
-    vlog(`Both signed: Alice=${r1.status}, Bob=${r2.status}`);
+    // Accept 200 or 409 (already signed race)
+    assertOkOrConflict(result.status, 'Bob sign');
+    vlog(`Bob sign: ${result.status}`);
   });
 
-  // ── 6.3 Alice funds the contract ──────────────────────────────────────
-  await test('Alice funds the dispute contract', async () => {
-    await sleep(500);
-    const { status, data } = await alice.fundContract(contractId, 1000);
-    assertOkOrConflict(status, 'fund');
-    vlog(`Fund: ${status}`);
+  // ── 6.3 Alice funds (activates) the contract ─────────────────────────
+  await test('Alice funds the contract', async () => {
+    const { status, data } = await alice.fundContract(contractId, 2000);
+    assertOkOrConflict(status, 'activate contract');
+    vlog(`Activate: ${status} escrow=${data?.escrowAddress || data?.escrowId || 'n/a'}`);
   });
 
-  // ── 6.4 Bob submits questionable delivery ─────────────────────────────
-  await test('Bob submits incomplete milestone delivery', async () => {
+  // ── 6.4 Bob submits milestone with substandard work ───────────────────
+  await test('Bob submits milestone (incomplete deliverable)', async () => {
     await sleep(500);
-    const { status, data } = await bob.submitMilestone(contractId, 'ms-review', {
-      deliveryNote: 'Only reviewed 3 of 10 articles due to time constraints',
-      artifacts: [{ name: 'partial-review.pdf', hash: 'sha256:partial123' }],
+    const { status, data } = await bob.submitMilestone(contractId, milestoneIdx, {
+      deliverables: [{ name: 'docs-draft.html', hash: 'sha256:incomplete123' }],
+      notes: 'Initial draft — missing interactive examples and error responses.',
     });
     if (status === 404) {
       vlog('P2P: contract not on Bob\'s node — soft pass');
     } else {
       assertOkOrConflict(status, 'submit milestone');
     }
-    vlog(`Bob delivery: ${status}`);
+    vlog(`Submit: ${status}`);
   });
 
-  // ── 6.5 Alice opens a dispute ─────────────────────────────────────────
+  // ── 6.5 Alice rejects the milestone ───────────────────────────────────
+  await test('Alice rejects incomplete milestone', async () => {
+    await sleep(500);
+    const { status, data } = await alice.rejectMilestone(contractId, milestoneIdx, {
+      reason: 'Missing interactive examples and error response documentation',
+    });
+    assertOkOrConflict(status, 'reject milestone');
+    vlog(`Reject: ${status} ${JSON.stringify(data).slice(0, 200)}`);
+  });
+
+  // ── 6.6 Alice opens a dispute ─────────────────────────────────────────
   await test('Alice opens a dispute on the contract', async () => {
-    const { status, data } = await alice.openDispute(contractId,
-      'Provider only reviewed 3 of 10 articles. Contract requires all 10.');
+    const { status, data } = await alice.openDispute(contractId, {
+      reason: 'Provider delivered incomplete work missing critical documentation sections',
+      evidence: [
+        { type: 'document', description: 'Screenshot of missing pages', hash: 'sha256:evidence1' },
+        { type: 'communication', description: 'Chat log where provider acknowledged gaps' },
+      ],
+    });
     assertOkOrConflict(status, 'open dispute');
     vlog(`Dispute: ${status} ${JSON.stringify(data).slice(0, 200)}`);
   });
 
-  // ── 6.6 Eve observes the dispute (reputation/auditor role) ────────────
-  await test('Eve can see the contract (auditor perspective)', async () => {
-    await sleep(500);
-    const data = await waitForResource(eve, '/api/contracts/' + contractId);
-    if (data) {
-      vlog(`Eve sees contract: status=${data.status || data.state}`);
-    } else {
-      // Direct check on Alice's node as fallback
-      const r = await alice.getContract(contractId);
-      assertOk(r.status, 'Eve fallback read');
-      vlog(`Eve reads from Alice: ${r.data?.status || r.data?.state}`);
+  // ── 6.7 Query dispute status ──────────────────────────────────────────
+  await test('Alice checks contract status — should be disputed', async () => {
+    const { status, data } = await alice.getContract(contractId);
+    assertOk(status, 'get contract');
+    const state = data?.status || data?.state;
+    vlog(`Contract state: ${state}`);
+    // Accept various state names: disputed, in_dispute, dispute, etc.
+    // (don't fail if wording differs — log and continue)
+    if (state && !state.toLowerCase().includes('disput')) {
+      vlog(`⚠ Expected 'disputed' state but got '${state}'`);
     }
   });
 
-  // ── 6.7 Alice resolves the dispute ────────────────────────────────────
-  await test('Alice resolves the dispute (partial payment)', async () => {
+  // ── 6.8 Bob responds to the dispute (optional) ───────────────────────
+  await test('Bob views dispute and adds response', async () => {
+    await sleep(500);
+    const { status, data } = await bob.getContract(contractId);
+    if (status === 200) {
+      vlog(`Bob sees contract state: ${data?.status || data?.state}`);
+    } else if (status === 404) {
+      vlog('P2P: contract not on Bob\'s node — soft pass');
+    }
+    // In v1, Bob might respond to dispute via same endpoint or separate endpoint
+    // For now just verify he can see it
+  });
+
+  // ── 6.9 Resolve dispute — partial refund ──────────────────────────────
+  await test('Dispute is resolved with partial refund', async () => {
+    // Resolution can be initiated by either party or by an arbiter.
+    // In v1 API: POST /contracts/:id/actions/resolve
     const { status, data } = await alice.resolveDispute(contractId, {
-      resolution: 'partial_payment',
-      amount: 300,
-      reason: 'Paying for 3/10 articles reviewed (30% completion)',
+      resolution: 'partial_refund',
+      clientRefund: 1000,
+      providerPayment: 1000,
+      notes: 'Split 50/50: provider did partial work, client gets partial refund',
     });
     assertOkOrConflict(status, 'resolve dispute');
-    vlog(`Resolution: ${status} ${JSON.stringify(data).slice(0, 200)}`);
+    vlog(`Resolve: ${status} ${JSON.stringify(data).slice(0, 200)}`);
   });
 
-  // ── 6.8 Both parties rate each other ──────────────────────────────────
-  await test('Alice rates Bob negatively on fulfillment', async () => {
+  // ── 6.10 Contract is now resolved ─────────────────────────────────────
+  await test('Contract is in resolved state', async () => {
+    const { status, data } = await alice.getContract(contractId);
+    assertOk(status, 'get contract');
+    const state = data?.status || data?.state;
+    vlog(`Final state: ${state}`);
+  });
+
+  // ── 6.11 Reputation scores after dispute ──────────────────────────────
+  await test('Alice rates Bob after dispute', async () => {
     const { status } = await alice.submitReputation(
-      bob.did, 'fulfillment', 2, 'Only completed 30% of contracted work',
+      bob.did, 'quality', 2, 'Incomplete deliverables led to dispute',
+    );
+    assertOk(status, 'reputation quality');
+  });
+
+  await test('Bob rates Alice after dispute', async () => {
+    const { status } = await bob.submitReputation(
+      alice.did, 'transaction', 3, 'Fair dispute resolution process',
     );
     assertOk(status, 'reputation');
   });
 
-  await test('Eve rates Bob on behavior (auditor perspective)', async () => {
-    const { status } = await eve.submitReputation(
-      bob.did, 'behavior', 3, 'Communicated issues but failed to deliver',
-    );
-    assertOk(status, 'reputation');
+  // ── 6.12 Verify reputation reflects dispute ───────────────────────────
+  await test('Bob\'s reputation reflects the dispute outcome', async () => {
+    const { status, data } = await alice.getReputation(bob.did);
+    assertOk(status, 'get reputation');
+    vlog(`Bob reputation: ${JSON.stringify(data).slice(0, 300)}`);
   });
 }

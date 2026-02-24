@@ -39,7 +39,7 @@ export default async function run({ alice, bob, dave }) {
       },
     });
     assertOk(status, 'publish info');
-    listingId = data.listingId;
+    listingId = data?.listingId;
     assert(listingId, 'should return listingId');
     vlog(`Listing ID: ${listingId}`);
   });
@@ -48,8 +48,9 @@ export default async function run({ alice, bob, dave }) {
   await test('Alice sees her listing on her own node', async () => {
     const { status, data } = await alice.getInfoListing(listingId);
     assertOk(status, 'get listing');
-    assert(data.id === listingId || data.listing?.id === listingId, 'listing ID matches');
-    vlog(`Listing title: ${data.title || data.listing?.title}`);
+    const lid = data?.id || data?.listingId;
+    assert(lid === listingId, 'listing ID matches');
+    vlog(`Listing title: ${data?.title}`);
   });
 
   // ── 2.3 Bob discovers listing via P2P ─────────────────────────────────
@@ -67,24 +68,19 @@ export default async function run({ alice, bob, dave }) {
   await test('Bob searches info market', async () => {
     const { status, data } = await bob.searchInfo('AI Agent');
     assertOk(status, 'search status');
-    const listings = data.listings || data.results || [];
+    // Paginated: data is the array of listings
+    const listings = Array.isArray(data) ? data : (data?.listings || data?.results || []);
     vlog(`Bob search results: ${listings.length} listings`);
     // The listing may or may not be visible depending on P2P propagation
   });
 
   // ── 2.5 Bob purchases the report on his own node ─────────────────────
   await test('Bob purchases research report', async () => {
-    // Try Bob's node first; fall back to Alice's node if listing not propagated
     let result = await bob.purchaseInfo(listingId);
     if (result.status === 404) {
-      vlog('Listing not on Bob\'s node, trying Alice\'s node');
-      result = await alice.post('/api/markets/info/' + encodeURIComponent(listingId) + '/purchase', {
-        did: bob.did,
-        passphrase: bob.passphrase, // This won't work — Bob's key not on Alice's node
-        nonce: Date.now(),
-      });
+      vlog('Listing not on Bob\'s node (P2P lag)');
     }
-    // Even if purchase fails due to P2P key issue, we validate the attempt
+    // Even if purchase fails due to P2P issue, we validate the attempt
     assert(result.status >= 200 && result.status < 500, `purchase status: ${result.status}`);
     vlog(`Bob purchase: ${result.status} ${JSON.stringify(result.data).slice(0, 200)}`);
   });
@@ -119,7 +115,7 @@ export default async function run({ alice, bob, dave }) {
     // Check Bob's node since that's where his submission is stored.
     const { status, data } = await bob.getReputation(alice.did);
     if (status === 200) {
-      vlog(`Alice reputation (from Bob's node): score=${data.score}, level=${data.level}`);
+      vlog(`Alice reputation (from Bob's node): score=${data?.score}, level=${data?.level}`);
     } else {
       // Reputation data may not be queryable yet — soft pass
       vlog(`Alice reputation not yet available: ${status}`);

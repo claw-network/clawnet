@@ -27,7 +27,7 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     for (const agent of agents) {
       const { status, data } = await agent.balance();
       assertOk(status, `${agent.name} balance status`);
-      const bal = Number(data.balance ?? data.available ?? 0);
+      const bal = Number(data?.balance ?? data?.available ?? 0);
       assert(bal > 0, `${agent.name} balance should be > 0, got ${bal}`);
       vlog(`${agent.name}: ${bal} Tokens`);
     }
@@ -37,18 +37,18 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
   let aliceBalBefore;
   await test('Alice transfers 500 Tokens to Bob', async () => {
     const { data: balData } = await alice.balance();
-    aliceBalBefore = Number(balData.balance || balData.available);
+    aliceBalBefore = Number(balData?.balance ?? balData?.available ?? 0);
 
     const { status, data } = await alice.transfer(bob.did, 500, 'payment for services');
     assertOk(status, 'transfer status');
-    assert(data.txHash, 'should return txHash');
+    assert(data?.txHash, 'should return txHash');
     vlog(`txHash: ${data.txHash}`);
   });
 
   await test('Alice balance decreased after transfer', async () => {
     await sleep(300);
     const { data } = await alice.balance();
-    const bal = Number(data.balance || data.available);
+    const bal = Number(data?.balance ?? data?.available ?? 0);
     assert(bal < aliceBalBefore, `Alice balance should decrease: was ${aliceBalBefore}, now ${bal}`);
     vlog(`Alice: ${aliceBalBefore} → ${bal}`);
   });
@@ -62,7 +62,7 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     } else {
       // If P2P didn't propagate yet, check from Alice's perspective
       const { data } = await alice.balance(bob.did);
-      const bal = Number(data.balance ?? data.available ?? 0);
+      const bal = Number(data?.balance ?? data?.available ?? 0);
       assert(bal >= 500, `Bob should have >=500 on Alice node, got ${bal}`);
       vlog(`Bob balance on Alice's node: ${bal} (P2P pending)`);
     }
@@ -72,26 +72,27 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
   await test('Dave transfers 200 Tokens to Charlie', async () => {
     const { status, data } = await dave.transfer(charlie.did, 200, 'investment');
     assertOk(status, 'Dave→Charlie transfer');
-    assert(data.txHash, 'txHash present');
+    assert(data?.txHash, 'txHash present');
     vlog(`Dave→Charlie: ${data.txHash}`);
   });
 
   await test('Eve transfers 300 Tokens to Alice', async () => {
     const { status, data } = await eve.transfer(alice.did, 300, 'audit fee refund');
     assertOk(status, 'Eve→Alice transfer');
-    assert(data.txHash, 'txHash present');
+    assert(data?.txHash, 'txHash present');
     vlog(`Eve→Alice: ${data.txHash}`);
   });
 
   // ── 1.6 Transaction history ───────────────────────────────────────────
   await test('Alice has transaction history entries', async () => {
     await sleep(300);
-    const { status, data } = await alice.history();
+    const { status, data, meta } = await alice.history();
     assertOk(status, 'history status');
-    const entries = data.transactions || data.history || data;
+    // Paginated: data is the array of transactions
+    const entries = Array.isArray(data) ? data : (data?.transactions || data?.history || []);
     assert(Array.isArray(entries), 'history should be array');
     assert(entries.length > 0, 'should have history entries');
-    vlog(`Alice history: ${entries.length} entries`);
+    vlog(`Alice history: ${entries.length} entries (total: ${meta?.pagination?.total ?? '?'})`);
   });
 
   // ── 1.7 Node status and peer connectivity ─────────────────────────────
@@ -99,8 +100,10 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     for (const agent of agents) {
       const { status, data } = await agent.status();
       assertOk(status, `${agent.name} status`);
-      assert(data.blockHeight >= 0, `${agent.name} blockHeight`);
-      vlog(`${agent.name}: blockHeight=${data.blockHeight}, peers=${data.peers?.length ?? 0}`);
+      assert(data?.blockHeight >= 0, `${agent.name} blockHeight`);
+      // In v1 API, peers is a count (number), not an array
+      const peerCount = typeof data?.peers === 'number' ? data.peers : (data?.connections ?? 0);
+      vlog(`${agent.name}: blockHeight=${data.blockHeight}, peers=${peerCount}`);
     }
   });
 }

@@ -17,9 +17,13 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     for (const agent of agents) {
       const { status, data } = await agent.peers();
       assertOk(status, `${agent.name} peers`);
-      const peers = Array.isArray(data) ? data : (data?.peers || []);
-      totalPeers += peers.length;
-      vlog(`${agent.name}: ${peers.length} peers`);
+      // v1: data may be an array of peer objects, a plain count, or { peers: [...] }
+      let count;
+      if (Array.isArray(data))          count = data.length;
+      else if (typeof data === 'number') count = data;
+      else                               count = data?.peers?.length ?? data?.count ?? 0;
+      totalPeers += count;
+      vlog(`${agent.name}: ${count} peers`);
     }
     // In Docker, peer discovery may be slow; check total rather than per-node
     vlog(`Total peer connections across network: ${totalPeers}`);
@@ -181,7 +185,7 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
   await test('Alice wallet history shows all transfers', async () => {
     const { status, data } = await alice.history();
     assertOk(status, 'history');
-    const txns = Array.isArray(data) ? data : (data?.transactions || data?.history || []);
+    const txns = Array.isArray(data) ? data : (data?.transactions || data?.history || data?.items || []);
     vlog(`Alice history entries: ${txns.length}`);
     assert(txns.length >= 1, 'at least 1 history entry');
   });

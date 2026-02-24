@@ -49,7 +49,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
       }],
     });
     assertOk(status, 'create proposal');
-    proposalId = data.id || data.proposalId;
+    proposalId = data?.proposalId || data?.id;
     assert(proposalId, `proposal ID created: ${proposalId}`);
     vlog(`Proposal: ${proposalId}`);
   });
@@ -58,7 +58,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   await test('Alice can read her proposal', async () => {
     const { status, data } = await alice.getProposal(proposalId);
     assertOk(status, 'get proposal');
-    vlog(`Proposal state: ${data.status || data.state}, type: ${data.type}`);
+    vlog(`Proposal state: ${data?.status || data?.state}, type: ${data?.type}`);
   });
 
   // ── 7.6 Bob sees proposal via P2P ────────────────────────────────────
@@ -67,15 +67,18 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     try {
       await waitFor('Bob sees proposal', async () => {
         const { status, data } = await bob.listProposals();
-        if (status === 200 && Array.isArray(data)) {
-          found = data.some(p => p.id === proposalId || p.proposalId === proposalId);
+        if (status === 200) {
+          // v1: paginated response — data is the array (auto-unwrapped)
+          const list = Array.isArray(data) ? data : (data?.proposals || data?.items || []);
+          found = list.some(p => (p.proposalId || p.id) === proposalId);
         }
         return found;
       });
     } catch {
       // Fallback check: Bob can at least read from his own node
       const { status, data } = await bob.listProposals();
-      vlog(`Bob proposals fallback: ${status}, count: ${Array.isArray(data) ? data.length : 0}`);
+      const list = Array.isArray(data) ? data : (data?.proposals || []);
+      vlog(`Bob proposals fallback: ${status}, count: ${list.length}`);
     }
     vlog(`Bob sees proposal: ${found}`);
   });
@@ -85,13 +88,13 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     // Check current status — signal proposals might auto-advance
     const { status, data } = await alice.getProposal(proposalId);
     assertOk(status, 'get proposal');
-    const currentStatus = data.status || data.state;
+    const currentStatus = data?.status || data?.state;
     vlog(`Current proposal status: ${currentStatus}`);
 
     if (currentStatus === 'draft' || currentStatus === 'discussion') {
       // Try advancing through stages
       if (currentStatus === 'draft') {
-        const a1 = await alice.advanceProposal(proposalId, 'discussion', data.hash || data.eventHash);
+        const a1 = await alice.advanceProposal(proposalId, 'discussion', data?.hash || data?.eventHash);
         vlog(`Advance draft→discussion: ${a1.status} ${JSON.stringify(a1.data).slice(0, 200)}`);
         await sleep(300);
       }
@@ -151,10 +154,10 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
 
   // ── 7.14 Check vote tally ────────────────────────────────────────────
   await test('Proposal has recorded votes', async () => {
-    // Primary: check Alice's proposal aggregate tally (proposal lives on Alice's node)
+    // v1: check Alice's proposal aggregate tally (proposal lives on Alice's node)
     const { status: pStatus, data: pData } = await alice.getProposal(proposalId);
     assertOk(pStatus, 'get proposal from Alice');
-    const tally = pData?.votes || pData?.tally;
+    const tally = pData?.tally || pData?.votes;
     vlog(`Alice proposal tally: ${JSON.stringify(tally)}`);
 
     // Also check individual votes across all nodes

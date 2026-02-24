@@ -35,7 +35,7 @@ export async function waitFor(label, fn, timeoutMs = 5000, intervalMs = 500) {
 /**
  * Wait until an Agent can see a resource via GET (status 200).
  * @param {import('./client.mjs').Agent} agent
- * @param {string} path   e.g. /api/contracts/xxx
+ * @param {string} path   e.g. /api/v1/contracts/xxx
  * @param {number} timeoutMs
  * @returns {object|null} response data or null
  */
@@ -54,7 +54,7 @@ export async function waitForResource(agent, path, timeoutMs = 5000) {
  * Wait until an Agent can see a market listing by ID.
  */
 export async function waitForListing(agent, marketType, listingId, timeoutMs = 5000) {
-  const path = `/api/markets/${marketType}/${encodeURIComponent(listingId)}`;
+  const path = `/api/v1/markets/${marketType}/${encodeURIComponent(listingId)}`;
   return waitForResource(agent, path, timeoutMs);
 }
 
@@ -101,7 +101,7 @@ export async function waitForAllNodes(agents, timeoutMs = 20000) {
     const ready = await waitFor(
       `${agent.name} healthy`,
       async () => {
-        const r = await agent.get('/api/node/status');
+        const r = await agent.get('/api/v1/node');
         return r.status === 200;
       },
       Math.max(5000, timeoutMs - (Date.now() - start)),

@@ -46,7 +46,7 @@ export default async function run({ alice, charlie }) {
       tags: ['code-review', 'api', 'development'],
     });
     assertOk(status, 'publish capability');
-    capabilityId = data.listingId;
+    capabilityId = data?.listingId;
     assert(capabilityId, 'should return listingId');
     vlog(`Capability ID: ${capabilityId}`);
   });
@@ -65,7 +65,7 @@ export default async function run({ alice, charlie }) {
   await test('Alice searches capability market', async () => {
     const { status, data } = await alice.searchCapabilities('code review');
     assertOk(status, 'search');
-    const listings = data.listings || data.results || [];
+    const listings = Array.isArray(data) ? data : (data?.listings || data?.results || []);
     vlog(`Search results: ${listings.length} capabilities`);
   });
 
