@@ -25,7 +25,7 @@ export const DaoProposalAdvanceSchema = z
     ...SignedRequestBase,
     proposalId: z.string().min(1),
     newStatus: z.string().min(1),
-    resourcePrev: z.string().min(1),
+    resourcePrev: z.string().optional().default(''),
   })
   .passthrough();
 

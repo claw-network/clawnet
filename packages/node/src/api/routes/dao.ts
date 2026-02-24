@@ -1,5 +1,5 @@
 /**
- * DAO governance routes — /api/v1/dao
+ * DAO governance routes �?/api/v1/dao
  */
 
 import { Router } from '../router.js';
@@ -41,11 +41,9 @@ import {
 export function daoRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
 
-  // ═══════════════════════════════════════════════════════════════
-  //  Proposals
-  // ═══════════════════════════════════════════════════════════════
-
-  // ── POST /proposals — create proposal ─────────────────────────
+  // ══════════════════════════════════════════════════════════════�?  //  Proposals
+  // ══════════════════════════════════════════════════════════════�?
+  // ── POST /proposals �?create proposal ─────────────────────────
   r.post('/proposals', async (_req, res, route) => {
     const v = validate(DaoProposalCreateSchema, route.body);
     if (!v.success) {
@@ -104,12 +102,12 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         { proposalId, txHash: hash, status: 'broadcast' },
         { self: `/api/v1/dao/proposals/${proposalId}` },
       );
-    } catch {
-      internalError(res, 'Proposal creation failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Proposal creation failed');
     }
   });
 
-  // ── GET /proposals — list proposals ───────────────────────────
+  // ── GET /proposals �?list proposals ───────────────────────────
   r.get('/proposals', async (_req, res, route) => {
     const { page, perPage, offset } = parsePagination(route.query);
     const status = route.query.get('status');
@@ -152,7 +150,7 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     paginated(res, [], { page, perPage, total: 0, basePath: '/api/v1/dao/proposals' });
   });
 
-  // ── GET /proposals/:id — single proposal ──────────────────────
+  // ── GET /proposals/:id �?single proposal ──────────────────────
   r.get('/proposals/:id', async (_req, res, route) => {
     const { id } = route.params;
 
@@ -215,7 +213,7 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         privateKey,
         proposalId: body.proposalId ?? id,
         newStatus: body.newStatus,
-        resourcePrev: body.resourcePrev,
+        resourcePrev: body.resourcePrev ?? '',
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -226,15 +224,13 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, proposalId: id, newStatus: body.newStatus, status: 'broadcast' },
         { self: `/api/v1/dao/proposals/${id}` },
       );
-    } catch {
-      internalError(res, 'Proposal advance failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Proposal advance failed');
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════
-  //  Votes
-  // ═══════════════════════════════════════════════════════════════
-
+  // ══════════════════════════════════════════════════════════════�?  //  Votes
+  // ══════════════════════════════════════════════════════════════�?
   // ── GET /proposals/:id/votes ──────────────────────────────────
   r.get('/proposals/:id/votes', async (_req, res, route) => {
     const { id } = route.params;
@@ -262,7 +258,7 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     ok(res, [], { self: `/api/v1/dao/proposals/${id}/votes` });
   });
 
-  // ── POST /proposals/:id/votes — cast vote ─────────────────────
+  // ── POST /proposals/:id/votes �?cast vote ─────────────────────
   r.post('/proposals/:id/votes', async (_req, res, route) => {
     const { id } = route.params;
     const v = validate(DaoVoteCastSchema, route.body);
@@ -317,16 +313,14 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, proposalId: id, option: body.option, status: 'broadcast' },
         { self: `/api/v1/dao/proposals/${id}/votes` },
       );
-    } catch {
-      internalError(res, 'Vote cast failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Vote cast failed');
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════
-  //  Delegations
-  // ═══════════════════════════════════════════════════════════════
-
-  // ── GET /delegations — list delegations ───────────────────────
+  // ══════════════════════════════════════════════════════════════�?  //  Delegations
+  // ══════════════════════════════════════════════════════════════�?
+  // ── GET /delegations �?list delegations ───────────────────────
   r.get('/delegations', async (_req, res, route) => {
     const did = route.query.get('did');
 
@@ -343,7 +337,7 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     ok(res, [], { self: '/api/v1/dao/delegations' });
   });
 
-  // ── POST /delegations — set delegate ──────────────────────────
+  // ── POST /delegations �?set delegate ──────────────────────────
   r.post('/delegations', async (_req, res, route) => {
     const v = validate(DaoDelegateSetSchema, route.body);
     if (!v.success) {
@@ -375,12 +369,12 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, delegate: body.delegate, status: 'broadcast' },
         { self: '/api/v1/dao/delegations' },
       );
-    } catch {
-      internalError(res, 'Delegate set failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Delegate set failed');
     }
   });
 
-  // ── DELETE /delegations/:delegate — revoke delegation ─────────
+  // ── DELETE /delegations/:delegate �?revoke delegation ─────────
   r.delete('/delegations/:delegate', async (_req, res, route) => {
     const { delegate } = route.params;
     const v = validate(DaoDelegateRevokeSchema, route.body);
@@ -406,12 +400,12 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { txHash: hash, delegate, status: 'revoked' }, { self: '/api/v1/dao/delegations' });
-    } catch {
-      internalError(res, 'Delegate revoke failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Delegate revoke failed');
     }
   });
 
-  // ── POST /delegations/:delegate — compatibility alias ─────────
+  // ── POST /delegations/:delegate �?compatibility alias ─────────
   r.post('/delegations/:delegate', async (_req, res, route) => {
     const { delegate } = route.params;
     const v = validate(DaoDelegateRevokeSchema, route.body);
@@ -437,16 +431,14 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { txHash: hash, delegate, status: 'revoked' }, { self: '/api/v1/dao/delegations' });
-    } catch {
-      internalError(res, 'Delegate revoke failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Delegate revoke failed');
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════
-  //  Treasury
-  // ═══════════════════════════════════════════════════════════════
-
-  // ── GET /treasury — treasury balance ──────────────────────────
+  // ══════════════════════════════════════════════════════════════�?  //  Treasury
+  // ══════════════════════════════════════════════════════════════�?
+  // ── GET /treasury �?treasury balance ──────────────────────────
   r.get('/treasury', async (_req, res) => {
     if (ctx.daoService) {
       try {
@@ -471,7 +463,7 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     ok(res, { balance: 0 }, { self: '/api/v1/dao/treasury' });
   });
 
-  // ── POST /treasury/deposits — deposit to treasury ─────────────
+  // ── POST /treasury/deposits �?deposit to treasury ─────────────
   r.post('/treasury/deposits', async (_req, res, route) => {
     const v = validate(DaoTreasuryDepositSchema, route.body);
     if (!v.success) {
@@ -516,16 +508,14 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, amount: Number(body.amount), status: 'broadcast' },
         { self: '/api/v1/dao/treasury' },
       );
-    } catch {
-      internalError(res, 'Treasury deposit failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Treasury deposit failed');
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════
-  //  Timelock
-  // ═══════════════════════════════════════════════════════════════
-
-  // ── GET /timelock — list timelock actions ──────────────────────
+  // ══════════════════════════════════════════════════════════════�?  //  Timelock
+  // ══════════════════════════════════════════════════════════════�?
+  // ── GET /timelock �?list timelock actions ──────────────────────
   r.get('/timelock', async (_req, res) => {
     if (ctx.daoStore) {
       try {
@@ -580,8 +570,8 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, actionId, status: 'executed' },
         { self: `/api/v1/dao/timelock/${actionId}` },
       );
-    } catch {
-      internalError(res, 'Timelock execute failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Timelock execute failed');
     }
   });
 
@@ -627,16 +617,14 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, actionId, reason: body.reason, status: 'cancelled' },
         { self: `/api/v1/dao/timelock/${actionId}` },
       );
-    } catch {
-      internalError(res, 'Timelock cancel failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Timelock cancel failed');
     }
   });
 
-  // ═══════════════════════════════════════════════════════════════
-  //  Parameters
-  // ═══════════════════════════════════════════════════════════════
-
-  // ── GET /params — current DAO parameters ──────────────────────
+  // ══════════════════════════════════════════════════════════════�?  //  Parameters
+  // ══════════════════════════════════════════════════════════════�?
+  // ── GET /params �?current DAO parameters ──────────────────────
   r.get('/params', async (_req, res) => {
     if (ctx.daoService) {
       try {
@@ -650,7 +638,7 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       }
     }
 
-    // DaoStore has no getParams — return empty
+    // DaoStore has no getParams �?return empty
     ok(res, {}, { self: '/api/v1/dao/params' });
   });
 

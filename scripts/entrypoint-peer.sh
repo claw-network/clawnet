@@ -32,9 +32,9 @@ RETRY=0
 PEER_ID=""
 
 while [ $RETRY -lt $MAX_RETRIES ]; do
-  RESP=$(wget -qO- "$BOOTSTRAP_API/api/node/status" 2>/dev/null || true)
+  RESP=$(wget -qO- "$BOOTSTRAP_API/api/v1/node" 2>/dev/null || true)
   if [ -n "$RESP" ]; then
-    # Extract peerId from JSON using simple grep
+    # Extract peerId from JSON — handles both envelope {data:{peerId:...}} and flat {peerId:...}
     PEER_ID=$(echo "$RESP" | sed 's/.*"peerId":"\([^"]*\)".*/\1/' 2>/dev/null || true)
     if [ -n "$PEER_ID" ]; then
       break

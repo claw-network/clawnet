@@ -846,7 +846,6 @@ export function parseMarketListingUpdatePayload(
   const listingId = String(payload.listingId ?? '');
   requireNonEmpty(listingId, 'listingId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const statusValue = String(payload.status ?? '');
   if (!isListingStatus(statusValue)) {
     throw new Error('status is invalid');
@@ -869,7 +868,6 @@ export function parseMarketListingRemovePayload(
   const listingId = String(payload.listingId ?? '');
   requireNonEmpty(listingId, 'listingId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   return {
     listingId,
     resourcePrev,
@@ -938,7 +936,6 @@ export function parseMarketOrderUpdatePayload(
   const orderId = String(payload.orderId ?? '');
   requireNonEmpty(orderId, 'orderId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const statusValue = String(payload.status ?? '');
   if (!isOrderStatus(statusValue)) {
     throw new Error('status is invalid');
@@ -1033,7 +1030,6 @@ export function parseMarketBidUpdatePayload(
   const bidId = String(payload.bidId ?? '');
   requireNonEmpty(bidId, 'bidId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   return {
     bidId,
     resourcePrev,
@@ -1070,7 +1066,6 @@ export function parseMarketSubmissionReviewPayload(
   const submissionId = String(payload.submissionId ?? '');
   requireNonEmpty(submissionId, 'submissionId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const approved = payload.approved;
   if (typeof approved !== 'boolean') {
     throw new Error('approved must be a boolean');
@@ -1125,7 +1120,6 @@ export function parseMarketSubscriptionCancelPayload(
   const subscriptionId = String(payload.subscriptionId ?? '');
   requireNonEmpty(subscriptionId, 'subscriptionId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   return {
     subscriptionId,
     resourcePrev,
@@ -1166,7 +1160,6 @@ export function parseMarketDisputeResponsePayload(
   const disputeId = String(payload.disputeId ?? '');
   requireNonEmpty(disputeId, 'disputeId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const response = String(payload.response ?? '').trim();
   requireNonEmpty(response, 'response');
   let evidence: Record<string, unknown>[] | undefined;
@@ -1190,7 +1183,6 @@ export function parseMarketDisputeResolvePayload(
   const disputeId = String(payload.disputeId ?? '');
   requireNonEmpty(disputeId, 'disputeId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const resolution = String(payload.resolution ?? '').trim();
   requireNonEmpty(resolution, 'resolution');
   const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
@@ -1244,7 +1236,6 @@ export function parseMarketCapabilityLeaseUpdatePayload(
   const leaseId = String(payload.leaseId ?? '');
   requireNonEmpty(leaseId, 'leaseId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   return {
     leaseId,
     resourcePrev,

@@ -55,6 +55,13 @@ export function contractRoutes(ctx: RuntimeContext): Router {
     return (await ctx.contractStore.getContract(contractId)) ?? null;
   }
 
+  /** Resolve the latest event hash for a contract (for resourcePrev). */
+  async function contractPrev(contractId: string): Promise<string> {
+    if (!ctx.contractStore) return '';
+    const state = await ctx.contractStore.getState();
+    return state.contractEvents[contractId] ?? '';
+  }
+
   // ── POST / — create contract ──────────────────────────────────
   r.post('/', async (_req, res, route) => {
     const v = validate(ContractCreateSchema, route.body);
@@ -130,8 +137,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         ? buildContractView(resultContract)
         : { contractId, txHash: hash };
       created(res, view, { self: `/api/v1/contracts/${contractId}` });
-    } catch {
-      internalError(res, 'Contract creation failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Contract creation failed');
     }
   });
 
@@ -206,11 +213,12 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      const prev = await contractPrev(id);
       const envelope = await createContractSignEnvelope({
         issuer: body.did,
         privateKey,
         contractId: id,
-        resourcePrev: body.prev ?? '',
+        resourcePrev: prev,
         signer: body.did,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
@@ -222,8 +230,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, contractId: id, status: 'signed', timestamp: body.ts ?? Date.now() },
         { self: `/api/v1/contracts/${id}` },
       );
-    } catch {
-      internalError(res, 'Contract sign failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Contract sign failed');
     }
   });
 
@@ -284,12 +292,13 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       });
       const h2 = await ctx.publishEvent(e2);
 
+      const cPrev = await contractPrev(id);
       const e3 = await createContractActivateEnvelope({
         issuer: body.did,
         privateKey,
         contractId: id,
         escrowId,
-        resourcePrev: h2,
+        resourcePrev: cPrev,
         ts: ts + 2,
         nonce: nonce + 2,
         prev: h2,
@@ -306,8 +315,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/contracts/${id}` },
       );
-    } catch {
-      internalError(res, 'Contract activation failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Contract activation failed');
     }
   });
 
@@ -338,11 +347,12 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      const prev = await contractPrev(id);
       const envelope = await createContractCompleteEnvelope({
         issuer: body.did,
         privateKey,
         contractId: id,
-        resourcePrev: body.prev ?? '',
+        resourcePrev: prev,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -353,8 +363,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, contractId: id, status: 'completed', timestamp: body.ts ?? Date.now() },
         { self: `/api/v1/contracts/${id}` },
       );
-    } catch {
-      internalError(res, 'Contract complete failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Contract complete failed');
     }
   });
 
@@ -385,13 +395,14 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      const prev = await contractPrev(id);
       const envelope = await createContractSettlementExecuteEnvelope({
         issuer: body.did,
         privateKey,
         contractId: id,
         settlement: body.settlement,
         notes: body.notes,
-        resourcePrev: body.prev ?? '',
+        resourcePrev: prev,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -402,8 +413,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         { txHash: hash, contractId: id, status: 'terminated', timestamp: body.ts ?? Date.now() },
         { self: `/api/v1/contracts/${id}` },
       );
-    } catch {
-      internalError(res, 'Contract terminate failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Contract terminate failed');
     }
   });
 
@@ -437,6 +448,7 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      const prev = await contractPrev(id);
       const envelope = await createContractDisputeOpenEnvelope({
         issuer: body.did,
         privateKey,
@@ -444,7 +456,7 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         reason: body.reason,
         description: body.description,
         evidence: body.evidence,
-        resourcePrev: body.prev ?? '',
+        resourcePrev: prev,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -463,8 +475,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/contracts/${id}` },
       );
-    } catch {
-      internalError(res, 'Contract dispute failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Contract dispute failed');
     }
   });
 
@@ -503,13 +515,14 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      const prev = await contractPrev(id);
       const envelope = await createContractDisputeResolveEnvelope({
         issuer: body.did,
         privateKey,
         contractId: id,
         resolution: body.resolution,
         notes: body.notes,
-        resourcePrev: body.prev ?? '',
+        resourcePrev: prev,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -526,8 +539,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/contracts/${id}` },
       );
-    } catch {
-      internalError(res, 'Contract dispute resolve failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Contract dispute resolve failed');
     }
   });
 
@@ -590,14 +603,15 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      const prev = await contractPrev(id);
       const envelope = await createContractMilestoneSubmitEnvelope({
         issuer: body.did,
         privateKey,
         contractId: id,
         milestoneId: String(index),
-        submissionId: body.submissionId ?? '',
+        submissionId: body.submissionId ?? `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         notes: body.notes,
-        resourcePrev: body.prev ?? '',
+        resourcePrev: prev,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -614,8 +628,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/contracts/${id}/milestones/${idx}` },
       );
-    } catch {
-      internalError(res, 'Milestone submit failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Milestone submit failed');
     }
   });
 
@@ -647,13 +661,14 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      const prev = await contractPrev(id);
       const envelope = await createContractMilestoneApproveEnvelope({
         issuer: body.did,
         privateKey,
         contractId: id,
         milestoneId: String(index),
         notes: body.notes,
-        resourcePrev: body.prev ?? '',
+        resourcePrev: prev,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -670,8 +685,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/contracts/${id}/milestones/${idx}` },
       );
-    } catch {
-      internalError(res, 'Milestone approve failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Milestone approve failed');
     }
   });
 
@@ -704,13 +719,14 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      const prev = await contractPrev(id);
       const envelope = await createContractMilestoneRejectEnvelope({
         issuer: body.did,
         privateKey,
         contractId: id,
         milestoneId: String(index),
         notes: body.feedback ?? body.notes,
-        resourcePrev: body.prev ?? '',
+        resourcePrev: prev,
         ts: body.ts ?? Date.now(),
         nonce: body.nonce,
         prev: body.prev,
@@ -727,8 +743,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/contracts/${id}/milestones/${idx}` },
       );
-    } catch {
-      internalError(res, 'Milestone reject failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Milestone reject failed');
     }
   });
 

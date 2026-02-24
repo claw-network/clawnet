@@ -9,7 +9,7 @@ import { ok, badRequest, internalError } from '../response.js';
 import { validate } from '../schemas/common.js';
 import { z } from 'zod';
 import type { RuntimeContext } from '../types.js';
-import { resolveAddress } from '../types.js';
+import { resolveAddress, resolvePrivateKey } from '../types.js';
 import { createWalletMintEnvelope } from '@claw-network/protocol';
 
 const FaucetSchema = z
@@ -45,7 +45,7 @@ export function devRoutes(ctx: RuntimeContext): Router {
         const walletService = ctx.walletService as unknown as {
           transfer?: (...args: unknown[]) => Promise<unknown>;
         };
-        const result = await walletService.transfer?.(to, amount);
+        const result = await walletService.transfer?.('faucet', to, amount, 'dev-faucet-mint');
         if (result) {
           ok(res, result, { self: '/api/v1/dev/faucet' });
           return;
@@ -56,11 +56,23 @@ export function devRoutes(ctx: RuntimeContext): Router {
       }
     }
 
-    // Legacy: create mint envelope
+    // Legacy: create mint envelope using node's own identity
     try {
+      const nodeStatus = await ctx.getNodeStatus?.();
+      const nodeDid = typeof nodeStatus?.did === 'string' ? nodeStatus.did : '';
+      const passphrase = process.env.CLAW_PASSPHRASE ?? '';
+      if (!nodeDid || !passphrase) {
+        internalError(res, 'Faucet requires node identity and CLAW_PASSPHRASE');
+        return;
+      }
+      const privateKey = await resolvePrivateKey(ctx.config.dataDir, nodeDid, passphrase);
+      if (!privateKey) {
+        internalError(res, 'Could not resolve node private key for faucet signing');
+        return;
+      }
       const envelope = await createWalletMintEnvelope({
-        issuer: 'system',
-        privateKey: new Uint8Array(64),
+        issuer: nodeDid,
+        privateKey,
         to,
         amount: String(amount),
         ts: Date.now(),
@@ -68,8 +80,8 @@ export function devRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { txHash: hash, to, amount, status: 'broadcast' }, { self: '/api/v1/dev/faucet' });
-    } catch {
-      internalError(res, 'Faucet mint failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Faucet mint failed');
     }
   });
 

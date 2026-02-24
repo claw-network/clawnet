@@ -32,6 +32,9 @@ import { parseCsv, parseBoolean } from './types.js';
 
 export function parseEvent(bytes: unknown): EventEnvelope | null {
   try {
+    if (bytes instanceof Uint8Array) {
+      return JSON.parse(new TextDecoder().decode(bytes)) as EventEnvelope;
+    }
     if (typeof bytes === 'string') return JSON.parse(bytes) as EventEnvelope;
     if (bytes && typeof bytes === 'object') return bytes as EventEnvelope;
     return null;

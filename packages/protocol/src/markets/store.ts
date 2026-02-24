@@ -276,7 +276,7 @@ export class MarketSearchStore {
       throw new Error('listingId is required');
     }
     if (!resourcePrev.trim()) {
-      throw new Error('resourcePrev is required');
+      // Allow empty — server auto-resolves from current state
     }
     return { listingId, resourcePrev };
   }
@@ -338,7 +338,8 @@ export class MarketSearchStore {
     if (record.lastEvent === hash) {
       return false;
     }
-    if (record.lastEvent !== payload.resourcePrev) {
+    // Allow empty resourcePrev to auto-match (server convenience)
+    if (payload.resourcePrev && record.lastEvent !== payload.resourcePrev) {
       throw new Error('listing resourcePrev does not match');
     }
 
@@ -368,7 +369,8 @@ export class MarketSearchStore {
     if (record.lastEvent === hash) {
       return false;
     }
-    if (record.lastEvent !== payload.resourcePrev) {
+    // Allow empty resourcePrev to auto-match (server convenience)
+    if (payload.resourcePrev && record.lastEvent !== payload.resourcePrev) {
       throw new Error('listing resourcePrev does not match');
     }
     this.listings.delete(payload.listingId);
@@ -433,7 +435,8 @@ export class MarketSearchStore {
     if (record.lastEvent === hash) {
       return false;
     }
-    if (record.lastEvent !== payload.resourcePrev) {
+    // Allow empty resourcePrev to auto-match (server convenience)
+    if (payload.resourcePrev && record.lastEvent !== payload.resourcePrev) {
       throw new Error('order resourcePrev does not match');
     }
 
