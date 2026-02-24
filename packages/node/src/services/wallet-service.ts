@@ -214,6 +214,43 @@ export class WalletService {
     };
   }
 
+  /**
+   * Mint new Tokens to a target address.
+   *
+   * The node's signer **must** hold MINTER_ROLE on ClawToken for this to
+   * succeed.  Typically used by the dev faucet so it can create fresh Tokens
+   * without requiring a pre-funded balance.
+   *
+   * @param to   Target EVM address.
+   * @param amount Number of Tokens to mint (integer, 0 decimals).
+   * @param memo Optional human-readable memo (logged, not stored on-chain).
+   */
+  async mint(
+    to: string,
+    amount: number,
+    memo?: string,
+  ): Promise<TransferResult> {
+    this.log.info(
+      'Wallet mint: → %s, %d Token(s)%s',
+      to,
+      amount,
+      memo ? ` (${memo})` : '',
+    );
+
+    const tx = await this.contracts.token.mint(to, amount);
+    const receipt = await tx.wait();
+    const timestamp = Date.now();
+
+    return {
+      txHash: receipt.hash,
+      from: '0x0000000000000000000000000000000000000000',
+      to,
+      amount,
+      status: receipt.status === 1 ? 'confirmed' : 'failed',
+      timestamp,
+    };
+  }
+
   // ========================================================================
   // WRITE operations — Escrow lifecycle
   // ========================================================================

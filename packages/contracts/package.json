@@ -22,6 +22,9 @@
     "clean": "hardhat clean",
     "gas-report": "REPORT_GAS=true hardhat test",
     "deploy:local": "hardhat run scripts/deploy-helpers.ts --network hardhat",
+    "deploy:testnet": "hardhat run scripts/deploy-all.ts --network clawnetTestnet",
+    "deploy:testnet:bootstrap": "BOOTSTRAP_MINT=true hardhat run scripts/deploy-all.ts --network clawnetTestnet",
+    "bootstrap:testnet": "hardhat run scripts/bootstrap-mint.ts --network clawnetTestnet",
     "slither": "slither .",
     "lint:sol": "solhint 'contracts/**/*.sol'"
   },

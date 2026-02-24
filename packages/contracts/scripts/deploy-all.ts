@@ -256,6 +256,28 @@ async function main() {
     }
   }
 
+  // Testnet / devnet: optional inline bootstrap mint.
+  // Set BOOTSTRAP_MINT=true to run genesis distribution after deploy.
+  // For finer control, use `npx hardhat run scripts/bootstrap-mint.ts` separately.
+  if (
+    Number(network.chainId) !== 31337 &&
+    process.env.BOOTSTRAP_MINT === 'true'
+  ) {
+    console.log('\n[Bootstrap] BOOTSTRAP_MINT=true — running genesis distribution...');
+    const bootstrapTotal = Number(process.env.BOOTSTRAP_TOTAL_SUPPLY || 1_000_000);
+    const bootstrapTargets: { label: string; addr: string; amount: number }[] = [
+      { label: 'Treasury (DAO)', addr: daoDeploy.proxy, amount: Math.floor(bootstrapTotal * 0.5) },
+      { label: 'Faucet / Deployer', addr: deployer.address, amount: Math.floor(bootstrapTotal * 0.35) },
+      { label: 'Liquidity', addr: treasury, amount: Math.floor(bootstrapTotal * 0.1) },
+      { label: 'Risk Reserve', addr: treasury, amount: Math.floor(bootstrapTotal * 0.05) },
+    ];
+    for (const t of bootstrapTargets) {
+      await (await tokenContract.mint(t.addr, t.amount)).wait();
+      console.log(`  ✓ Minted ${t.amount.toLocaleString()} Token → ${t.label} (${t.addr})`);
+    }
+    console.log(`  ✓ Bootstrap complete — ${bootstrapTotal.toLocaleString()} Token distributed`);
+  }
+
   const MINTER_ROLE = keccak(toUtf8('MINTER_ROLE'));
   await (await tokenContract.grantRole(MINTER_ROLE, stakingDeploy.proxy)).wait();
   console.log(`  ✓ ClawToken.MINTER_ROLE → ClawStaking`);

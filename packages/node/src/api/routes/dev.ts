@@ -39,16 +39,35 @@ export function devRoutes(ctx: RuntimeContext): Router {
     }
     const amount = body.amount ?? 1000;
 
-    // On-chain faucet
+    // On-chain faucet — prefer mint (no pre-funded balance needed),
+    // fall back to transfer if the node signer lacks MINTER_ROLE.
     if (ctx.walletService) {
       try {
         const walletService = ctx.walletService as unknown as {
+          mint?: (...args: unknown[]) => Promise<unknown>;
           transfer?: (...args: unknown[]) => Promise<unknown>;
         };
-        const result = await walletService.transfer?.('faucet', to, amount, 'dev-faucet-mint');
-        if (result) {
-          ok(res, result, { self: '/api/v1/dev/faucet' });
-          return;
+
+        // Try minting fresh Tokens first (requires MINTER_ROLE).
+        if (walletService.mint) {
+          try {
+            const result = await walletService.mint(to, amount, 'dev-faucet-mint');
+            if (result) {
+              ok(res, result, { self: '/api/v1/dev/faucet' });
+              return;
+            }
+          } catch {
+            // Mint failed (likely no MINTER_ROLE) — fall through to transfer.
+          }
+        }
+
+        // Fallback: transfer from the node signer's own balance.
+        if (walletService.transfer) {
+          const result = await walletService.transfer('faucet', to, amount, 'dev-faucet-transfer');
+          if (result) {
+            ok(res, result, { self: '/api/v1/dev/faucet' });
+            return;
+          }
         }
       } catch (err) {
         internalError(res, (err as Error).message);
