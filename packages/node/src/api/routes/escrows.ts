@@ -401,6 +401,16 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
       return;
     }
 
+    // Resolve resourcePrev from the last event related to this escrow
+    let resPrev = '';
+    for (let i = state.history.length - 1; i >= 0; i--) {
+      const entry = state.history[i];
+      if ((entry.payload as Record<string, unknown>).escrowId === id) {
+        resPrev = entry.hash;
+        break;
+      }
+    }
+
     try {
       const action = body.action ?? 'refund';
       let envelope: Record<string, unknown>;
@@ -411,7 +421,7 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
           escrowId: id,
           amount: String(remaining),
           ruleId: 'expired',
-          resourcePrev: body.ruleId ?? '',
+          resourcePrev: resPrev,
           ts: body.ts ?? Date.now(),
           nonce: body.nonce,
           prev: body.prev,
@@ -423,7 +433,7 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
           escrowId: id,
           amount: String(remaining),
           reason: 'expired',
-          resourcePrev: body.ruleId ?? '',
+          resourcePrev: resPrev,
           ts: body.ts ?? Date.now(),
           nonce: body.nonce,
           prev: body.prev,

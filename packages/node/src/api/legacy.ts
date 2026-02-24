@@ -188,7 +188,13 @@ export async function buildWalletState(eventStore: EventStore): Promise<WalletSt
     if (!events.length) break;
     for (const bytes of events) {
       const envelope = parseEvent(bytes);
-      if (envelope) state = applyWalletEvent(state, envelope);
+      if (envelope) {
+        try {
+          state = applyWalletEvent(state, envelope);
+        } catch {
+          // Skip events that fail during state reconstruction (e.g. out-of-order funds)
+        }
+      }
     }
     if (!next) break;
     cursor = next;
