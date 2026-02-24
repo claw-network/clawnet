@@ -5,11 +5,27 @@
 import { Router } from '../router.js';
 import { ok, created, noContent, notFound, badRequest, internalError } from '../response.js';
 import { validate } from '../schemas/common.js';
-import { IdentityRegisterSchema, IdentityRotateKeySchema, IdentityRevokeSchema, CapabilityRegisterSchema } from '../schemas/identity.js';
+import {
+  IdentityRegisterSchema,
+  IdentityRotateKeySchema,
+  IdentityRevokeSchema,
+  CapabilityRegisterSchema,
+} from '../schemas/identity.js';
 import type { RuntimeContext } from '../types.js';
-import { isValidDid, resolvePrivateKey, publicKeyFromDid, keyIdFromPublicKey, resolveStoragePaths, loadKeyRecord, decryptKeyRecord, verifyCapabilityCredential } from '../types.js';
+import {
+  isValidDid,
+  publicKeyFromDid,
+  keyIdFromPublicKey,
+  resolveStoragePaths,
+  loadKeyRecord,
+  decryptKeyRecord,
+  verifyCapabilityCredential,
+} from '../types.js';
 import { resolveLocalIdentity, buildIdentityView, buildIdentityCapabilities } from '../legacy.js';
-import { createIdentityCapabilityRegisterEnvelope, type CapabilityCredential } from '@claw-network/protocol';
+import {
+  createIdentityCapabilityRegisterEnvelope,
+  type CapabilityCredential,
+} from '@claw-network/protocol';
 
 export function identityRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -29,24 +45,40 @@ export function identityRoutes(ctx: RuntimeContext): Router {
           const capabilities = ctx.eventStore
             ? await buildIdentityCapabilities(ctx.eventStore, identity.did)
             : [];
-          ok(res, {
-            did: identity.did, publicKey: doc.publicKey, controller: doc.controller,
-            keyPurpose: doc.keyPurpose, isActive: doc.isActive,
-            created: doc.createdAt, updated: doc.updatedAt,
-            displayName: identity.displayName, avatar: identity.avatar, bio: identity.bio,
-            platformLinks: doc.platformLinks, capabilities,
-          }, { self: '/api/v1/identities/self' });
+          ok(
+            res,
+            {
+              did: identity.did,
+              publicKey: doc.publicKey,
+              controller: doc.controller,
+              keyPurpose: doc.keyPurpose,
+              isActive: doc.isActive,
+              created: doc.createdAt,
+              updated: doc.updatedAt,
+              displayName: identity.displayName,
+              avatar: identity.avatar,
+              bio: identity.bio,
+              platformLinks: doc.platformLinks,
+              capabilities,
+            },
+            { self: '/api/v1/identities/self' },
+          );
           return;
         }
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
 
     // Legacy fallback
     if (ctx.eventStore) {
       const fromEvents = await buildIdentityView(ctx.eventStore, identity.did);
       if (fromEvents) {
-        ok(res, { ...identity, ...fromEvents, did: identity.did, publicKey: identity.publicKey },
-          { self: '/api/v1/identities/self' });
+        ok(
+          res,
+          { ...identity, ...fromEvents, did: identity.did, publicKey: identity.publicKey },
+          { self: '/api/v1/identities/self' },
+        );
         return;
       }
       const caps = await buildIdentityCapabilities(ctx.eventStore, identity.did);
@@ -71,15 +103,26 @@ export function identityRoutes(ctx: RuntimeContext): Router {
           const capabilities = ctx.eventStore
             ? await buildIdentityCapabilities(ctx.eventStore, did)
             : [];
-          ok(res, {
-            did, publicKey: doc.publicKey, controller: doc.controller,
-            keyPurpose: doc.keyPurpose, isActive: doc.isActive,
-            created: doc.createdAt, updated: doc.updatedAt,
-            platformLinks: doc.platformLinks, capabilities,
-          }, { self: `/api/v1/identities/${encodeURIComponent(did)}` });
+          ok(
+            res,
+            {
+              did,
+              publicKey: doc.publicKey,
+              controller: doc.controller,
+              keyPurpose: doc.keyPurpose,
+              isActive: doc.isActive,
+              created: doc.createdAt,
+              updated: doc.updatedAt,
+              platformLinks: doc.platformLinks,
+              capabilities,
+            },
+            { self: `/api/v1/identities/${encodeURIComponent(did)}` },
+          );
           return;
         }
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
 
     // Legacy
@@ -105,12 +148,18 @@ export function identityRoutes(ctx: RuntimeContext): Router {
       return;
     }
     const v = validate(IdentityRegisterSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     try {
       const result = await ctx.identityService.registerDID(
-        body.did, body.publicKey, body.purpose ?? 'authentication', body.evmAddress,
+        body.did,
+        body.publicKey,
+        body.purpose ?? 'authentication',
+        body.evmAddress,
       );
       created(res, result, { self: `/api/v1/identities/${encodeURIComponent(body.did)}` });
     } catch (err) {
@@ -124,8 +173,11 @@ export function identityRoutes(ctx: RuntimeContext): Router {
       internalError(res, 'Chain identity service unavailable');
       return;
     }
-    const v = validate(IdentityRevokeSchema, { ...route.body as object, did: route.params.did });
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    const v = validate(IdentityRevokeSchema, { ...(route.body as object), did: route.params.did });
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
 
     try {
       await ctx.identityService.revokeDID(route.params.did);
@@ -141,12 +193,22 @@ export function identityRoutes(ctx: RuntimeContext): Router {
       internalError(res, 'Chain identity service unavailable');
       return;
     }
-    const v = validate(IdentityRotateKeySchema, { ...route.body as object, did: route.params.did });
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    const v = validate(IdentityRotateKeySchema, {
+      ...(route.body as object),
+      did: route.params.did,
+    });
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     try {
-      const result = await ctx.identityService.rotateKey(body.did, body.newPublicKey, body.rotationProof ?? '0x');
+      const result = await ctx.identityService.rotateKey(
+        body.did,
+        body.newPublicKey,
+        body.rotationProof ?? '0x',
+      );
       created(res, result, { self: `/api/v1/identities/${encodeURIComponent(body.did)}` });
     } catch (err) {
       internalError(res, err instanceof Error ? err.message : 'Key rotation failed');
@@ -156,20 +218,27 @@ export function identityRoutes(ctx: RuntimeContext): Router {
   // ── GET /:did/capabilities — list capabilities ────────────────
   r.get('/:did/capabilities', async (_req, res, route) => {
     const { did } = route.params;
-    const caps = ctx.eventStore
-      ? await buildIdentityCapabilities(ctx.eventStore, did)
-      : [];
+    const caps = ctx.eventStore ? await buildIdentityCapabilities(ctx.eventStore, did) : [];
     ok(res, caps, { self: `/api/v1/identities/${encodeURIComponent(did)}/capabilities` });
   });
 
   // ── POST /:did/capabilities — register capability ─────────────
   r.post('/:did/capabilities', async (_req, res, route) => {
-    const v = validate(CapabilityRegisterSchema, { ...route.body as object, did: route.params.did });
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    const v = validate(CapabilityRegisterSchema, {
+      ...(route.body as object),
+      did: route.params.did,
+    });
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     const credential = body.credential as CapabilityCredential | undefined;
-    if (!credential) { badRequest(res, 'Missing credential', route.url.pathname); return; }
+    if (!credential) {
+      badRequest(res, 'Missing credential', route.url.pathname);
+      return;
+    }
     if (!(await verifyCapabilityCredential(credential))) {
       badRequest(res, 'Invalid capability credential', route.url.pathname);
       return;
@@ -195,17 +264,28 @@ export function identityRoutes(ctx: RuntimeContext): Router {
 
     try {
       const envelope = await createIdentityCapabilityRegisterEnvelope({
-        did: body.did, privateKey, name: subject.name, pricing: subject.pricing,
-        description: subject.description, credential,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        did: body.did,
+        privateKey,
+        name: subject.name,
+        pricing: subject.pricing,
+        description: subject.description,
+        credential,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
       const data: Record<string, unknown> = {
-        id: hash, name: subject.name, pricing: subject.pricing,
-        verified: false, registeredAt: body.ts ?? Date.now(),
+        id: hash,
+        name: subject.name,
+        pricing: subject.pricing,
+        verified: false,
+        registeredAt: body.ts ?? Date.now(),
       };
       if (subject.description) data.description = subject.description;
-      created(res, data, { self: `/api/v1/identities/${encodeURIComponent(body.did)}/capabilities/${hash}` });
+      created(res, data, {
+        self: `/api/v1/identities/${encodeURIComponent(body.did)}/capabilities/${hash}`,
+      });
     } catch {
       internalError(res, 'Publish failed');
     }

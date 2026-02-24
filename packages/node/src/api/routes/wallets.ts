@@ -3,9 +3,9 @@
  */
 
 import { Router } from '../router.js';
-import { ok, notFound, badRequest, internalError, paginated, parsePagination } from '../response.js';
+import { ok, badRequest, internalError, paginated, parsePagination } from '../response.js';
 import type { RuntimeContext } from '../types.js';
-import { resolveAddress, isValidDid } from '../types.js';
+import { resolveAddress } from '../types.js';
 import { buildWalletState } from '../legacy.js';
 import { getWalletBalance } from '@claw-network/protocol';
 
@@ -40,15 +40,22 @@ export function walletRoutes(ctx: RuntimeContext): Router {
     }
     const state = await buildWalletState(ctx.eventStore);
     const balance = getWalletBalance(state, resolved);
-    const total = BigInt(balance.available) + BigInt(balance.pending)
-      + BigInt(balance.locked.escrow) + BigInt(balance.locked.governance);
-    ok(res, {
-      address: resolved,
-      balance: Number(total),
-      available: Number(balance.available),
-      pending: Number(balance.pending),
-      locked: Number(balance.locked.escrow),
-    }, { self: `/api/v1/wallets/${address}` });
+    const total =
+      BigInt(balance.available) +
+      BigInt(balance.pending) +
+      BigInt(balance.locked.escrow) +
+      BigInt(balance.locked.governance);
+    ok(
+      res,
+      {
+        address: resolved,
+        balance: Number(total),
+        available: Number(balance.available),
+        pending: Number(balance.pending),
+        locked: Number(balance.locked.escrow),
+      },
+      { self: `/api/v1/wallets/${address}` },
+    );
   });
 
   // ── GET /:address/transactions — transaction history ──────────
@@ -73,7 +80,9 @@ export function walletRoutes(ctx: RuntimeContext): Router {
         });
         const items = Array.isArray(result.transactions) ? result.transactions : [];
         paginated(res, items, {
-          page, perPage, total: result.total ?? items.length,
+          page,
+          perPage,
+          total: result.total ?? items.length,
           basePath: `/api/v1/wallets/${address}/transactions`,
           query: typeFilter ? { type: typeFilter } : {},
         });
@@ -99,7 +108,9 @@ export function walletRoutes(ctx: RuntimeContext): Router {
     const filtered = typeFilter ? all.filter((tx) => tx.type === typeFilter) : all;
     const slice = filtered.slice(offset, offset + perPage);
     paginated(res, slice, {
-      page, perPage, total: filtered.length,
+      page,
+      perPage,
+      total: filtered.length,
       basePath: `/api/v1/wallets/${address}/transactions`,
       query: typeFilter ? { type: typeFilter } : {},
     });

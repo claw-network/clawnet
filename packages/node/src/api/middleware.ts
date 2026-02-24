@@ -2,7 +2,6 @@
  * HTTP middleware: CORS, error boundary, request logging.
  */
 
-import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Middleware } from './router.js';
 import { internalError } from './response.js';
 
@@ -35,9 +34,7 @@ export const errorBoundary: Middleware = async (_req, res, next) => {
 };
 
 /** Optional request logging middleware. */
-export function requestLogger(
-  log: (msg: string) => void,
-): Middleware {
+export function requestLogger(log: (msg: string) => void): Middleware {
   return async (req, res, next) => {
     const start = Date.now();
     await next();

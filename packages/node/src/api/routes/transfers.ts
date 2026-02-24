@@ -2,7 +2,6 @@
  * Transfer routes — /api/v1/transfers
  */
 
-import { randomUUID } from 'node:crypto';
 import { Router } from '../router.js';
 import { created, badRequest, internalError } from '../response.js';
 import { validate } from '../schemas/common.js';
@@ -17,11 +16,17 @@ export function transferRoutes(ctx: RuntimeContext): Router {
   // ── POST / — transfer Tokens ──────────────────────────────────
   r.post('/', async (_req, res, route) => {
     const v = validate(TransferSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     const to = resolveAddress(body.to);
-    if (!to) { badRequest(res, 'Invalid recipient address', route.url.pathname); return; }
+    if (!to) {
+      badRequest(res, 'Invalid recipient address', route.url.pathname);
+      return;
+    }
     const from = addressFromDid(body.did);
 
     // On-chain path
@@ -45,15 +50,30 @@ export function transferRoutes(ctx: RuntimeContext): Router {
 
     try {
       const envelope = await createWalletTransferEnvelope({
-        issuer: body.did, privateKey, from, to,
-        amount: String(body.amount), fee: body.fee != null ? String(body.fee) : '0',
-        memo: body.memo, ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        issuer: body.did,
+        privateKey,
+        from,
+        to,
+        amount: String(body.amount),
+        fee: body.fee != null ? String(body.fee) : '0',
+        memo: body.memo,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      created(res, {
-        txHash: hash, from, to, amount: Number(body.amount),
-        status: 'broadcast', timestamp: body.ts ?? Date.now(),
-      }, { self: `/api/v1/wallets/${from}` });
+      created(
+        res,
+        {
+          txHash: hash,
+          from,
+          to,
+          amount: Number(body.amount),
+          status: 'broadcast',
+          timestamp: body.ts ?? Date.now(),
+        },
+        { self: `/api/v1/wallets/${from}` },
+      );
     } catch {
       internalError(res, 'Transfer publish failed');
     }

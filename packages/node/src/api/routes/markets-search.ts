@@ -3,7 +3,7 @@
  */
 
 import { Router } from '../router.js';
-import { ok, badRequest, paginated, parsePagination } from '../response.js';
+import { badRequest, paginated, parsePagination } from '../response.js';
 import type { RuntimeContext } from '../types.js';
 import { parseMarketSearchQuery } from '../legacy.js';
 
@@ -29,11 +29,10 @@ export function marketsSearchRoutes(ctx: RuntimeContext): Router {
       const listings = result.listings ?? [];
       const total = result.total ?? listings.length;
 
-      const response: Record<string, unknown> = { listings };
-      if (result.facets) response.facets = result.facets;
-
       paginated(res, listings, {
-        page, perPage, total,
+        page,
+        perPage,
+        total,
         basePath: '/api/v1/markets/search',
         query: Object.fromEntries(
           [...route.query.entries()].filter(([k]) => k !== 'page' && k !== 'per_page'),

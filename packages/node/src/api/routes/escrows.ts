@@ -21,9 +21,8 @@ import {
   addressFromDid,
   buildEscrowView,
   parseBigInt,
-  mapEscrowStatus,
 } from '../types.js';
-import { buildWalletState, parseEvent } from '../legacy.js';
+import { buildWalletState } from '../legacy.js';
 import {
   createWalletEscrowCreateEnvelope,
   createWalletEscrowFundEnvelope,
@@ -142,8 +141,6 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
         );
         if (result) {
           const escrows = (result as unknown as Record<string, unknown>).items ?? result;
-          const total =
-            (result as unknown as Record<string, unknown>).total ?? (escrows as unknown[]).length;
           paginated(res, escrows as unknown[], {
             page,
             perPage,
@@ -207,7 +204,6 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
       return;
     }
     const body = v.data;
-
     if (ctx.walletService) {
       try {
         const result = await ctx.walletService.fundEscrow(id, Number(body.amount));
@@ -260,7 +256,6 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
       return;
     }
     const body = v.data;
-
     if (ctx.walletService) {
       try {
         const result = await ctx.walletService.releaseEscrow(id);
@@ -314,7 +309,6 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
       return;
     }
     const body = v.data;
-
     if (ctx.walletService) {
       try {
         const result = await ctx.walletService.refundEscrow(id);
@@ -368,7 +362,6 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
       return;
     }
     const body = v.data;
-
     if (ctx.walletService) {
       try {
         const result = await ctx.walletService.expireEscrow(id);
@@ -462,7 +455,6 @@ export function escrowRoutes(ctx: RuntimeContext): Router {
       badRequest(res, v.error, route.url.pathname);
       return;
     }
-    const body = v.data;
 
     if (ctx.walletService) {
       try {
