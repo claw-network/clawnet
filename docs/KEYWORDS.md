@@ -35,3 +35,10 @@
 - timelock（时间锁）：提案通过后到执行前的等待期，用于审查与风险拦截。
 - calldata：链上合约函数调用的编码数据。
 - chainId：链的唯一标识。ClawNet testnet 当前为 `7625`。
+- Geth（Go-Ethereum）：以太坊官方客户端的 Go 语言实现，最广泛使用的以太坊节点软件。负责运行 EVM、维护区块链状态、参与共识出块、提供 JSON-RPC API。ClawNet testnet 使用 Geth v1.13.15 以 Clique PoA 模式运行独立链。
+- Clique PoA（Proof of Authority）：一种许可型共识算法，由预授权的 Validator 节点轮流出块，无需算力竞争。ClawNet testnet 配置 3 个 Validator，出块间隔 2 秒。
+- JSON-RPC：基于 JSON 的远程过程调用协议，Geth 通过该接口暴露区块链读写能力（端口 8545），ClawNet 节点通过它与链交互。
+- EVM（Ethereum Virtual Machine）：以太坊虚拟机，执行智能合约字节码的沙盒运行时环境。
+- Hardhat：以太坊智能合约开发框架（TypeScript），负责编译 Solidity 源码、运行测试、部署合约、生成 TypeScript 类型。开发阶段工具，不参与运行时；运行时仅使用其编译产物（`artifacts/` 目录中的 ABI 文件）。
+- ABI（Application Binary Interface）：智能合约的接口描述，定义函数签名与参数编码规则。Hardhat 编译后输出到 `artifacts/`，Node.js 运行时通过 `ContractProvider` 加载 ABI 与链上合约交互。
+- artifacts：Hardhat 编译 Solidity 合约后的产物目录，包含 ABI 和字节码。`chain-config.ts` 中的 `artifactsDir` 字段指向此目录。
