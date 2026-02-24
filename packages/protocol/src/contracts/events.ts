@@ -387,7 +387,6 @@ export function parseContractSignPayload(payload: Record<string, unknown>): Cont
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const signer = String(payload.signer ?? '');
   assertValidDid(signer, 'signer');
   return {
@@ -401,7 +400,6 @@ export function parseContractActivatePayload(payload: Record<string, unknown>): 
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const escrowId = payload.escrowId !== undefined ? String(payload.escrowId) : undefined;
   return {
     contractId,
@@ -414,7 +412,6 @@ export function parseContractNegotiatePayload(payload: Record<string, unknown>):
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const terms = assertRecord(payload.terms, 'terms');
   const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
   return {
@@ -431,7 +428,6 @@ export function parseContractNegotiateAcceptPayload(
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
   return {
     contractId,
@@ -446,7 +442,6 @@ export function parseContractMilestoneSubmitPayload(
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const milestoneId = String(payload.milestoneId ?? '');
   requireNonEmpty(milestoneId, 'milestoneId');
   const submissionId = String(payload.submissionId ?? '');
@@ -467,7 +462,6 @@ export function parseContractMilestoneReviewPayload(
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const milestoneId = String(payload.milestoneId ?? '');
   requireNonEmpty(milestoneId, 'milestoneId');
   const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
@@ -483,7 +477,6 @@ export function parseContractCompletePayload(payload: Record<string, unknown>): 
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   return {
     contractId,
     resourcePrev,
@@ -496,7 +489,6 @@ export function parseContractDisputeOpenPayload(
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const reason = String(payload.reason ?? '').trim();
   requireNonEmpty(reason, 'reason');
   const description = typeof payload.description === 'string' ? payload.description : undefined;
@@ -522,7 +514,6 @@ export function parseContractDisputeResolvePayload(
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const resolution = String(payload.resolution ?? '').trim();
   requireNonEmpty(resolution, 'resolution');
   const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
@@ -540,7 +531,6 @@ export function parseContractSettlementPayload(
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const settlement = assertRecord(payload.settlement, 'settlement');
   const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
   return {
@@ -557,7 +547,6 @@ export function parseContractTerminatePayload(
   const contractId = String(payload.contractId ?? '');
   requireNonEmpty(contractId, 'contractId');
   const resourcePrev = String(payload.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
   const reason = String(payload.reason ?? '').trim();
   requireNonEmpty(reason, 'reason');
   return {

@@ -83,8 +83,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { listingId, txHash: hash },
         { self: `/api/v1/markets/capabilities/${listingId}` },
       );
-    } catch {
-      internalError(res, 'Capability listing publish failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Capability listing publish failed');
     }
   });
 
@@ -161,8 +161,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { listingId: id, txHash: hash }, { self: `/api/v1/markets/capabilities/${id}` });
-    } catch {
-      internalError(res, 'Capability listing remove failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Capability listing remove failed');
     }
   });
 
@@ -193,8 +193,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { listingId: id, txHash: hash }, { self: `/api/v1/markets/capabilities/${id}` });
-    } catch {
-      internalError(res, 'Capability listing remove failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Capability listing remove failed');
     }
   });
 
@@ -236,8 +236,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { leaseId, txHash: hash, credentials: body.credentials },
         { self: `/api/v1/markets/capabilities/${id}/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Lease start failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Lease start failed');
     }
   });
 
@@ -292,8 +292,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/markets/capabilities/${id}/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Capability invoke failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Capability invoke failed');
     }
   });
 
@@ -328,8 +328,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { leaseId, txHash: hash, action: 'pause' },
         { self: `/api/v1/markets/capabilities/${id}/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Lease pause failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Lease pause failed');
     }
   });
 
@@ -364,8 +364,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { leaseId, txHash: hash, action: 'resume' },
         { self: `/api/v1/markets/capabilities/${id}/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Lease resume failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Lease resume failed');
     }
   });
 
@@ -400,8 +400,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { leaseId, txHash: hash, action: 'terminate' },
         { self: `/api/v1/markets/capabilities/${id}/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Lease terminate failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Lease terminate failed');
     }
   });
 
@@ -444,8 +444,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { leaseId, txHash: hash },
         { self: `/api/v1/markets/capabilities/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Capability invoke failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Capability invoke failed');
     }
   });
 
@@ -478,8 +478,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { leaseId, txHash: hash, action: 'pause' },
         { self: `/api/v1/markets/capabilities/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Lease pause failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Lease pause failed');
     }
   });
 
@@ -512,8 +512,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { leaseId, txHash: hash, action: 'resume' },
         { self: `/api/v1/markets/capabilities/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Lease resume failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Lease resume failed');
     }
   });
 
@@ -546,8 +546,8 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
         { leaseId, txHash: hash, action: 'terminate' },
         { self: `/api/v1/markets/capabilities/leases/${leaseId}` },
       );
-    } catch {
-      internalError(res, 'Lease terminate failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Lease terminate failed');
     }
   });
 

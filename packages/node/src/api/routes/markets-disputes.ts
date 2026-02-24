@@ -43,7 +43,7 @@ export function marketsDisputeRoutes(ctx: RuntimeContext): Router {
         disputeId, txHash: hash, type: body.type,
         status: 'open', createdAt: body.ts ?? Date.now(),
       }, { self: `/api/v1/markets/disputes/${disputeId}` });
-    } catch { internalError(res, 'Dispute open failed'); }
+    } catch (err) { internalError(res, (err as Error).message || 'Dispute open failed'); }
   });
 
   // ── POST /:id/actions/respond — respond to dispute ────────────
@@ -65,7 +65,7 @@ export function marketsDisputeRoutes(ctx: RuntimeContext): Router {
       const hash = await ctx.publishEvent(envelope);
       ok(res, { disputeId: id, txHash: hash, status: 'responded' },
         { self: `/api/v1/markets/disputes/${id}` });
-    } catch { internalError(res, 'Dispute response failed'); }
+    } catch (err) { internalError(res, (err as Error).message || 'Dispute response failed'); }
   });
 
   // ── POST /:id/actions/resolve — resolve dispute ───────────────
@@ -87,7 +87,7 @@ export function marketsDisputeRoutes(ctx: RuntimeContext): Router {
       const hash = await ctx.publishEvent(envelope);
       ok(res, { disputeId: id, txHash: hash, resolution: body.resolution, status: 'resolved' },
         { self: `/api/v1/markets/disputes/${id}` });
-    } catch { internalError(res, 'Dispute resolve failed'); }
+    } catch (err) { internalError(res, (err as Error).message || 'Dispute resolve failed'); }
   });
 
   return r;

@@ -90,8 +90,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       } as never);
       const hash = await ctx.publishEvent(envelope);
       created(res, { listingId, txHash: hash }, { self: `/api/v1/markets/tasks/${listingId}` });
-    } catch {
-      internalError(res, 'Task listing publish failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Task listing publish failed');
     }
   });
 
@@ -168,8 +168,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { listingId: id, txHash: hash }, { self: `/api/v1/markets/tasks/${id}` });
-    } catch {
-      internalError(res, 'Task listing remove failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Task listing remove failed');
     }
   });
 
@@ -200,8 +200,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { listingId: id, txHash: hash }, { self: `/api/v1/markets/tasks/${id}` });
-    } catch {
-      internalError(res, 'Task listing remove failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Task listing remove failed');
     }
   });
 
@@ -239,8 +239,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       created(res, { bidId, txHash: hash }, { self: `/api/v1/markets/tasks/${id}/bids/${bidId}` });
-    } catch {
-      internalError(res, 'Bid submit failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Bid submit failed');
     }
   });
 
@@ -363,8 +363,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/markets/tasks/${id}` },
       );
-    } catch {
-      internalError(res, 'Bid accept failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Bid accept failed');
     }
   });
 
@@ -399,8 +399,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
         { bidId: body.bidId ?? bidId, txHash: hash },
         { self: `/api/v1/markets/tasks/${id}` },
       );
-    } catch {
-      internalError(res, 'Bid reject failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Bid reject failed');
     }
   });
 
@@ -435,8 +435,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
         { bidId: body.bidId ?? bidId, txHash: hash },
         { self: `/api/v1/markets/tasks/${id}` },
       );
-    } catch {
-      internalError(res, 'Bid withdraw failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Bid withdraw failed');
     }
   });
 
@@ -490,8 +490,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
         { submissionId, submissionHash: h1, orderUpdateHash: h2 },
         { self: `/api/v1/markets/tasks/${id}` },
       );
-    } catch {
-      internalError(res, 'Task delivery failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Task delivery failed');
     }
   });
 
@@ -572,8 +572,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       }
 
       ok(res, result, { self: `/api/v1/markets/tasks/${id}` });
-    } catch {
-      internalError(res, 'Task confirm failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Task confirm failed');
     }
   });
 
@@ -611,8 +611,8 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { orderUpdateHash: hash }, { self: `/api/v1/markets/tasks/${id}` });
-    } catch {
-      internalError(res, 'Task review failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Task review failed');
     }
   });
 

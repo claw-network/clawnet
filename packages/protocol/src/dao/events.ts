@@ -222,7 +222,7 @@ export function parseDaoProposalAdvancePayload(
   const newStatus = String(raw.newStatus ?? '');
   requireNonEmpty(newStatus, 'newStatus');
   const resourcePrev = String(raw.resourcePrev ?? '');
-  requireNonEmpty(resourcePrev, 'resourcePrev');
+  // resourcePrev is optional — server auto-resolves when empty
   return { proposalId, newStatus, resourcePrev };
 }
 

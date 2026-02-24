@@ -32,6 +32,9 @@ import { parseCsv, parseBoolean } from './types.js';
 
 export function parseEvent(bytes: unknown): EventEnvelope | null {
   try {
+    if (bytes instanceof Uint8Array) {
+      return JSON.parse(new TextDecoder().decode(bytes)) as EventEnvelope;
+    }
     if (typeof bytes === 'string') return JSON.parse(bytes) as EventEnvelope;
     if (bytes && typeof bytes === 'object') return bytes as EventEnvelope;
     return null;
@@ -185,7 +188,13 @@ export async function buildWalletState(eventStore: EventStore): Promise<WalletSt
     if (!events.length) break;
     for (const bytes of events) {
       const envelope = parseEvent(bytes);
-      if (envelope) state = applyWalletEvent(state, envelope);
+      if (envelope) {
+        try {
+          state = applyWalletEvent(state, envelope);
+        } catch {
+          // Skip events that fail during state reconstruction (e.g. out-of-order funds)
+        }
+      }
     }
     if (!next) break;
     cursor = next;

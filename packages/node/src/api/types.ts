@@ -249,7 +249,14 @@ export async function buildWalletState(eventStore: EventStore): Promise<WalletSt
     const { events, cursor: next } = await eventStore.getEventLogRange(cursor, 200);
     if (!events.length) break;
     for (const raw of events) {
-      const envelope = (typeof raw === 'string' ? JSON.parse(raw) : raw) as EventEnvelope;
+      let envelope: EventEnvelope;
+      if (raw instanceof Uint8Array) {
+        envelope = JSON.parse(new TextDecoder().decode(raw)) as EventEnvelope;
+      } else if (typeof raw === 'string') {
+        envelope = JSON.parse(raw) as EventEnvelope;
+      } else {
+        envelope = raw as EventEnvelope;
+      }
       if ((envelope.type as string)?.startsWith('wallet.')) {
         applyWalletEvent(state, envelope);
       }

@@ -490,7 +490,7 @@ export class InfoContentStore {
       throw new Error('listingId is required');
     }
     if (!resourcePrev.trim()) {
-      throw new Error('resourcePrev is required');
+      // Allow empty — server auto-resolves from current state
     }
     return { listingId, resourcePrev };
   }

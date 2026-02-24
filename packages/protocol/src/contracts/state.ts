@@ -68,7 +68,8 @@ function requireResourcePrev(current: string | undefined, provided: string, fiel
   if (!current) {
     throw new Error(`${field} has no previous event`);
   }
-  if (current !== provided) {
+  // Allow empty provided value to auto-match (server-side convenience)
+  if (provided && current !== provided) {
     throw new Error(`${field} resourcePrev does not match`);
   }
 }

@@ -88,8 +88,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
       } as never);
       const hash = await ctx.publishEvent(envelope);
       created(res, { listingId, txHash: hash }, { self: `/api/v1/markets/info/${listingId}` });
-    } catch {
-      internalError(res, 'Info listing publish failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info listing publish failed');
     }
   });
 
@@ -160,8 +160,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         | Record<string, unknown>
         | undefined;
       ok(res, marketData?.content ?? {}, { self: `/api/v1/markets/info/${id}/content` });
-    } catch {
-      internalError(res, 'Info content lookup failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info content lookup failed');
     }
   });
 
@@ -179,8 +179,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         return;
       }
       ok(res, delivery, { self: `/api/v1/markets/info/orders/${orderId}/delivery` });
-    } catch {
-      internalError(res, 'Info delivery lookup failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info delivery lookup failed');
     }
   });
 
@@ -211,8 +211,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { listingId: id, txHash: hash }, { self: `/api/v1/markets/info/${id}` });
-    } catch {
-      internalError(res, 'Info listing remove failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info listing remove failed');
     }
   });
 
@@ -243,8 +243,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { listingId: id, txHash: hash }, { self: `/api/v1/markets/info/${id}` });
-    } catch {
-      internalError(res, 'Info listing remove failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info listing remove failed');
     }
   });
 
@@ -274,13 +274,23 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
       // Fetch listing object for order create
       const listing = ctx.marketStore ? await ctx.marketStore.getListing?.(id) : null;
 
+      // If listing not found locally and no price override, return 404
+      if (!listing && !body.unitPrice) {
+        notFound(res, `Listing ${id} not found on this node`, route.url.pathname);
+        return;
+      }
+
+      // Default unitPrice when listing is unavailable but override given
+      const effectiveUnitPrice = body.unitPrice ? String(body.unitPrice)
+        : undefined;
+
       const e1 = await createInfoOrderCreateEnvelope({
         issuer: body.did,
         privateKey,
-        listing: (listing ?? { id, marketType: 'info' }) as never,
+        listing: (listing ?? { id, marketType: 'info', pricing: { type: 'fixed', fixedPrice: '0' } }) as never,
         orderId,
         quantity: body.quantity,
-        unitPrice: body.unitPrice ? String(body.unitPrice) : undefined,
+        unitPrice: effectiveUnitPrice,
         ts,
         nonce,
         prev: body.prev,
@@ -291,12 +301,21 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         ? String(Number(body.unitPrice) * (body.quantity ?? 1))
         : '0';
 
+      // Resolve seller DID from body, listing, or fallback to buyer
+      const listingRec = listing as Record<string, unknown> | null;
+      const sellerObj = listingRec?.seller as Record<string, unknown> | undefined;
+      const resolvedSellerDid =
+        ((body as Record<string, unknown>).sellerDid as string) ||
+        (sellerObj?.did as string) ||
+        (listingRec?.did as string) ||
+        body.did;
+
       const e2 = await createInfoEscrowCreateEnvelope({
         issuer: body.did,
         privateKey,
         escrowId,
         buyerDid: body.did,
-        sellerDid: ((body as Record<string, unknown>).sellerDid as string) ?? '',
+        sellerDid: resolvedSellerDid,
         amount: totalAmount,
         releaseRules: body.releaseRules ?? [{ type: 'delivery_confirmation' }],
         ts: ts + 1,
@@ -341,8 +360,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         },
         { self: `/api/v1/markets/info/${id}` },
       );
-    } catch {
-      internalError(res, 'Info purchase failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info purchase failed');
     }
   });
 
@@ -380,8 +399,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { deliveryId, orderUpdateHash: hash }, { self: `/api/v1/markets/info/${id}` });
-    } catch {
-      internalError(res, 'Info delivery failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info delivery failed');
     }
   });
 
@@ -434,8 +453,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         { escrowReleaseHash: h1, orderUpdateHash: h2 },
         { self: `/api/v1/markets/info/${id}` },
       );
-    } catch {
-      internalError(res, 'Info confirm failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info confirm failed');
     }
   });
 
@@ -473,8 +492,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
       });
       const hash = await ctx.publishEvent(envelope);
       ok(res, { orderUpdateHash: hash }, { self: `/api/v1/markets/info/${id}` });
-    } catch {
-      internalError(res, 'Info review failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Info review failed');
     }
   });
 
@@ -511,8 +530,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         { subscriptionId, txHash: hash },
         { self: `/api/v1/markets/info/${id}/subscriptions/${subscriptionId}` },
       );
-    } catch {
-      internalError(res, 'Subscription start failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Subscription start failed');
     }
   });
 
@@ -547,8 +566,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         { subscriptionId: subId, txHash: hash },
         { self: `/api/v1/markets/info/${route.params.id}` },
       );
-    } catch {
-      internalError(res, 'Subscription cancel failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Subscription cancel failed');
     }
   });
 
@@ -583,8 +602,8 @@ export function marketsInfoRoutes(ctx: RuntimeContext): Router {
         { subscriptionId: subId, txHash: hash },
         { self: `/api/v1/markets/info/subscriptions/${subId}` },
       );
-    } catch {
-      internalError(res, 'Subscription cancel failed');
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Subscription cancel failed');
     }
   });
 

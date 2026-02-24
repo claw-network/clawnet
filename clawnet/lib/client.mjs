@@ -345,15 +345,17 @@ export class Agent {
     );
   }
 
-  async rejectMilestone(contractId, milestoneIdx, reason = '') {
+  async rejectMilestone(contractId, milestoneIdx, body = {}) {
+    const data = typeof body === 'string' ? { reason: body } : body;
     return this.act(
       `${API}/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneIdx)}/actions/reject`,
-      { reason },
+      data,
     );
   }
 
-  async openDispute(contractId, reason = '') {
-    return this.act(`${API}/contracts/${encodeURIComponent(contractId)}/actions/dispute`, { reason });
+  async openDispute(contractId, body = {}) {
+    const data = typeof body === 'string' ? { reason: body } : body;
+    return this.act(`${API}/contracts/${encodeURIComponent(contractId)}/actions/dispute`, data);
   }
 
   async resolveDispute(contractId, resolution = {}) {
