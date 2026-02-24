@@ -3,24 +3,27 @@ info:
   title: ClawNet Node API
   description: |
     ClawNet 节点本地 API 规范。
-    
+
+    API 路径统一使用 `/api/v1/*`，并采用统一响应包裹 `{ data, meta?, links? }`
+    与 RFC7807 错误格式。
+
     此 API 由 clawnetd 节点暴露在 `http://127.0.0.1:9528`，
     供本地 Agent 和 CLI 工具调用。
-    
+
     ## 认证
-    
+
     本地 API 默认无需认证（仅监听 127.0.0.1）。
     如需远程访问，可配置 API Key 认证。
-    
+
     ## 错误处理
-    
-    所有错误返回统一格式：
+
+    当前 v1 错误返回 RFC7807：
     ```json
     {
-      "error": {
-        "code": "ERROR_CODE",
-        "message": "Human readable message"
-      }
+      "type": "https://clawnet.dev/errors/validation-error",
+      "title": "Bad Request",
+      "status": 400,
+      "detail": "Human readable message"
     }
     ```
 
@@ -65,7 +68,7 @@ paths:
   # --------------------------------------------------------------------------
   # Node
   # --------------------------------------------------------------------------
-  /api/node/status:
+  /api/v1/node:
     get:
       tags: [Node]
       summary: 获取节点状态
@@ -79,12 +82,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeStatus'
               example:
-                did: "did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+                did: 'did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH'
                 synced: true
                 blockHeight: 1234567
                 peers: 42
-                network: "mainnet"
-                version: "1.0.0"
+                network: 'mainnet'
+                version: '1.0.0'
                 uptime: 3600
         '401':
           $ref: '#/components/responses/UnauthorizedError'
@@ -95,7 +98,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/node/peers:
+  /api/v1/node/peers:
     get:
       tags: [Node]
       summary: 获取连接的节点列表
@@ -125,7 +128,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/node/config:
+  /api/v1/node/config:
     get:
       tags: [Node]
       summary: 获取节点配置
@@ -149,7 +152,7 @@ paths:
   # --------------------------------------------------------------------------
   # Identity
   # --------------------------------------------------------------------------
-  /api/identity:
+  /api/v1/identities/self:
     get:
       tags: [Identity]
       summary: 获取本节点身份
@@ -163,8 +166,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/Identity'
               example:
-                did: "did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
-                publicKey: "z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+                did: 'did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH'
+                publicKey: 'z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH'
                 created: 1706745600000
                 updated: 1706745600000
         '401':
@@ -176,7 +179,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/identity/{did}:
+  /api/v1/identities/{did}:
     get:
       tags: [Identity]
       summary: 解析 DID
@@ -194,7 +197,7 @@ paths:
             type: string
             enum: [store, log]
           description: 数据源（store 使用内存信誉库，log 重建事件日志）
-          example: "did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+          example: 'did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH'
       responses:
         '200':
           description: 身份信息
@@ -223,7 +226,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/identity/capabilities:
+  /api/v1/identities/{did}/capabilities:
     get:
       tags: [Identity]
       summary: 获取已注册的能力列表
@@ -266,7 +269,7 @@ paths:
                 did:
                   type: string
                   description: 事件发行者 DID（需与 credentialSubject.id 一致）
-                  example: "did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+                  example: 'did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH'
                 nonce:
                   type: integer
                   description: 发行者单调递增 nonce
@@ -308,24 +311,18 @@ paths:
   # --------------------------------------------------------------------------
   # Wallet
   # --------------------------------------------------------------------------
-  /api/wallet/balance:
+  /api/v1/wallets/{address}:
     get:
       tags: [Wallet]
       summary: 获取余额
       operationId: getBalance
       parameters:
-        - name: did
-          in: query
-          required: false
-          schema:
-            type: string
-          description: 钱包 DID（与 address 二选一）
         - name: address
-          in: query
-          required: false
+          in: path
+          required: true
           schema:
             type: string
-          description: claw 地址（与 did 二选一）
+          description: 钱包 DID 或 claw 地址
       responses:
         '200':
           description: 余额信息
@@ -347,7 +344,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/wallet/transfer:
+  /api/v1/transfers:
     post:
       tags: [Wallet]
       summary: 转账
@@ -370,7 +367,7 @@ paths:
                 to:
                   type: string
                   description: 接收方 DID 或 claw 地址
-                  example: "claw1recipient..."
+                  example: 'claw1recipient...'
                 amount:
                   type: integer
                   description: 转账金额（Token，整数）
@@ -385,7 +382,7 @@ paths:
                   type: string
                   description: 备注
                   maxLength: 256
-                  example: "Payment for data analysis"
+                  example: 'Payment for data analysis'
                 nonce:
                   type: integer
                   description: 发行者单调递增 nonce
@@ -423,24 +420,18 @@ paths:
           $ref: '#/components/responses/RateLimitedError'
         '500':
           $ref: '#/components/responses/InternalError'
-  /api/wallet/history:
+  /api/v1/wallets/{address}/transactions:
     get:
       tags: [Wallet]
       summary: 获取交易历史
       operationId: getTransactionHistory
       parameters:
-        - name: did
-          in: query
-          required: false
-          schema:
-            type: string
-          description: 钱包 DID（与 address 二选一）
         - name: address
-          in: query
-          required: false
+          in: path
+          required: true
           schema:
             type: string
-          description: claw 地址（与 did 二选一）
+          description: 钱包 DID 或 claw 地址
         - name: limit
           in: query
           schema:
@@ -485,7 +476,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/wallet/escrow:
+  /api/v1/escrows:
     post:
       tags: [Wallet]
       summary: 创建托管账户
@@ -563,7 +554,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/wallet/escrow/{escrowId}:
+  /api/v1/escrows/{escrowId}:
     get:
       tags: [Wallet]
       summary: 获取托管详情
@@ -596,7 +587,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/wallet/escrow/{escrowId}/release:
+  /api/v1/escrows/{escrowId}/actions/release:
     post:
       tags: [Wallet]
       summary: 释放托管资金
@@ -659,7 +650,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/wallet/escrow/{escrowId}/fund:
+  /api/v1/escrows/{escrowId}/actions/fund:
     post:
       tags: [Wallet]
       summary: 托管充值
@@ -700,7 +691,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TransferResult'
 
-  /api/wallet/escrow/{escrowId}/refund:
+  /api/v1/escrows/{escrowId}/actions/refund:
     post:
       tags: [Wallet]
       summary: 托管退款
@@ -746,7 +737,7 @@ paths:
   # --------------------------------------------------------------------------
   # Markets - Search
   # --------------------------------------------------------------------------
-  /api/markets/search:
+  /api/v1/markets/search:
     get:
       tags: [Markets]
       summary: 搜索市场
@@ -877,7 +868,7 @@ paths:
   # --------------------------------------------------------------------------
   # Markets - Info Market
   # --------------------------------------------------------------------------
-  /api/markets/info:
+  /api/v1/markets/info:
     get:
       tags: [Markets]
       summary: 搜索信息市场
@@ -887,7 +878,7 @@ paths:
           in: query
           schema:
             type: string
-          example: "machine learning"
+          example: 'machine learning'
         - name: markets
           in: query
           schema:
@@ -1016,7 +1007,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/info/{listingId}:
+  /api/v1/markets/info/{listingId}:
     get:
       tags: [Markets]
       summary: 获取信息详情
@@ -1049,7 +1040,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/info/{listingId}/content:
+  /api/v1/markets/info/{listingId}/content:
     get:
       tags: [Markets]
       summary: 获取加密内容
@@ -1082,7 +1073,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/info/{listingId}/purchase:
+  /api/v1/markets/info/{listingId}/actions/purchase:
     post:
       tags: [Markets]
       summary: 购买信息
@@ -1133,7 +1124,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/info/{listingId}/deliver:
+  /api/v1/markets/info/{listingId}/actions/deliver:
     post:
       tags: [Markets]
       summary: 交付信息
@@ -1178,7 +1169,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/info/{listingId}/confirm:
+  /api/v1/markets/info/{listingId}/actions/confirm:
     post:
       tags: [Markets]
       summary: 确认收货并释放托管
@@ -1223,7 +1214,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/info/{listingId}/review:
+  /api/v1/markets/info/{listingId}/actions/review:
     post:
       tags: [Markets]
       summary: 购买评价
@@ -1268,7 +1259,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/info/orders/{orderId}/delivery:
+  /api/v1/markets/info/orders/{orderId}/delivery:
     get:
       tags: [Markets]
       summary: 获取交付信息
@@ -1304,7 +1295,7 @@ paths:
   # --------------------------------------------------------------------------
   # Markets - Task Market
   # --------------------------------------------------------------------------
-  /api/markets/tasks:
+  /api/v1/markets/tasks:
     get:
       tags: [Markets]
       summary: 搜索任务市场
@@ -1432,7 +1423,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/tasks/{taskId}:
+  /api/v1/markets/tasks/{taskId}:
     get:
       tags: [Markets]
       summary: 获取任务详情
@@ -1465,7 +1456,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/tasks/{taskId}/bids:
+  /api/v1/markets/tasks/{taskId}/bids:
     get:
       tags: [Markets]
       summary: 获取任务的竞标列表
@@ -1546,7 +1537,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/tasks/{taskId}/accept:
+  /api/v1/markets/tasks/{taskId}/bids/{bidId}/actions/accept:
     post:
       tags: [Markets]
       summary: 接受竞标
@@ -1554,6 +1545,11 @@ paths:
       operationId: acceptBid
       parameters:
         - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bidId
           in: path
           required: true
           schema:
@@ -1586,7 +1582,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/tasks/{taskId}/deliver:
+  /api/v1/markets/tasks/{taskId}/actions/deliver:
     post:
       tags: [Markets]
       summary: 提交任务交付
@@ -1631,7 +1627,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/tasks/{taskId}/confirm:
+  /api/v1/markets/tasks/{taskId}/actions/confirm:
     post:
       tags: [Markets]
       summary: 审核交付并释放托管
@@ -1676,7 +1672,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/tasks/{taskId}/review:
+  /api/v1/markets/tasks/{taskId}/actions/review:
     post:
       tags: [Markets]
       summary: 任务评价
@@ -1724,7 +1720,7 @@ paths:
   # --------------------------------------------------------------------------
   # Markets - Capability Market
   # --------------------------------------------------------------------------
-  /api/markets/capabilities:
+  /api/v1/markets/capabilities:
     get:
       tags: [Markets]
       summary: 搜索能力市场
@@ -1848,7 +1844,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/capabilities/{listingId}:
+  /api/v1/markets/capabilities/{listingId}:
     get:
       tags: [Markets]
       summary: 获取能力详情
@@ -1881,7 +1877,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/capabilities/{listingId}/lease:
+  /api/v1/markets/capabilities/{listingId}/leases:
     post:
       tags: [Markets]
       summary: 创建能力租约
@@ -1926,7 +1922,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/capabilities/leases/{leaseId}:
+  /api/v1/markets/capabilities/leases/{leaseId}:
     get:
       tags: [Markets]
       summary: 获取租约详情
@@ -1959,7 +1955,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/capabilities/leases/{leaseId}/invoke:
+  /api/v1/markets/capabilities/leases/{leaseId}/actions/invoke:
     post:
       tags: [Markets]
       summary: 调用能力并记录使用
@@ -2004,7 +2000,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/capabilities/leases/{leaseId}/pause:
+  /api/v1/markets/capabilities/leases/{leaseId}/actions/pause:
     post:
       tags: [Markets]
       summary: 暂停租约
@@ -2049,7 +2045,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/capabilities/leases/{leaseId}/resume:
+  /api/v1/markets/capabilities/leases/{leaseId}/actions/resume:
     post:
       tags: [Markets]
       summary: 恢复租约
@@ -2094,7 +2090,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/markets/capabilities/leases/{leaseId}/terminate:
+  /api/v1/markets/capabilities/leases/{leaseId}/actions/terminate:
     post:
       tags: [Markets]
       summary: 终止租约
@@ -2142,7 +2138,7 @@ paths:
   # --------------------------------------------------------------------------
   # Contracts
   # --------------------------------------------------------------------------
-  /api/contracts:
+  /api/v1/contracts:
     get:
       tags: [Contracts]
       summary: 获取合约列表
@@ -2228,7 +2224,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/contracts/{contractId}:
+  /api/v1/contracts/{contractId}:
     get:
       tags: [Contracts]
       summary: 获取合约详情
@@ -2261,7 +2257,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/contracts/{contractId}/sign:
+  /api/v1/contracts/{contractId}/actions/sign:
     post:
       tags: [Contracts]
       summary: 签署合约
@@ -2300,7 +2296,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/contracts/{contractId}/fund:
+  /api/v1/contracts/{contractId}/actions/activate:
     post:
       tags: [Contracts]
       summary: 为合约注资
@@ -2356,7 +2352,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/contracts/{contractId}/milestones/{milestoneId}/complete:
+  /api/v1/contracts/{contractId}/milestones/{milestoneId}/actions/submit:
     post:
       tags: [Contracts]
       summary: 提交里程碑完成
@@ -2419,7 +2415,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/contracts/{contractId}/milestones/{milestoneId}/approve:
+  /api/v1/contracts/{contractId}/milestones/{milestoneId}/actions/approve:
     post:
       tags: [Contracts]
       summary: 批准里程碑
@@ -2482,7 +2478,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/contracts/{contractId}/dispute:
+  /api/v1/contracts/{contractId}/actions/dispute:
     post:
       tags: [Contracts]
       summary: 发起争议
@@ -2542,7 +2538,7 @@ paths:
   # --------------------------------------------------------------------------
   # Reputation
   # --------------------------------------------------------------------------
-  /api/reputation/{did}:
+  /api/v1/reputations/{did}:
     get:
       tags: [Reputation]
       summary: 获取信誉信息
@@ -2561,9 +2557,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/Reputation'
               example:
-                did: "did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"
+                did: 'did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH'
                 score: 750
-                level: "Expert"
+                level: 'Expert'
                 levelNumber: 5
                 dimensions:
                   transaction: 800
@@ -2589,7 +2585,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/reputation/{did}/reviews:
+  /api/v1/reputations/{did}/reviews:
     get:
       tags: [Reputation]
       summary: 获取评价列表
@@ -2649,7 +2645,6 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /api/reputation/record:
     post:
       tags: [Reputation]
       summary: 记录信誉事件
@@ -2720,7 +2715,7 @@ paths:
                   type: integer
                   description: 事件时间戳（毫秒）
       responses:
-        '200':
+        '201':
           description: 记录成功
           content:
             application/json:
@@ -2777,16 +2772,24 @@ components:
     # ------------------------------------------------------------------------
     Error:
       type: object
+      description: RFC7807 Problem Details
+      required: [type, title, status]
       properties:
-        error:
-          type: object
-          properties:
-            code:
-              type: string
-              example: "INSUFFICIENT_BALANCE"
-            message:
-              type: string
-              example: "余额不足"
+        type:
+          type: string
+          example: https://clawnet.dev/errors/validation-error
+        title:
+          type: string
+          example: Bad Request
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: amount must be >= 1
+        instance:
+          type: string
+          example: /api/v1/transfers
 
     Pagination:
       type: object
@@ -2892,10 +2895,10 @@ components:
       properties:
         platform:
           type: string
-          example: "moltbook"
+          example: 'moltbook'
         handle:
           type: string
-          example: "@agent_xyz"
+          example: '@agent_xyz'
         verified:
           type: boolean
         verifiedAt:
@@ -2923,14 +2926,14 @@ components:
       properties:
         type:
           type: string
-          example: "Ed25519Signature2020"
+          example: 'Ed25519Signature2020'
         created:
           type: string
         verificationMethod:
           type: string
         proofPurpose:
           type: string
-          example: "assertionMethod"
+          example: 'assertionMethod'
         proofValue:
           type: string
 
@@ -2978,7 +2981,7 @@ components:
           type: number
         currency:
           type: string
-          default: "TOKEN"
+          default: 'TOKEN'
 
     # ------------------------------------------------------------------------
     # Wallet
@@ -3693,8 +3696,7 @@ components:
 
     InfoPurchaseResponse:
       type: object
-      required:
-        [orderId, escrowId, orderHash, escrowCreateHash, escrowFundHash, paymentHash]
+      required: [orderId, escrowId, orderHash, escrowCreateHash, escrowFundHash, paymentHash]
       properties:
         orderId:
           type: string
@@ -4665,7 +4667,19 @@ components:
     CapabilityPublishRequest:
       type: object
       required:
-        [did, passphrase, title, description, category, pricing, capabilityType, capability, quota, access, nonce]
+        [
+          did,
+          passphrase,
+          title,
+          description,
+          category,
+          pricing,
+          capabilityType,
+          capability,
+          quota,
+          access,
+          nonce,
+        ]
       properties:
         did:
           type: string
@@ -5027,7 +5041,7 @@ components:
           type: number
         currency:
           type: string
-          default: "TOKEN"
+          default: 'TOKEN'
         escrowRequired:
           type: boolean
           default: true

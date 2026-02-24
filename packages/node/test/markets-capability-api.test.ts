@@ -17,6 +17,11 @@ import { didFromPublicKey } from '@claw-network/core/identity';
 import { MarketSearchStore } from '@claw-network/protocol';
 import type { EventEnvelope } from '@claw-network/core/protocol';
 
+async function readData<T>(res: Response): Promise<T> {
+  const payload = (await res.json()) as { data?: T };
+  return (payload.data ?? payload) as T;
+}
+
 const pricing = {
   type: 'usage',
   usagePrice: {
@@ -53,9 +58,7 @@ const access = {
 
 const quota = {
   type: 'unlimited',
-  rateLimits: [
-    { requests: 1000, period: 60_000 },
-  ],
+  rateLimits: [{ requests: 1000, period: 60_000 }],
 };
 
 describe('capability market api', () => {
@@ -79,12 +82,17 @@ describe('capability market api', () => {
     lesseeDid = didFromPublicKey(lesseeKeys.publicKey);
 
     const paths = resolveStoragePaths(tempDir);
-    const providerRecord = createKeyRecord(providerKeys.publicKey, providerKeys.privateKey, passphrase, {
-      t: 1,
-      m: 1024,
-      p: 1,
-      dkLen: 32,
-    });
+    const providerRecord = createKeyRecord(
+      providerKeys.publicKey,
+      providerKeys.privateKey,
+      passphrase,
+      {
+        t: 1,
+        m: 1024,
+        p: 1,
+        dkLen: 32,
+      },
+    );
     const lesseeRecord = createKeyRecord(lesseeKeys.publicKey, lesseeKeys.privateKey, passphrase, {
       t: 1,
       m: 1024,
@@ -104,9 +112,10 @@ describe('capability market api', () => {
       {
         publishEvent: async (envelope) => {
           published.push(envelope);
-          const hash = typeof envelope.hash === 'string' && envelope.hash.length > 0
-            ? envelope.hash
-            : eventHashHex(envelope as EventEnvelope);
+          const hash =
+            typeof envelope.hash === 'string' && envelope.hash.length > 0
+              ? envelope.hash
+              : eventHashHex(envelope as EventEnvelope);
           await eventStore.appendEvent(hash, canonicalizeBytes(envelope));
           await marketStore.applyEvent(envelope as EventEnvelope);
           return hash;
@@ -126,7 +135,7 @@ describe('capability market api', () => {
   });
 
   it('publishes capability listing', async () => {
-    const res = await fetch(`${baseUrl}/api/markets/capabilities`, {
+    const res = await fetch(`${baseUrl}/api/v1/markets/capabilities`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -150,7 +159,7 @@ describe('capability market api', () => {
   });
 
   it('leases and invokes capability', async () => {
-    const publishRes = await fetch(`${baseUrl}/api/markets/capabilities`, {
+    const publishRes = await fetch(`${baseUrl}/api/v1/markets/capabilities`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -170,34 +179,40 @@ describe('capability market api', () => {
       }),
     });
     expect(publishRes.status).toBe(201);
-    const publishJson = (await publishRes.json()) as { listingId: string };
+    const publishJson = await readData<{ listingId: string }>(publishRes);
 
-    const leaseRes = await fetch(`${baseUrl}/api/markets/capabilities/${publishJson.listingId}/lease`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        did: lesseeDid,
-        passphrase,
-        plan: { type: 'pay_per_use' },
-        nonce: 1,
-      }),
-    });
+    const leaseRes = await fetch(
+      `${baseUrl}/api/v1/markets/capabilities/${publishJson.listingId}/leases`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          did: lesseeDid,
+          passphrase,
+          plan: { type: 'pay_per_use' },
+          nonce: 1,
+        }),
+      },
+    );
     expect(leaseRes.status).toBe(201);
-    const leaseJson = (await leaseRes.json()) as { leaseId: string };
+    const leaseJson = await readData<{ leaseId: string }>(leaseRes);
 
-    const invokeRes = await fetch(`${baseUrl}/api/markets/capabilities/leases/${leaseJson.leaseId}/invoke`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        did: lesseeDid,
-        passphrase,
-        resource: 'echo',
-        units: 1,
-        latency: 120,
-        success: true,
-        nonce: 2,
-      }),
-    });
+    const invokeRes = await fetch(
+      `${baseUrl}/api/v1/markets/capabilities/leases/${leaseJson.leaseId}/actions/invoke`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          did: lesseeDid,
+          passphrase,
+          resource: 'echo',
+          units: 1,
+          latency: 120,
+          success: true,
+          nonce: 2,
+        }),
+      },
+    );
     expect(invokeRes.status).toBe(200);
     const types = published.map((entry) => entry.type);
     expect(types).toContain('market.capability.lease.start');

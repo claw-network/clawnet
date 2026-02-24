@@ -14,7 +14,10 @@ afterEach(async () => {
 describe('WalletApi', () => {
   it('getBalance returns balance', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/wallet/balance', 200, {
+    mock.addRoute('GET', '/api/v1/identities/self', 200, {
+      did: 'did:claw:z6MkSelf',
+    });
+    mock.addRoute('GET', '/api/v1/wallets/did%3Aclaw%3Az6MkSelf', 200, {
       balance: 1000,
       available: 800,
       pending: 100,
@@ -30,9 +33,9 @@ describe('WalletApi', () => {
     expect(b.locked).toBe(100);
   });
 
-  it('getBalance with DID passes query param', async () => {
+  it('getBalance with DID uses DID path segment', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/wallet/balance', 200, {
+    mock.addRoute('GET', '/api/v1/wallets/did%3Aclaw%3Az6MkOther', 200, {
       balance: 500,
       available: 500,
       pending: 0,
@@ -42,12 +45,12 @@ describe('WalletApi', () => {
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     await client.wallet.getBalance({ did: 'did:claw:z6MkOther' });
 
-    expect(mock.requests[0].url).toContain('did=');
+    expect(mock.requests[0].url).toContain('/api/v1/wallets/did%3Aclaw%3Az6MkOther');
   });
 
   it('transfer sends tokens', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/wallet/transfer', 200, {
+    mock.addRoute('POST', '/api/v1/transfers', 200, {
       txHash: 'abc123',
       from: 'did:claw:z6MkSender',
       to: 'did:claw:z6MkReceiver',
@@ -77,16 +80,28 @@ describe('WalletApi', () => {
 
   it('getHistory returns transactions', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/wallet/history', 200, {
+    mock.addRoute('GET', '/api/v1/wallets/did%3Aclaw%3Az6MkOther/transactions', 200, {
       transactions: [
-        { txHash: 'tx1', from: 'a', to: 'b', amount: 10, type: 'transfer', status: 'confirmed', timestamp: 1 },
+        {
+          txHash: 'tx1',
+          from: 'a',
+          to: 'b',
+          amount: 10,
+          type: 'transfer',
+          status: 'confirmed',
+          timestamp: 1,
+        },
       ],
       total: 1,
       hasMore: false,
     });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
-    const result = await client.wallet.getHistory({ limit: 10, offset: 0 });
+    const result = await client.wallet.getHistory({
+      did: 'did:claw:z6MkOther',
+      limit: 10,
+      offset: 0,
+    });
 
     expect(result.transactions).toHaveLength(1);
     expect(result.total).toBe(1);
@@ -95,7 +110,7 @@ describe('WalletApi', () => {
 
   it('createEscrow creates escrow', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/wallet/escrow', 201, {
+    mock.addRoute('POST', '/api/v1/escrows', 201, {
       id: 'escrow-1',
       depositor: 'did:claw:z6MkA',
       beneficiary: 'did:claw:z6MkB',
@@ -123,7 +138,7 @@ describe('WalletApi', () => {
 
   it('getEscrow retrieves escrow details', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/wallet/escrow/escrow-1', 200, {
+    mock.addRoute('GET', '/api/v1/escrows/escrow-1', 200, {
       id: 'escrow-1',
       depositor: 'did:claw:z6MkA',
       beneficiary: 'did:claw:z6MkB',
@@ -143,7 +158,7 @@ describe('WalletApi', () => {
 
   it('releaseEscrow releases funds', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/wallet/escrow/escrow-1/release', 200, {
+    mock.addRoute('POST', '/api/v1/escrows/escrow-1/actions/release', 200, {
       txHash: 'release-tx',
       from: 'escrow-1',
       to: 'did:claw:z6MkB',
@@ -166,7 +181,7 @@ describe('WalletApi', () => {
 
   it('fundEscrow adds funds', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/wallet/escrow/escrow-2/fund', 200, {
+    mock.addRoute('POST', '/api/v1/escrows/escrow-2/actions/fund', 200, {
       txHash: 'fund-tx',
       from: 'did:claw:z6MkA',
       to: 'escrow-2',
@@ -189,7 +204,7 @@ describe('WalletApi', () => {
 
   it('refundEscrow refunds depositor', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/wallet/escrow/escrow-3/refund', 200, {
+    mock.addRoute('POST', '/api/v1/escrows/escrow-3/actions/refund', 200, {
       txHash: 'refund-tx',
       from: 'escrow-3',
       to: 'did:claw:z6MkA',
@@ -212,7 +227,7 @@ describe('WalletApi', () => {
 
   it('expireEscrow handles expiration', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/wallet/escrow/escrow-4/expire', 200, {
+    mock.addRoute('POST', '/api/v1/escrows/escrow-4/actions/expire', 200, {
       txHash: 'expire-tx',
       from: 'escrow-4',
       to: 'did:claw:z6MkA',

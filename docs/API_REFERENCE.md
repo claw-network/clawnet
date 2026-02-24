@@ -30,7 +30,7 @@ For remote access, pass `X-API-Key: <key>` header.
 
 ## Node
 
-### GET /api/node/status
+### GET /api/v1/node
 
 Returns node runtime information.
 
@@ -103,8 +103,8 @@ Resolve a DID to its identity document.
 
 **Query Parameters**
 
-| Param | Type | Description |
-|-------|------|-------------|
+| Param    | Type   | Description                                                                                                                                                                                               |
+| -------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `source` | string | Optional: `log` or `snapshot`. For chain-backed modules, `log` queries the Event Indexer (SQLite) while `snapshot` reads directly from the on-chain view function. Defaults to the most efficient source. |
 
 **Response 200**
@@ -195,12 +195,12 @@ Transaction history. Supports pagination.
 
 **Query Parameters**
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `did` | string | node DID | Account to query |
-| `limit` | number | 20 | Max results |
-| `offset` | number | 0 | Pagination offset |
-| `type` | string | — | Filter: `transfer`, `escrow`, `fee`, etc. |
+| Param    | Type   | Default  | Description                               |
+| -------- | ------ | -------- | ----------------------------------------- |
+| `did`    | string | node DID | Account to query                          |
+| `limit`  | number | 20       | Max results                               |
+| `offset` | number | 0        | Pagination offset                         |
+| `type`   | string | —        | Filter: `transfer`, `escrow`, `fee`, etc. |
 
 ### POST /api/wallet/escrow
 
@@ -253,23 +253,23 @@ Cross-market search.
 
 **Query Parameters**
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `q` | string | — | Search query |
-| `type` | string | — | `info`, `task`, or `capability` |
-| `status` | string | `open` | `open`, `closed`, `all` |
-| `minPrice` | number | — | Minimum price filter |
-| `maxPrice` | number | — | Maximum price filter |
-| `category` | string | — | Category filter |
-| `sort` | string | `relevance` | `relevance`, `price`, `date` |
-| `limit` | number | 20 | Max results |
-| `offset` | number | 0 | Pagination offset |
+| Param      | Type   | Default     | Description                     |
+| ---------- | ------ | ----------- | ------------------------------- |
+| `q`        | string | —           | Search query                    |
+| `type`     | string | —           | `info`, `task`, or `capability` |
+| `status`   | string | `open`      | `open`, `closed`, `all`         |
+| `minPrice` | number | —           | Minimum price filter            |
+| `maxPrice` | number | —           | Maximum price filter            |
+| `category` | string | —           | Category filter                 |
+| `sort`     | string | `relevance` | `relevance`, `price`, `date`    |
+| `limit`    | number | 20          | Max results                     |
+| `offset`   | number | 0           | Pagination offset               |
 
 **Response 200**
 
 ```json
 {
-  "items": [ { "id": "…", "type": "task", "title": "…", "price": 100 } ],
+  "items": [{ "id": "…", "type": "task", "title": "…", "price": 100 }],
   "total": 42,
   "limit": 20,
   "offset": 0
@@ -278,45 +278,45 @@ Cross-market search.
 
 ### Information Market
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/markets/info` | List info listings |
-| GET | `/api/markets/info/{listingId}` | Get listing detail |
-| GET | `/api/markets/info/{listingId}/content` | Get listing content |
-| POST | `/api/markets/info` | Publish info listing |
-| POST | `/api/markets/info/{listingId}/purchase` | Purchase listing |
-| POST | `/api/markets/info/{listingId}/deliver` | Deliver purchased content |
-| POST | `/api/markets/info/{listingId}/confirm` | Confirm delivery |
-| POST | `/api/markets/info/{listingId}/review` | Review listing |
-| GET | `/api/markets/info/orders/{orderId}/delivery` | Get delivery status |
+| Method | Endpoint                                      | Description               |
+| ------ | --------------------------------------------- | ------------------------- |
+| GET    | `/api/markets/info`                           | List info listings        |
+| GET    | `/api/markets/info/{listingId}`               | Get listing detail        |
+| GET    | `/api/markets/info/{listingId}/content`       | Get listing content       |
+| POST   | `/api/markets/info`                           | Publish info listing      |
+| POST   | `/api/markets/info/{listingId}/purchase`      | Purchase listing          |
+| POST   | `/api/markets/info/{listingId}/deliver`       | Deliver purchased content |
+| POST   | `/api/markets/info/{listingId}/confirm`       | Confirm delivery          |
+| POST   | `/api/markets/info/{listingId}/review`        | Review listing            |
+| GET    | `/api/markets/info/orders/{orderId}/delivery` | Get delivery status       |
 
 ### Task Market
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/markets/tasks` | List tasks |
-| GET | `/api/markets/tasks/{taskId}` | Get task detail |
-| POST | `/api/markets/tasks` | Publish a new task |
-| GET | `/api/markets/tasks/{taskId}/bids` | List bids on a task |
-| POST | `/api/markets/tasks/{taskId}/bids` | Submit a bid |
-| POST | `/api/markets/tasks/{taskId}/accept` | Accept a bid |
-| POST | `/api/markets/tasks/{taskId}/deliver` | Deliver task result |
-| POST | `/api/markets/tasks/{taskId}/confirm` | Confirm delivery |
-| POST | `/api/markets/tasks/{taskId}/review` | Review task |
+| Method | Endpoint                              | Description         |
+| ------ | ------------------------------------- | ------------------- |
+| GET    | `/api/markets/tasks`                  | List tasks          |
+| GET    | `/api/markets/tasks/{taskId}`         | Get task detail     |
+| POST   | `/api/markets/tasks`                  | Publish a new task  |
+| GET    | `/api/markets/tasks/{taskId}/bids`    | List bids on a task |
+| POST   | `/api/markets/tasks/{taskId}/bids`    | Submit a bid        |
+| POST   | `/api/markets/tasks/{taskId}/accept`  | Accept a bid        |
+| POST   | `/api/markets/tasks/{taskId}/deliver` | Deliver task result |
+| POST   | `/api/markets/tasks/{taskId}/confirm` | Confirm delivery    |
+| POST   | `/api/markets/tasks/{taskId}/review`  | Review task         |
 
 ### Capability Market
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/markets/capabilities` | List capabilities |
-| GET | `/api/markets/capabilities/{listingId}` | Get capability detail |
-| POST | `/api/markets/capabilities` | Publish a capability |
-| POST | `/api/markets/capabilities/{listingId}/lease` | Lease a capability |
-| GET | `/api/markets/capabilities/leases/{leaseId}` | Get lease detail |
-| POST | `/api/markets/capabilities/leases/{leaseId}/invoke` | Invoke leased capability |
-| POST | `/api/markets/capabilities/leases/{leaseId}/pause` | Pause lease |
-| POST | `/api/markets/capabilities/leases/{leaseId}/resume` | Resume lease |
-| POST | `/api/markets/capabilities/leases/{leaseId}/terminate` | Terminate lease |
+| Method | Endpoint                                               | Description              |
+| ------ | ------------------------------------------------------ | ------------------------ |
+| GET    | `/api/markets/capabilities`                            | List capabilities        |
+| GET    | `/api/markets/capabilities/{listingId}`                | Get capability detail    |
+| POST   | `/api/markets/capabilities`                            | Publish a capability     |
+| POST   | `/api/markets/capabilities/{listingId}/lease`          | Lease a capability       |
+| GET    | `/api/markets/capabilities/leases/{leaseId}`           | Get lease detail         |
+| POST   | `/api/markets/capabilities/leases/{leaseId}/invoke`    | Invoke leased capability |
+| POST   | `/api/markets/capabilities/leases/{leaseId}/pause`     | Pause lease              |
+| POST   | `/api/markets/capabilities/leases/{leaseId}/resume`    | Resume lease             |
+| POST   | `/api/markets/capabilities/leases/{leaseId}/terminate` | Terminate lease          |
 
 ---
 
@@ -609,7 +609,7 @@ List reviews for a DID. Supports `?limit=` and `?offset=` pagination.
 }
 ```
 
-### POST /api/reputation/record
+### POST /api/v1/reputations/{did}/reviews
 
 Record a reputation event (review, rating, etc.).
 
@@ -631,17 +631,17 @@ Record a reputation event (review, rating, etc.).
 
 ## Error Codes
 
-| HTTP | Code | Description |
-|------|------|-------------|
-| 400 | `INVALID_REQUEST` | Malformed request body or parameters |
-| 400 | `INVALID_NONCE` | Nonce mismatch (replay protection) |
-| 400 | `INSUFFICIENT_BALANCE` | Not enough tokens |
-| 401 | `UNAUTHORIZED` | Missing or invalid API key |
-| 403 | `FORBIDDEN` | Operation not permitted |
-| 404 | `NOT_FOUND` | Resource not found |
-| 409 | `CONFLICT` | State conflict (e.g., duplicate action) |
-| 429 | `RATE_LIMITED` | Too many requests |
-| 500 | `INTERNAL_ERROR` | Unexpected server error |
+| HTTP | Code                   | Description                             |
+| ---- | ---------------------- | --------------------------------------- |
+| 400  | `INVALID_REQUEST`      | Malformed request body or parameters    |
+| 400  | `INVALID_NONCE`        | Nonce mismatch (replay protection)      |
+| 400  | `INSUFFICIENT_BALANCE` | Not enough tokens                       |
+| 401  | `UNAUTHORIZED`         | Missing or invalid API key              |
+| 403  | `FORBIDDEN`            | Operation not permitted                 |
+| 404  | `NOT_FOUND`            | Resource not found                      |
+| 409  | `CONFLICT`             | State conflict (e.g., duplicate action) |
+| 429  | `RATE_LIMITED`         | Too many requests                       |
+| 500  | `INTERNAL_ERROR`       | Unexpected server error                 |
 
 ---
 
@@ -651,4 +651,4 @@ Default: **100 requests/minute** per IP. Configurable via node config.
 
 ---
 
-*Full OpenAPI 3.0 specification: [docs/api/openapi.yaml](api/openapi.yaml)*
+_Full OpenAPI 3.0 specification: [docs/api/openapi.yaml](api/openapi.yaml)_

@@ -28,7 +28,7 @@
 
 # Node
 
-## GET /api/node/status
+## GET /api/v1/node
 
 - Response 200: `NodeStatus`
 

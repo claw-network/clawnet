@@ -59,23 +59,31 @@ export class HttpClient {
   // Public helpers
   // ---------------------------------------------------------------------------
 
-  async get<T = unknown>(path: string, query?: Record<string, string | number | boolean | undefined>, opts?: RequestOptions): Promise<T> {
-    const url = this.buildUrl(path, query);
+  async get<T = unknown>(
+    path: string,
+    query?: Record<string, string | number | boolean | undefined>,
+    opts?: RequestOptions,
+  ): Promise<T> {
+    const normalizedPath = this.normalizePath(path, 'GET', undefined);
+    const url = this.buildUrl(normalizedPath, query);
     return this.request<T>('GET', url, undefined, opts);
   }
 
   async post<T = unknown>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
-    const url = this.buildUrl(path);
+    const normalizedPath = this.normalizePath(path, 'POST', body);
+    const url = this.buildUrl(normalizedPath);
     return this.request<T>('POST', url, body, opts);
   }
 
   async put<T = unknown>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
-    const url = this.buildUrl(path);
+    const normalizedPath = this.normalizePath(path, 'PUT', body);
+    const url = this.buildUrl(normalizedPath);
     return this.request<T>('PUT', url, body, opts);
   }
 
   async delete<T = unknown>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
-    const url = this.buildUrl(path);
+    const normalizedPath = this.normalizePath(path, 'DELETE', body);
+    const url = this.buildUrl(normalizedPath);
     return this.request<T>('DELETE', url, body, opts);
   }
 
@@ -83,7 +91,10 @@ export class HttpClient {
   // Internals
   // ---------------------------------------------------------------------------
 
-  private buildUrl(path: string, query?: Record<string, string | number | boolean | undefined>): string {
+  private buildUrl(
+    path: string,
+    query?: Record<string, string | number | boolean | undefined>,
+  ): string {
     const base = `${this.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
     if (!query) return base;
 
@@ -95,7 +106,16 @@ export class HttpClient {
     return qs ? `${base}?${qs}` : base;
   }
 
-  private async request<T>(method: string, url: string, body: unknown | undefined, opts?: RequestOptions): Promise<T> {
+  private normalizePath(path: string, _method: string, _body?: unknown): string {
+    return path;
+  }
+
+  private async request<T>(
+    method: string,
+    url: string,
+    body: unknown | undefined,
+    opts?: RequestOptions,
+  ): Promise<T> {
     const headers: Record<string, string> = {
       accept: 'application/json',
       ...opts?.headers,
@@ -141,12 +161,40 @@ export class HttpClient {
       }
 
       if (!res.ok) {
+        const problem = json as { title?: string; detail?: string; status?: number };
         const err = (json as { error?: { code?: string; message?: string } })?.error;
         throw new ClawNetError(
           res.status,
-          err?.code ?? 'UNKNOWN',
-          err?.message ?? res.statusText,
+          err?.code ?? String(problem.status ?? 'UNKNOWN'),
+          err?.message ?? problem.detail ?? problem.title ?? res.statusText,
         );
+      }
+
+      const envelope = json as {
+        data?: unknown;
+        meta?: { pagination?: { total?: number; page?: number; perPage?: number } };
+      };
+      if (Object.prototype.hasOwnProperty.call(envelope, 'data')) {
+        if (Array.isArray(envelope.data)) {
+          const total = envelope.meta?.pagination?.total ?? envelope.data.length;
+          const page = envelope.meta?.pagination?.page ?? 1;
+          const pageSize = envelope.meta?.pagination?.perPage ?? envelope.data.length;
+          return {
+            items: envelope.data,
+            listings: envelope.data,
+            contracts: envelope.data,
+            proposals: envelope.data,
+            votes: envelope.data,
+            reviews: envelope.data,
+            delegations: envelope.data,
+            transactions: envelope.data,
+            total,
+            page,
+            pageSize,
+            pagination: { total, page, perPage: pageSize },
+          } as T;
+        }
+        return envelope.data as T;
       }
 
       return json as T;

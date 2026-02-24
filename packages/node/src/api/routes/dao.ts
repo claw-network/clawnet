@@ -4,14 +4,23 @@
 
 import { Router } from '../router.js';
 import {
-  ok, created, badRequest, notFound, internalError,
-  paginated, parsePagination,
+  ok,
+  created,
+  badRequest,
+  notFound,
+  internalError,
+  paginated,
+  parsePagination,
 } from '../response.js';
 import { validate } from '../schemas/common.js';
 import {
-  DaoProposalCreateSchema, DaoProposalAdvanceSchema,
-  DaoVoteCastSchema, DaoDelegateSetSchema, DaoDelegateRevokeSchema,
-  DaoTimelockExecuteSchema, DaoTimelockCancelSchema,
+  DaoProposalCreateSchema,
+  DaoProposalAdvanceSchema,
+  DaoVoteCastSchema,
+  DaoDelegateSetSchema,
+  DaoDelegateRevokeSchema,
+  DaoTimelockExecuteSchema,
+  DaoTimelockCancelSchema,
   DaoTreasuryDepositSchema,
 } from '../schemas/dao.js';
 import type { RuntimeContext } from '../types.js';
@@ -39,40 +48,65 @@ export function daoRoutes(ctx: RuntimeContext): Router {
   // ── POST /proposals — create proposal ─────────────────────────
   r.post('/proposals', async (_req, res, route) => {
     const v = validate(DaoProposalCreateSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
-    const proposalId = body.proposalId ?? `proposal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const proposalId =
+      body.proposalId ?? `proposal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     if (ctx.daoService) {
       try {
         const result = await ctx.daoService.propose(
-          body.type, body.description,
-          body.actions?.[0]?.target as string ?? '',
-          body.actions?.[0]?.callData as string ?? '',
+          body.type,
+          body.description,
+          (body.actions?.[0]?.target as string) ?? '',
+          (body.actions?.[0]?.callData as string) ?? '',
         );
-        created(res, { proposalId, txHash: result.txHash ?? result, status: 'created' },
-          { self: `/api/v1/dao/proposals/${proposalId}` });
+        created(
+          res,
+          { proposalId, txHash: result.txHash ?? result, status: 'created' },
+          { self: `/api/v1/dao/proposals/${proposalId}` },
+        );
         return;
-      } catch (err) { internalError(res, (err as Error).message); return; }
+      } catch (err) {
+        internalError(res, (err as Error).message);
+        return;
+      }
     }
 
     const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
-    if (!privateKey) { badRequest(res, 'Key unavailable', route.url.pathname); return; }
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
     try {
       const envelope = await createDaoProposalCreateEnvelope({
-        issuer: body.did, privateKey, proposalId,
-        proposalType: body.type, title: body.title,
-        description: body.description, discussionUrl: body.discussionUrl,
+        issuer: body.did,
+        privateKey,
+        proposalId,
+        proposalType: body.type,
+        title: body.title,
+        description: body.description,
+        discussionUrl: body.discussionUrl,
         actions: (body.actions ?? []) as unknown as ProposalAction[],
         discussionPeriod: body.discussionPeriod ?? 0,
         votingPeriod: body.votingPeriod ?? 0,
         timelockDelay: body.timelockDelay ?? 0,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      created(res, { proposalId, txHash: hash, status: 'broadcast' },
-        { self: `/api/v1/dao/proposals/${proposalId}` });
-    } catch { internalError(res, 'Proposal creation failed'); }
+      created(
+        res,
+        { proposalId, txHash: hash, status: 'broadcast' },
+        { self: `/api/v1/dao/proposals/${proposalId}` },
+      );
+    } catch {
+      internalError(res, 'Proposal creation failed');
+    }
   });
 
   // ── GET /proposals — list proposals ───────────────────────────
@@ -83,24 +117,36 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     if (ctx.daoService) {
       try {
         const statusNum = status != null ? Number(status) : undefined;
-        const result = await ctx.daoService.listProposals({ status: statusNum, limit: perPage, offset });
+        const result = await ctx.daoService.listProposals({
+          status: statusNum,
+          limit: perPage,
+          offset,
+        });
         paginated(res, result.proposals ?? [], {
-          page, perPage, total: result.total ?? 0,
+          page,
+          perPage,
+          total: result.total ?? 0,
           basePath: '/api/v1/dao/proposals',
         });
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     if (ctx.daoStore) {
       try {
         const proposals = await ctx.daoStore.listProposals(status as never);
         paginated(res, proposals ?? [], {
-          page, perPage, total: proposals.length,
+          page,
+          perPage,
+          total: proposals.length,
           basePath: '/api/v1/dao/proposals',
         });
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     paginated(res, [], { page, perPage, total: 0, basePath: '/api/v1/dao/proposals' });
@@ -113,15 +159,25 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     if (ctx.daoService) {
       try {
         const result = await ctx.daoService.getProposal(Number(id));
-        if (result) { ok(res, result, { self: `/api/v1/dao/proposals/${id}` }); return; }
-      } catch { /* fallthrough */ }
+        if (result) {
+          ok(res, result, { self: `/api/v1/dao/proposals/${id}` });
+          return;
+        }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     if (ctx.daoStore) {
       try {
         const proposal = await ctx.daoStore.getProposal(id);
-        if (proposal) { ok(res, proposal, { self: `/api/v1/dao/proposals/${id}` }); return; }
-      } catch { /* fallthrough */ }
+        if (proposal) {
+          ok(res, proposal, { self: `/api/v1/dao/proposals/${id}` });
+          return;
+        }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     notFound(res, `Proposal ${id} not found`);
@@ -131,7 +187,10 @@ export function daoRoutes(ctx: RuntimeContext): Router {
   r.post('/proposals/:id/actions/advance', async (_req, res, route) => {
     const { id } = route.params;
     const v = validate(DaoProposalAdvanceSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     if (ctx.daoService) {
@@ -139,21 +198,37 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         const result = await ctx.daoService.advanceProposal(Number(id) || 0, body.newStatus);
         ok(res, result, { self: `/api/v1/dao/proposals/${id}` });
         return;
-      } catch (err) { internalError(res, (err as Error).message); return; }
+      } catch (err) {
+        internalError(res, (err as Error).message);
+        return;
+      }
     }
 
     const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
-    if (!privateKey) { badRequest(res, 'Key unavailable', route.url.pathname); return; }
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
     try {
       const envelope = await createDaoProposalAdvanceEnvelope({
-        issuer: body.did, privateKey, proposalId: body.proposalId ?? id,
-        newStatus: body.newStatus, resourcePrev: body.resourcePrev,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        issuer: body.did,
+        privateKey,
+        proposalId: body.proposalId ?? id,
+        newStatus: body.newStatus,
+        resourcePrev: body.resourcePrev,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      ok(res, { txHash: hash, proposalId: id, newStatus: body.newStatus, status: 'broadcast' },
-        { self: `/api/v1/dao/proposals/${id}` });
-    } catch { internalError(res, 'Proposal advance failed'); }
+      ok(
+        res,
+        { txHash: hash, proposalId: id, newStatus: body.newStatus, status: 'broadcast' },
+        { self: `/api/v1/dao/proposals/${id}` },
+      );
+    } catch {
+      internalError(res, 'Proposal advance failed');
+    }
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -169,7 +244,9 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         const result = await ctx.daoService.listVotes({ proposalId: Number(id) || 0 });
         ok(res, result, { self: `/api/v1/dao/proposals/${id}/votes` });
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     if (ctx.daoStore) {
@@ -177,7 +254,9 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         const votes = await ctx.daoStore.getVotes(id);
         ok(res, votes ?? [], { self: `/api/v1/dao/proposals/${id}/votes` });
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     ok(res, [], { self: `/api/v1/dao/proposals/${id}/votes` });
@@ -187,31 +266,60 @@ export function daoRoutes(ctx: RuntimeContext): Router {
   r.post('/proposals/:id/votes', async (_req, res, route) => {
     const { id } = route.params;
     const v = validate(DaoVoteCastSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     if (ctx.daoService) {
       try {
-        const optionStr = body.option === 'for' ? 'for' : body.option === 'against' ? 'against' : 'abstain';
+        const optionStr =
+          body.option === 'for' ? 'for' : body.option === 'against' ? 'against' : 'abstain';
         const result = await ctx.daoService.vote(Number(id) || 0, optionStr);
-        ok(res, { txHash: (result as unknown as Record<string, unknown>).txHash ?? result, proposalId: id, option: body.option, status: 'confirmed' },
-          { self: `/api/v1/dao/proposals/${id}/votes` });
+        ok(
+          res,
+          {
+            txHash: (result as unknown as Record<string, unknown>).txHash ?? result,
+            proposalId: id,
+            option: body.option,
+            status: 'confirmed',
+          },
+          { self: `/api/v1/dao/proposals/${id}/votes` },
+        );
         return;
-      } catch (err) { internalError(res, (err as Error).message); return; }
+      } catch (err) {
+        internalError(res, (err as Error).message);
+        return;
+      }
     }
 
     const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
-    if (!privateKey) { badRequest(res, 'Key unavailable', route.url.pathname); return; }
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
     try {
       const envelope = await createDaoVoteCastEnvelope({
-        issuer: body.did, privateKey, proposalId: body.proposalId ?? id,
-        option: body.option, power: String(body.power), reason: body.reason,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        issuer: body.did,
+        privateKey,
+        proposalId: body.proposalId ?? id,
+        option: body.option,
+        power: String(body.power),
+        reason: body.reason,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      ok(res, { txHash: hash, proposalId: id, option: body.option, status: 'broadcast' },
-        { self: `/api/v1/dao/proposals/${id}/votes` });
-    } catch { internalError(res, 'Vote cast failed'); }
+      ok(
+        res,
+        { txHash: hash, proposalId: id, option: body.option, status: 'broadcast' },
+        { self: `/api/v1/dao/proposals/${id}/votes` },
+      );
+    } catch {
+      internalError(res, 'Vote cast failed');
+    }
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -224,12 +332,12 @@ export function daoRoutes(ctx: RuntimeContext): Router {
 
     if (ctx.daoStore) {
       try {
-        const delegations = did
-          ? await ctx.daoStore.getDelegationsFrom(did)
-          : [];
+        const delegations = did ? await ctx.daoStore.getDelegationsFrom(did) : [];
         ok(res, delegations ?? [], { self: '/api/v1/dao/delegations' });
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     ok(res, [], { self: '/api/v1/dao/delegations' });
@@ -238,43 +346,100 @@ export function daoRoutes(ctx: RuntimeContext): Router {
   // ── POST /delegations — set delegate ──────────────────────────
   r.post('/delegations', async (_req, res, route) => {
     const v = validate(DaoDelegateSetSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
-    if (!privateKey) { badRequest(res, 'Key unavailable', route.url.pathname); return; }
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
     try {
       const envelope = await createDaoDelegateSetEnvelope({
-        issuer: body.did, privateKey, delegate: body.delegate,
+        issuer: body.did,
+        privateKey,
+        delegate: body.delegate,
         scope: (body.scope ?? { all: true }) as DelegationScope,
         percentage: body.percentage ?? 100,
         expiresAt: body.expiresAt,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      created(res, { txHash: hash, delegate: body.delegate, status: 'broadcast' },
-        { self: '/api/v1/dao/delegations' });
-    } catch { internalError(res, 'Delegate set failed'); }
+      created(
+        res,
+        { txHash: hash, delegate: body.delegate, status: 'broadcast' },
+        { self: '/api/v1/dao/delegations' },
+      );
+    } catch {
+      internalError(res, 'Delegate set failed');
+    }
   });
 
   // ── DELETE /delegations/:delegate — revoke delegation ─────────
   r.delete('/delegations/:delegate', async (_req, res, route) => {
     const { delegate } = route.params;
     const v = validate(DaoDelegateRevokeSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
-    if (!privateKey) { badRequest(res, 'Key unavailable', route.url.pathname); return; }
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
     try {
       const envelope = await createDaoDelegateRevokeEnvelope({
-        issuer: body.did, privateKey, delegate: body.delegate ?? delegate,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        issuer: body.did,
+        privateKey,
+        delegate: body.delegate ?? delegate,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      ok(res, { txHash: hash, delegate, status: 'revoked' },
-        { self: '/api/v1/dao/delegations' });
-    } catch { internalError(res, 'Delegate revoke failed'); }
+      ok(res, { txHash: hash, delegate, status: 'revoked' }, { self: '/api/v1/dao/delegations' });
+    } catch {
+      internalError(res, 'Delegate revoke failed');
+    }
+  });
+
+  // ── POST /delegations/:delegate — compatibility alias ─────────
+  r.post('/delegations/:delegate', async (_req, res, route) => {
+    const { delegate } = route.params;
+    const v = validate(DaoDelegateRevokeSchema, route.body);
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
+    const body = v.data;
+
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
+    try {
+      const envelope = await createDaoDelegateRevokeEnvelope({
+        issuer: body.did,
+        privateKey,
+        delegate: body.delegate ?? delegate,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
+      });
+      const hash = await ctx.publishEvent(envelope);
+      ok(res, { txHash: hash, delegate, status: 'revoked' }, { self: '/api/v1/dao/delegations' });
+    } catch {
+      internalError(res, 'Delegate revoke failed');
+    }
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -288,7 +453,9 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         const result = await ctx.daoService.getTreasuryBalance?.();
         ok(res, result ?? { balance: 0 }, { self: '/api/v1/dao/treasury' });
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     if (ctx.daoStore) {
@@ -296,7 +463,9 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         const treasury = await ctx.daoStore.getTreasury?.();
         ok(res, treasury ?? { balance: 0 }, { self: '/api/v1/dao/treasury' });
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     ok(res, { balance: 0 }, { self: '/api/v1/dao/treasury' });
@@ -305,29 +474,51 @@ export function daoRoutes(ctx: RuntimeContext): Router {
   // ── POST /treasury/deposits — deposit to treasury ─────────────
   r.post('/treasury/deposits', async (_req, res, route) => {
     const v = validate(DaoTreasuryDepositSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     if (ctx.daoService) {
       try {
         const result = await ctx.daoService.treasuryDeposit(Number(body.amount));
-        created(res, { txHash: result.txHash ?? result, amount: Number(body.amount), status: 'confirmed' },
-          { self: '/api/v1/dao/treasury' });
+        created(
+          res,
+          { txHash: result.txHash ?? result, amount: Number(body.amount), status: 'confirmed' },
+          { self: '/api/v1/dao/treasury' },
+        );
         return;
-      } catch (err) { internalError(res, (err as Error).message); return; }
+      } catch (err) {
+        internalError(res, (err as Error).message);
+        return;
+      }
     }
 
     const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
-    if (!privateKey) { badRequest(res, 'Key unavailable', route.url.pathname); return; }
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
     try {
       const envelope = await createDaoTreasuryDepositEnvelope({
-        issuer: body.did, privateKey, amount: String(body.amount), source: body.source,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        issuer: body.did,
+        privateKey,
+        amount: String(body.amount),
+        source: body.source,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      created(res, { txHash: hash, amount: Number(body.amount), status: 'broadcast' },
-        { self: '/api/v1/dao/treasury' });
-    } catch { internalError(res, 'Treasury deposit failed'); }
+      created(
+        res,
+        { txHash: hash, amount: Number(body.amount), status: 'broadcast' },
+        { self: '/api/v1/dao/treasury' },
+      );
+    } catch {
+      internalError(res, 'Treasury deposit failed');
+    }
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -341,7 +532,9 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         const actions = await ctx.daoStore.listTimelockEntries();
         ok(res, actions ?? [], { self: '/api/v1/dao/timelock' });
         return;
-      } catch { /* fallthrough */ }
+      } catch {
+        /* fallthrough */
+      }
     }
     ok(res, [], { self: '/api/v1/dao/timelock' });
   });
@@ -350,7 +543,10 @@ export function daoRoutes(ctx: RuntimeContext): Router {
   r.post('/timelock/:actionId/actions/execute', async (_req, res, route) => {
     const { actionId } = route.params;
     const v = validate(DaoTimelockExecuteSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     if (ctx.daoService) {
@@ -358,27 +554,45 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         const result = await ctx.daoService.execute(Number(actionId) || 0);
         ok(res, result, { self: `/api/v1/dao/timelock/${actionId}` });
         return;
-      } catch (err) { internalError(res, (err as Error).message); return; }
+      } catch (err) {
+        internalError(res, (err as Error).message);
+        return;
+      }
     }
 
     const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
-    if (!privateKey) { badRequest(res, 'Key unavailable', route.url.pathname); return; }
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
     try {
       const envelope = await createDaoTimelockExecuteEnvelope({
-        issuer: body.did, privateKey, actionId: body.actionId ?? actionId,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        issuer: body.did,
+        privateKey,
+        actionId: body.actionId ?? actionId,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      ok(res, { txHash: hash, actionId, status: 'executed' },
-        { self: `/api/v1/dao/timelock/${actionId}` });
-    } catch { internalError(res, 'Timelock execute failed'); }
+      ok(
+        res,
+        { txHash: hash, actionId, status: 'executed' },
+        { self: `/api/v1/dao/timelock/${actionId}` },
+      );
+    } catch {
+      internalError(res, 'Timelock execute failed');
+    }
   });
 
   // ── POST /timelock/:actionId/actions/cancel ───────────────────
   r.post('/timelock/:actionId/actions/cancel', async (_req, res, route) => {
     const { actionId } = route.params;
     const v = validate(DaoTimelockCancelSchema, route.body);
-    if (!v.success) { badRequest(res, v.error, route.url.pathname); return; }
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
     const body = v.data;
 
     if (ctx.daoService) {
@@ -386,21 +600,36 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         const result = await ctx.daoService.cancel(Number(actionId) || 0);
         ok(res, result, { self: `/api/v1/dao/timelock/${actionId}` });
         return;
-      } catch (err) { internalError(res, (err as Error).message); return; }
+      } catch (err) {
+        internalError(res, (err as Error).message);
+        return;
+      }
     }
 
     const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
-    if (!privateKey) { badRequest(res, 'Key unavailable', route.url.pathname); return; }
+    if (!privateKey) {
+      badRequest(res, 'Key unavailable', route.url.pathname);
+      return;
+    }
     try {
       const envelope = await createDaoTimelockCancelEnvelope({
-        issuer: body.did, privateKey, actionId: body.actionId ?? actionId,
+        issuer: body.did,
+        privateKey,
+        actionId: body.actionId ?? actionId,
         reason: body.reason,
-        ts: body.ts ?? Date.now(), nonce: body.nonce, prev: body.prev,
+        ts: body.ts ?? Date.now(),
+        nonce: body.nonce,
+        prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
-      ok(res, { txHash: hash, actionId, reason: body.reason, status: 'cancelled' },
-        { self: `/api/v1/dao/timelock/${actionId}` });
-    } catch { internalError(res, 'Timelock cancel failed'); }
+      ok(
+        res,
+        { txHash: hash, actionId, reason: body.reason, status: 'cancelled' },
+        { self: `/api/v1/dao/timelock/${actionId}` },
+      );
+    } catch {
+      internalError(res, 'Timelock cancel failed');
+    }
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -412,8 +641,13 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     if (ctx.daoService) {
       try {
         const params = await ctx.daoService.getAllParams();
-        if (params) { ok(res, params, { self: '/api/v1/dao/params' }); return; }
-      } catch { /* fallthrough */ }
+        if (params) {
+          ok(res, params, { self: '/api/v1/dao/params' });
+          return;
+        }
+      } catch {
+        /* fallthrough */
+      }
     }
 
     // DaoStore has no getParams — return empty

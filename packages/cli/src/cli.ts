@@ -484,20 +484,20 @@ async function runInit(rawArgs: string[]): Promise<void> {
 
 async function runStatus(rawArgs: string[]): Promise<void> {
   const parsed = parseApiArgs(rawArgs);
-  const data = await fetchApiJson(parsed.apiUrl, '/api/node/status', parsed.token);
+  const data = await fetchApiJson(parsed.apiUrl, '/api/v1/node', parsed.token);
   console.log(JSON.stringify(data, null, 2));
 }
 
 async function runPeers(rawArgs: string[]): Promise<void> {
   const parsed = parseApiArgs(rawArgs);
-  const data = await fetchApiJson(parsed.apiUrl, '/api/node/peers', parsed.token);
+  const data = await fetchApiJson(parsed.apiUrl, '/api/v1/node/peers', parsed.token);
   console.log(JSON.stringify(data, null, 2));
 }
 
 async function runMarketInfoList(rawArgs: string[]): Promise<void> {
   const parsed = parseApiArgsWithQuery(rawArgs);
   const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
-  const data = await fetchApiJson(parsed.apiUrl, `/api/markets/info${query}`, parsed.token);
+  const data = await fetchApiJson(parsed.apiUrl, `/api/v1/markets/info${query}`, parsed.token);
   console.log(JSON.stringify(data, null, 2));
 }
 
@@ -510,7 +510,7 @@ async function runMarketInfoGet(rawArgs: string[]): Promise<void> {
   }
   const data = await fetchApiJson(
     parsed.apiUrl,
-    `/api/markets/info/${encodeURIComponent(listingId)}`,
+    `/api/v1/markets/info/${encodeURIComponent(listingId)}`,
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
@@ -525,7 +525,7 @@ async function runMarketInfoContent(rawArgs: string[]): Promise<void> {
   }
   const data = await fetchApiJson(
     parsed.apiUrl,
-    `/api/markets/info/${encodeURIComponent(listingId)}/content`,
+    `/api/v1/markets/info/${encodeURIComponent(listingId)}/content`,
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
@@ -540,7 +540,7 @@ async function runMarketInfoDelivery(rawArgs: string[]): Promise<void> {
   }
   const data = await fetchApiJson(
     parsed.apiUrl,
-    `/api/markets/info/orders/${encodeURIComponent(orderId)}/delivery`,
+    `/api/v1/markets/info/orders/${encodeURIComponent(orderId)}/delivery`,
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
@@ -548,7 +548,7 @@ async function runMarketInfoDelivery(rawArgs: string[]): Promise<void> {
 
 async function runMarketInfoPublish(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
-  const response = await fetchApiJsonWithBody(apiUrl, '/api/markets/info', 'POST', data, token);
+  const response = await fetchApiJsonWithBody(apiUrl, '/api/v1/markets/info', 'POST', data, token);
   console.log(JSON.stringify(response, null, 2));
 }
 
@@ -560,7 +560,7 @@ async function runMarketInfoPurchase(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/info/${encodeURIComponent(listingId)}/purchase`,
+    `/api/v1/markets/info/${encodeURIComponent(listingId)}/actions/purchase`,
     'POST',
     data,
     token,
@@ -576,7 +576,7 @@ async function runMarketInfoSubscribe(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/info/${encodeURIComponent(listingId)}/subscribe`,
+    `/api/v1/markets/info/${encodeURIComponent(listingId)}/subscriptions`,
     'POST',
     data,
     token,
@@ -592,7 +592,7 @@ async function runMarketInfoUnsubscribe(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/info/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+    `/api/v1/markets/info/subscriptions/${encodeURIComponent(subscriptionId)}/actions/cancel`,
     'POST',
     data,
     token,
@@ -608,7 +608,7 @@ async function runMarketInfoDeliver(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/info/${encodeURIComponent(listingId)}/deliver`,
+    `/api/v1/markets/info/${encodeURIComponent(listingId)}/actions/deliver`,
     'POST',
     data,
     token,
@@ -624,7 +624,7 @@ async function runMarketInfoConfirm(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/info/${encodeURIComponent(listingId)}/confirm`,
+    `/api/v1/markets/info/${encodeURIComponent(listingId)}/actions/confirm`,
     'POST',
     data,
     token,
@@ -640,7 +640,7 @@ async function runMarketInfoReview(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/info/${encodeURIComponent(listingId)}/review`,
+    `/api/v1/markets/info/${encodeURIComponent(listingId)}/actions/review`,
     'POST',
     data,
     token,
@@ -656,7 +656,7 @@ async function runMarketInfoRemove(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/info/${encodeURIComponent(listingId)}/remove`,
+    `/api/v1/markets/info/${encodeURIComponent(listingId)}/actions/remove`,
     'POST',
     data,
     token,
@@ -667,7 +667,7 @@ async function runMarketInfoRemove(rawArgs: string[]): Promise<void> {
 async function runMarketTaskList(rawArgs: string[]): Promise<void> {
   const parsed = parseApiArgsWithQuery(rawArgs);
   const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
-  const data = await fetchApiJson(parsed.apiUrl, `/api/markets/tasks${query}`, parsed.token);
+  const data = await fetchApiJson(parsed.apiUrl, `/api/v1/markets/tasks${query}`, parsed.token);
   console.log(JSON.stringify(data, null, 2));
 }
 
@@ -680,7 +680,7 @@ async function runMarketTaskGet(rawArgs: string[]): Promise<void> {
   }
   const data = await fetchApiJson(
     parsed.apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}`,
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
@@ -702,7 +702,7 @@ async function runMarketTaskBids(rawArgs: string[]): Promise<void> {
   const suffix = query ? `?${query.replace(/^\\?/, '')}` : '';
   const data = await fetchApiJson(
     parsed.apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/bids${suffix}`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/bids${suffix}`,
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
@@ -710,7 +710,7 @@ async function runMarketTaskBids(rawArgs: string[]): Promise<void> {
 
 async function runMarketTaskPublish(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
-  const response = await fetchApiJsonWithBody(apiUrl, '/api/markets/tasks', 'POST', data, token);
+  const response = await fetchApiJsonWithBody(apiUrl, '/api/v1/markets/tasks', 'POST', data, token);
   console.log(JSON.stringify(response, null, 2));
 }
 
@@ -722,7 +722,7 @@ async function runMarketTaskBid(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/bids`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/bids`,
     'POST',
     data,
     token,
@@ -738,7 +738,7 @@ async function runMarketTaskAccept(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/accept`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/bids/selected/actions/accept`,
     'POST',
     data,
     token,
@@ -754,7 +754,7 @@ async function runMarketTaskReject(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/reject`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/bids/selected/actions/reject`,
     'POST',
     data,
     token,
@@ -770,7 +770,7 @@ async function runMarketTaskWithdraw(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/withdraw`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/bids/selected/actions/withdraw`,
     'POST',
     data,
     token,
@@ -786,7 +786,7 @@ async function runMarketTaskDeliver(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/deliver`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/actions/deliver`,
     'POST',
     data,
     token,
@@ -802,7 +802,7 @@ async function runMarketTaskConfirm(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/confirm`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/actions/confirm`,
     'POST',
     data,
     token,
@@ -818,7 +818,7 @@ async function runMarketTaskReview(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/review`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/actions/review`,
     'POST',
     data,
     token,
@@ -834,7 +834,7 @@ async function runMarketTaskRemove(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/tasks/${encodeURIComponent(taskId)}/remove`,
+    `/api/v1/markets/tasks/${encodeURIComponent(taskId)}/actions/remove`,
     'POST',
     data,
     token,
@@ -845,7 +845,11 @@ async function runMarketTaskRemove(rawArgs: string[]): Promise<void> {
 async function runMarketCapabilityList(rawArgs: string[]): Promise<void> {
   const parsed = parseApiArgsWithQuery(rawArgs);
   const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
-  const data = await fetchApiJson(parsed.apiUrl, `/api/markets/capabilities${query}`, parsed.token);
+  const data = await fetchApiJson(
+    parsed.apiUrl,
+    `/api/v1/markets/capabilities${query}`,
+    parsed.token,
+  );
   console.log(JSON.stringify(data, null, 2));
 }
 
@@ -858,7 +862,7 @@ async function runMarketCapabilityGet(rawArgs: string[]): Promise<void> {
   }
   const data = await fetchApiJson(
     parsed.apiUrl,
-    `/api/markets/capabilities/${encodeURIComponent(listingId)}`,
+    `/api/v1/markets/capabilities/${encodeURIComponent(listingId)}`,
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
@@ -872,7 +876,7 @@ async function runMarketCapabilityRemove(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/capabilities/${encodeURIComponent(listingId)}/remove`,
+    `/api/v1/markets/capabilities/${encodeURIComponent(listingId)}/actions/remove`,
     'POST',
     data,
     token,
@@ -882,7 +886,13 @@ async function runMarketCapabilityRemove(rawArgs: string[]): Promise<void> {
 
 async function runMarketCapabilityPublish(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
-  const response = await fetchApiJsonWithBody(apiUrl, '/api/markets/capabilities', 'POST', data, token);
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    '/api/v1/markets/capabilities',
+    'POST',
+    data,
+    token,
+  );
   console.log(JSON.stringify(response, null, 2));
 }
 
@@ -894,7 +904,7 @@ async function runMarketCapabilityLease(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/capabilities/${encodeURIComponent(listingId)}/lease`,
+    `/api/v1/markets/capabilities/${encodeURIComponent(listingId)}/leases`,
     'POST',
     data,
     token,
@@ -911,7 +921,7 @@ async function runMarketCapabilityLeaseGet(rawArgs: string[]): Promise<void> {
   }
   const data = await fetchApiJson(
     parsed.apiUrl,
-    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}`,
+    `/api/v1/markets/capabilities/leases/${encodeURIComponent(leaseId)}`,
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
@@ -925,7 +935,7 @@ async function runMarketCapabilityInvoke(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/invoke`,
+    `/api/v1/markets/capabilities/leases/${encodeURIComponent(leaseId)}/actions/invoke`,
     'POST',
     data,
     token,
@@ -941,7 +951,7 @@ async function runMarketCapabilityPause(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/pause`,
+    `/api/v1/markets/capabilities/leases/${encodeURIComponent(leaseId)}/actions/pause`,
     'POST',
     data,
     token,
@@ -957,7 +967,7 @@ async function runMarketCapabilityResume(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/resume`,
+    `/api/v1/markets/capabilities/leases/${encodeURIComponent(leaseId)}/actions/resume`,
     'POST',
     data,
     token,
@@ -973,7 +983,7 @@ async function runMarketCapabilityTerminate(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/capabilities/leases/${encodeURIComponent(leaseId)}/terminate`,
+    `/api/v1/markets/capabilities/leases/${encodeURIComponent(leaseId)}/actions/terminate`,
     'POST',
     data,
     token,
@@ -989,9 +999,9 @@ async function runMarketDisputeOpen(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/orders/${encodeURIComponent(orderId)}/dispute`,
+    '/api/v1/markets/disputes',
     'POST',
-    data,
+    { ...data, orderId },
     token,
   );
   console.log(JSON.stringify(response, null, 2));
@@ -1005,7 +1015,7 @@ async function runMarketDisputeRespond(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/disputes/${encodeURIComponent(disputeId)}/respond`,
+    `/api/v1/markets/disputes/${encodeURIComponent(disputeId)}/actions/respond`,
     'POST',
     data,
     token,
@@ -1021,7 +1031,7 @@ async function runMarketDisputeResolve(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/markets/disputes/${encodeURIComponent(disputeId)}/resolve`,
+    `/api/v1/markets/disputes/${encodeURIComponent(disputeId)}/actions/resolve`,
     'POST',
     data,
     token,
@@ -1032,7 +1042,7 @@ async function runMarketDisputeResolve(rawArgs: string[]): Promise<void> {
 async function runContractList(rawArgs: string[]): Promise<void> {
   const parsed = parseApiArgsWithQuery(rawArgs);
   const query = parsed.query ? `?${parsed.query.replace(/^\?/, '')}` : '';
-  const data = await fetchApiJson(parsed.apiUrl, `/api/contracts${query}`, parsed.token);
+  const data = await fetchApiJson(parsed.apiUrl, `/api/v1/contracts${query}`, parsed.token);
   console.log(JSON.stringify(data, null, 2));
 }
 
@@ -1045,7 +1055,7 @@ async function runContractGet(rawArgs: string[]): Promise<void> {
   }
   const data = await fetchApiJson(
     parsed.apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}`,
     parsed.token,
   );
   console.log(JSON.stringify(data, null, 2));
@@ -1053,7 +1063,7 @@ async function runContractGet(rawArgs: string[]): Promise<void> {
 
 async function runContractCreate(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
-  const response = await fetchApiJsonWithBody(apiUrl, '/api/contracts', 'POST', data, token);
+  const response = await fetchApiJsonWithBody(apiUrl, '/api/v1/contracts', 'POST', data, token);
   console.log(JSON.stringify(response, null, 2));
 }
 
@@ -1065,7 +1075,7 @@ async function runContractSign(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/sign`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/actions/sign`,
     'POST',
     data,
     token,
@@ -1081,7 +1091,7 @@ async function runContractFund(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/fund`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/actions/activate`,
     'POST',
     data,
     token,
@@ -1097,7 +1107,7 @@ async function runContractComplete(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/complete`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/actions/complete`,
     'POST',
     data,
     token,
@@ -1114,7 +1124,7 @@ async function runContractMilestoneComplete(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/complete`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/actions/submit`,
     'POST',
     data,
     token,
@@ -1131,7 +1141,7 @@ async function runContractMilestoneApprove(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/approve`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/actions/approve`,
     'POST',
     data,
     token,
@@ -1148,7 +1158,7 @@ async function runContractMilestoneReject(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/reject`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/milestones/${encodeURIComponent(milestoneId)}/actions/reject`,
     'POST',
     data,
     token,
@@ -1164,7 +1174,7 @@ async function runContractDisputeOpen(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/dispute`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/actions/dispute`,
     'POST',
     data,
     token,
@@ -1180,7 +1190,7 @@ async function runContractDisputeResolve(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/dispute/resolve`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/actions/resolve`,
     'POST',
     data,
     token,
@@ -1196,7 +1206,7 @@ async function runContractSettlementExecute(rawArgs: string[]): Promise<void> {
   }
   const response = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/contracts/${encodeURIComponent(contractId)}/settlement`,
+    `/api/v1/contracts/${encodeURIComponent(contractId)}/actions/terminate`,
     'POST',
     data,
     token,
@@ -1706,9 +1716,11 @@ async function parseApiArgsWithData(
   return { apiUrl, token, data, rest };
 }
 
-function parseApiArgsWithQuery(
-  rawArgs: string[],
-): { apiUrl: string; token?: string; query: string } {
+function parseApiArgsWithQuery(rawArgs: string[]): {
+  apiUrl: string;
+  token?: string;
+  query: string;
+} {
   const apiArgs: string[] = [];
   let query = '';
   for (let i = 0; i < rawArgs.length; i += 1) {
@@ -1856,7 +1868,8 @@ async function fetchApiJson(
   if (token) {
     headers.authorization = `Bearer ${token}`;
   }
-  const res = await fetch(`${apiUrl}${path}`, { headers });
+  const normalizedPath = normalizeCliApiPath(path, 'GET');
+  const res = await fetch(`${apiUrl}${normalizedPath}`, { headers });
   const text = await res.text();
   let payload: Record<string, unknown> = {};
   if (text) {
@@ -1867,18 +1880,19 @@ async function fetchApiJson(
     }
   }
   if (!res.ok) {
+    const problem = payload as { title?: string; detail?: string; status?: number };
     const error = payload.error as { code?: string; message?: string } | undefined;
-    const code = error?.code ?? `HTTP_${res.status}`;
-    const message = error?.message ?? res.statusText;
+    const code = error?.code ?? String(problem.status ?? `HTTP_${res.status}`);
+    const message = error?.message ?? problem.detail ?? problem.title ?? res.statusText;
     fail(`API error ${code}: ${message}`);
   }
-  return payload;
+  return normalizeCliPayload(payload);
 }
 
 async function fetchApiJsonWithBody(
   apiUrl: string,
   path: string,
-  method: 'POST' | 'PUT',
+  method: 'POST' | 'PUT' | 'DELETE',
   body: Record<string, unknown>,
   token?: string,
 ): Promise<Record<string, unknown>> {
@@ -1889,7 +1903,8 @@ async function fetchApiJsonWithBody(
   if (token) {
     headers.authorization = `Bearer ${token}`;
   }
-  const res = await fetch(`${apiUrl}${path}`, {
+  const normalizedPath = normalizeCliApiPath(path, method, body);
+  const res = await fetch(`${apiUrl}${normalizedPath}`, {
     method,
     headers,
     body: JSON.stringify(body),
@@ -1904,12 +1919,51 @@ async function fetchApiJsonWithBody(
     }
   }
   if (!res.ok) {
+    const problem = payload as { title?: string; detail?: string; status?: number };
     const error = payload.error as { code?: string; message?: string } | undefined;
-    const code = error?.code ?? `HTTP_${res.status}`;
-    const message = error?.message ?? res.statusText;
+    const code = error?.code ?? String(problem.status ?? `HTTP_${res.status}`);
+    const message = error?.message ?? problem.detail ?? problem.title ?? res.statusText;
     fail(`API error ${code}: ${message}`);
   }
-  return payload;
+  return normalizeCliPayload(payload);
+}
+
+function normalizeCliApiPath(
+  path: string,
+  _method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  _body?: Record<string, unknown>,
+): string {
+  return path;
+}
+
+function normalizeCliPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  if (!Object.prototype.hasOwnProperty.call(payload, 'data')) {
+    return payload;
+  }
+
+  const data = payload.data;
+  if (!Array.isArray(data)) {
+    return (data ?? {}) as Record<string, unknown>;
+  }
+
+  const pagination = (payload.meta as { pagination?: Record<string, unknown> } | undefined)
+    ?.pagination;
+  const total = typeof pagination?.total === 'number' ? pagination.total : data.length;
+  const page = typeof pagination?.page === 'number' ? pagination.page : 1;
+  const perPage = typeof pagination?.perPage === 'number' ? pagination.perPage : data.length;
+
+  return {
+    items: data,
+    listings: data,
+    contracts: data,
+    proposals: data,
+    votes: data,
+    reviews: data,
+    delegations: data,
+    transactions: data,
+    total,
+    pagination: { total, page, perPage },
+  };
 }
 
 async function resolveLogFile(dataDir?: string): Promise<string | null> {
@@ -3205,8 +3259,8 @@ async function runDaoProposals(rawArgs: string[]): Promise<void> {
   const { apiUrl, token } = parseApiArgs(apiArgs);
   const status = rest.find((a) => !a.startsWith('-')) ?? undefined;
   const path = status
-    ? `/api/dao/proposals?status=${encodeURIComponent(status)}`
-    : '/api/dao/proposals';
+    ? `/api/v1/dao/proposals?status=${encodeURIComponent(status)}`
+    : '/api/v1/dao/proposals';
   const result = await fetchApiJson(apiUrl, path, token);
   console.log(JSON.stringify(result, null, 2));
 }
@@ -3218,7 +3272,7 @@ async function runDaoProposal(rawArgs: string[]): Promise<void> {
   if (!proposalId) fail('missing proposal id');
   const result = await fetchApiJson(
     apiUrl,
-    `/api/dao/proposals/${encodeURIComponent(proposalId)}`,
+    `/api/v1/dao/proposals/${encodeURIComponent(proposalId)}`,
     token,
   );
   console.log(JSON.stringify(result, null, 2));
@@ -3226,7 +3280,7 @@ async function runDaoProposal(rawArgs: string[]): Promise<void> {
 
 async function runDaoCreateProposal(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
-  const result = await fetchApiJsonWithBody(apiUrl, '/api/dao/proposals', 'POST', data, token);
+  const result = await fetchApiJsonWithBody(apiUrl, '/api/v1/dao/proposals', 'POST', data, token);
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -3236,7 +3290,7 @@ async function runDaoAdvanceProposal(rawArgs: string[]): Promise<void> {
   if (!proposalId) fail('missing proposal id');
   const result = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/dao/proposals/${encodeURIComponent(proposalId)}/advance`,
+    `/api/v1/dao/proposals/${encodeURIComponent(proposalId)}/actions/advance`,
     'POST',
     data,
     token,
@@ -3246,7 +3300,17 @@ async function runDaoAdvanceProposal(rawArgs: string[]): Promise<void> {
 
 async function runDaoVote(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
-  const result = await fetchApiJsonWithBody(apiUrl, '/api/dao/vote', 'POST', data, token);
+  const proposalId = data.proposalId;
+  if (typeof proposalId !== 'string' && typeof proposalId !== 'number') {
+    fail('missing proposal id in data.proposalId');
+  }
+  const result = await fetchApiJsonWithBody(
+    apiUrl,
+    `/api/v1/dao/proposals/${encodeURIComponent(String(proposalId))}/votes`,
+    'POST',
+    data,
+    token,
+  );
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -3257,7 +3321,7 @@ async function runDaoVotes(rawArgs: string[]): Promise<void> {
   if (!proposalId) fail('missing proposal id');
   const result = await fetchApiJson(
     apiUrl,
-    `/api/dao/proposals/${encodeURIComponent(proposalId)}/votes`,
+    `/api/v1/dao/proposals/${encodeURIComponent(proposalId)}/votes`,
     token,
   );
   console.log(JSON.stringify(result, null, 2));
@@ -3265,16 +3329,20 @@ async function runDaoVotes(rawArgs: string[]): Promise<void> {
 
 async function runDaoDelegate(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
-  const result = await fetchApiJsonWithBody(apiUrl, '/api/dao/delegate', 'POST', data, token);
+  const result = await fetchApiJsonWithBody(apiUrl, '/api/v1/dao/delegations', 'POST', data, token);
   console.log(JSON.stringify(result, null, 2));
 }
 
 async function runDaoRevokeDelegation(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
+  const delegate = data.delegate;
+  if (typeof delegate !== 'string' || !delegate) {
+    fail('missing delegate in data.delegate');
+  }
   const result = await fetchApiJsonWithBody(
     apiUrl,
-    '/api/dao/delegate/revoke',
-    'POST',
+    `/api/v1/dao/delegations/${encodeURIComponent(delegate)}`,
+    'DELETE',
     data,
     token,
   );
@@ -3288,7 +3356,7 @@ async function runDaoDelegations(rawArgs: string[]): Promise<void> {
   if (!did) fail('missing DID');
   const result = await fetchApiJson(
     apiUrl,
-    `/api/dao/delegations/${encodeURIComponent(did)}`,
+    `/api/v1/dao/delegations?did=${encodeURIComponent(did)}`,
     token,
   );
   console.log(JSON.stringify(result, null, 2));
@@ -3296,7 +3364,7 @@ async function runDaoDelegations(rawArgs: string[]): Promise<void> {
 
 async function runDaoTreasury(rawArgs: string[]): Promise<void> {
   const { apiUrl, token } = parseApiArgs(rawArgs);
-  const result = await fetchApiJson(apiUrl, '/api/dao/treasury', token);
+  const result = await fetchApiJson(apiUrl, '/api/v1/dao/treasury', token);
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -3304,7 +3372,7 @@ async function runDaoDeposit(rawArgs: string[]): Promise<void> {
   const { apiUrl, token, data } = await parseApiArgsWithData(rawArgs);
   const result = await fetchApiJsonWithBody(
     apiUrl,
-    '/api/dao/treasury/deposit',
+    '/api/v1/dao/treasury/deposits',
     'POST',
     data,
     token,
@@ -3314,7 +3382,7 @@ async function runDaoDeposit(rawArgs: string[]): Promise<void> {
 
 async function runDaoTimelock(rawArgs: string[]): Promise<void> {
   const { apiUrl, token } = parseApiArgs(rawArgs);
-  const result = await fetchApiJson(apiUrl, '/api/dao/timelock', token);
+  const result = await fetchApiJson(apiUrl, '/api/v1/dao/timelock', token);
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -3324,7 +3392,7 @@ async function runDaoTimelockExecute(rawArgs: string[]): Promise<void> {
   if (!actionId) fail('missing action id');
   const result = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/dao/timelock/${encodeURIComponent(actionId)}/execute`,
+    `/api/v1/dao/timelock/${encodeURIComponent(actionId)}/actions/execute`,
     'POST',
     data,
     token,
@@ -3338,7 +3406,7 @@ async function runDaoTimelockCancel(rawArgs: string[]): Promise<void> {
   if (!actionId) fail('missing action id');
   const result = await fetchApiJsonWithBody(
     apiUrl,
-    `/api/dao/timelock/${encodeURIComponent(actionId)}/cancel`,
+    `/api/v1/dao/timelock/${encodeURIComponent(actionId)}/actions/cancel`,
     'POST',
     data,
     token,
@@ -3348,7 +3416,7 @@ async function runDaoTimelockCancel(rawArgs: string[]): Promise<void> {
 
 async function runDaoParams(rawArgs: string[]): Promise<void> {
   const { apiUrl, token } = parseApiArgs(rawArgs);
-  const result = await fetchApiJson(apiUrl, '/api/dao/params', token);
+  const result = await fetchApiJson(apiUrl, '/api/v1/dao/params', token);
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -3594,10 +3662,7 @@ async function buildWalletState(eventStore: EventStore) {
   return state;
 }
 
-function findLatestEscrowHistoryHash(
-  state: WalletState,
-  escrowId: string,
-): string | null {
+function findLatestEscrowHistoryHash(state: WalletState, escrowId: string): string | null {
   for (let i = state.history.length - 1; i >= 0; i -= 1) {
     const entry = state.history[i];
     if (!entry || !entry.payload) {

@@ -34,19 +34,16 @@ export class DaoApi {
   ): Promise<DaoProposalListResponse> {
     const params = status ? { status } : undefined;
     return this.http.get<DaoProposalListResponse>(
-      '/api/dao/proposals',
+      '/api/v1/dao/proposals',
       params as Record<string, string> | undefined,
       opts,
     );
   }
 
   /** Get a single proposal by ID. */
-  async getProposal(
-    proposalId: string,
-    opts?: RequestOptions,
-  ): Promise<DaoProposalResponse> {
+  async getProposal(proposalId: string, opts?: RequestOptions): Promise<DaoProposalResponse> {
     return this.http.get<DaoProposalResponse>(
-      `/api/dao/proposals/${encodeURIComponent(proposalId)}`,
+      `/api/v1/dao/proposals/${encodeURIComponent(proposalId)}`,
       undefined,
       opts,
     );
@@ -57,7 +54,7 @@ export class DaoApi {
     params: DaoCreateProposalParams,
     opts?: RequestOptions,
   ): Promise<DaoTxResult> {
-    return this.http.post<DaoTxResult>('/api/dao/proposals', params, opts);
+    return this.http.post<DaoTxResult>('/api/v1/dao/proposals', params, opts);
   }
 
   /** Advance a proposal to a new status. */
@@ -67,7 +64,7 @@ export class DaoApi {
     opts?: RequestOptions,
   ): Promise<DaoTxResult> {
     return this.http.post<DaoTxResult>(
-      `/api/dao/proposals/${encodeURIComponent(proposalId)}/advance`,
+      `/api/v1/dao/proposals/${encodeURIComponent(proposalId)}/actions/advance`,
       params,
       opts,
     );
@@ -76,12 +73,9 @@ export class DaoApi {
   // ── Voting ─────────────────────────────────────────────────────────
 
   /** Get votes for a proposal. */
-  async getVotes(
-    proposalId: string,
-    opts?: RequestOptions,
-  ): Promise<DaoVotesResponse> {
+  async getVotes(proposalId: string, opts?: RequestOptions): Promise<DaoVotesResponse> {
     return this.http.get<DaoVotesResponse>(
-      `/api/dao/proposals/${encodeURIComponent(proposalId)}/votes`,
+      `/api/v1/dao/proposals/${encodeURIComponent(proposalId)}/votes`,
       undefined,
       opts,
     );
@@ -89,14 +83,18 @@ export class DaoApi {
 
   /** Cast a vote on a proposal. */
   async vote(params: DaoVoteCastParams, opts?: RequestOptions): Promise<DaoTxResult> {
-    return this.http.post<DaoTxResult>('/api/dao/vote', params, opts);
+    return this.http.post<DaoTxResult>(
+      `/api/v1/dao/proposals/${encodeURIComponent(params.proposalId)}/votes`,
+      params,
+      opts,
+    );
   }
 
   // ── Delegation ─────────────────────────────────────────────────────
 
   /** Set delegation to another DID. */
   async delegate(params: DaoDelegateSetParams, opts?: RequestOptions): Promise<DaoTxResult> {
-    return this.http.post<DaoTxResult>('/api/dao/delegate', params, opts);
+    return this.http.post<DaoTxResult>('/api/v1/dao/delegations', params, opts);
   }
 
   /** Revoke a delegation. */
@@ -104,41 +102,35 @@ export class DaoApi {
     params: DaoDelegateRevokeParams,
     opts?: RequestOptions,
   ): Promise<DaoTxResult> {
-    return this.http.post<DaoTxResult>('/api/dao/delegate/revoke', params, opts);
+    return this.http.delete<DaoTxResult>(
+      `/api/v1/dao/delegations/${encodeURIComponent(params.delegate)}`,
+      params,
+      opts,
+    );
   }
 
   /** Get delegations for a DID. */
-  async getDelegations(
-    did: string,
-    opts?: RequestOptions,
-  ): Promise<DaoDelegationsResponse> {
-    return this.http.get<DaoDelegationsResponse>(
-      `/api/dao/delegations/${encodeURIComponent(did)}`,
-      undefined,
-      opts,
-    );
+  async getDelegations(did: string, opts?: RequestOptions): Promise<DaoDelegationsResponse> {
+    return this.http.get<DaoDelegationsResponse>('/api/v1/dao/delegations', { did }, opts);
   }
 
   // ── Treasury ───────────────────────────────────────────────────────
 
   /** Get current treasury status. */
   async getTreasury(opts?: RequestOptions): Promise<DaoTreasuryResponse> {
-    return this.http.get<DaoTreasuryResponse>('/api/dao/treasury', undefined, opts);
+    return this.http.get<DaoTreasuryResponse>('/api/v1/dao/treasury', undefined, opts);
   }
 
   /** Deposit into the treasury. */
-  async deposit(
-    params: DaoTreasuryDepositParams,
-    opts?: RequestOptions,
-  ): Promise<DaoTxResult> {
-    return this.http.post<DaoTxResult>('/api/dao/treasury/deposit', params, opts);
+  async deposit(params: DaoTreasuryDepositParams, opts?: RequestOptions): Promise<DaoTxResult> {
+    return this.http.post<DaoTxResult>('/api/v1/dao/treasury/deposits', params, opts);
   }
 
   // ── Timelock ───────────────────────────────────────────────────────
 
   /** List timelock entries. */
   async listTimelock(opts?: RequestOptions): Promise<DaoTimelockListResponse> {
-    return this.http.get<DaoTimelockListResponse>('/api/dao/timelock', undefined, opts);
+    return this.http.get<DaoTimelockListResponse>('/api/v1/dao/timelock', undefined, opts);
   }
 
   /** Execute a timelocked action. */
@@ -148,7 +140,7 @@ export class DaoApi {
     opts?: RequestOptions,
   ): Promise<DaoTxResult> {
     return this.http.post<DaoTxResult>(
-      `/api/dao/timelock/${encodeURIComponent(actionId)}/execute`,
+      `/api/v1/dao/timelock/${encodeURIComponent(actionId)}/actions/execute`,
       params,
       opts,
     );
@@ -161,7 +153,7 @@ export class DaoApi {
     opts?: RequestOptions,
   ): Promise<DaoTxResult> {
     return this.http.post<DaoTxResult>(
-      `/api/dao/timelock/${encodeURIComponent(actionId)}/cancel`,
+      `/api/v1/dao/timelock/${encodeURIComponent(actionId)}/actions/cancel`,
       params,
       opts,
     );
@@ -171,6 +163,6 @@ export class DaoApi {
 
   /** Get governance parameters and thresholds. */
   async getParams(opts?: RequestOptions): Promise<DaoParamsResponse> {
-    return this.http.get<DaoParamsResponse>('/api/dao/params', undefined, opts);
+    return this.http.get<DaoParamsResponse>('/api/v1/dao/params', undefined, opts);
   }
 }

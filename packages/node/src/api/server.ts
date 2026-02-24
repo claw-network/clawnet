@@ -38,20 +38,20 @@ function buildRouter(ctx: RuntimeContext): Router {
   const api = new Router();
 
   // Mount all domain routers under /api/v1/
-  api.mount('/api/v1/node',                    nodeRoutes(ctx));
-  api.mount('/api/v1/identities',              identityRoutes(ctx));
-  api.mount('/api/v1/wallets',                 walletRoutes(ctx));
-  api.mount('/api/v1/transfers',               transferRoutes(ctx));
-  api.mount('/api/v1/escrows',                 escrowRoutes(ctx));
-  api.mount('/api/v1/reputations',             reputationRoutes(ctx));
-  api.mount('/api/v1/contracts',               contractRoutes(ctx));
-  api.mount('/api/v1/dao',                     daoRoutes(ctx));
-  api.mount('/api/v1/markets/info',            marketsInfoRoutes(ctx));
-  api.mount('/api/v1/markets/tasks',           marketsTaskRoutes(ctx));
-  api.mount('/api/v1/markets/capabilities',    marketsCapabilityRoutes(ctx));
-  api.mount('/api/v1/markets/disputes',        marketsDisputeRoutes(ctx));
-  api.mount('/api/v1/markets/search',          marketsSearchRoutes(ctx));
-  api.mount('/api/v1/dev',                     devRoutes(ctx));
+  api.mount('/api/v1/node', nodeRoutes(ctx));
+  api.mount('/api/v1/identities', identityRoutes(ctx));
+  api.mount('/api/v1/wallets', walletRoutes(ctx));
+  api.mount('/api/v1/transfers', transferRoutes(ctx));
+  api.mount('/api/v1/escrows', escrowRoutes(ctx));
+  api.mount('/api/v1/reputations', reputationRoutes(ctx));
+  api.mount('/api/v1/contracts', contractRoutes(ctx));
+  api.mount('/api/v1/dao', daoRoutes(ctx));
+  api.mount('/api/v1/markets/info', marketsInfoRoutes(ctx));
+  api.mount('/api/v1/markets/tasks', marketsTaskRoutes(ctx));
+  api.mount('/api/v1/markets/capabilities', marketsCapabilityRoutes(ctx));
+  api.mount('/api/v1/markets/disputes', marketsDisputeRoutes(ctx));
+  api.mount('/api/v1/markets/search', marketsSearchRoutes(ctx));
+  api.mount('/api/v1/dev', devRoutes(ctx));
 
   return api;
 }
@@ -77,7 +77,9 @@ export class ApiServer {
       reputationService?: import('../services/reputation-service.js').ReputationService;
       contractsService?: import('../services/contracts-service.js').ContractsService;
       daoService?: import('../services/dao-service.js').DaoService;
-      searchMarkets?: (query: import('@claw-network/protocol').SearchQuery) => import('@claw-network/protocol').SearchResult;
+      searchMarkets?: (
+        query: import('@claw-network/protocol').SearchQuery,
+      ) => import('@claw-network/protocol').SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
       getNodeConfig?: () => Promise<Record<string, unknown>>;

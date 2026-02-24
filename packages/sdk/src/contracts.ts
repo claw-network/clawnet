@@ -30,7 +30,7 @@ export class ContractsApi {
     opts?: RequestOptions,
   ): Promise<{ contracts: Contract[]; total: number }> {
     return this.http.get<{ contracts: Contract[]; total: number }>(
-      '/api/contracts',
+      '/api/v1/contracts',
       params as Record<string, string | number>,
       opts,
     );
@@ -38,27 +38,54 @@ export class ContractsApi {
 
   /** Get contract by ID. */
   async get(contractId: string, opts?: RequestOptions): Promise<Contract> {
-    return this.http.get<Contract>(`/api/contracts/${enc(contractId)}`, undefined, opts);
+    return this.http.get<Contract>(`/api/v1/contracts/${enc(contractId)}`, undefined, opts);
   }
 
   /** Create a new service contract. */
-  async create(params: CreateContractParams, opts?: RequestOptions): Promise<CreateContractResponse> {
-    return this.http.post<CreateContractResponse>('/api/contracts', params, opts);
+  async create(
+    params: CreateContractParams,
+    opts?: RequestOptions,
+  ): Promise<CreateContractResponse> {
+    return this.http.post<CreateContractResponse>('/api/v1/contracts', params, opts);
   }
 
   /** Sign a contract. */
-  async sign(contractId: string, params: ContractActionParams, opts?: RequestOptions): Promise<TxHashResponse> {
-    return this.http.post<TxHashResponse>(`/api/contracts/${enc(contractId)}/sign`, params, opts);
+  async sign(
+    contractId: string,
+    params: ContractActionParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
+    return this.http.post<TxHashResponse>(
+      `/api/v1/contracts/${enc(contractId)}/actions/sign`,
+      params,
+      opts,
+    );
   }
 
   /** Fund a contract (lock escrow). */
-  async fund(contractId: string, params: ContractFundParams, opts?: RequestOptions): Promise<TxHashResponse> {
-    return this.http.post<TxHashResponse>(`/api/contracts/${enc(contractId)}/fund`, params, opts);
+  async fund(
+    contractId: string,
+    params: ContractFundParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
+    return this.http.post<TxHashResponse>(
+      `/api/v1/contracts/${enc(contractId)}/actions/activate`,
+      params,
+      opts,
+    );
   }
 
   /** Mark contract as completed. */
-  async complete(contractId: string, params: ContractActionParams, opts?: RequestOptions): Promise<TxHashResponse> {
-    return this.http.post<TxHashResponse>(`/api/contracts/${enc(contractId)}/complete`, params, opts);
+  async complete(
+    contractId: string,
+    params: ContractActionParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
+    return this.http.post<TxHashResponse>(
+      `/api/v1/contracts/${enc(contractId)}/actions/complete`,
+      params,
+      opts,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -66,27 +93,42 @@ export class ContractsApi {
   // -------------------------------------------------------------------------
 
   /** Submit a milestone deliverable. */
-  async submitMilestone(contractId: string, milestoneId: string, params: MilestoneSubmitParams, opts?: RequestOptions): Promise<TxHashResponse> {
+  async submitMilestone(
+    contractId: string,
+    milestoneId: string,
+    params: MilestoneSubmitParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
     return this.http.post<TxHashResponse>(
-      `/api/contracts/${enc(contractId)}/milestones/${enc(milestoneId)}/complete`,
+      `/api/v1/contracts/${enc(contractId)}/milestones/${enc(milestoneId)}/actions/submit`,
       params,
       opts,
     );
   }
 
   /** Approve a submitted milestone. */
-  async approveMilestone(contractId: string, milestoneId: string, params: MilestoneApproveParams, opts?: RequestOptions): Promise<TxHashResponse> {
+  async approveMilestone(
+    contractId: string,
+    milestoneId: string,
+    params: MilestoneApproveParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
     return this.http.post<TxHashResponse>(
-      `/api/contracts/${enc(contractId)}/milestones/${enc(milestoneId)}/approve`,
+      `/api/v1/contracts/${enc(contractId)}/milestones/${enc(milestoneId)}/actions/approve`,
       params,
       opts,
     );
   }
 
   /** Reject a submitted milestone. */
-  async rejectMilestone(contractId: string, milestoneId: string, params: MilestoneRejectParams, opts?: RequestOptions): Promise<TxHashResponse> {
+  async rejectMilestone(
+    contractId: string,
+    milestoneId: string,
+    params: MilestoneRejectParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
     return this.http.post<TxHashResponse>(
-      `/api/contracts/${enc(contractId)}/milestones/${enc(milestoneId)}/reject`,
+      `/api/v1/contracts/${enc(contractId)}/milestones/${enc(milestoneId)}/actions/reject`,
       params,
       opts,
     );
@@ -97,13 +139,29 @@ export class ContractsApi {
   // -------------------------------------------------------------------------
 
   /** Open a dispute on a contract. */
-  async openDispute(contractId: string, params: ContractDisputeParams, opts?: RequestOptions): Promise<TxHashResponse> {
-    return this.http.post<TxHashResponse>(`/api/contracts/${enc(contractId)}/dispute`, params, opts);
+  async openDispute(
+    contractId: string,
+    params: ContractDisputeParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
+    return this.http.post<TxHashResponse>(
+      `/api/v1/contracts/${enc(contractId)}/actions/dispute`,
+      params,
+      opts,
+    );
   }
 
   /** Resolve a contract dispute. */
-  async resolveDispute(contractId: string, params: ContractDisputeResolveParams, opts?: RequestOptions): Promise<TxHashResponse> {
-    return this.http.post<TxHashResponse>(`/api/contracts/${enc(contractId)}/dispute/resolve`, params, opts);
+  async resolveDispute(
+    contractId: string,
+    params: ContractDisputeResolveParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
+    return this.http.post<TxHashResponse>(
+      `/api/v1/contracts/${enc(contractId)}/actions/resolve`,
+      params,
+      opts,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -111,8 +169,16 @@ export class ContractsApi {
   // -------------------------------------------------------------------------
 
   /** Execute settlement (final payout). */
-  async settlement(contractId: string, params: ContractSettlementParams, opts?: RequestOptions): Promise<TxHashResponse> {
-    return this.http.post<TxHashResponse>(`/api/contracts/${enc(contractId)}/settlement`, params, opts);
+  async settlement(
+    contractId: string,
+    params: ContractSettlementParams,
+    opts?: RequestOptions,
+  ): Promise<TxHashResponse> {
+    return this.http.post<TxHashResponse>(
+      `/api/v1/contracts/${enc(contractId)}/actions/terminate`,
+      params,
+      opts,
+    );
   }
 }
 

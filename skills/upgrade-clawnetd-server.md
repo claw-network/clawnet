@@ -8,20 +8,20 @@ This skill describes the full procedure to upgrade the production ClawNet node r
 
 ## Server Details
 
-| Item | Value |
-|------|-------|
-| **IP** | `66.94.125.242` |
-| **OS** | Ubuntu 24.04 |
-| **Domain** | `clawnetd.com` / `api.clawnetd.com` |
-| **SSH** | `ssh root@66.94.125.242` (key-based auth) |
-| **Code path** | `/opt/clawnet` |
-| **Data path** | `/var/lib/clawnet` |
-| **Service** | `clawnet.service` (systemd) |
-| **API port** | `9528` (internal, behind Caddy) |
-| **P2P port** | `9527` (public TCP) |
-| **Reverse proxy** | Caddy → `localhost:9528` |
-| **Node.js** | v20 (system-installed) |
-| **Package manager** | pnpm v10 |
+| Item                | Value                                     |
+| ------------------- | ----------------------------------------- |
+| **IP**              | `66.94.125.242`                           |
+| **OS**              | Ubuntu 24.04                              |
+| **Domain**          | `clawnetd.com` / `api.clawnetd.com`       |
+| **SSH**             | `ssh root@66.94.125.242` (key-based auth) |
+| **Code path**       | `/opt/clawnet`                            |
+| **Data path**       | `/var/lib/clawnet`                        |
+| **Service**         | `clawnet.service` (systemd)               |
+| **API port**        | `9528` (internal, behind Caddy)           |
+| **P2P port**        | `9527` (public TCP)                       |
+| **Reverse proxy**   | Caddy → `localhost:9528`                  |
+| **Node.js**         | v20 (system-installed)                    |
+| **Package manager** | pnpm v10                                  |
 
 ### Systemd Service File
 
@@ -54,7 +54,7 @@ WantedBy=multi-user.target
 Located at `/etc/caddy/Caddyfile`:
 
 - `api.clawnetd.com` → reverse proxy to `localhost:9528`
-  - `/api/node/status` (GET) is public (no auth)
+  - `/api/v1/node` (GET) is public (no auth)
   - All other routes require `X-API-Key` header
 - `clawnetd.com` → serves homepage from `packages/homepage/dist` (see `skills/deploy-homepage.md`)
 
@@ -73,6 +73,7 @@ Located at `/etc/caddy/Caddyfile`:
 ### Step 1: Ensure local code is pushed
 
 **Windows (PowerShell):**
+
 ```powershell
 cd c:\Users\11701\Workspace\clawnet
 git status                    # verify clean working tree
@@ -81,6 +82,7 @@ git log --oneline -1          # note the commit hash
 ```
 
 **macOS / Ubuntu (Bash):**
+
 ```bash
 cd ~/Workspace/clawnet
 git status                    # verify clean working tree
@@ -91,6 +93,7 @@ git log --oneline -1          # note the commit hash
 ### Step 2: Check current server state
 
 **All platforms (same SSH command):**
+
 ```bash
 ssh root@66.94.125.242 "cd /opt/clawnet && git log --oneline -1 && systemctl is-active clawnet"
 ```
@@ -104,6 +107,7 @@ ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1"
 ```
 
 > **Note**: The remote on the server is set to HTTPS (`https://github.com/claw-network/clawnet.git`). If it was previously SSH and fails with "Permission denied (publickey)", fix it with:
+>
 > ```bash
 > ssh root@66.94.125.242 "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
 > ```
@@ -123,6 +127,7 @@ ssh root@66.94.125.242 "cd /opt/clawnet && pnpm build 2>&1 | tail -10"
 ```
 
 Verify the output shows all packages built successfully:
+
 ```
 packages/core build: Done
 packages/protocol build: Done
@@ -148,25 +153,27 @@ ssh root@66.94.125.242 "systemctl restart clawnet"
 Wait a few seconds for startup, then verify:
 
 ```bash
-ssh root@66.94.125.242 "sleep 3 && curl -s http://127.0.0.1:9528/api/node/status | python3 -m json.tool"
+ssh root@66.94.125.242 "sleep 3 && curl -s http://127.0.0.1:9528/api/v1/node | python3 -m json.tool"
 ```
 
 Expected output (example):
+
 ```json
 {
-    "did": "did:claw:zGdsjCwGWZagTeXN4xyV13L8eDzUVGbVZhqJhChRXFuea",
-    "peerId": "12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW",
-    "synced": true,
-    "blockHeight": 0,
-    "peers": 0,
-    "connections": 0,
-    "network": "devnet",
-    "version": "0.2.0",
-    "uptime": 3
+  "did": "did:claw:zGdsjCwGWZagTeXN4xyV13L8eDzUVGbVZhqJhChRXFuea",
+  "peerId": "12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW",
+  "synced": true,
+  "blockHeight": 0,
+  "peers": 0,
+  "connections": 0,
+  "network": "devnet",
+  "version": "0.2.0",
+  "uptime": 3
 }
 ```
 
 Check that:
+
 - `version` matches the version in `packages/node/package.json`
 - `synced` is `true`
 - `uptime` is a small number (freshly restarted)
@@ -174,13 +181,15 @@ Check that:
 Also verify via the public HTTPS endpoint:
 
 **Windows (PowerShell):**
+
 ```powershell
-Invoke-RestMethod -Uri "https://api.clawnetd.com/api/node/status"
+Invoke-RestMethod -Uri "https://api.clawnetd.com/api/v1/node"
 ```
 
 **macOS / Ubuntu (Bash):**
+
 ```bash
-curl -s https://api.clawnetd.com/api/node/status | python3 -m json.tool
+curl -s https://api.clawnetd.com/api/v1/node | python3 -m json.tool
 ```
 
 ### Step 8: Check service logs (optional)
@@ -190,6 +199,7 @@ ssh root@66.94.125.242 "journalctl -u clawnet --no-pager -n 20"
 ```
 
 Look for the startup banner:
+
 ```
 [INFO] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [INFO] clawnetd
@@ -208,8 +218,9 @@ Look for the startup banner:
 For a fast upgrade when you know the code is already pushed:
 
 **All platforms (same SSH command):**
+
 ```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm install 2>&1 | tail -3 && pnpm build 2>&1 | tail -10 && systemctl restart clawnet && sleep 3 && curl -s http://127.0.0.1:9528/api/node/status | python3 -m json.tool"
+ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm install 2>&1 | tail -3 && pnpm build 2>&1 | tail -10 && systemctl restart clawnet && sleep 3 && curl -s http://127.0.0.1:9528/api/v1/node | python3 -m json.tool"
 ```
 
 ---

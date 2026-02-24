@@ -38,5 +38,19 @@ export function nodeRoutes(ctx: RuntimeContext): Router {
     }
   });
 
+  // GET /api/v1/node/config
+  r.get('/config', async (_req, res) => {
+    if (!ctx.getNodeConfig) {
+      internalError(res, 'Node config unavailable');
+      return;
+    }
+    try {
+      const config = await ctx.getNodeConfig();
+      ok(res, config, { self: '/api/v1/node/config' });
+    } catch {
+      internalError(res, 'Failed to read node config');
+    }
+  });
+
   return r;
 }

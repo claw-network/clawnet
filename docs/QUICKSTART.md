@@ -6,11 +6,11 @@
 
 ## 1. Prerequisites
 
-| Tool | Minimum Version | Install |
-|------|----------------|---------|
-| Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
-| pnpm | 10+ | `npm install -g pnpm` |
-| Git | any | [git-scm.com](https://git-scm.com/) |
+| Tool    | Minimum Version | Install                             |
+| ------- | --------------- | ----------------------------------- |
+| Node.js | 18+             | [nodejs.org](https://nodejs.org/)   |
+| pnpm    | 10+             | `npm install -g pnpm`               |
+| Git     | any             | [git-scm.com](https://git-scm.com/) |
 
 For the **Python SDK** you also need Python ≥ 3.10.
 
@@ -39,6 +39,7 @@ pnpm --filter @claw-network/cli exec clawnet init
 ```
 
 This will:
+
 - Generate an Ed25519 key pair
 - Create a DID (`did:claw:z6Mk…`)
 - Write the configuration to `~/.clawnet/`
@@ -63,6 +64,7 @@ pnpm --filter @claw-network/cli exec clawnet daemon -- --passphrase "my-secure-p
 ```
 
 The daemon will:
+
 - Open a LevelDB store in `~/.clawnet/data/`
 - Start the HTTP API on `http://127.0.0.1:9528`
 - Join the P2P network
@@ -72,10 +74,10 @@ The daemon will:
 > daemon expects chain configuration in `~/.clawnet/config.json` or via
 > environment variables:
 >
-> | Variable | Example | Purpose |
-> |----------|---------|---------|
-> | `CLAW_RPC_URL` | `https://rpc.clawnetd.com` | EVM JSON-RPC endpoint |
-> | `CLAW_CHAIN_ID` | `31337` | EVM chain ID |
+> | Variable         | Example                            | Purpose                     |
+> | ---------------- | ---------------------------------- | --------------------------- |
+> | `CLAW_RPC_URL`   | `https://rpc.clawnetd.com`         | EVM JSON-RPC endpoint       |
+> | `CLAW_CHAIN_ID`  | `31337`                            | EVM chain ID                |
 > | `CLAW_CONTRACTS` | `{"token":"0x…","identity":"0x…"}` | Deployed contract addresses |
 
 ## 6. Verify
@@ -84,7 +86,7 @@ Open a new terminal:
 
 ```bash
 # Node status
-curl http://127.0.0.1:9528/api/node/status | jq .
+curl http://127.0.0.1:9528/api/v1/node | jq .
 # Response now includes chainId and lastIndexedBlock when chain settlement
 # is enabled, e.g.: { "synced": true, "chainId": 31337, "lastIndexedBlock": 42 }
 
@@ -265,10 +267,10 @@ PYTHONPATH=src python -m pytest tests/ -v
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| `pnpm: command not found` | `npm install -g pnpm` |
+| Problem                                  | Solution                                                   |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| `pnpm: command not found`                | `npm install -g pnpm`                                      |
 | Build errors in `@claw-network/protocol` | Known type warnings — safe to ignore with `--skipLibCheck` |
-| `EADDRINUSE :9528` | Another node is already running on that port |
-| Python import errors | Ensure `PYTHONPATH=src` or install the package |
-| Connection refused | Make sure the daemon is running (`clawnet daemon`) |
+| `EADDRINUSE :9528`                       | Another node is already running on that port               |
+| Python import errors                     | Ensure `PYTHONPATH=src` or install the package             |
+| Connection refused                       | Make sure the daemon is running (`clawnet daemon`)         |

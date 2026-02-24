@@ -23,7 +23,7 @@ describe('NodeApi', () => {
       version: '0.3.0',
       uptime: 3600,
     };
-    mock.addRoute('GET', '/api/node/status', 200, status);
+    mock.addRoute('GET', '/api/v1/node', 200, { data: status });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.node.getStatus();
@@ -37,12 +37,14 @@ describe('NodeApi', () => {
 
   it('getPeers returns peer list', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/node/peers', 200, {
-      peers: [
-        { peerId: 'peer1', multiaddrs: ['/ip4/1.2.3.4/tcp/9527'], latency: 50 },
-        { peerId: 'peer2', multiaddrs: ['/ip4/5.6.7.8/tcp/9527'], latency: 120 },
-      ],
-      total: 2,
+    mock.addRoute('GET', '/api/v1/node/peers', 200, {
+      data: {
+        peers: [
+          { peerId: 'peer1', multiaddrs: ['/ip4/1.2.3.4/tcp/9527'], latency: 50 },
+          { peerId: 'peer2', multiaddrs: ['/ip4/5.6.7.8/tcp/9527'], latency: 120 },
+        ],
+        total: 2,
+      },
     });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
@@ -55,9 +57,13 @@ describe('NodeApi', () => {
 
   it('getConfig returns node config', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/node/config', 200, {
-      dataDir: '~/.clawnet',
-      apiPort: 9528,
+    mock.addRoute('GET', '/api/v1/node', 200, {
+      data: {
+        config: {
+          dataDir: '~/.clawnet',
+          apiPort: 9528,
+        },
+      },
     });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
@@ -72,14 +78,16 @@ describe('NodeApi', () => {
     let callCount = 0;
     // Override: first two calls return unsynced, third returns synced
     const origAddRoute = mock.addRoute.bind(mock);
-    origAddRoute('GET', '/api/node/status', 200, {
-      did: 'did:claw:z6Mk1234',
-      synced: false,
-      blockHeight: 0,
-      peers: 0,
-      network: 'testnet',
-      version: '0.3.0',
-      uptime: 0,
+    origAddRoute('GET', '/api/v1/node', 200, {
+      data: {
+        did: 'did:claw:z6Mk1234',
+        synced: false,
+        blockHeight: 0,
+        peers: 0,
+        network: 'testnet',
+        version: '0.3.0',
+        uptime: 0,
+      },
     });
 
     // Monkey-patch server to flip synced after 2 requests
@@ -88,17 +96,21 @@ describe('NodeApi', () => {
     origServer.removeAllListeners('request');
     origServer.on('request', (req, res) => {
       callCount++;
-      if (callCount >= 3 && req.url?.includes('/api/node/status')) {
+      if (callCount >= 3 && req.url?.includes('/api/v1/node')) {
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({
-          did: 'did:claw:z6Mk1234',
-          synced: true,
-          blockHeight: 100,
-          peers: 3,
-          network: 'testnet',
-          version: '0.3.0',
-          uptime: 10,
-        }));
+        res.end(
+          JSON.stringify({
+            data: {
+              did: 'did:claw:z6Mk1234',
+              synced: true,
+              blockHeight: 100,
+              peers: 3,
+              network: 'testnet',
+              version: '0.3.0',
+              uptime: 10,
+            },
+          }),
+        );
         return;
       }
       // Forward to original handler
@@ -115,14 +127,16 @@ describe('NodeApi', () => {
 
   it('waitForSync throws on timeout', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/node/status', 200, {
-      did: 'did:claw:z6Mk1234',
-      synced: false,
-      blockHeight: 0,
-      peers: 0,
-      network: 'testnet',
-      version: '0.3.0',
-      uptime: 0,
+    mock.addRoute('GET', '/api/v1/node', 200, {
+      data: {
+        did: 'did:claw:z6Mk1234',
+        synced: false,
+        blockHeight: 0,
+        peers: 0,
+        network: 'testnet',
+        version: '0.3.0',
+        uptime: 0,
+      },
     });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });

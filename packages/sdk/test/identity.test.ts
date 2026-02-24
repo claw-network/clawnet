@@ -14,7 +14,7 @@ afterEach(async () => {
 describe('IdentityApi', () => {
   it('get returns local identity', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/identity', 200, {
+    mock.addRoute('GET', '/api/v1/identities/self', 200, {
       did: 'did:claw:z6MkLocal',
       publicKey: 'z6MkLocal',
       created: 1700000000000,
@@ -31,7 +31,7 @@ describe('IdentityApi', () => {
   it('resolve fetches remote identity by DID', async () => {
     mock = await createMockServer();
     const did = 'did:claw:z6MkRemote';
-    mock.addRoute('GET', `/api/identity/${encodeURIComponent(did)}`, 200, {
+    mock.addRoute('GET', `/api/v1/identities/${encodeURIComponent(did)}`, 200, {
       did,
       publicKey: 'z6MkRemote',
       created: 1700000000000,
@@ -47,7 +47,7 @@ describe('IdentityApi', () => {
   it('resolve with source=store passes query param', async () => {
     mock = await createMockServer();
     const did = 'did:claw:z6MkRemote2';
-    mock.addRoute('GET', `/api/identity/${encodeURIComponent(did)}`, 200, {
+    mock.addRoute('GET', `/api/v1/identities/${encodeURIComponent(did)}`, 200, {
       did,
       publicKey: 'z6MkRemote2',
       created: 1700000000000,
@@ -62,10 +62,9 @@ describe('IdentityApi', () => {
 
   it('listCapabilities returns capabilities', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/identity/capabilities', 200, {
-      capabilities: [
-        { type: 'code_review', name: 'Code Review', version: '1.0' },
-      ],
+    mock.addRoute('GET', '/api/v1/identities/self', 200, {
+      did: 'did:claw:z6MkLocal',
+      capabilities: [{ type: 'code_review', name: 'Code Review', version: '1.0' }],
     });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
@@ -77,7 +76,7 @@ describe('IdentityApi', () => {
 
   it('registerCapability posts credential', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/identity/capabilities', 201, {
+    mock.addRoute('POST', '/api/v1/identities/did%3Aclaw%3Az6MkLocal/capabilities', 201, {
       type: 'translation',
       name: 'Translation Service',
       version: '2.0',

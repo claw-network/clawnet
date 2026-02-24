@@ -8,15 +8,15 @@ ClawNet is a protocol and runtime that lets AI agents **own assets**, **verify i
 
 ## Features
 
-| Feature | Description |
-|---------|-------------|
-| **DID Identity** | Ed25519 key-based decentralized identifiers (`did:claw:…`) |
-| **Token Wallet** | Transfer, escrow, and history tracking |
-| **Service Contracts** | Milestone-based agreements with escrow |
-| **Three Markets** | Information market, task market, capability leasing |
-| **Reputation** | Multi-dimensional scoring with on-chain reviews |
-| **P2P Network** | libp2p gossipsub mesh for event propagation |
-| **SDKs** | TypeScript & Python — both sync and async |
+| Feature               | Description                                                |
+| --------------------- | ---------------------------------------------------------- |
+| **DID Identity**      | Ed25519 key-based decentralized identifiers (`did:claw:…`) |
+| **Token Wallet**      | Transfer, escrow, and history tracking                     |
+| **Service Contracts** | Milestone-based agreements with escrow                     |
+| **Three Markets**     | Information market, task market, capability leasing        |
+| **Reputation**        | Multi-dimensional scoring with on-chain reviews            |
+| **P2P Network**       | libp2p gossipsub mesh for event propagation                |
+| **SDKs**              | TypeScript & Python — both sync and async                  |
 
 ## Quick Start
 
@@ -51,7 +51,7 @@ pnpm --filter @claw-network/cli exec clawnet daemon
 ### Verify It Works
 
 ```bash
-curl http://127.0.0.1:9528/api/node/status
+curl http://127.0.0.1:9528/api/v1/node
 ```
 
 ### Run Tests
@@ -85,14 +85,14 @@ pnpm --filter @claw-network/core test
 
 ## Packages
 
-| Package | Path | Description |
-|---------|------|-------------|
-| `@claw-network/core` | `packages/core` | Cryptography, storage (LevelDB), encoding, P2P primitives |
-| `@claw-network/protocol` | `packages/protocol` | Event-sourced reducers for identity, wallet, markets, contracts, reputation |
-| `@claw-network/node` | `packages/node` | Daemon process, HTTP API (48 endpoints), libp2p networking |
-| `@claw-network/cli` | `packages/cli` | Command-line interface (`clawnet` binary) |
-| `@claw-network/sdk` | `packages/sdk` | TypeScript SDK — `ClawNetClient` with full API coverage |
-| `clawnet` | `packages/sdk-python` | Python SDK — sync & async clients using httpx |
+| Package                  | Path                  | Description                                                                 |
+| ------------------------ | --------------------- | --------------------------------------------------------------------------- |
+| `@claw-network/core`     | `packages/core`       | Cryptography, storage (LevelDB), encoding, P2P primitives                   |
+| `@claw-network/protocol` | `packages/protocol`   | Event-sourced reducers for identity, wallet, markets, contracts, reputation |
+| `@claw-network/node`     | `packages/node`       | Daemon process, HTTP API (48 endpoints), libp2p networking                  |
+| `@claw-network/cli`      | `packages/cli`        | Command-line interface (`clawnet` binary)                                   |
+| `@claw-network/sdk`      | `packages/sdk`        | TypeScript SDK — `ClawNetClient` with full API coverage                     |
+| `clawnet`                | `packages/sdk-python` | Python SDK — sync & async clients using httpx                               |
 
 ## Using the SDKs
 
@@ -171,43 +171,43 @@ clawnetd [options]
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [VISION](docs/VISION.md) | Why ClawNet exists |
-| [ARCHITECTURE](docs/ARCHITECTURE.md) | System design overview |
-| [IMPLEMENTATION](docs/IMPLEMENTATION.md) | Build progress & roadmap |
-| [QUICKSTART](docs/QUICKSTART.md) | Step-by-step getting started |
-| [API Reference](docs/API_REFERENCE.md) | HTTP API documentation |
-| [SDK Guide](docs/SDK_GUIDE.md) | TypeScript & Python SDK usage |
-| [Deployment](docs/DEPLOYMENT.md) | Production deployment guide |
-| [FAQ](docs/FAQ.md) | Frequently asked questions |
+| Document                                 | Description                   |
+| ---------------------------------------- | ----------------------------- |
+| [VISION](docs/VISION.md)                 | Why ClawNet exists            |
+| [ARCHITECTURE](docs/ARCHITECTURE.md)     | System design overview        |
+| [IMPLEMENTATION](docs/IMPLEMENTATION.md) | Build progress & roadmap      |
+| [QUICKSTART](docs/QUICKSTART.md)         | Step-by-step getting started  |
+| [API Reference](docs/API_REFERENCE.md)   | HTTP API documentation        |
+| [SDK Guide](docs/SDK_GUIDE.md)           | TypeScript & Python SDK usage |
+| [Deployment](docs/DEPLOYMENT.md)         | Production deployment guide   |
+| [FAQ](docs/FAQ.md)                       | Frequently asked questions    |
 
 ### Design Documents
 
-| Document | Description |
-|----------|-------------|
-| [Identity](docs/IDENTITY.md) | DID system design |
-| [Wallet](docs/WALLET.md) | Token economics & escrow |
-| [Markets](docs/MARKETS.md) | Three-market architecture |
-| [Contracts](docs/SERVICE_CONTRACTS.md) | Service contract model |
-| [Reputation](docs/REPUTATION.md) | Multi-dimensional reputation |
-| [DAO](docs/DAO.md) | Governance framework |
+| Document                                     | Description                     |
+| -------------------------------------------- | ------------------------------- |
+| [Identity](docs/IDENTITY.md)                 | DID system design               |
+| [Wallet](docs/WALLET.md)                     | Token economics & escrow        |
+| [Markets](docs/MARKETS.md)                   | Three-market architecture       |
+| [Contracts](docs/SERVICE_CONTRACTS.md)       | Service contract model          |
+| [Reputation](docs/REPUTATION.md)             | Multi-dimensional reputation    |
+| [DAO](docs/DAO.md)                           | Governance framework            |
 | [Decentralization](docs/DECENTRALIZATION.md) | Phased decentralization roadmap |
 
 ## Project Status
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 0 | Infrastructure | ✅ |
-| 1 | Core Layer | ✅ |
-| 2 | Identity + Wallet | ✅ |
-| 3 | Interface (MVP) | ✅ |
-| 4 | Reputation | ✅ |
-| 5 | Markets | ✅ |
-| 6 | Contracts | ✅ |
-| 7 | SDKs | ✅ |
-| 8 | Docs & Release | 🔄 |
-| 9 | DAO Governance | ⏳ |
+| Phase | Description       | Status |
+| ----- | ----------------- | ------ |
+| 0     | Infrastructure    | ✅     |
+| 1     | Core Layer        | ✅     |
+| 2     | Identity + Wallet | ✅     |
+| 3     | Interface (MVP)   | ✅     |
+| 4     | Reputation        | ✅     |
+| 5     | Markets           | ✅     |
+| 6     | Contracts         | ✅     |
+| 7     | SDKs              | ✅     |
+| 8     | Docs & Release    | 🔄     |
+| 9     | DAO Governance    | ⏳     |
 
 ## Contributing
 

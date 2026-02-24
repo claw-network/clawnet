@@ -20,7 +20,7 @@ const EVENT_FIELDS = {
 describe('ContractsApi', () => {
   it('create contract', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/contracts', 201, {
+    mock.addRoute('POST', '/api/v1/contracts', 201, {
       contractId: 'ct-1',
       txHash: 'tx-ct-1',
     });
@@ -53,7 +53,7 @@ describe('ContractsApi', () => {
 
   it('list contracts', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/contracts', 200, {
+    mock.addRoute('GET', '/api/v1/contracts', 200, {
       contracts: [
         {
           id: 'ct-1',
@@ -80,7 +80,7 @@ describe('ContractsApi', () => {
 
   it('get contract by ID', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/contracts/ct-1', 200, {
+    mock.addRoute('GET', '/api/v1/contracts/ct-1', 200, {
       id: 'ct-1',
       client: 'did:claw:z6MkClient',
       provider: 'did:claw:z6MkProvider',
@@ -101,7 +101,7 @@ describe('ContractsApi', () => {
 
   it('sign contract', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/contracts/ct-1/sign', 200, { txHash: 'tx-sign' });
+    mock.addRoute('POST', '/api/v1/contracts/ct-1/actions/sign', 200, { txHash: 'tx-sign' });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.sign('ct-1', EVENT_FIELDS);
@@ -111,7 +111,7 @@ describe('ContractsApi', () => {
 
   it('fund contract', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/contracts/ct-1/fund', 200, { txHash: 'tx-fund' });
+    mock.addRoute('POST', '/api/v1/contracts/ct-1/actions/activate', 200, { txHash: 'tx-fund' });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.fund('ct-1', {
@@ -126,7 +126,9 @@ describe('ContractsApi', () => {
 
   it('complete contract', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/contracts/ct-1/complete', 200, { txHash: 'tx-complete' });
+    mock.addRoute('POST', '/api/v1/contracts/ct-1/actions/complete', 200, {
+      txHash: 'tx-complete',
+    });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.contracts.complete('ct-1', EVENT_FIELDS);
@@ -137,7 +139,9 @@ describe('ContractsApi', () => {
   describe('milestones', () => {
     it('submit milestone', async () => {
       mock = await createMockServer();
-      mock.addRoute('POST', '/api/contracts/ct-1/milestones/ms-1/complete', 200, { txHash: 'tx-ms-submit' });
+      mock.addRoute('POST', '/api/v1/contracts/ct-1/milestones/ms-1/actions/submit', 200, {
+        txHash: 'tx-ms-submit',
+      });
 
       const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.submitMilestone('ct-1', 'ms-1', {
@@ -151,7 +155,9 @@ describe('ContractsApi', () => {
 
     it('approve milestone', async () => {
       mock = await createMockServer();
-      mock.addRoute('POST', '/api/contracts/ct-1/milestones/ms-1/approve', 200, { txHash: 'tx-ms-approve' });
+      mock.addRoute('POST', '/api/v1/contracts/ct-1/milestones/ms-1/actions/approve', 200, {
+        txHash: 'tx-ms-approve',
+      });
 
       const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.approveMilestone('ct-1', 'ms-1', EVENT_FIELDS);
@@ -161,7 +167,9 @@ describe('ContractsApi', () => {
 
     it('reject milestone', async () => {
       mock = await createMockServer();
-      mock.addRoute('POST', '/api/contracts/ct-1/milestones/ms-1/reject', 200, { txHash: 'tx-ms-reject' });
+      mock.addRoute('POST', '/api/v1/contracts/ct-1/milestones/ms-1/actions/reject', 200, {
+        txHash: 'tx-ms-reject',
+      });
 
       const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.rejectMilestone('ct-1', 'ms-1', {
@@ -176,7 +184,9 @@ describe('ContractsApi', () => {
   describe('disputes', () => {
     it('open dispute on contract', async () => {
       mock = await createMockServer();
-      mock.addRoute('POST', '/api/contracts/ct-1/dispute', 200, { txHash: 'tx-dispute' });
+      mock.addRoute('POST', '/api/v1/contracts/ct-1/actions/dispute', 200, {
+        txHash: 'tx-dispute',
+      });
 
       const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.openDispute('ct-1', {
@@ -190,7 +200,9 @@ describe('ContractsApi', () => {
 
     it('resolve dispute', async () => {
       mock = await createMockServer();
-      mock.addRoute('POST', '/api/contracts/ct-1/dispute/resolve', 200, { txHash: 'tx-resolve' });
+      mock.addRoute('POST', '/api/v1/contracts/ct-1/actions/resolve', 200, {
+        txHash: 'tx-resolve',
+      });
 
       const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.resolveDispute('ct-1', {
@@ -207,7 +219,9 @@ describe('ContractsApi', () => {
   describe('settlement', () => {
     it('execute settlement', async () => {
       mock = await createMockServer();
-      mock.addRoute('POST', '/api/contracts/ct-1/settlement', 200, { txHash: 'tx-settle' });
+      mock.addRoute('POST', '/api/v1/contracts/ct-1/actions/terminate', 200, {
+        txHash: 'tx-settle',
+      });
 
       const client = new ClawNetClient({ baseUrl: mock.baseUrl });
       const result = await client.contracts.settlement('ct-1', EVENT_FIELDS);

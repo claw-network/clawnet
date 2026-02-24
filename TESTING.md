@@ -28,11 +28,11 @@ pnpm --filter @claw-network/cli test
 
 The testnet spins up 3 nodes on a Docker bridge network (`clawnet`):
 
-| Node      | HTTP API           | P2P (host) | Role                  |
-| --------- | ------------------ | ---------- | --------------------- |
-| bootstrap | `localhost:9528`   | 9529       | Seed / bootstrap node |
-| peer1     | `localhost:9530`   | 9531       | Peer node             |
-| peer2     | `localhost:9532`   | 9533       | Peer node             |
+| Node      | HTTP API         | P2P (host) | Role                  |
+| --------- | ---------------- | ---------- | --------------------- |
+| bootstrap | `localhost:9528` | 9529       | Seed / bootstrap node |
+| peer1     | `localhost:9530` | 9531       | Peer node             |
+| peer2     | `localhost:9532` | 9533       | Peer node             |
 
 Peer nodes auto-discover the bootstrap node's PeerId via its API, then connect over libp2p (TCP + Noise + Yamux + Kademlia DHT).
 
@@ -90,7 +90,7 @@ For custom passphrase:
 
 ```yaml
 environment:
-  - CLAW_PASSPHRASE=your-passphrase-here  # minimum 12 characters
+  - CLAW_PASSPHRASE=your-passphrase-here # minimum 12 characters
 ```
 
 ### Troubleshooting
@@ -98,7 +98,7 @@ environment:
 **Nodes not connecting?** Check bootstrap health first:
 
 ```bash
-curl http://localhost:9528/api/node/status
+curl http://localhost:9528/api/v1/node
 ```
 
 **Identity returns 404?** Ensure `CLAW_PASSPHRASE` is set (min 12 chars). Restart with fresh volumes:

@@ -14,6 +14,17 @@ import {
 import { generateKeypair } from '@claw-network/core/crypto';
 import { didFromPublicKey } from '@claw-network/core/identity';
 
+async function readData<T>(res: Response): Promise<T> {
+  const payload = (await res.json()) as { data?: T };
+  return (payload.data ?? payload) as T;
+}
+
+async function readProblem(
+  res: Response,
+): Promise<{ type: string; title: string; status: number }> {
+  return (await res.json()) as { type: string; title: string; status: number };
+}
+
 describe('node api', () => {
   let api: ApiServer;
   let baseUrl: string;
@@ -55,20 +66,20 @@ describe('node api', () => {
   });
 
   it('serves node status/peers/config', async () => {
-    const statusRes = await fetch(`${baseUrl}/api/node/status`);
+    const statusRes = await fetch(`${baseUrl}/api/v1/node`);
     expect(statusRes.status).toBe(200);
-    const status = (await statusRes.json()) as { blockHeight: number; peers: number };
+    const status = await readData<{ blockHeight: number; peers: number }>(statusRes);
     expect(status.blockHeight).toBe(42);
     expect(status.peers).toBe(3);
 
-    const peersRes = await fetch(`${baseUrl}/api/node/peers`);
+    const peersRes = await fetch(`${baseUrl}/api/v1/node/peers`);
     expect(peersRes.status).toBe(200);
-    const peers = (await peersRes.json()) as { total: number };
+    const peers = await readData<{ total: number }>(peersRes);
     expect(peers.total).toBe(1);
 
-    const configRes = await fetch(`${baseUrl}/api/node/config`);
+    const configRes = await fetch(`${baseUrl}/api/v1/node/config`);
     expect(configRes.status).toBe(200);
-    const config = (await configRes.json()) as { apiPort: number };
+    const config = await readData<{ apiPort: number }>(configRes);
     expect(config.apiPort).toBe(9528);
   });
 });
@@ -113,33 +124,33 @@ describe('identity api', () => {
   });
 
   it('returns local identity', async () => {
-    const res = await fetch(`${baseUrl}/api/identity`);
+    const res = await fetch(`${baseUrl}/api/v1/identities/self`);
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { did: string; publicKey: string };
+    const json = await readData<{ did: string; publicKey: string }>(res);
     expect(json.did).toBe(did);
     expect(json.publicKey).toBe(publicKeyMb);
   });
 
   it('lists capabilities', async () => {
-    const res = await fetch(`${baseUrl}/api/identity/capabilities`);
+    const res = await fetch(`${baseUrl}/api/v1/identities/${encodeURIComponent(did)}/capabilities`);
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { capabilities: unknown[] };
-    expect(json.capabilities).toEqual([]);
+    const json = await readData<unknown[]>(res);
+    expect(json).toEqual([]);
   });
 
   it('rejects invalid did', async () => {
-    const res = await fetch(`${baseUrl}/api/identity/not-a-did`);
+    const res = await fetch(`${baseUrl}/api/v1/identities/not-a-did`);
     expect(res.status).toBe(400);
-    const json = (await res.json()) as { error: { code: string } };
-    expect(json.error.code).toBe('DID_INVALID');
+    const json = await readProblem(res);
+    expect(json.type).toContain('validation-error');
   });
 
   it('returns did not found for unknown did', async () => {
     const other = await generateKeypair();
     const otherDid = didFromPublicKey(other.publicKey);
-    const res = await fetch(`${baseUrl}/api/identity/${encodeURIComponent(otherDid)}`);
+    const res = await fetch(`${baseUrl}/api/v1/identities/${encodeURIComponent(otherDid)}`);
     expect(res.status).toBe(404);
-    const json = (await res.json()) as { error: { code: string } };
-    expect(json.error.code).toBe('DID_NOT_FOUND');
+    const json = await readProblem(res);
+    expect(json.type).toContain('not-found');
   });
 });

@@ -14,7 +14,11 @@ export class ReputationApi {
 
   /** Get reputation profile for a DID. */
   async getProfile(did: string, opts?: RequestOptions): Promise<Reputation> {
-    return this.http.get<Reputation>(`/api/reputation/${encodeURIComponent(did)}`, undefined, opts);
+    return this.http.get<Reputation>(
+      `/api/v1/reputations/${encodeURIComponent(did)}`,
+      undefined,
+      opts,
+    );
   }
 
   /** Get reviews for a DID. */
@@ -24,14 +28,21 @@ export class ReputationApi {
     opts?: RequestOptions,
   ): Promise<ReviewsResponse> {
     return this.http.get<ReviewsResponse>(
-      `/api/reputation/${encodeURIComponent(did)}/reviews`,
+      `/api/v1/reputations/${encodeURIComponent(did)}/reviews`,
       params as Record<string, string | number>,
       opts,
     );
   }
 
   /** Record a reputation event (rate another agent). */
-  async record(params: RecordReputationParams, opts?: RequestOptions): Promise<ReputationRecordResult> {
-    return this.http.post<ReputationRecordResult>('/api/reputation/record', params, opts);
+  async record(
+    params: RecordReputationParams,
+    opts?: RequestOptions,
+  ): Promise<ReputationRecordResult> {
+    return this.http.post<ReputationRecordResult>(
+      `/api/v1/reputations/${encodeURIComponent(params.target)}/reviews`,
+      params,
+      opts,
+    );
   }
 }

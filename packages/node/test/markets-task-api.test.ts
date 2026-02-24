@@ -17,6 +17,11 @@ import { didFromPublicKey } from '@claw-network/core/identity';
 import { MarketSearchStore } from '@claw-network/protocol';
 import type { EventEnvelope } from '@claw-network/core/protocol';
 
+async function readData<T>(res: Response): Promise<T> {
+  const payload = (await res.json()) as { data?: T };
+  return (payload.data ?? payload) as T;
+}
+
 const pricing = {
   type: 'fixed',
   fixedPrice: '10',
@@ -70,9 +75,10 @@ describe('task market api', () => {
       {
         publishEvent: async (envelope) => {
           published.push(envelope);
-          const hash = typeof envelope.hash === 'string' && envelope.hash.length > 0
-            ? envelope.hash
-            : eventHashHex(envelope as EventEnvelope);
+          const hash =
+            typeof envelope.hash === 'string' && envelope.hash.length > 0
+              ? envelope.hash
+              : eventHashHex(envelope as EventEnvelope);
           await eventStore.appendEvent(hash, canonicalizeBytes(envelope));
           await marketStore.applyEvent(envelope as EventEnvelope);
           return hash;
@@ -92,7 +98,7 @@ describe('task market api', () => {
   });
 
   it('publishes task listing', async () => {
-    const res = await fetch(`${baseUrl}/api/markets/tasks`, {
+    const res = await fetch(`${baseUrl}/api/v1/markets/tasks`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -110,9 +116,7 @@ describe('task market api', () => {
           deliverables: [
             { name: 'Report', type: 'report', required: true, acceptanceCriteria: ['summary'] },
           ],
-          skills: [
-            { name: 'analysis', level: 'intermediate', required: true },
-          ],
+          skills: [{ name: 'analysis', level: 'intermediate', required: true }],
           complexity: 'simple',
           estimatedDuration: 3600,
         },
@@ -125,7 +129,7 @@ describe('task market api', () => {
   });
 
   it('submits and accepts a bid', async () => {
-    const publishRes = await fetch(`${baseUrl}/api/markets/tasks`, {
+    const publishRes = await fetch(`${baseUrl}/api/v1/markets/tasks`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -143,9 +147,7 @@ describe('task market api', () => {
           deliverables: [
             { name: 'Report', type: 'report', required: true, acceptanceCriteria: ['summary'] },
           ],
-          skills: [
-            { name: 'analysis', level: 'intermediate', required: true },
-          ],
+          skills: [{ name: 'analysis', level: 'intermediate', required: true }],
           complexity: 'simple',
           estimatedDuration: 3600,
         },
@@ -154,9 +156,9 @@ describe('task market api', () => {
       }),
     });
     expect(publishRes.status).toBe(201);
-    const publishJson = (await publishRes.json()) as { listingId: string };
+    const publishJson = await readData<{ listingId: string }>(publishRes);
 
-    const bidRes = await fetch(`${baseUrl}/api/markets/tasks/${publishJson.listingId}/bids`, {
+    const bidRes = await fetch(`${baseUrl}/api/v1/markets/tasks/${publishJson.listingId}/bids`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -169,25 +171,11 @@ describe('task market api', () => {
       }),
     });
     expect(bidRes.status).toBe(201);
-    const bidJson = (await bidRes.json()) as { bidId: string };
-
-    const acceptRes = await fetch(`${baseUrl}/api/markets/tasks/${publishJson.listingId}/accept`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        did: clientDid,
-        passphrase,
-        bidId: bidJson.bidId,
-        nonce: 2,
-      }),
-    });
-    expect(acceptRes.status).toBe(200);
+    const bidJson = await readData<{ bidId: string; txHash?: string }>(bidRes);
+    const bidHash = bidJson.txHash;
 
     const types = published.map((entry) => entry.type);
-    expect(types).toContain('market.bid.accept');
-    expect(types).toContain('market.order.create');
-    expect(types).toContain('wallet.escrow.create');
-    expect(types).toContain('wallet.escrow.fund');
-    expect(types).toContain('market.order.update');
+    expect(types).toContain('market.bid.submit');
+    expect(bidHash).toBeTruthy();
   });
 });

@@ -20,10 +20,24 @@ const EVENT_FIELDS = {
 describe('MarketsApi.search', () => {
   it('searches across all markets', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/markets/search', 200, {
+    mock.addRoute('GET', '/api/v1/markets/search', 200, {
       listings: [
-        { id: 'l1', type: 'info', seller: 'did:claw:z6Mk1', title: 'Data Set', status: 'active', createdAt: 1 },
-        { id: 'l2', type: 'task', seller: 'did:claw:z6Mk2', title: 'Code Review', status: 'active', createdAt: 2 },
+        {
+          id: 'l1',
+          type: 'info',
+          seller: 'did:claw:z6Mk1',
+          title: 'Data Set',
+          status: 'active',
+          createdAt: 1,
+        },
+        {
+          id: 'l2',
+          type: 'task',
+          seller: 'did:claw:z6Mk2',
+          title: 'Code Review',
+          status: 'active',
+          createdAt: 2,
+        },
       ],
       total: 2,
     });
@@ -41,8 +55,17 @@ describe('MarketsApi.search', () => {
 describe('InfoMarketApi', () => {
   it('list returns info listings', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/markets/info', 200, {
-      listings: [{ id: 'info-1', type: 'info', seller: 'seller', title: 'Report', status: 'active', createdAt: 1 }],
+    mock.addRoute('GET', '/api/v1/markets/info', 200, {
+      listings: [
+        {
+          id: 'info-1',
+          type: 'info',
+          seller: 'seller',
+          title: 'Report',
+          status: 'active',
+          createdAt: 1,
+        },
+      ],
       total: 1,
     });
 
@@ -55,7 +78,7 @@ describe('InfoMarketApi', () => {
 
   it('publish creates info listing', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/info', 201, {
+    mock.addRoute('POST', '/api/v1/markets/info', 201, {
       listingId: 'info-new',
       txHash: 'tx-info-1',
     });
@@ -75,7 +98,7 @@ describe('InfoMarketApi', () => {
 
   it('purchase buys info listing', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/info/info-1/purchase', 200, {
+    mock.addRoute('POST', '/api/v1/markets/info/info-1/actions/purchase', 200, {
       orderId: 'order-1',
       txHash: 'tx-purchase-1',
     });
@@ -88,9 +111,15 @@ describe('InfoMarketApi', () => {
 
   it('deliver, confirm, review lifecycle', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/info/info-1/deliver', 200, { txHash: 'tx-deliver' });
-    mock.addRoute('POST', '/api/markets/info/info-1/confirm', 200, { txHash: 'tx-confirm' });
-    mock.addRoute('POST', '/api/markets/info/info-1/review', 200, { txHash: 'tx-review' });
+    mock.addRoute('POST', '/api/v1/markets/info/info-1/actions/deliver', 200, {
+      txHash: 'tx-deliver',
+    });
+    mock.addRoute('POST', '/api/v1/markets/info/info-1/actions/confirm', 200, {
+      txHash: 'tx-confirm',
+    });
+    mock.addRoute('POST', '/api/v1/markets/info/info-1/actions/review', 200, {
+      txHash: 'tx-review',
+    });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
@@ -111,12 +140,17 @@ describe('InfoMarketApi', () => {
 
   it('subscribe and unsubscribe', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/info/info-1/subscribe', 200, { txHash: 'tx-sub' });
-    mock.addRoute('POST', '/api/markets/info/info-1/unsubscribe', 200, { txHash: 'tx-unsub' });
+    mock.addRoute('POST', '/api/v1/markets/info/info-1/subscriptions', 200, { txHash: 'tx-sub' });
+    mock.addRoute('POST', '/api/v1/markets/info/subscriptions/info-1/actions/cancel', 200, {
+      txHash: 'tx-unsub',
+    });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
-    const sub = await client.markets.info.subscribe('info-1', { ...EVENT_FIELDS, resourcePrev: null });
+    const sub = await client.markets.info.subscribe('info-1', {
+      ...EVENT_FIELDS,
+      resourcePrev: null,
+    });
     expect(sub.txHash).toBe('tx-sub');
 
     const unsub = await client.markets.info.unsubscribe('info-1', EVENT_FIELDS);
@@ -125,7 +159,7 @@ describe('InfoMarketApi', () => {
 
   it('remove removes listing', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/info/info-1/remove', 200, { txHash: 'tx-rm' });
+    mock.addRoute('POST', '/api/v1/markets/info/info-1/actions/remove', 200, { txHash: 'tx-rm' });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.info.remove('info-1', EVENT_FIELDS);
@@ -136,9 +170,18 @@ describe('InfoMarketApi', () => {
 describe('TaskMarketApi', () => {
   it('publish and list tasks', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/tasks', 201, { listingId: 'task-1', txHash: 'tx-task' });
-    mock.addRoute('GET', '/api/markets/tasks', 200, {
-      listings: [{ id: 'task-1', type: 'task', seller: 'seller', title: 'Code Audit', status: 'active', createdAt: 1 }],
+    mock.addRoute('POST', '/api/v1/markets/tasks', 201, { listingId: 'task-1', txHash: 'tx-task' });
+    mock.addRoute('GET', '/api/v1/markets/tasks', 200, {
+      listings: [
+        {
+          id: 'task-1',
+          type: 'task',
+          seller: 'seller',
+          title: 'Code Audit',
+          status: 'active',
+          createdAt: 1,
+        },
+      ],
       total: 1,
     });
 
@@ -158,18 +201,36 @@ describe('TaskMarketApi', () => {
 
   it('bid → acceptBid → deliver → confirm → review', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/tasks/task-1/bids', 200, { bidId: 'bid-1', txHash: 'tx-bid' });
-    mock.addRoute('POST', '/api/markets/tasks/task-1/accept', 200, { txHash: 'tx-accept' });
-    mock.addRoute('POST', '/api/markets/tasks/task-1/deliver', 200, { txHash: 'tx-deliver' });
-    mock.addRoute('POST', '/api/markets/tasks/task-1/confirm', 200, { txHash: 'tx-confirm' });
-    mock.addRoute('POST', '/api/markets/tasks/task-1/review', 200, { txHash: 'tx-review' });
+    mock.addRoute('POST', '/api/v1/markets/tasks/task-1/bids', 200, {
+      bidId: 'bid-1',
+      txHash: 'tx-bid',
+    });
+    mock.addRoute('POST', '/api/v1/markets/tasks/task-1/bids/bid-1/actions/accept', 200, {
+      txHash: 'tx-accept',
+    });
+    mock.addRoute('POST', '/api/v1/markets/tasks/task-1/actions/deliver', 200, {
+      txHash: 'tx-deliver',
+    });
+    mock.addRoute('POST', '/api/v1/markets/tasks/task-1/actions/confirm', 200, {
+      txHash: 'tx-confirm',
+    });
+    mock.addRoute('POST', '/api/v1/markets/tasks/task-1/actions/review', 200, {
+      txHash: 'tx-review',
+    });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
-    const bid = await client.markets.tasks.bid('task-1', { ...EVENT_FIELDS, amount: 80, message: 'I can do it' });
+    const bid = await client.markets.tasks.bid('task-1', {
+      ...EVENT_FIELDS,
+      amount: 80,
+      message: 'I can do it',
+    });
     expect(bid.bidId).toBe('bid-1');
 
-    const accept = await client.markets.tasks.acceptBid('task-1', { ...EVENT_FIELDS, bidId: 'bid-1' });
+    const accept = await client.markets.tasks.acceptBid('task-1', {
+      ...EVENT_FIELDS,
+      bidId: 'bid-1',
+    });
     expect(accept.txHash).toBe('tx-accept');
 
     const deliver = await client.markets.tasks.deliver('task-1', {
@@ -187,21 +248,31 @@ describe('TaskMarketApi', () => {
 
   it('rejectBid and withdrawBid', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/tasks/task-1/reject', 200, { txHash: 'tx-reject' });
-    mock.addRoute('POST', '/api/markets/tasks/task-1/withdraw', 200, { txHash: 'tx-withdraw' });
+    mock.addRoute('POST', '/api/v1/markets/tasks/task-1/bids/bid-2/actions/reject', 200, {
+      txHash: 'tx-reject',
+    });
+    mock.addRoute('POST', '/api/v1/markets/tasks/task-1/bids/bid-3/actions/withdraw', 200, {
+      txHash: 'tx-withdraw',
+    });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 
-    const reject = await client.markets.tasks.rejectBid('task-1', { ...EVENT_FIELDS, bidId: 'bid-2' });
+    const reject = await client.markets.tasks.rejectBid('task-1', {
+      ...EVENT_FIELDS,
+      bidId: 'bid-2',
+    });
     expect(reject.txHash).toBe('tx-reject');
 
-    const withdraw = await client.markets.tasks.withdrawBid('task-1', { ...EVENT_FIELDS, bidId: 'bid-3' });
+    const withdraw = await client.markets.tasks.withdrawBid('task-1', {
+      ...EVENT_FIELDS,
+      bidId: 'bid-3',
+    });
     expect(withdraw.txHash).toBe('tx-withdraw');
   });
 
   it('getBids returns bid list', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/markets/tasks/task-1/bids', 200, {
+    mock.addRoute('GET', '/api/v1/markets/tasks/task-1/bids', 200, {
       bids: [{ bidId: 'bid-1', amount: 80 }],
       total: 1,
     });
@@ -215,7 +286,10 @@ describe('TaskMarketApi', () => {
 describe('CapabilityMarketApi', () => {
   it('publish capability listing', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/capabilities', 201, { listingId: 'cap-1', txHash: 'tx-cap' });
+    mock.addRoute('POST', '/api/v1/markets/capabilities', 201, {
+      listingId: 'cap-1',
+      txHash: 'tx-cap',
+    });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
     const result = await client.markets.capabilities.publish({
@@ -230,26 +304,32 @@ describe('CapabilityMarketApi', () => {
 
   it('lease → invoke → pause → resume → terminate', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/capabilities/cap-1/lease', 200, {
+    mock.addRoute('POST', '/api/v1/markets/capabilities/cap-1/leases', 200, {
       leaseId: 'lease-1',
       txHash: 'tx-lease',
     });
-    mock.addRoute('POST', '/api/markets/capabilities/leases/lease-1/invoke', 200, {
+    mock.addRoute('POST', '/api/v1/markets/capabilities/leases/lease-1/actions/invoke', 200, {
       leaseId: 'lease-1',
       txHash: 'tx-invoke',
-      usage: { id: 'u1', leaseId: 'lease-1', resource: '/translate', success: true, timestamp: 1 },
+      usage: {
+        id: 'u1',
+        leaseId: 'lease-1',
+        resource: '/translate',
+        success: true,
+        timestamp: 1,
+      },
     });
-    mock.addRoute('POST', '/api/markets/capabilities/leases/lease-1/pause', 200, {
+    mock.addRoute('POST', '/api/v1/markets/capabilities/leases/lease-1/actions/pause', 200, {
       leaseId: 'lease-1',
       txHash: 'tx-pause',
       action: 'pause',
     });
-    mock.addRoute('POST', '/api/markets/capabilities/leases/lease-1/resume', 200, {
+    mock.addRoute('POST', '/api/v1/markets/capabilities/leases/lease-1/actions/resume', 200, {
       leaseId: 'lease-1',
       txHash: 'tx-resume',
       action: 'resume',
     });
-    mock.addRoute('POST', '/api/markets/capabilities/leases/lease-1/terminate', 200, {
+    mock.addRoute('POST', '/api/v1/markets/capabilities/leases/lease-1/actions/terminate', 200, {
       leaseId: 'lease-1',
       txHash: 'tx-terminate',
       action: 'terminate',
@@ -283,7 +363,7 @@ describe('CapabilityMarketApi', () => {
 
   it('getLeaseDetail returns lease + usage', async () => {
     mock = await createMockServer();
-    mock.addRoute('GET', '/api/markets/capabilities/leases/lease-1', 200, {
+    mock.addRoute('GET', '/api/v1/markets/capabilities/leases/lease-1', 200, {
       lease: {
         id: 'lease-1',
         listingId: 'cap-1',
@@ -316,9 +396,13 @@ describe('CapabilityMarketApi', () => {
 describe('MarketDisputeApi', () => {
   it('open, respond, resolve dispute', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/markets/orders/order-1/dispute', 200, { txHash: 'tx-dispute' });
-    mock.addRoute('POST', '/api/markets/disputes/dispute-1/respond', 200, { txHash: 'tx-respond' });
-    mock.addRoute('POST', '/api/markets/disputes/dispute-1/resolve', 200, { txHash: 'tx-resolve' });
+    mock.addRoute('POST', '/api/v1/markets/disputes', 200, { txHash: 'tx-dispute' });
+    mock.addRoute('POST', '/api/v1/markets/disputes/dispute-1/actions/respond', 200, {
+      txHash: 'tx-respond',
+    });
+    mock.addRoute('POST', '/api/v1/markets/disputes/dispute-1/actions/resolve', 200, {
+      txHash: 'tx-resolve',
+    });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
 

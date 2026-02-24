@@ -14,13 +14,13 @@ export class IdentityApi {
 
   /** Get this node's identity. */
   async get(opts?: RequestOptions): Promise<Identity> {
-    return this.http.get<Identity>('/api/identity', undefined, opts);
+    return this.http.get<Identity>('/api/v1/identities/self', undefined, opts);
   }
 
   /** Resolve another agent's identity by DID. */
   async resolve(did: string, source?: 'store' | 'log', opts?: RequestOptions): Promise<Identity> {
     return this.http.get<Identity>(
-      `/api/identity/${encodeURIComponent(did)}`,
+      `/api/v1/identities/${encodeURIComponent(did)}`,
       source ? { source } : undefined,
       opts,
     );
@@ -28,11 +28,24 @@ export class IdentityApi {
 
   /** List registered capabilities. */
   async listCapabilities(opts?: RequestOptions): Promise<CapabilitiesResponse> {
-    return this.http.get<CapabilitiesResponse>('/api/identity/capabilities', undefined, opts);
+    const identity = await this.http.get<Record<string, unknown>>(
+      '/api/v1/identities/self',
+      undefined,
+      opts,
+    );
+    const capabilities = Array.isArray(identity.capabilities) ? identity.capabilities : [];
+    return { capabilities } as CapabilitiesResponse;
   }
 
   /** Register a new capability credential. */
-  async registerCapability(params: RegisterCapabilityParams, opts?: RequestOptions): Promise<Capability> {
-    return this.http.post<Capability>('/api/identity/capabilities', params, opts);
+  async registerCapability(
+    params: RegisterCapabilityParams,
+    opts?: RequestOptions,
+  ): Promise<Capability> {
+    return this.http.post<Capability>(
+      `/api/v1/identities/${encodeURIComponent(params.did)}/capabilities`,
+      params,
+      opts,
+    );
   }
 }

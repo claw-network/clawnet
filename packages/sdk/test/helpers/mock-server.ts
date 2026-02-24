@@ -24,7 +24,7 @@ export interface MockRoute {
  *
  * ```ts
  * const mock = await createMockServer();
- * mock.addRoute('GET', '/api/node/status', 200, { synced: true });
+ * mock.addRoute('GET', '/api/v1/node', 200, { data: { synced: true } });
  * const client = new ClawNetClient({ baseUrl: mock.baseUrl });
  * await client.node.getStatus();
  * mock.close();
@@ -86,7 +86,11 @@ export async function createMockServer(): Promise<MockServer> {
 
     if (!matched) {
       res.writeHead(404, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ error: { code: 'NOT_FOUND', message: `No mock for ${req.method} ${urlpath}` } }));
+      res.end(
+        JSON.stringify({
+          error: { code: 'NOT_FOUND', message: `No mock for ${req.method} ${urlpath}` },
+        }),
+      );
       return;
     }
 

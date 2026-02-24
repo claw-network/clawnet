@@ -3,6 +3,17 @@ import type { AddressInfo } from 'node:net';
 import { ApiServer } from '../src/api/server.js';
 import { MarketListing, MarketSearchIndex } from '@claw-network/protocol';
 
+async function readData<T>(res: Response): Promise<T> {
+  const payload = (await res.json()) as { data?: T };
+  return (payload.data ?? payload) as T;
+}
+
+async function readProblem(
+  res: Response,
+): Promise<{ type: string; title: string; status: number }> {
+  return (await res.json()) as { type: string; title: string; status: number };
+}
+
 function createListing(overrides: Partial<MarketListing>): MarketListing {
   const base: MarketListing = {
     id: 'listing-1',
@@ -136,34 +147,34 @@ describe('markets search api', () => {
 
   it('filters search results', async () => {
     const res = await fetch(
-      `${baseUrl}/api/markets/search?markets=info&tags=data&minPrice=10&maxPrice=20&sort=price_asc`,
+      `${baseUrl}/api/v1/markets/search?markets=info&tags=data&minPrice=10&maxPrice=20&sort=price_asc`,
     );
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { listings: Array<{ id: string }> };
-    expect(json.listings.map((item) => item.id)).toEqual(['info-1']);
+    const json = await readData<Array<{ id: string }>>(res);
+    expect(json.map((item) => item.id)).toEqual(['info-1']);
 
-    const taskRes = await fetch(`${baseUrl}/api/markets/search?markets=task&skills=translation`);
+    const taskRes = await fetch(`${baseUrl}/api/v1/markets/search?markets=task&skills=translation`);
     expect(taskRes.status).toBe(200);
-    const taskJson = (await taskRes.json()) as { listings: Array<{ id: string }> };
-    expect(taskJson.listings.map((item) => item.id)).toEqual(['task-1']);
+    const taskJson = await readData<Array<{ id: string }>>(taskRes);
+    expect(taskJson.map((item) => item.id)).toEqual(['task-1']);
 
-    const taskTypeRes = await fetch(`${baseUrl}/api/markets/search?taskTypes=one_time`);
+    const taskTypeRes = await fetch(`${baseUrl}/api/v1/markets/search?taskTypes=one_time`);
     expect(taskTypeRes.status).toBe(200);
-    const taskTypeJson = (await taskTypeRes.json()) as { listings: Array<{ id: string }> };
-    expect(taskTypeJson.listings.map((item) => item.id)).toEqual(['task-1']);
+    const taskTypeJson = await readData<Array<{ id: string }>>(taskTypeRes);
+    expect(taskTypeJson.map((item) => item.id)).toEqual(['task-1']);
 
     const infoRes = await fetch(
-      `${baseUrl}/api/markets/search?infoTypes=dataset&contentFormats=csv&accessMethods=download`,
+      `${baseUrl}/api/v1/markets/search?infoTypes=dataset&contentFormats=csv&accessMethods=download`,
     );
     expect(infoRes.status).toBe(200);
-    const infoJson = (await infoRes.json()) as { listings: Array<{ id: string }> };
-    expect(infoJson.listings.map((item) => item.id)).toEqual(['info-1']);
+    const infoJson = await readData<Array<{ id: string }>>(infoRes);
+    expect(infoJson.map((item) => item.id)).toEqual(['info-1']);
   });
 
   it('returns 400 for invalid market type', async () => {
-    const res = await fetch(`${baseUrl}/api/markets/search?markets=unknown`);
+    const res = await fetch(`${baseUrl}/api/v1/markets/search?markets=unknown`);
     expect(res.status).toBe(400);
-    const json = (await res.json()) as { error: { code: string } };
-    expect(json.error.code).toBe('INVALID_REQUEST');
+    const json = await readProblem(res);
+    expect(json.type).toContain('validation-error');
   });
 });

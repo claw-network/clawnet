@@ -1,6 +1,6 @@
 ---
-title: "Deployment Guide"
-description: "Deploy ClawNet nodes for development, staging, and production"
+title: 'Deployment Guide'
+description: 'Deploy ClawNet nodes for development, staging, and production'
 ---
 
 > How to run a ClawNet node in development, staging, and production.
@@ -91,7 +91,7 @@ services:
   clawnet:
     build: .
     ports:
-      - "9528:9528"
+      - '9528:9528'
     volumes:
       - clawnet-data:/data
     environment:
@@ -99,7 +99,7 @@ services:
       - CLAW_API_PORT=9528
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]
+      test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:9528/api/v1/node']
       interval: 30s
       timeout: 5s
       retries: 3
@@ -108,12 +108,12 @@ services:
   clawnet-peer:
     build: .
     ports:
-      - "9529:9528"
+      - '9529:9528'
     volumes:
       - clawnet-peer-data:/data
     environment:
       - CLAW_API_HOST=0.0.0.0
-    command: ["--bootstrap", "/ip4/clawnet/tcp/9529"]
+    command: ['--bootstrap', '/ip4/clawnet/tcp/9529']
     restart: unless-stopped
 
 volumes:
@@ -130,11 +130,13 @@ volumes:
 Default: `~/.clawnet/`
 
 Override:
+
 ```bash
 clawnetd --data-dir /opt/clawnet/data
 ```
 
 Or via environment variable:
+
 ```bash
 export CLAW_DATA_DIR=/opt/clawnet/data
 ```
@@ -150,25 +152,26 @@ export CLAW_DATA_DIR=/opt/clawnet/data
 
 ### API Configuration
 
-| Flag | Environment | Default | Description |
-|------|-------------|---------|-------------|
-| `--api-host` | `CLAW_API_HOST` | `127.0.0.1` | Listen address |
-| `--api-port` | `CLAW_API_PORT` | `9528` | Listen port |
-| `--no-api` | — | — | Disable API entirely |
+| Flag         | Environment     | Default     | Description          |
+| ------------ | --------------- | ----------- | -------------------- |
+| `--api-host` | `CLAW_API_HOST` | `127.0.0.1` | Listen address       |
+| `--api-port` | `CLAW_API_PORT` | `9528`      | Listen port          |
+| `--no-api`   | —               | —           | Disable API entirely |
 
 **Security**: The API listens on `127.0.0.1` by default (local only). To expose remotely, set `--api-host 0.0.0.0` and configure an API key.
 
 ### Identity Passphrase (REQUIRED)
 
-| Flag | Environment | Default | Description |
-|------|-------------|---------|-------------|
-| `--passphrase <str>` | `CLAW_PASSPHRASE` | — | **Required.** Encrypts the node’s identity key record |
+| Flag                 | Environment       | Default | Description                                           |
+| -------------------- | ----------------- | ------- | ----------------------------------------------------- |
+| `--passphrase <str>` | `CLAW_PASSPHRASE` | —       | **Required.** Encrypts the node’s identity key record |
 
 > **⚠️ CRITICAL**: Every ClawNet node **must** have a passphrase configured.
 > Without it the node **will refuse to start**.
 >
 > The passphrase is used to encrypt/decrypt the Ed25519 identity key on disk.
 > A node without a passphrase has **no DID**, which means:
+>
 > - ❌ Cannot sign any transactions
 > - ❌ Cannot participate in markets (info / task / capability)
 > - ❌ Cannot hold a wallet or transfer Tokens
@@ -204,13 +207,14 @@ docker run -e CLAW_PASSPHRASE="my-secure-passphrase" ...
 
 ### P2P Configuration
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--listen <multiaddr>` | Auto | libp2p listen address (repeatable) |
-| `--bootstrap <multiaddr>` | Built-in | Bootstrap peer (repeatable) |
-| `--health-interval-ms` | `30000` | Health check interval (0 to disable) |
+| Flag                      | Default  | Description                          |
+| ------------------------- | -------- | ------------------------------------ |
+| `--listen <multiaddr>`    | Auto     | libp2p listen address (repeatable)   |
+| `--bootstrap <multiaddr>` | Built-in | Bootstrap peer (repeatable)          |
+| `--health-interval-ms`    | `30000`  | Health check interval (0 to disable) |
 
 Example:
+
 ```bash
 clawnetd \
   --listen /ip4/0.0.0.0/tcp/9529 \
@@ -252,7 +256,7 @@ server {
 
 ### Monitoring
 
-- [ ] Health endpoint: `GET /api/node/status`
+- [ ] Health endpoint: `GET /api/v1/node`
 - [ ] Check `synced == true`
 - [ ] Monitor peer count (`peers > 0` for networked nodes)
 - [ ] Track uptime and block height
@@ -325,7 +329,7 @@ import { ClawNetClient } from '@claw-network/sdk';
 
 const client = new ClawNetClient({
   baseUrl: 'https://api.clawnetd.com',
-  apiKey:  'your-secure-random-key',
+  apiKey: 'your-secure-random-key',
 });
 ```
 
@@ -347,13 +351,13 @@ services:
   caddy:
     image: caddy:2
     ports:
-      - "443:443"
-      - "80:80"
+      - '443:443'
+      - '80:80'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy-data:/data
     environment:
-      CLAW_API_KEY: "${CLAW_API_KEY}"
+      CLAW_API_KEY: '${CLAW_API_KEY}'
     depends_on:
       - clawnet
     restart: unless-stopped
@@ -372,10 +376,11 @@ For production, configure API key authentication on the node itself:
 api:
   host: 127.0.0.1
   port: 9528
-  apiKey: "your-secure-random-key"   # Required for all requests
+  apiKey: 'your-secure-random-key' # Required for all requests
 ```
 
 Or set via environment variable:
+
 ```bash
 export CLAW_API_KEY="your-secure-random-key"
 ```
@@ -395,7 +400,7 @@ sudo ufw enable
 ```bash
 # Check node is healthy behind the proxy
 curl -s -H "X-API-Key: $CLAW_API_KEY" \
-     https://api.clawnetd.com/api/node/status | jq .
+     https://api.clawnetd.com/api/v1/node | jq .
 
 # Expected: { "synced": true, "peers": 4, ... }
 ```
@@ -428,6 +433,7 @@ clawnetd \
 ```
 
 Record the node's peer ID from startup logs, then share the multiaddr:
+
 ```
 /ip4/<public-ip>/tcp/9527/p2p/<peer-id>
 ```
@@ -478,7 +484,7 @@ async function drip(recipientDid: string, amount = 1000) {
 3. **Stop** the daemon gracefully (`SIGTERM`)
 4. **Replace** the binary or update source
 5. **Start** the daemon — it will auto-migrate if needed
-6. **Verify** status: `curl http://127.0.0.1:9528/api/node/status`
+6. **Verify** status: `curl http://127.0.0.1:9528/api/v1/node`
 
 The protocol maintains backward compatibility for 1 minor version. Emergency rollback is supported by restoring the backup.
 
@@ -486,11 +492,11 @@ The protocol maintains backward compatibility for 1 minor version. Emergency rol
 
 ## 8. Troubleshooting
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `EADDRINUSE :9528` | Port in use | Stop existing node or use `--api-port` |
-| `Cannot find module` | Missing build | Run `pnpm build` |
-| Node never syncs | No peers | Check bootstrap addresses, firewall |
-| High memory usage | Large event log | Enable snapshot compaction |
-| Slow API responses | Too many peers | Limit connections in config |
+| Symptom               | Cause            | Fix                                        |
+| --------------------- | ---------------- | ------------------------------------------ |
+| `EADDRINUSE :9528`    | Port in use      | Stop existing node or use `--api-port`     |
+| `Cannot find module`  | Missing build    | Run `pnpm build`                           |
+| Node never syncs      | No peers         | Check bootstrap addresses, firewall        |
+| High memory usage     | Large event log  | Enable snapshot compaction                 |
+| Slow API responses    | Too many peers   | Limit connections in config                |
 | Key decryption failed | Wrong passphrase | Verify passphrase or recover from mnemonic |

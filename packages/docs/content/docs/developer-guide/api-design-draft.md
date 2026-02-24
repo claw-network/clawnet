@@ -1,6 +1,6 @@
 ---
-title: "API Design Draft"
-description: "Minimal API design aligned with OpenAPI spec"
+title: 'API Design Draft'
+description: 'Minimal API design aligned with OpenAPI spec'
 ---
 
 > 完全对齐 `docs/api/openapi.yaml`，并补齐响应 schema 与错误码引用。
@@ -31,7 +31,7 @@ description: "Minimal API design aligned with OpenAPI spec"
 
 # Node
 
-## GET /api/node/status
+## GET /api/v1/node
 
 - Response 200: `NodeStatus`
 

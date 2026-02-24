@@ -15,16 +15,18 @@ describe('ReputationApi', () => {
   it('getProfile returns reputation profile', async () => {
     mock = await createMockServer();
     const did = 'did:claw:z6MkAgent';
-    mock.addRoute('GET', `/api/reputation/${encodeURIComponent(did)}`, 200, {
-      did,
-      score: 85,
-      level: 'gold',
-      levelNumber: 4,
-      dimensions: { transaction: 90, delivery: 80, quality: 85, social: 75, behavior: 95 },
-      totalTransactions: 50,
-      successRate: 0.96,
-      averageRating: 4.5,
-      badges: ['early_adopter'],
+    mock.addRoute('GET', `/api/v1/reputations/${encodeURIComponent(did)}`, 200, {
+      data: {
+        did,
+        score: 85,
+        level: 'gold',
+        levelNumber: 4,
+        dimensions: { transaction: 90, delivery: 80, quality: 85, social: 75, behavior: 95 },
+        totalTransactions: 50,
+        successRate: 0.96,
+        averageRating: 4.5,
+        badges: ['early_adopter'],
+      },
     });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
@@ -41,8 +43,8 @@ describe('ReputationApi', () => {
   it('getReviews returns review list', async () => {
     mock = await createMockServer();
     const did = 'did:claw:z6MkAgent';
-    mock.addRoute('GET', `/api/reputation/${encodeURIComponent(did)}/reviews`, 200, {
-      reviews: [
+    mock.addRoute('GET', `/api/v1/reputations/${encodeURIComponent(did)}/reviews`, 200, {
+      data: [
         {
           id: 'rev-1',
           reviewer: 'did:claw:z6MkOther',
@@ -52,8 +54,7 @@ describe('ReputationApi', () => {
           createdAt: 1700000000000,
         },
       ],
-      total: 1,
-      averageRating: 5.0,
+      meta: { pagination: { total: 1, page: 1, perPage: 10 } },
     });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });
@@ -61,15 +62,17 @@ describe('ReputationApi', () => {
 
     expect(result.reviews).toHaveLength(1);
     expect(result.reviews[0].rating).toBe(5);
-    expect(result.averageRating).toBe(5.0);
+    expect(result.total).toBe(1);
   });
 
   it('record submits reputation event', async () => {
     mock = await createMockServer();
-    mock.addRoute('POST', '/api/reputation/record', 200, {
-      txHash: 'rep-tx-1',
-      status: 'confirmed',
-      timestamp: 1700000000000,
+    mock.addRoute('POST', '/api/v1/reputations/did%3Aclaw%3Az6MkTarget/reviews', 201, {
+      data: {
+        txHash: 'rep-tx-1',
+        status: 'confirmed',
+        timestamp: 1700000000000,
+      },
     });
 
     const client = new ClawNetClient({ baseUrl: mock.baseUrl });

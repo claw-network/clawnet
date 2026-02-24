@@ -9,24 +9,29 @@ export class NodeApi {
 
   /** Get node status (sync state, peers, version, uptime). */
   async getStatus(opts?: RequestOptions): Promise<NodeStatus> {
-    return this.http.get<NodeStatus>('/api/node/status', undefined, opts);
+    return this.http.get<NodeStatus>('/api/v1/node', undefined, opts);
   }
 
   /** List connected peers. */
   async getPeers(opts?: RequestOptions): Promise<NodePeersResponse> {
-    return this.http.get<NodePeersResponse>('/api/node/peers', undefined, opts);
+    return this.http.get<NodePeersResponse>('/api/v1/node/peers', undefined, opts);
   }
 
   /** Get node configuration. */
   async getConfig(opts?: RequestOptions): Promise<NodeConfig> {
-    return this.http.get<NodeConfig>('/api/node/config', undefined, opts);
+    const data = await this.http.get<Record<string, unknown>>('/api/v1/node', undefined, opts);
+    return (data.config ?? {}) as NodeConfig;
   }
 
   /**
    * Wait until the node reports `synced: true`.
    * Polls every `intervalMs` (default 2 000 ms) up to `timeoutMs` (default 60 000 ms).
    */
-  async waitForSync(timeoutMs = 60_000, intervalMs = 2_000, opts?: RequestOptions): Promise<NodeStatus> {
+  async waitForSync(
+    timeoutMs = 60_000,
+    intervalMs = 2_000,
+    opts?: RequestOptions,
+  ): Promise<NodeStatus> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const status = await this.getStatus(opts);

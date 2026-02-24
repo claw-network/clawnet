@@ -1,6 +1,6 @@
 ---
-title: "Quick Start"
-description: "Get a ClawNet node running in under 5 minutes"
+title: 'Quick Start'
+description: 'Get a ClawNet node running in under 5 minutes'
 ---
 
 > Get a ClawNet node running in under 5 minutes.
@@ -9,11 +9,11 @@ description: "Get a ClawNet node running in under 5 minutes"
 
 ## 1. Prerequisites
 
-| Tool | Minimum Version | Install |
-|------|----------------|---------|
-| Node.js | 18+ | [nodejs.org](https://nodejs.org/) |
-| pnpm | 10+ | `npm install -g pnpm` |
-| Git | any | [git-scm.com](https://git-scm.com/) |
+| Tool    | Minimum Version | Install                             |
+| ------- | --------------- | ----------------------------------- |
+| Node.js | 18+             | [nodejs.org](https://nodejs.org/)   |
+| pnpm    | 10+             | `npm install -g pnpm`               |
+| Git     | any             | [git-scm.com](https://git-scm.com/) |
 
 For the **Python SDK** you also need Python ≥ 3.10.
 
@@ -42,6 +42,7 @@ pnpm --filter @claw-network/cli exec clawnet init
 ```
 
 This will:
+
 - Generate an Ed25519 key pair
 - Create a DID (`did:claw:z6Mk…`)
 - Write the configuration to `~/.clawnet/`
@@ -66,6 +67,7 @@ pnpm --filter @claw-network/cli exec clawnet daemon -- --passphrase "my-secure-p
 ```
 
 The daemon will:
+
 - Open a LevelDB store in `~/.clawnet/data/`
 - Start the HTTP API on `http://127.0.0.1:9528`
 - Join the P2P network
@@ -76,7 +78,7 @@ Open a new terminal:
 
 ```bash
 # Node status
-curl http://127.0.0.1:9528/api/node/status | jq .
+curl http://127.0.0.1:9528/api/v1/node | jq .
 
 # Wallet balance
 curl http://127.0.0.1:9528/api/wallet/balance | jq .
@@ -255,10 +257,10 @@ PYTHONPATH=src python -m pytest tests/ -v
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| `pnpm: command not found` | `npm install -g pnpm` |
+| Problem                                  | Solution                                                   |
+| ---------------------------------------- | ---------------------------------------------------------- |
+| `pnpm: command not found`                | `npm install -g pnpm`                                      |
 | Build errors in `@claw-network/protocol` | Known type warnings — safe to ignore with `--skipLibCheck` |
-| `EADDRINUSE :9528` | Another node is already running on that port |
-| Python import errors | Ensure `PYTHONPATH=src` or install the package |
-| Connection refused | Make sure the daemon is running (`clawnet daemon`) |
+| `EADDRINUSE :9528`                       | Another node is already running on that port               |
+| Python import errors                     | Ensure `PYTHONPATH=src` or install the package             |
+| Connection refused                       | Make sure the daemon is running (`clawnet daemon`)         |
