@@ -57,7 +57,9 @@
 
 ### 阶段一：初始铸造（Genesis Mint）
 
-由 Deployer 执行，将初始供应量 mint 到 DAO 国库。
+由 Deployer 执行。**不能只 mint 到 DAO 国库**——否则没人有 Token，DAO 提案也无法创建（需要 100 Token 门槛），经济无法启动。
+
+初始 mint 必须分多笔，按比例直接 mint 到各目标地址：
 
 ```bash
 # 在 packages/contracts 目录下
@@ -69,13 +71,56 @@ const token = await ethers.getContractAt(
   "ClawToken",
   "0xA98Cc076321aF8cC66A579b91643B5B98E316AA4"
 );
-const daoAddress = "0xe3C7a659591EaA8E724505E00Bccbb743CB9948b";
 
-// 铸造初始供应量到 DAO 国库
-await token.mint(daoAddress, 10_000_000);
+// === 以 100 万初始供应为例 ===
+
+// 1. 给各节点钱包 mint（让节点能质押、提案、投票、运行 faucet）
+//    节点有了 Token 才能质押(10,000)、创建提案(100)、投票、运行 faucet
+await token.mint("0xNodeA_Address", 50000);   // 节点 A
+await token.mint("0xNodeB_Address", 50000);   // 节点 B
+await token.mint("0xNodeC_Address", 50000);   // 节点 C
+
+// 2. Faucet 运营钱包（给新 Agent 发启动金，POST /api/dev/faucet 从此钱包 transfer）
+await token.mint("0xFaucet_Address", 150000);
+
+// 3. 流动性钱包（市场初始流动性）
+await token.mint("0xLiquidity_Address", 100000);
+
+// 4. 风险储备钱包（安全事件应急）
+await token.mint("0xReserve_Address", 50000);
+
+// 5. 大头 mint 到 DAO 国库（后续通过治理提案分配）
+const daoAddress = "0xe3C7a659591EaA8E724505E00Bccbb743CB9948b";
+await token.mint(daoAddress, 500000);
 ```
 
-执行后：DAO 合约地址持有 10,000,000 Token（这就是"国库"）。
+分配比例参照 `value-anchor-monetary-policy-v0.1.md` Section 13.2：
+
+| 用途 | 比例 | 金额 | 接收方 | 为什么需要 |
+|------|------|------|--------|-----------|
+| 国库 | 50% | 500,000 | DAO 合约地址 | 后续治理拨款的资金池 |
+| 生态拨款 | 20% | 200,000 | 含节点初始分配 | 让节点能质押、提案、投票 |
+| Faucet | 15% | 150,000 | Faucet 运营钱包 | 给新 Agent 发启动金 |
+| 流动性 | 10% | 100,000 | 流动性钱包 | 市场初始流动性 |
+| 风险储备 | 5% | 50,000 | 风险储备钱包 | 安全事件应急 |
+
+> **为什么不全部 mint 到国库再走提案拨款？**
+> 因为 DAO 提案需要 100 Token 门槛，投票也需要 Token 余额计算权重。
+> 如果没人有 Token，就没人能创建提案或投票——这就是冷启动悖论。
+> 所以必须由 Deployer 先将一部分 Token 直接 mint 给节点和运营钱包。
+
+初始化后的启动链路：
+
+```
+Deployer mint → 节点钱包各获得 Token
+                  │
+                  ├── 质押 10,000 Token → ClawStaking → 成为验证节点
+                  ├── 运行 faucet → 新 Agent 获得启动金
+                  ├── 发起 DAO 提案 → 投票分配国库资金
+                  └── 参与服务交易 → 平台费回流国库
+                                           │
+                  经济循环运转 ←────────────┘
+```
 
 ### 阶段二：DAO 提案拨款（Treasury Spend）
 
