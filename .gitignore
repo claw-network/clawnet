@@ -7,3 +7,5 @@ dist
 .source
 package-lock.json
 *.tsbuildinfo
+localdev
+/.idea
