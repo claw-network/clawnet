@@ -52,6 +52,7 @@ export const ErrorTypes = {
   VALIDATION: `${ERROR_BASE_URL}/validation-error`,
   UNAUTHORIZED: `${ERROR_BASE_URL}/unauthorized`,
   FORBIDDEN: `${ERROR_BASE_URL}/forbidden`,
+  TOO_MANY_REQUESTS: `${ERROR_BASE_URL}/too-many-requests`,
   NOT_FOUND: `${ERROR_BASE_URL}/not-found`,
   CONFLICT: `${ERROR_BASE_URL}/conflict`,
   UNPROCESSABLE: `${ERROR_BASE_URL}/unprocessable-entity`,
@@ -171,6 +172,28 @@ export function forbidden(res: ServerResponse, detail?: string, instance?: strin
   });
 }
 
+export function tooManyRequests(
+  res: ServerResponse,
+  detail?: string,
+  instance?: string,
+  retryAfterSeconds?: number,
+): void {
+  if (
+    typeof retryAfterSeconds === 'number' &&
+    Number.isFinite(retryAfterSeconds) &&
+    retryAfterSeconds > 0
+  ) {
+    res.setHeader('Retry-After', String(Math.ceil(retryAfterSeconds)));
+  }
+  problem(res, {
+    type: ErrorTypes.TOO_MANY_REQUESTS,
+    title: 'Too Many Requests',
+    status: 429,
+    detail: detail ?? 'Rate limit exceeded',
+    instance,
+  });
+}
+
 export function notFound(res: ServerResponse, detail?: string, instance?: string): void {
   problem(res, {
     type: ErrorTypes.NOT_FOUND,
@@ -232,11 +255,16 @@ export interface PaginationParams {
 
 export function parsePagination(searchParams: URLSearchParams): PaginationParams {
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
-  const perPage = Math.min(100, Math.max(1, parseInt(searchParams.get('per_page') ?? '20', 10) || 20));
+  const perPage = Math.min(
+    100,
+    Math.max(1, parseInt(searchParams.get('per_page') ?? '20', 10) || 20),
+  );
   return { page, perPage, offset: (page - 1) * perPage };
 }
 
-export function parseSort(searchParams: URLSearchParams): { field: string; order: 'asc' | 'desc' } | undefined {
+export function parseSort(
+  searchParams: URLSearchParams,
+): { field: string; order: 'asc' | 'desc' } | undefined {
   const sort = searchParams.get('sort');
   if (!sort) return undefined;
   if (sort.startsWith('-')) {

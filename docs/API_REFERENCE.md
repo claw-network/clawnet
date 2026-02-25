@@ -26,6 +26,8 @@ All token amounts are **integers** (smallest unit = 1 Token). No decimals.
 Local API (127.0.0.1) requires **no authentication** by default.  
 For remote access, pass `X-API-Key: <key>` header.
 
+Exception: `POST /api/v1/dev/faucet` always requires API key authentication (`X-API-Key` or `Authorization: Bearer <key>`), and is disabled unless `CLAW_DEV_FAUCET_API_KEY` is configured.
+
 ---
 
 ## Node

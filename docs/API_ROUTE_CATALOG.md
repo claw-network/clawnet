@@ -9,25 +9,27 @@
 
 ## General Conventions
 
-| Item | Detail |
-|---|---|
-| Base URL | `http://localhost:9600/api/` (alice node; bob=9601, charlie=9602, dave=9603, eve=9604) |
-| Port mapping | Host port → container port 9528 |
-| Content-Type | `application/json; charset=utf-8` |
-| Max body size | 1 MB |
-| Auth model | **No header auth.** POST endpoints require `{ did, passphrase }` in the JSON body. |
-| Currency unit | **Token** (never "CLAW") |
+| Item          | Detail                                                                                 |
+| ------------- | -------------------------------------------------------------------------------------- |
+| Base URL      | `http://localhost:9600/api/` (alice node; bob=9601, charlie=9602, dave=9603, eve=9604) |
+| Port mapping  | Host port → container port 9528                                                        |
+| Content-Type  | `application/json; charset=utf-8`                                                      |
+| Max body size | 1 MB                                                                                   |
+| Auth model    | **No header auth.** POST endpoints require `{ did, passphrase }` in the JSON body.     |
+| Currency unit | **Token** (never "CLAW")                                                               |
 
 ### Response Patterns
 
 **Success** — `sendJson(res, statusCode, rawObject)` — returns the raw JSON object directly, **NO envelope wrapper**.
 
 **Error** — `sendError(res, statusCode, code, message)`:
+
 ```json
 { "error": { "code": "ERROR_CODE", "message": "human-readable message" } }
 ```
 
 **Pagination** (collections) — inline in the response body:
+
 ```json
 {
   "items": [ ... ],
@@ -40,13 +42,13 @@
 
 All mutation endpoints share these base fields:
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `did` | string | ✅ | Caller's DID (`did:claw:...`) |
-| `passphrase` | string | ✅ | Passphrase to decrypt the caller's private key |
-| `nonce` | integer | ✅ | Monotonically increasing nonce |
-| `prev` | string | ❌ | Hash of the caller's previous event (hash chain) |
-| `ts` | number | ❌ | Timestamp override (defaults to `Date.now()`) |
+| Field        | Type    | Required | Description                                      |
+| ------------ | ------- | -------- | ------------------------------------------------ |
+| `did`        | string  | ✅       | Caller's DID (`did:claw:...`)                    |
+| `passphrase` | string  | ✅       | Passphrase to decrypt the caller's private key   |
+| `nonce`      | integer | ✅       | Monotonically increasing nonce                   |
+| `prev`       | string  | ❌       | Hash of the caller's previous event (hash chain) |
+| `ts`         | number  | ❌       | Timestamp override (defaults to `Date.now()`)    |
 
 ---
 
@@ -57,6 +59,7 @@ All mutation endpoints share these base fields:
 Returns node identity and runtime info.
 
 **Response:**
+
 ```json
 {
   "did": "did:claw:z...",
@@ -65,24 +68,24 @@ Returns node identity and runtime info.
   "uptime": 12345,
   "eventCount": 100,
   "peerCount": 4,
-  "capabilities": [ "identity", "wallet", "reputation", "contracts", "market", "dao" ]
+  "capabilities": ["identity", "wallet", "reputation", "contracts", "market", "dao"]
 }
 ```
 
 ### `GET /api/node/peers`
 
 **Response:**
+
 ```json
 {
-  "peers": [
-    { "peerId": "...", "addrs": ["/ip4/..."], "did": "did:claw:z..." }
-  ]
+  "peers": [{ "peerId": "...", "addrs": ["/ip4/..."], "did": "did:claw:z..." }]
 }
 ```
 
 ### `GET /api/node/config`
 
 **Response** (sanitized — no secrets):
+
 ```json
 {
   "host": "0.0.0.0",
@@ -102,6 +105,7 @@ Returns node identity and runtime info.
 Returns the **local** node's own identity.
 
 **Response:**
+
 ```json
 {
   "did": "did:claw:z...",
@@ -124,6 +128,7 @@ Resolve any identity by DID (scans event log).
 Returns capabilities for the local identity (or query param `?did=`).
 
 **Response:**
+
 ```json
 {
   "did": "did:claw:z...",
@@ -153,6 +158,7 @@ Register a new capability via a signed Verifiable Credential.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "abc123...", "capability": { "id": "...", "name": "...", ... } }
 ```
@@ -166,6 +172,7 @@ Register a new capability via a signed Verifiable Credential.
 Query param: `?source=store|log` (default: both, `store` uses the reputation store, `log` replays event log).
 
 **Response:**
+
 ```json
 {
   "did": "did:claw:z...",
@@ -184,6 +191,7 @@ Query param: `?source=store|log` (default: both, `store` uses the reputation sto
 ### `GET /api/reputation/:did/reviews`
 
 **Response:**
+
 ```json
 {
   "did": "did:claw:z...",
@@ -219,6 +227,7 @@ Submit a reputation review for another DID.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "target": "did:claw:z...", "dimension": "quality", "status": "recorded" }
 ```
@@ -232,6 +241,7 @@ Submit a reputation review for another DID.
 Query params: `?did=did:claw:z...` **or** `?address=...` (one required).
 
 **Response:**
+
 ```json
 {
   "address": "abc123...",
@@ -248,6 +258,7 @@ Query params: `?did=did:claw:z...` **or** `?address=...` (one required).
 Query params: `?did=` or `?address=` (required), `&type=all|sent|received|escrow`, `&limit=50`, `&offset=0`.
 
 **Response:**
+
 ```json
 {
   "address": "...",
@@ -284,6 +295,7 @@ Transaction `type` values: `transfer`, `escrow_lock`, `escrow_release`.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "from": "...", "to": "...", "amount": "100", "status": "broadcast" }
 ```
@@ -312,6 +324,7 @@ Create an escrow. Optionally auto-funds in the same call.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 {
   "escrowId": "uuid",
@@ -323,11 +336,13 @@ Create an escrow. Optionally auto-funds in the same call.
   "fundTxHash": "..."
 }
 ```
+
 (`fundTxHash` present only when `autoFund: true`; status is `"funded"` in that case.)
 
 ### `GET /api/wallet/escrow/:id`
 
 **Response (200):**
+
 ```json
 {
   "escrowId": "...",
@@ -358,6 +373,7 @@ Create an escrow. Optionally auto-funds in the same call.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "escrowId": "...", "amount": "500", "status": "broadcast" }
 ```
@@ -367,6 +383,7 @@ Create an escrow. Optionally auto-funds in the same call.
 Same request body as `/fund`. Releases funds to beneficiary.
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "escrowId": "...", "amount": "500", "status": "broadcast" }
 ```
@@ -376,6 +393,7 @@ Same request body as `/fund`. Releases funds to beneficiary.
 Same request body as `/fund`. Refunds funds to depositor.
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "escrowId": "...", "amount": "500", "status": "broadcast" }
 ```
@@ -393,6 +411,7 @@ Same request body as `/fund`. Refunds funds to depositor.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "escrowId": "...", "action": "refund", "status": "broadcast" }
 ```
@@ -406,6 +425,7 @@ Same request body as `/fund`. Refunds funds to depositor.
 Query params: `?role=all|client|provider`, `?status=...`, `?limit=20`, `?offset=0`.
 
 **Response:**
+
 ```json
 {
   "items": [
@@ -445,6 +465,7 @@ Query params: `?role=all|client|provider`, `?status=...`, `?limit=20`, `?offset=
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 {
   "contractId": "...",
@@ -464,9 +485,11 @@ Query params: `?role=all|client|provider`, `?status=...`, `?limit=20`, `?offset=
 **Request body** (ContractSignSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "contractId": "...", "signer": "did:claw:z...", "status": "draft|active" }
 ```
+
 Status becomes `"active"` once both parties sign.
 
 ### `POST /api/contracts/:id/fund`
@@ -482,6 +505,7 @@ Status becomes `"active"` once both parties sign.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 {
   "contractId": "...",
@@ -508,6 +532,7 @@ Submit milestone deliverables (provider).
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "contractId": "...", "milestoneId": "...", "status": "submitted" }
 ```
@@ -519,6 +544,7 @@ Client approves milestone. Triggers escrow release for milestone amount.
 **Request body** (ContractMilestoneReviewSchema): `{ did, passphrase, notes?, rating?, feedback?, nonce }`
 
 **Response (200):**
+
 ```json
 {
   "txHash": "...",
@@ -529,6 +555,7 @@ Client approves milestone. Triggers escrow release for milestone amount.
   "paymentAmount": "5000"
 }
 ```
+
 (`paymentTxHash` + `paymentAmount` only if escrow release succeeds.)
 
 ### `POST /api/contracts/:id/milestones/:mid/reject`
@@ -536,6 +563,7 @@ Client approves milestone. Triggers escrow release for milestone amount.
 **Request body** (ContractMilestoneReviewSchema): `{ did, passphrase, notes?, feedback?, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "contractId": "...", "milestoneId": "...", "status": "rejected" }
 ```
@@ -547,6 +575,7 @@ Mark contract as completed (client).
 **Request body** (ContractCompleteSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "contractId": "...", "status": "completed" }
 ```
@@ -566,6 +595,7 @@ Open a dispute on the contract.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "contractId": "...", "status": "disputed" }
 ```
@@ -582,6 +612,7 @@ Open a dispute on the contract.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "contractId": "...", "status": "resolved" }
 ```
@@ -600,6 +631,7 @@ Execute a settlement (e.g. partial payment after dispute).
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "contractId": "...", "status": "settled" }
 ```
@@ -635,6 +667,7 @@ Query params (all optional):
 | `includeFacets` | boolean | Include facet counts |
 
 **Response:**
+
 ```json
 {
   "results": [ { "listing": { ... }, "market": "info|task|capability", "score": 1.0 } ],
@@ -665,6 +698,7 @@ Open a dispute on a market order.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 { "txHash": "...", "disputeId": "...", "orderId": "...", "status": "open" }
 ```
@@ -681,6 +715,7 @@ Open a dispute on a market order.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "disputeId": "...", "status": "responded" }
 ```
@@ -697,6 +732,7 @@ Open a dispute on a market order.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "disputeId": "...", "status": "resolved" }
 ```
@@ -710,6 +746,7 @@ Open a dispute on a market order.
 Search/list info listings. Accepts same query params as cross-market search (subset: `keyword`, `category`, `tags`, `infoTypes`, `contentFormats`, `accessMethods`, `statuses`, `visibility`, `minPrice`, `maxPrice`, `minReputation`, `minRating`, `sort`, `page`, `pageSize`, `includeFacets`).
 
 **Response:**
+
 ```json
 {
   "results": [ { "listing": { ... }, "market": "info", "score": 1.0 } ],
@@ -748,6 +785,7 @@ Publish an info listing.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 { "txHash": "...", "listingId": "...", "status": "active" }
 ```
@@ -777,6 +815,7 @@ Returns decrypted/raw content for the listing.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 {
   "txHash": "...",
@@ -792,6 +831,7 @@ Returns decrypted/raw content for the listing.
 **Request body** (InfoSubscriptionSchema): `{ did, passphrase, subscriptionId?, nonce }`
 
 **Response (201):**
+
 ```json
 { "txHash": "...", "subscriptionId": "...", "listingId": "...", "status": "active" }
 ```
@@ -801,6 +841,7 @@ Returns decrypted/raw content for the listing.
 **Request body** (InfoSubscriptionCancelSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "subscriptionId": "...", "status": "cancelled" }
 ```
@@ -824,6 +865,7 @@ Seller delivers purchased info.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 {
   "txHash": "...",
@@ -838,6 +880,7 @@ Seller delivers purchased info.
 Retrieve delivery info for a purchased order.
 
 **Response (200):**
+
 ```json
 {
   "orderId": "...",
@@ -865,6 +908,7 @@ Buyer confirms delivery and releases escrow.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 {
   "txHash": "...",
@@ -889,6 +933,7 @@ Buyer confirms delivery and releases escrow.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "orderId": "...", "status": "reviewed" }
 ```
@@ -898,6 +943,7 @@ Buyer confirms delivery and releases escrow.
 **Request body** (ListingRemoveSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "listingId": "...", "status": "removed" }
 ```
@@ -940,6 +986,7 @@ Publish a task listing.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 { "txHash": "...", "listingId": "...", "status": "active" }
 ```
@@ -951,6 +998,7 @@ Publish a task listing.
 ### `GET /api/markets/tasks/:id/bids`
 
 **Response (200):**
+
 ```json
 {
   "listingId": "...",
@@ -985,6 +1033,7 @@ Submit a bid on a task.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 { "txHash": "...", "bidId": "...", "listingId": "...", "status": "submitted" }
 ```
@@ -1005,6 +1054,7 @@ Accept a bid (creates order + escrow).
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 {
   "txHash": "...",
@@ -1021,6 +1071,7 @@ Accept a bid (creates order + escrow).
 **Request body** (TaskBidActionSchema): `{ did, passphrase, bidId, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "bidId": "...", "listingId": "...", "status": "rejected" }
 ```
@@ -1032,6 +1083,7 @@ Bidder withdraws their own bid.
 **Request body** (TaskBidActionSchema): `{ did, passphrase, bidId, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "bidId": "...", "listingId": "...", "status": "withdrawn" }
 ```
@@ -1052,6 +1104,7 @@ Submit deliverables for an accepted task.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "orderId": "...", "submissionId": "...", "status": "delivered" }
 ```
@@ -1076,6 +1129,7 @@ Review/approve a task delivery (releases escrow if approved).
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 {
   "txHash": "...",
@@ -1094,6 +1148,7 @@ Post-completion review.
 **Request body** (TaskReviewSchema): Same as InfoReviewSchema.
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "orderId": "...", "status": "reviewed" }
 ```
@@ -1103,6 +1158,7 @@ Post-completion review.
 **Request body** (ListingRemoveSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "listingId": "...", "status": "removed" }
 ```
@@ -1145,6 +1201,7 @@ Publish a capability listing.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 { "txHash": "...", "listingId": "...", "status": "active" }
 ```
@@ -1170,6 +1227,7 @@ Start a lease on a capability.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 {
   "txHash": "...",
@@ -1185,6 +1243,7 @@ Start a lease on a capability.
 **Request body** (ListingRemoveSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "listingId": "...", "status": "removed" }
 ```
@@ -1192,6 +1251,7 @@ Start a lease on a capability.
 ### `GET /api/markets/capabilities/leases/:id`
 
 **Response (200):**
+
 ```json
 {
   "leaseId": "...",
@@ -1231,6 +1291,7 @@ Record a usage/invocation event on a lease.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 {
   "txHash": "...",
@@ -1247,6 +1308,7 @@ Record a usage/invocation event on a lease.
 **Request body** (CapabilityLeaseActionSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "leaseId": "...", "status": "paused" }
 ```
@@ -1256,6 +1318,7 @@ Record a usage/invocation event on a lease.
 **Request body** (CapabilityLeaseActionSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "leaseId": "...", "status": "active" }
 ```
@@ -1265,6 +1328,7 @@ Record a usage/invocation event on a lease.
 **Request body** (CapabilityLeaseActionSchema): `{ did, passphrase, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "leaseId": "...", "status": "terminated" }
 ```
@@ -1278,9 +1342,14 @@ Record a usage/invocation event on a lease.
 Query params: `?status=...`, `?type=...`, `?limit=20`, `?offset=0`.
 
 **Response:**
+
 ```json
 {
-  "items": [ { /* proposal objects */ } ],
+  "items": [
+    {
+      /* proposal objects */
+    }
+  ],
   "total": 5,
   "pagination": { "limit": 20, "offset": 0, "hasMore": false }
 }
@@ -1307,6 +1376,7 @@ Create a governance proposal.
 | `nonce` | integer | ✅ |
 
 **Response (201):**
+
 ```json
 { "txHash": "...", "proposalId": "...", "status": "discussion" }
 ```
@@ -1330,6 +1400,7 @@ Advance proposal to the next stage.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "proposalId": "...", "newStatus": "voting", "status": "advanced" }
 ```
@@ -1337,11 +1408,18 @@ Advance proposal to the next stage.
 ### `GET /api/dao/proposals/:id/votes`
 
 **Response (200):**
+
 ```json
 {
   "proposalId": "...",
   "votes": [
-    { "voter": "did:claw:z...", "option": "for", "power": "1000", "reason": "...", "ts": 1700000000000 }
+    {
+      "voter": "did:claw:z...",
+      "option": "for",
+      "power": "1000",
+      "reason": "...",
+      "ts": 1700000000000
+    }
   ],
   "summary": { "for": "3000", "against": "500", "abstain": "200" }
 }
@@ -1363,6 +1441,7 @@ Cast a vote on a proposal.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "proposalId": "...", "option": "for", "status": "broadcast" }
 ```
@@ -1383,6 +1462,7 @@ Delegate voting power to another DID.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "delegate": "did:claw:z...", "status": "broadcast" }
 ```
@@ -1392,6 +1472,7 @@ Delegate voting power to another DID.
 **Request body** (DaoDelegateRevokeSchema): `{ did, passphrase, delegate, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "delegate": "did:claw:z...", "status": "revoked" }
 ```
@@ -1399,6 +1480,7 @@ Delegate voting power to another DID.
 ### `GET /api/dao/delegations/:did`
 
 **Response (200):**
+
 ```json
 {
   "did": "did:claw:z...",
@@ -1410,6 +1492,7 @@ Delegate voting power to another DID.
 ### `GET /api/dao/treasury`
 
 **Response (200):**
+
 ```json
 { "treasury": { ... } }
 ```
@@ -1426,6 +1509,7 @@ Delegate voting power to another DID.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "amount": "1000", "status": "broadcast" }
 ```
@@ -1433,6 +1517,7 @@ Delegate voting power to another DID.
 ### `GET /api/dao/timelock`
 
 **Response (200):**
+
 ```json
 { "entries": [ ... ] }
 ```
@@ -1442,6 +1527,7 @@ Delegate voting power to another DID.
 **Request body** (DaoTimelockExecuteSchema): `{ did, passphrase, actionId, nonce }`
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "actionId": "...", "status": "executed" }
 ```
@@ -1458,6 +1544,7 @@ Delegate voting power to another DID.
 | `nonce` | integer | ✅ |
 
 **Response (200):**
+
 ```json
 { "txHash": "...", "actionId": "...", "status": "cancelled" }
 ```
@@ -1465,6 +1552,7 @@ Delegate voting power to another DID.
 ### `GET /api/dao/params`
 
 **Response (200):**
+
 ```json
 {
   "thresholds": {
@@ -1481,111 +1569,129 @@ Delegate voting power to another DID.
 
 ## 13. Dev / Testnet
 
-### `POST /api/dev/faucet`
+### `POST /api/v1/dev/faucet`
 
-**Only available when `NODE_ENV=development`.**
+**Dev/testnet-only route.**
+
+**Authentication (required):**
+
+- Header `X-API-Key: <CLAW_DEV_FAUCET_API_KEY>`
+- Or header `Authorization: Bearer <CLAW_DEV_FAUCET_API_KEY>`
+
+If `CLAW_DEV_FAUCET_API_KEY` is not configured, the faucet endpoint is disabled and returns `401`.
 
 **Request body:**
 | Field | Type | Required |
 |---|---|---|
-| `did` | string | ✅ — Recipient DID |
-| `amount` | number\|string | ✅ — Token amount to mint |
+| `address` | string | ✅* — Recipient address |
+| `did` | string | ✅* — Recipient DID |
+| `amount` | integer | ❌ — Defaults to `CLAW_DEV_FAUCET_MAX_AMOUNT_PER_CLAIM` |
 
-> Note: No `passphrase` needed in the body — the faucet uses the node's own identity and the `CLAW_PASSPHRASE` env var.
+\* `address` or `did` must be provided.
+
+**Policy guardrails (defaults):**
+
+- `CLAW_DEV_FAUCET_MAX_AMOUNT_PER_CLAIM=50`
+- `CLAW_DEV_FAUCET_COOLDOWN_HOURS=24`
+- `CLAW_DEV_FAUCET_MAX_CLAIMS_PER_DID_PER_MONTH=4`
+- `CLAW_DEV_FAUCET_MAX_CLAIMS_PER_IP_PER_DAY=3`
+
+Exceeding policy limits returns `429 Too Many Requests` with `Retry-After`.
 
 **Response (200):**
+
 ```json
-{ "txHash": "...", "did": "did:claw:z...", "amount": "10000", "status": "minted" }
+{ "data": { "txHash": "0x...", "to": "0x...", "amount": 50, "status": "broadcast" } }
 ```
 
 ---
 
 ## Quick Reference — All 75 Routes
 
-| # | Method | Path | Description |
-|---|---|---|---|
-| 1 | GET | `/api/node/status` | Node status & identity |
-| 2 | GET | `/api/node/peers` | Connected peers |
-| 3 | GET | `/api/node/config` | Sanitized config |
-| 4 | GET | `/api/identity` | Local identity |
-| 5 | GET | `/api/identity/:did` | Resolve DID |
-| 6 | GET | `/api/identity/capabilities` | List capabilities |
-| 7 | POST | `/api/identity/capabilities` | Register capability |
-| 8 | GET | `/api/reputation/:did` | Reputation profile |
-| 9 | GET | `/api/reputation/:did/reviews` | Reviews list |
-| 10 | POST | `/api/reputation/record` | Submit review |
-| 11 | GET | `/api/wallet/balance` | Wallet balance |
-| 12 | GET | `/api/wallet/history` | Transaction history |
-| 13 | POST | `/api/wallet/transfer` | Transfer Tokens |
-| 14 | POST | `/api/wallet/escrow` | Create escrow |
-| 15 | GET | `/api/wallet/escrow/:id` | Get escrow |
-| 16 | POST | `/api/wallet/escrow/:id/fund` | Fund escrow |
-| 17 | POST | `/api/wallet/escrow/:id/release` | Release escrow |
-| 18 | POST | `/api/wallet/escrow/:id/refund` | Refund escrow |
-| 19 | POST | `/api/wallet/escrow/:id/expire` | Expire escrow |
-| 20 | GET | `/api/contracts` | List contracts |
-| 21 | POST | `/api/contracts` | Create contract |
-| 22 | GET | `/api/contracts/:id` | Get contract |
-| 23 | POST | `/api/contracts/:id/sign` | Sign contract |
-| 24 | POST | `/api/contracts/:id/fund` | Fund contract |
-| 25 | POST | `/api/contracts/:id/complete` | Complete contract |
-| 26 | POST | `/api/contracts/:id/dispute` | Open dispute |
-| 27 | POST | `/api/contracts/:id/dispute/resolve` | Resolve dispute |
-| 28 | POST | `/api/contracts/:id/settlement` | Execute settlement |
-| 29 | POST | `/api/contracts/:id/milestones/:mid/complete` | Submit milestone |
-| 30 | POST | `/api/contracts/:id/milestones/:mid/approve` | Approve milestone |
-| 31 | POST | `/api/contracts/:id/milestones/:mid/reject` | Reject milestone |
-| 32 | GET | `/api/markets/search` | Cross-market search |
-| 33 | POST | `/api/markets/orders/:id/dispute` | Open order dispute |
-| 34 | POST | `/api/markets/disputes/:id/respond` | Respond to dispute |
-| 35 | POST | `/api/markets/disputes/:id/resolve` | Resolve dispute |
-| 36 | GET | `/api/markets/info` | List info listings |
-| 37 | POST | `/api/markets/info` | Publish info listing |
-| 38 | GET | `/api/markets/info/:id` | Get info listing |
-| 39 | GET | `/api/markets/info/:id/content` | Get info content |
-| 40 | GET | `/api/markets/info/orders/:orderId/delivery` | Get delivery info |
-| 41 | POST | `/api/markets/info/:id/purchase` | Purchase info |
-| 42 | POST | `/api/markets/info/:id/subscribe` | Subscribe to info |
-| 43 | POST | `/api/markets/info/subscriptions/:id/cancel` | Cancel subscription |
-| 44 | POST | `/api/markets/info/:id/deliver` | Deliver info |
-| 45 | POST | `/api/markets/info/:id/confirm` | Confirm delivery |
-| 46 | POST | `/api/markets/info/:id/review` | Review info order |
-| 47 | POST | `/api/markets/info/:id/remove` | Remove info listing |
-| 48 | GET | `/api/markets/tasks` | List task listings |
-| 49 | POST | `/api/markets/tasks` | Publish task |
-| 50 | GET | `/api/markets/tasks/:id` | Get task listing |
-| 51 | GET | `/api/markets/tasks/:id/bids` | List bids |
-| 52 | POST | `/api/markets/tasks/:id/bids` | Submit bid |
-| 53 | POST | `/api/markets/tasks/:id/accept` | Accept bid |
-| 54 | POST | `/api/markets/tasks/:id/reject` | Reject bid |
-| 55 | POST | `/api/markets/tasks/:id/withdraw` | Withdraw bid |
-| 56 | POST | `/api/markets/tasks/:id/deliver` | Deliver task |
-| 57 | POST | `/api/markets/tasks/:id/confirm` | Confirm task delivery |
-| 58 | POST | `/api/markets/tasks/:id/review` | Review task order |
-| 59 | POST | `/api/markets/tasks/:id/remove` | Remove task listing |
-| 60 | GET | `/api/markets/capabilities` | List capabilities |
-| 61 | POST | `/api/markets/capabilities` | Publish capability |
-| 62 | GET | `/api/markets/capabilities/:id` | Get capability listing |
-| 63 | POST | `/api/markets/capabilities/:id/lease` | Start lease |
-| 64 | POST | `/api/markets/capabilities/:id/remove` | Remove capability |
-| 65 | GET | `/api/markets/capabilities/leases/:id` | Get lease |
-| 66 | POST | `/api/markets/capabilities/leases/:id/invoke` | Record invocation |
-| 67 | POST | `/api/markets/capabilities/leases/:id/pause` | Pause lease |
-| 68 | POST | `/api/markets/capabilities/leases/:id/resume` | Resume lease |
-| 69 | POST | `/api/markets/capabilities/leases/:id/terminate` | Terminate lease |
-| 70 | GET | `/api/dao/proposals` | List proposals |
-| 71 | POST | `/api/dao/proposals` | Create proposal |
-| 72 | GET | `/api/dao/proposals/:id` | Get proposal |
-| 73 | POST | `/api/dao/proposals/:id/advance` | Advance proposal |
-| 74 | GET | `/api/dao/proposals/:id/votes` | Get votes |
-| 75 | POST | `/api/dao/vote` | Cast vote |
-| 76 | POST | `/api/dao/delegate` | Set delegation |
-| 77 | POST | `/api/dao/delegate/revoke` | Revoke delegation |
-| 78 | GET | `/api/dao/delegations/:did` | Get delegations |
-| 79 | GET | `/api/dao/treasury` | Get treasury |
-| 80 | POST | `/api/dao/treasury/deposit` | Deposit to treasury |
-| 81 | GET | `/api/dao/timelock` | List timelock entries |
-| 82 | POST | `/api/dao/timelock/:id/execute` | Execute timelock |
-| 83 | POST | `/api/dao/timelock/:id/cancel` | Cancel timelock |
-| 84 | GET | `/api/dao/params` | Get DAO params |
-| 85 | POST | `/api/dev/faucet` | Dev faucet (mint) |
+| #   | Method | Path                                             | Description                              |
+| --- | ------ | ------------------------------------------------ | ---------------------------------------- |
+| 1   | GET    | `/api/node/status`                               | Node status & identity                   |
+| 2   | GET    | `/api/node/peers`                                | Connected peers                          |
+| 3   | GET    | `/api/node/config`                               | Sanitized config                         |
+| 4   | GET    | `/api/identity`                                  | Local identity                           |
+| 5   | GET    | `/api/identity/:did`                             | Resolve DID                              |
+| 6   | GET    | `/api/identity/capabilities`                     | List capabilities                        |
+| 7   | POST   | `/api/identity/capabilities`                     | Register capability                      |
+| 8   | GET    | `/api/reputation/:did`                           | Reputation profile                       |
+| 9   | GET    | `/api/reputation/:did/reviews`                   | Reviews list                             |
+| 10  | POST   | `/api/reputation/record`                         | Submit review                            |
+| 11  | GET    | `/api/wallet/balance`                            | Wallet balance                           |
+| 12  | GET    | `/api/wallet/history`                            | Transaction history                      |
+| 13  | POST   | `/api/wallet/transfer`                           | Transfer Tokens                          |
+| 14  | POST   | `/api/wallet/escrow`                             | Create escrow                            |
+| 15  | GET    | `/api/wallet/escrow/:id`                         | Get escrow                               |
+| 16  | POST   | `/api/wallet/escrow/:id/fund`                    | Fund escrow                              |
+| 17  | POST   | `/api/wallet/escrow/:id/release`                 | Release escrow                           |
+| 18  | POST   | `/api/wallet/escrow/:id/refund`                  | Refund escrow                            |
+| 19  | POST   | `/api/wallet/escrow/:id/expire`                  | Expire escrow                            |
+| 20  | GET    | `/api/contracts`                                 | List contracts                           |
+| 21  | POST   | `/api/contracts`                                 | Create contract                          |
+| 22  | GET    | `/api/contracts/:id`                             | Get contract                             |
+| 23  | POST   | `/api/contracts/:id/sign`                        | Sign contract                            |
+| 24  | POST   | `/api/contracts/:id/fund`                        | Fund contract                            |
+| 25  | POST   | `/api/contracts/:id/complete`                    | Complete contract                        |
+| 26  | POST   | `/api/contracts/:id/dispute`                     | Open dispute                             |
+| 27  | POST   | `/api/contracts/:id/dispute/resolve`             | Resolve dispute                          |
+| 28  | POST   | `/api/contracts/:id/settlement`                  | Execute settlement                       |
+| 29  | POST   | `/api/contracts/:id/milestones/:mid/complete`    | Submit milestone                         |
+| 30  | POST   | `/api/contracts/:id/milestones/:mid/approve`     | Approve milestone                        |
+| 31  | POST   | `/api/contracts/:id/milestones/:mid/reject`      | Reject milestone                         |
+| 32  | GET    | `/api/markets/search`                            | Cross-market search                      |
+| 33  | POST   | `/api/markets/orders/:id/dispute`                | Open order dispute                       |
+| 34  | POST   | `/api/markets/disputes/:id/respond`              | Respond to dispute                       |
+| 35  | POST   | `/api/markets/disputes/:id/resolve`              | Resolve dispute                          |
+| 36  | GET    | `/api/markets/info`                              | List info listings                       |
+| 37  | POST   | `/api/markets/info`                              | Publish info listing                     |
+| 38  | GET    | `/api/markets/info/:id`                          | Get info listing                         |
+| 39  | GET    | `/api/markets/info/:id/content`                  | Get info content                         |
+| 40  | GET    | `/api/markets/info/orders/:orderId/delivery`     | Get delivery info                        |
+| 41  | POST   | `/api/markets/info/:id/purchase`                 | Purchase info                            |
+| 42  | POST   | `/api/markets/info/:id/subscribe`                | Subscribe to info                        |
+| 43  | POST   | `/api/markets/info/subscriptions/:id/cancel`     | Cancel subscription                      |
+| 44  | POST   | `/api/markets/info/:id/deliver`                  | Deliver info                             |
+| 45  | POST   | `/api/markets/info/:id/confirm`                  | Confirm delivery                         |
+| 46  | POST   | `/api/markets/info/:id/review`                   | Review info order                        |
+| 47  | POST   | `/api/markets/info/:id/remove`                   | Remove info listing                      |
+| 48  | GET    | `/api/markets/tasks`                             | List task listings                       |
+| 49  | POST   | `/api/markets/tasks`                             | Publish task                             |
+| 50  | GET    | `/api/markets/tasks/:id`                         | Get task listing                         |
+| 51  | GET    | `/api/markets/tasks/:id/bids`                    | List bids                                |
+| 52  | POST   | `/api/markets/tasks/:id/bids`                    | Submit bid                               |
+| 53  | POST   | `/api/markets/tasks/:id/accept`                  | Accept bid                               |
+| 54  | POST   | `/api/markets/tasks/:id/reject`                  | Reject bid                               |
+| 55  | POST   | `/api/markets/tasks/:id/withdraw`                | Withdraw bid                             |
+| 56  | POST   | `/api/markets/tasks/:id/deliver`                 | Deliver task                             |
+| 57  | POST   | `/api/markets/tasks/:id/confirm`                 | Confirm task delivery                    |
+| 58  | POST   | `/api/markets/tasks/:id/review`                  | Review task order                        |
+| 59  | POST   | `/api/markets/tasks/:id/remove`                  | Remove task listing                      |
+| 60  | GET    | `/api/markets/capabilities`                      | List capabilities                        |
+| 61  | POST   | `/api/markets/capabilities`                      | Publish capability                       |
+| 62  | GET    | `/api/markets/capabilities/:id`                  | Get capability listing                   |
+| 63  | POST   | `/api/markets/capabilities/:id/lease`            | Start lease                              |
+| 64  | POST   | `/api/markets/capabilities/:id/remove`           | Remove capability                        |
+| 65  | GET    | `/api/markets/capabilities/leases/:id`           | Get lease                                |
+| 66  | POST   | `/api/markets/capabilities/leases/:id/invoke`    | Record invocation                        |
+| 67  | POST   | `/api/markets/capabilities/leases/:id/pause`     | Pause lease                              |
+| 68  | POST   | `/api/markets/capabilities/leases/:id/resume`    | Resume lease                             |
+| 69  | POST   | `/api/markets/capabilities/leases/:id/terminate` | Terminate lease                          |
+| 70  | GET    | `/api/dao/proposals`                             | List proposals                           |
+| 71  | POST   | `/api/dao/proposals`                             | Create proposal                          |
+| 72  | GET    | `/api/dao/proposals/:id`                         | Get proposal                             |
+| 73  | POST   | `/api/dao/proposals/:id/advance`                 | Advance proposal                         |
+| 74  | GET    | `/api/dao/proposals/:id/votes`                   | Get votes                                |
+| 75  | POST   | `/api/dao/vote`                                  | Cast vote                                |
+| 76  | POST   | `/api/dao/delegate`                              | Set delegation                           |
+| 77  | POST   | `/api/dao/delegate/revoke`                       | Revoke delegation                        |
+| 78  | GET    | `/api/dao/delegations/:did`                      | Get delegations                          |
+| 79  | GET    | `/api/dao/treasury`                              | Get treasury                             |
+| 80  | POST   | `/api/dao/treasury/deposit`                      | Deposit to treasury                      |
+| 81  | GET    | `/api/dao/timelock`                              | List timelock entries                    |
+| 82  | POST   | `/api/dao/timelock/:id/execute`                  | Execute timelock                         |
+| 83  | POST   | `/api/dao/timelock/:id/cancel`                   | Cancel timelock                          |
+| 84  | GET    | `/api/dao/params`                                | Get DAO params                           |
+| 85  | POST   | `/api/v1/dev/faucet`                             | Dev faucet (API key + anti-abuse limits) |
