@@ -1,6 +1,6 @@
 # ClawNet Chain 基础设施部署指南
 
-> 3 台服务器部署 ClawNet Chain（Geth Clique PoA）的完整操作手册，基于 2025-02-23 实际部署经验编写。
+> 3 台服务器部署 ClawNet Chain（Geth Clique PoA）的完整操作手册，已合并 2026-02 的 redeploy 自动校验与多签地址隔离实践。
 
 ---
 
@@ -21,6 +21,7 @@
 13. [安全加固](#安全加固)
 14. [已知陷阱与经验教训](#已知陷阱与经验教训)
 15. [未来扩展](#未来扩展)
+16. [共识迁移决策（PoA -> QBFT -> PoS）](#共识迁移决策poa---qbft---pos)
 
 ---
 
@@ -401,7 +402,7 @@ echo $EXTRADATA
 
 ### 2.4 完整 genesis.json
 
-参考模板：[genesis.json](chain-testnet/genesis.json)
+参考模板：[genesis.json](testnet/genesis.json)
 
 将 Step 1 的地址填入对应占位符，生成最终文件。确保 **所有 fork time 字段仅到 londonBlock**。
 
@@ -501,12 +502,12 @@ EOF
 
 ```bash
 # 从仓库复制 compose 模板
-cp /opt/clawnet/infra/chain-testnet/docker-compose.yml /opt/clawnet/docker-compose.chain.yml
+cp /opt/clawnet/infra/testnet/docker-compose.yml /opt/clawnet/docker-compose.chain.yml
 
 # 编辑 VALIDATOR_ADDRESS、bootnodes 等（Server A 无需 bootnodes，留空）
 ```
 
-compose 文件模板参考：[docker-compose.yml](chain-testnet/docker-compose.yml)
+compose 文件模板参考：[docker-compose.yml](testnet/docker-compose.yml)
 
 > **注意**：Server A 的 Geth 8545 端口绑定到 `0.0.0.0:8545` 是为了给 Caddy 做反向代理。
 > 实际公网访问由 UFW 防火墙控制（不对外开放 8545 端口，只通过 Caddy 443 反代）。
@@ -551,7 +552,7 @@ pnpm build
 
 ```bash
 # 从仓库复制 Caddyfile
-cp /opt/clawnet/infra/chain-testnet/Caddyfile /etc/caddy/Caddyfile
+cp /opt/clawnet/infra/testnet/Caddyfile /etc/caddy/Caddyfile
 
 # 创建日志目录
 mkdir -p /var/log/caddy
@@ -568,7 +569,7 @@ curl -s https://rpc.clawnetd.com \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
 ```
 
-Caddyfile 模板参考：[Caddyfile](chain-testnet/Caddyfile)
+Caddyfile 模板参考：[Caddyfile](testnet/Caddyfile)
 
 ### 3.12 配置防火墙
 
@@ -649,7 +650,7 @@ VALIDATOR_ADDRESS=<VALIDATOR_2_ADDRESS>
 EOF
 
 # 使用同步模式的 compose（不含 --mine）
-cp /opt/clawnet/infra/chain-testnet/docker-compose.sync.yml /opt/clawnet/docker-compose.sync.yml
+cp /opt/clawnet/infra/testnet/docker-compose.sync.yml /opt/clawnet/docker-compose.sync.yml
 # 编辑 bootnodes 指向 Server A 的 enode URL
 
 docker compose -f docker-compose.sync.yml up -d
@@ -665,7 +666,7 @@ watch -n2 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/
 
 ```bash
 # 使用挖矿模式的 compose
-cp /opt/clawnet/infra/chain-testnet/docker-compose.peer.yml /opt/clawnet/docker-compose.chain.yml
+cp /opt/clawnet/infra/testnet/docker-compose.peer.yml /opt/clawnet/docker-compose.chain.yml
 # 编辑 VALIDATOR_ADDRESS、bootnodes
 
 # 切换
@@ -1192,6 +1193,6 @@ infra/
 
 ---
 
-_最后更新: 2025-02-23_
+_最后更新: 2026-02-25_
 _适用版本: ClawNet Chain Testnet v0.1_
 _Geth: v1.13.15 · Clique PoA · Chain ID: 7625_
