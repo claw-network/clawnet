@@ -35,6 +35,12 @@
 - timelock（时间锁）：提案通过后到执行前的等待期，用于审查与风险拦截。
 - calldata：链上合约函数调用的编码数据。
 - chainId：链的唯一标识。ClawNet testnet 当前为 `7625`。
+- genesis（创世配置）：链的初始规则与初始状态定义文件（如 chainId、共识参数、硬分叉激活点、alloc 预分配）。不是地理区域配置。
+- hard fork（协议升级）：一组协议规则切换。需要节点按同一规则运行，否则会分叉或拒绝同步。
+- London / Shanghai：以太坊协议升级代号（历史上使用城市名命名），表示 EVM/协议规则版本，不代表地区或部署地点。
+- londonBlock：在指定区块高度激活 London 规则的 Genesis 字段。
+- shanghaiTime：在指定 Unix 时间戳激活 Shanghai 规则的 Genesis 字段（time-based fork）。
+- Clique 与 Shanghai 兼容性：Clique PoA 链不应启用 `shanghaiTime`；在当前 ClawNet（Geth v1.13.15 + Clique）配置下会导致同步失败。
 - LIQUIDITY_ADDRESS：流动性资金地址。必须为独立地址，不得与 `TREASURY_ADDRESS`、`FAUCET_VAULT_ADDRESS`、`RISK_RESERVE_ADDRESS` 复用。
 - LIQUIDITY_WALLET_CONTROL：流动性钱包签名策略（N/M），要求多签；建议测试网 `2/3`，长期运行环境 `3/5`。
 - LIQUIDITY_MONTHLY_BUDGET_CAP：流动性月度预算上限（常用口径为国库可动用余额百分比），超额需治理追加审批。
