@@ -369,6 +369,10 @@ echo ""
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 9: Deploying smart contracts..."
 
+# Clear stale OpenZeppelin deployment manifest from previous chain
+run_remote "$SERVER_A" "rm -f /opt/clawnet/packages/contracts/.openzeppelin/unknown-7625.json"
+echo "  Cleared stale OpenZeppelin manifest."
+
 run_remote "$SERVER_A" "cd /opt/clawnet && \
   pnpm install --filter @claw-network/contracts... && \
   cd packages/contracts && \
