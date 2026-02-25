@@ -848,80 +848,88 @@
   - 验收指标：全量对账 0 差异
   - 工时：2 天
 
-### Sprint 3-C：双轨运行（W4–W6）
+### Sprint 3-C：Testnet 全业务验证（W2–W3）
 
-- [ ] **T-3.8** Node 节点适配双轨模式
-  - 修改 `packages/node/`：
-    - 链下事件处理保持不变
-    - 新增：每笔关键操作同时写入链上
-    - 新增：链上事件监听 → 更新本地状态
-  - 配置项：`mode: 'offchain' | 'dual' | 'onchain'`
-  - 验收：dual 模式下链上链下状态一致
-  - 工时：5 天
+- [ ] **T-3.8** Testnet 全场景集成测试
+  - 在测试网（chainId 7625，3 台 Geth PoA + 3 台 ClawNet Node）上端到端跑通所有业务流程
+  - 覆盖 `clawnet/scenarios/` 01–09 全部场景：
+    1. Identity + Wallet（DID 注册、转账、余额查询）
+    2. Info Market（信息市场发布、购买）
+    3. Task Market（任务发布、申领、交付）
+    4. Capability Market（能力市场）
+    5. Service Contract（创建、签约、milestone、完成）
+    6. Contract Dispute（争议、仲裁）
+    7. DAO Governance（提案、投票、执行）
+    8. Cross-node Sync（多节点 P2P 同步）
+    9. Economic Cycle（完整经济循环）
+  - 验收：全部 9 个场景通过，无链上异常
+  - 工时：3 天
 
-- [ ] **T-3.9** 双轨运行监控仪表板
-  - 产出：Grafana 面板 或 简单 CLI 工具
-  - 监控：
-    - 链上 vs 链下余额差异
-    - 链上 vs 链下 Escrow 状态差异
-    - 链上交易失败率
-    - Gas 消耗统计
-  - 工时：2 天
+- [ ] **T-3.9** Testnet 稳定性观察
+  - 持续运行 5–7 天，监控：
+    - Geth 出块稳定（2s 间隔，无分叉）
+    - Node REST API 响应正常
+    - 链上交易成功率 100%
+    - EventIndexer 索引无遗漏（indexer block == chain head）
+    - P2P gossipsub 消息同步正常
+  - 每日运行 `reconcile.ts`，确认链上链下 0 差异
+  - 验收：连续 5 天无异常
+  - 工时：5 天（含值班观察）
 
-- [ ] **T-3.10** 双轨运行测试（2 周观察期）
-  - 操作：
-    1. 在测试网启动双轨模式
-    2. 运行完整集成测试场景（clawnet scenarios 01-09）
-    3. 每日对账
-    4. 记录所有异常
-  - 验收：连续 7 天无链上链下差异
-  - 工时：持续
+### Sprint 3-D：主网升级部署（W3–W4）
 
-### Sprint 3-D：主网部署 + 切换（W6–W8）
-
-- [ ] **T-3.11** 主网部署准备
+- [ ] **T-3.10** 主网基础设施准备
   - 操作：
     1. 确认外部审计报告无 Critical/High 未修复
-    2. 准备主网 deployer 多签钱包
-    3. 准备足够 Token (gas)（ClawNet Chain 使用 Token 作原生 Gas 代币）
-    4. 社区公示迁移计划 + 时间表
-  - 工时：1 天
+    2. 准备主网 deployer 多签钱包（复用 `infra/testnet/multisig-soft-wallet/`）
+    3. 准备 2 台新服务器环境（与现有 3 台一致：Geth v1.13.15 + Docker）
+    4. 生成新 genesis.json（chainId 7626，5 Validator 地址）
+    5. 配置 5 节点 Clique PoA 共识（3/5 签名出块）
+  - 验收：5 台服务器就绪、genesis 配置确认
+  - 工时：2 天
 
-- [ ] **T-3.12** ClawNet Chain 主网部署
-  - 启动 ClawNet Chain 主网节点（高可用 PoA 部署，多授权节点）
-  - 执行 `deploy-all.ts --network clawnetMainnet`
-  - 验证所有合约源码
-  - 记录地址到 `deployments/clawnetMainnet.json`
-  - 工时：1 天
-
-- [ ] **T-3.13** 执行数据迁移
-  - 步骤：
-    1. 公告：链下系统进入维护窗口（暂停高价值操作）
-    2. 执行 DID 迁移 (`migrate-identities.ts`)
-    3. 执行余额迁移 (`migrate-balances.ts`)
-    4. 执行 Escrow 迁移 (`migrate-escrows.ts`)
-    5. 执行合约迁移 (`migrate-contracts.ts`)
-    6. 全量对账 (`reconcile.ts`)
-    7. 公告迁移完成
-  - 验收：对账 0 差异
-  - 工时：2 天（含测试+正式）
-
-- [ ] **T-3.14** 切换 source of truth
+- [ ] **T-3.11** ClawNet 主网链启动
   - 操作：
-    1. 节点配置从 `dual` 切为 `onchain`
-    2. SDK 默认 `onChain: true`
-    3. 链下事件溯源降级为只读缓存
-    4. 更新文档
-  - 验收：所有操作走链上通路
+    1. 5 台服务器初始化 Geth（`geth init genesis.json`）
+    2. 配置 bootnodes + static-nodes.json
+    3. 启动 Geth PoA 出块（`docker-compose.chain.yml`）
+    4. 验证区块同步、Clique 签名轮转正常
+    5. 配置 Caddy 反向代理（`rpc.clawnet.io` → 8545）
+  - 验收：5 节点出块，区块高度一致，RPC 可达
   - 工时：1 天
 
-- [ ] **T-3.15** Bug Bounty 正式启动
-  - 发布到 Immunefi / 社区
+- [ ] **T-3.12** 主网合约部署
+  - 执行 `npx hardhat run scripts/deploy-all.ts --network clawnetMainnet`
+  - 记录地址到 `deployments/clawnetMainnet.json`
   - 工时：0.5 天
 
-- [ ] **T-3.16** 发布公告 + 更新文档
+- [ ] **T-3.13** 主网数据迁移
+  - 步骤：
+    1. 公告：暂停 testnet 高价值操作（维护窗口）
+    2. Testnet 最终快照：`snapshot-balances.ts --network clawnetTestnet`
+    3. DID 迁移：`migrate-identities.ts --network clawnetMainnet`
+    4. 余额迁移：`migrate-balances.ts --network clawnetMainnet`
+    5. Escrow 迁移：`migrate-escrows.ts --network clawnetMainnet`
+    6. 合约迁移：`migrate-contracts.ts --network clawnetMainnet`
+    7. 全量对账：`reconcile.ts --network clawnetMainnet`
+  - 验收：对账 0 差异
+  - 工时：1 天
+
+- [ ] **T-3.14** 主网节点上线 + 切换
+  - 操作：
+    1. 5 台服务器部署 ClawNet Node（`packages/node`）
+    2. 配置 `chain.rpcUrl` 指向主网 Geth（chainId 7626）
+    3. 配置 `chain.contracts` 使用 `clawnetMainnet.json` 地址
+    4. 测试网 3 台 Geth 停止出块（保留数据归档）
+    5. DNS 切换：`rpc.clawnetd.com` → 主网 RPC
+    6. 更新 SDK/CLI 默认 RPC 端点
+  - 验收：5 节点主网运行，SDK/CLI 默认走主网
+  - 工时：1 天
+
+- [ ] **T-3.15** 发布公告 + 更新文档
   - 更新：README, QUICKSTART, DEPLOYMENT, SDK_GUIDE
-  - 新增：ON_CHAIN_GUIDE.md（链上操作指南）
+  - 新增：MAINNET_MIGRATION.md（主网迁移记录）
+  - 更新 `hardhat.config.ts` 主网配置
   - 工时：1 天
 
 ### Phase 3 验收门槛
@@ -929,13 +937,13 @@
 ```
 ■ 外部审计完成，所有 Critical/High 已修复（GPT-5 审计 10 findings 全部修复，583 tests passing）
 ■ 迁移工具开发完成：snapshot-balances / migrate-balances / migrate-escrows / migrate-contracts / reconcile（5 脚本共 ~1190 行）
-□ 数据迁移成功，链上链下对账 0 差异
-□ 双轨运行 7 天无异常
-□ 主网 8 个合约部署成功 + 源码验证
-□ ClawNet Chain 节点稳定运行
-□ 节点 onchain 模式稳定运行
-□ SDK + CLI 默认走链上
-□ Bug Bounty 已启动
+□ Testnet 全场景（01–09）通过
+□ Testnet 稳定运行 5 天，每日对账 0 差异
+□ 主网 5 节点 Geth PoA 出块正常（chainId 7626）
+□ 主网 9 个合约部署成功
+□ 主网数据迁移完成，对账 0 差异
+□ 5 台 ClawNet Node 主网运行
+□ SDK + CLI 默认走主网
 □ 文档已更新
 ```
 
@@ -966,28 +974,37 @@ T-0.13(Ed25519)──┼──→ T-1.1 (Token)──→ T-1.3 (Test)
                       T-2.11(Reputation)→ T-2.12(Test)    │
                       T-2.14(Router)                      │
                       T-2.15(集成测试)                     │
-                      T-2.17(Deploy All)──────────────────┼──→ T-3.3 (快照)
-                      T-2.21(内部审计)                     │    T-3.4 (迁移)
-                                                           │    T-3.8 (双轨)
-                                                           │    T-3.12(主网)
-                                                           └──→ T-3.14(切换)
+                      T-2.17(Deploy All)──────────────────┼──→ T-3.3 (快照工具)
+                      T-2.21(内部审计)                     │    T-3.4 (迁移工具)
+                                                           │
+                                            T-3.8 (Testnet 全场景)──→ T-3.9 (稳定观察)
+                                               │                           │
+                                               └───────────────────────────┤
+                                                                           ▼
+                                            T-3.10(主网基础设施)──→ T-3.11(主网链启动)
+                                               │                      │
+                                               └──→ T-3.12(合约部署)──→ T-3.13(数据迁移)
+                                                                           │
+                                                                      T-3.14(节点切换)
+                                                                           │
+                                                                      T-3.15(文档发布)
 ```
 
 ---
 
 ## 附录：工时汇总
 
-| Phase | 合约开发 | 测试 | 部署/脚本 | SDK/CLI | 审计/安全 | 迁移 | 总计 |
-|-------|---------|------|----------|---------|----------|------|------|
+| Phase | 合约开发 | 测试 | 部署/脚本 | SDK/CLI | 审计/安全 | 迁移/运维 | 总计 |
+|-------|---------|------|----------|---------|----------|----------|------|
 | Phase 0 | 4d | — | 5d | — | — | — | **~12d** |
 | Phase 1 | 13d | 13d | 4d | 6d | — | 1d | **~40d** |
 | Phase 2 | 22d | 15d | 4d | 8d | 6d | — | **~55d** |
-| Phase 3 | — | — | 3d | — | 持续 | 14d | **~20d** |
-| **总计** | **39d** | **28d** | **16d** | **14d** | **6d+** | **15d** | **~127d** |
+| Phase 3 | — | — | 3d | — | 持续 | 11.5d | **~17d** |
+| **总计** | **39d** | **28d** | **16d** | **14d** | **6d+** | **12.5d** | **~124d** |
 
 > 按 2 名合约工程师 + 2 名后端工程师并行，预计 8–9 个月完成全部 Phase。
 
 ---
 
-*最后更新: 2026年2月26日*
-*状态: Phase 0–2 全部完成，Phase 3 Sprint 3-A 完成（T-3.1 审计修复 ✅, T-3.2 报告公示 ✅）。GPT-5 外部审计 10 findings 全部修复（1C+2H+4M+1L+2I），583 tests passing，0 编译警告。9 合约已部署测试网（chainId 7625）。Sprint 3-B 迁移工具开发可启动。*
+*最后更新: 2026年2月25日*
+*状态: Phase 0–2 全部完成。Phase 3 Sprint 3-A（审计修复 ✅）+ Sprint 3-B（迁移工具 ✅）已完成。下一步：Sprint 3-C Testnet 全业务验证 → Sprint 3-D 主网升级部署（testnet 3 台 + 2 台新服务器 → 5 节点主网 PoA）。*
