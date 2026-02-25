@@ -175,6 +175,133 @@ bash deploy.sh
 - 三台服务器连通性与基础运行环境检查（`docker`、`git`、`python3`、`/opt/clawnet`）
 - 部署后链状态断言（区块高度、peer 数）和产物文件断言（`contracts.json`、`enodes.env`）
 
+### 3.5 多签落地步骤（Safe 版）
+
+为避免 `LIQUIDITY_ADDRESS` / `RESERVE_ADDRESS` 与单私钥绑定，建议使用 Safe 多签地址。
+
+1. 准备 signer 集合与阈值
+
+- 测试网建议：`2/3`
+- 长期运行环境建议：`3/5`
+- signer 地址应与 deployer、treasury 托管账号隔离。
+
+2. 在 ClawNet testnet（chainId `7625`）创建两个 Safe
+
+- `Safe #1`：流动性资金托管（对应 `LIQUIDITY_ADDRESS`）
+- `Safe #2`：风险储备托管（对应 `RESERVE_ADDRESS`）
+
+3. 将 Safe 地址写入部署配置
+
+编辑 `infra/testnet/prod/secrets.env`：
+
+```bash
+LIQUIDITY_ADDRESS=<SAFE_LIQUIDITY_ADDRESS>
+RESERVE_ADDRESS=<SAFE_RESERVE_ADDRESS>
+```
+
+必须满足：
+
+- `LIQUIDITY_ADDRESS != TREASURY_ADDRESS`
+- `RESERVE_ADDRESS != TREASURY_ADDRESS`
+- `LIQUIDITY_ADDRESS != RESERVE_ADDRESS`
+
+4. 上链前快速校验
+
+- `eth_getCode(<SAFE_ADDRESS>)` 返回不应为 `0x`（应为合约地址）。
+- 用小额资金做一次提案 + 多签确认 + 执行流程，确认阈值生效。
+
+5. 执行 redeploy
+
+```bash
+cd infra/testnet/prod
+bash deploy.sh
+```
+
+脚本会在 preflight 阶段再次校验地址格式与地址隔离。
+
+### 3.6 硬件钱包采购与初始化 Checklist（适配多签）
+
+采购建议：
+
+- 至少采购 `3` 台（`2/3` 阈值），建议 `5` 台（可升级 `3/5`）。
+- 仅通过官方渠道采购，禁止二手与来路不明设备。
+- 每个关键 signer 建议配 1 台备用设备。
+
+到货验收：
+
+- 检查外包装与防拆封状态，记录设备编号与责任人。
+- 首次初始化必须在设备内生成助记词，不导入外部助记词。
+- 升级到官方稳定固件并留存版本记录。
+
+初始化流程（每个 signer）：
+
+- 在离线环境设置 PIN，生成助记词并离线备份（禁止拍照/云盘）。
+- 可选启用 passphrase（第 25 词），并与助记词分离保存。
+- 完成一次恢复演练（验证助记词可恢复到备用设备）。
+- 导出公开地址并登记到 signer 名单。
+
+多签配置与接入：
+
+- 创建两个 Safe：`SAFE_LIQUIDITY_TESTNET`、`SAFE_RESERVE_TESTNET`。
+- 阈值建议：测试网 `2/3`，稳定后可升级 `3/5`。
+- 将 Safe 地址写入 `infra/testnet/prod/secrets.env`：
+
+```bash
+LIQUIDITY_ADDRESS=<SAFE_LIQUIDITY_ADDRESS>
+RESERVE_ADDRESS=<SAFE_RESERVE_ADDRESS>
+```
+
+- 确认与 `TREASURY_ADDRESS` 完全隔离（部署脚本会执行 fail-fast 校验）。
+
+上线前验证：
+
+- `eth_getCode(<SAFE_ADDRESS>)` 返回应非 `0x`（确认是合约地址）。
+- 执行一笔小额完整演练：提案 -> 多签确认 -> 执行 -> 审计记录。
+
+运行期规范：
+
+- 发起与审核分离（双人复核），高风险交易必须多人批准。
+- 周期输出执行台账（提案数、执行数、拒绝数、异常数、资金变动）。
+- 禁止把私钥/助记词保存到服务器、CI、聊天工具、邮箱。
+
+### 3.7 地址来源 -> 脚本 -> 链上落点映射（`infra/testnet/prod/secrets.env`）
+
+关键认知：
+
+- `ADDRESS` 是链上账户标识，不等于“必然单私钥”。
+- EOA 地址来自私钥推导；Safe 多签地址来自合约部署。
+- `secrets.env` 本身不是链上状态，它是部署/运维脚本输入；脚本执行后才把关系写上链。
+
+| 字段 | 类型 | 地址来源 | 使用脚本/阶段 | 链上落点（写入位置） |
+| --- | --- | --- | --- | --- |
+| `VALIDATOR_1_ADDRESS` | EOA 地址 | 由 `VALIDATOR_1_PRIVATE_KEY` 推导 | `infra/testnet/prod/deploy.sh` Phase 5/7/9/10 | Geth `--unlock/etherbase` 与 `NODE_ADDRESSES`（bootstrap 分配） |
+| `VALIDATOR_1_PRIVATE_KEY` | 私钥 | 本地生成/硬件导出 | `infra/testnet/prod/deploy.sh` Phase 3 | 导入节点 keystore（间接影响出块签名） |
+| `VALIDATOR_2_ADDRESS` | EOA 地址 | 由 `VALIDATOR_2_PRIVATE_KEY` 推导 | `infra/testnet/prod/deploy.sh` Phase 5/8/9/10 | 同上（验证者 #2） |
+| `VALIDATOR_2_PRIVATE_KEY` | 私钥 | 本地生成/硬件导出 | `infra/testnet/prod/deploy.sh` Phase 3 | 导入节点 keystore（验证者 #2） |
+| `VALIDATOR_3_ADDRESS` | EOA 地址 | 由 `VALIDATOR_3_PRIVATE_KEY` 推导 | `infra/testnet/prod/deploy.sh` Phase 5/8/9/10 | 同上（验证者 #3） |
+| `VALIDATOR_3_PRIVATE_KEY` | 私钥 | 本地生成/硬件导出 | `infra/testnet/prod/deploy.sh` Phase 3 | 导入节点 keystore（验证者 #3） |
+| `DEPLOYER_ADDRESS` | EOA 地址 | 由 `DEPLOYER_PRIVATE_KEY` 推导 | `infra/testnet/prod/deploy.sh`（部署与铸币交易发起者） | 作为交易 `from` 执行合约部署、bootstrap mint |
+| `DEPLOYER_PRIVATE_KEY` | 私钥 | 本地生成/硬件导出 | `infra/testnet/prod/deploy.sh` Phase 9/10 -> `scripts/deploy-all.ts` / `scripts/bootstrap-mint.ts` | 链上交易签名（部署、mint） |
+| `TREASURY_ADDRESS` | 地址（EOA 或合约） | 运营/治理指定 | `infra/testnet/prod/deploy.sh` Phase 9/10 | `deploy-all.ts` 参数（协议费接收）+ `bootstrap-mint.ts` 国库分配 |
+| `TREASURY_PRIVATE_KEY` | 私钥（如 treasury 为 EOA） | 本地生成/硬件导出 | 当前 `deploy.sh` 不直接使用（运营支出时使用） | 非部署阶段直接落点；用于后续 treasury 出账签名 |
+| `LIQUIDITY_ADDRESS` | 地址（建议 Safe 合约） | 推荐 Safe 创建 | `infra/testnet/prod/deploy.sh` Phase 10 -> `scripts/bootstrap-mint.ts` | bootstrap 的 10% 流动性份额接收地址 |
+| `RESERVE_ADDRESS` | 地址（建议 Safe 合约） | 推荐 Safe 创建 | `infra/testnet/prod/deploy.sh` Phase 10 -> `scripts/bootstrap-mint.ts` | bootstrap 的 5% 风险储备份额接收地址 |
+| `CLAW_PASSPHRASE` | 应用口令 | 运维设定 | 当前 `deploy.sh` 不直接使用 | 供节点/API 运行时解锁 DID 密钥（非合约状态） |
+| `CLAW_API_KEY` | API 凭证 | 运维设定 | 当前 `deploy.sh` 不直接使用 | 网关/API 鉴权（非合约状态） |
+| `VALIDATOR_PASSWORD` | keystore 口令 | 运维设定 | `infra/testnet/prod/deploy.sh` Phase 2/3 | 写入 `/opt/clawnet/config/password.txt`，用于 geth `account import` |
+
+地址如何“关联到链上”：
+
+1. Genesis `alloc` 预分配（区块 0 生效）。
+2. 部署脚本传参（如 `TREASURY_ADDRESS` 写入合约状态）。
+3. 交易执行写状态（如 bootstrap mint 把 Token 打到 `LIQUIDITY_ADDRESS` / `RESERVE_ADDRESS`）。
+
+核验建议：
+
+- EOA：`eth_getCode(<address>)` 返回 `0x`。
+- Safe 合约地址：`eth_getCode(<address>)` 返回非 `0x`。
+- 同一配置中保证 `TREASURY_ADDRESS`、`LIQUIDITY_ADDRESS`、`RESERVE_ADDRESS` 三者互不相同。
+
 ---
 
 ## Step 1：生成验证者密钥
