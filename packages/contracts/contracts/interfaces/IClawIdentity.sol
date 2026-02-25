@@ -28,7 +28,8 @@ interface IClawIdentity {
         bytes32 didHash,
         bytes calldata publicKey,
         KeyPurpose purpose,
-        address evmAddress
+        address evmAddress,
+        bytes calldata evmSig
     ) external;
 
     function batchRegisterDID(

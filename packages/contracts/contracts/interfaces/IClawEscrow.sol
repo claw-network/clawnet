@@ -42,6 +42,7 @@ interface IClawEscrow {
     function expire(bytes32 escrowId) external;
     function dispute(bytes32 escrowId) external;
     function resolve(bytes32 escrowId, bool releaseToBeneficiary) external;
+    function forceResolveAfterTimeout(bytes32 escrowId) external;
 
     // ─── View ────────────────────────────────────────────────────────
 

@@ -317,6 +317,20 @@ contract ClawStaking is
         return _activeValidators.length;
     }
 
+    /**
+     * @notice Get the lockup multiplier for a staked node.
+     * @dev I-01 fix: stub implementation returning 1000 (1x) for all stakers.
+     *      Phase 3 will implement actual lockup bonus logic (up to 3x).
+     * @param node The staker address.
+     * @return multiplier 1000-based multiplier (1000 = 1x, 2000 = 2x, etc.)
+     */
+    function getLockupMultiplier(address node) external view returns (uint256) {
+        StakeInfo storage s = stakes[node];
+        if (s.amount == 0 || !s.active) return 1000;
+        // Stub: return 1x for all stakers. Future: scale by lock duration.
+        return 1000;
+    }
+
     // ─── Admin ───────────────────────────────────────────────────────
 
     function pause() external onlyRole(PAUSER_ROLE) {

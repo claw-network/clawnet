@@ -15,6 +15,20 @@ import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signer
 import { keccak256, toUtf8Bytes, ZeroHash } from "ethers";
 
 describe("Full-Cycle Integration: Cross-Module E2E", function () {
+  // Helper: generate ECDSA signature for registerDID
+  async function signRegisterDID(
+    signer: HardhatEthersSigner,
+    didHash: string,
+    controller: string,
+  ): Promise<string> {
+    const ctrl = controller === ethers.ZeroAddress ? signer.address : controller;
+    const message = ethers.solidityPacked(
+      ["string", "bytes32", "address"],
+      ["clawnet:register:v1:", didHash, ctrl],
+    );
+    const digest = ethers.keccak256(message);
+    return signer.signMessage(ethers.getBytes(digest));
+  }
   // ─── Contracts ──────────────────────────────────────────────────
   let token: any;
   let escrow: any;
@@ -164,6 +178,11 @@ describe("Full-Cycle Integration: Cross-Module E2E", function () {
     await token.mint(alice.address, 500_000);
     await token.mint(bob.address, 500_000);
     await token.mint(carol.address, 500_000);
+
+    // ── Activate ERC20Votes checkpoints via self-delegation ───────
+    await token.connect(alice).delegate(alice.address);
+    await token.connect(bob).delegate(bob.address);
+    await token.connect(carol).delegate(carol.address);
   });
 
   // ──────────────────────────────────────────────────────────────────
@@ -172,14 +191,16 @@ describe("Full-Cycle Integration: Cross-Module E2E", function () {
   describe("Scenario 1: DID Registration + Staking", () => {
     it("registers Alice's DID on ClawIdentity", async () => {
       const pubKey = ethers.randomBytes(32);
-      await identity.registerDID(ALICE_DID_HASH, pubKey, 0, alice.address);
+      const evmSig = await signRegisterDID(alice, ALICE_DID_HASH, alice.address);
+      await identity.registerDID(ALICE_DID_HASH, pubKey, 0, alice.address, evmSig);
       expect(await identity.isActive(ALICE_DID_HASH)).to.be.true;
       expect(await identity.getController(ALICE_DID_HASH)).to.equal(alice.address);
     });
 
     it("registers Bob's DID on ClawIdentity", async () => {
       const pubKey = ethers.randomBytes(32);
-      await identity.registerDID(BOB_DID_HASH, pubKey, 0, bob.address);
+      const evmSig = await signRegisterDID(bob, BOB_DID_HASH, bob.address);
+      await identity.registerDID(BOB_DID_HASH, pubKey, 0, bob.address, evmSig);
       expect(await identity.isActive(BOB_DID_HASH)).to.be.true;
     });
 

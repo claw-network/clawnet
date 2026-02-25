@@ -75,6 +75,7 @@ contract ParamRegistry is AccessControlUpgradeable, UUPSUpgradeable {
     error InvalidAddress();
     error ArrayLengthMismatch();
     error EmptyBatch();
+    error ParamOutOfRange(bytes32 key, uint256 value);
 
     // ─── Initializer ─────────────────────────────────────────────────
 
@@ -106,6 +107,8 @@ contract ParamRegistry is AccessControlUpgradeable, UUPSUpgradeable {
      * @param value The new value.
      */
     function setParam(bytes32 key, uint256 value) external onlyRole(GOVERNOR_ROLE) {
+        _validateParamBounds(key, value);
+
         uint256 oldValue = _params[key];
         _params[key] = value;
 
@@ -130,6 +133,8 @@ contract ParamRegistry is AccessControlUpgradeable, UUPSUpgradeable {
         if (keys_.length != values.length) revert ArrayLengthMismatch();
 
         for (uint256 i = 0; i < keys_.length; i++) {
+            _validateParamBounds(keys_[i], values[i]);
+
             uint256 oldValue = _params[keys_[i]];
             _params[keys_[i]] = values[i];
 
@@ -184,6 +189,29 @@ contract ParamRegistry is AccessControlUpgradeable, UUPSUpgradeable {
             values[i] = _params[_keys[i]];
         }
         return (_keys, values);
+    }
+
+    // ─── Internal: Param Validation (M-04) ─────────────────────────
+
+    /**
+     * @dev Validate parameter bounds for critical governance/economic keys.
+     *      Unconstrained keys pass through without validation.
+     */
+    function _validateParamBounds(bytes32 key, uint256 value) internal pure {
+        if (key == QUORUM_BPS) {
+            if (value < 1 || value > 5000) revert ParamOutOfRange(key, value);
+        } else if (key == VOTING_PERIOD) {
+            if (value < 1 hours || value > 30 days) revert ParamOutOfRange(key, value);
+        } else if (key == TIMELOCK_DELAY) {
+            if (value < 1 hours || value > 30 days) revert ParamOutOfRange(key, value);
+        } else if (key == UNSTAKE_COOLDOWN) {
+            if (value < 1 hours || value > 30 days) revert ParamOutOfRange(key, value);
+        } else if (key == ESCROW_BASE_RATE) {
+            if (value > 1000) revert ParamOutOfRange(key, value); // max 10%
+        } else if (key == ESCROW_HOLDING_RATE) {
+            if (value > 100) revert ParamOutOfRange(key, value);  // max 1% per day
+        }
+        // Other keys have no bounds restrictions
     }
 
     // ─── Upgrade ─────────────────────────────────────────────────────

@@ -26,6 +26,50 @@ describe("ClawIdentity", function () {
   const KP_KEY_AGR = 2;     // KeyAgreement
   const KP_RECOVERY = 3;    // Recovery
 
+  // ─── ECDSA Signing Helpers (H-01 fix) ─────────────────────────────
+
+  async function signRegisterDID(
+    signer: HardhatEthersSigner,
+    didHash: string,
+    controller: string,
+  ): Promise<string> {
+    const digest = ethers.keccak256(
+      ethers.solidityPacked(
+        ["string", "bytes32", "address"],
+        ["clawnet:register:v1:", didHash, controller],
+      ),
+    );
+    return signer.signMessage(ethers.getBytes(digest));
+  }
+
+  async function signRotateKey(
+    signer: HardhatEthersSigner,
+    didHash: string,
+    oldKeyHash: string,
+    newKeyHash: string,
+  ): Promise<string> {
+    const digest = ethers.keccak256(
+      ethers.solidityPacked(
+        ["string", "bytes32", "bytes32", "bytes32"],
+        ["clawnet:rotate:v1:", didHash, oldKeyHash, newKeyHash],
+      ),
+    );
+    return signer.signMessage(ethers.getBytes(digest));
+  }
+
+  /** Helper: registerDID with auto-generated ECDSA signature */
+  async function registerDID(
+    signer: HardhatEthersSigner,
+    didHash: string,
+    publicKey: string,
+    purpose: number,
+    evmAddress: string,
+  ) {
+    const controller = evmAddress === ethers.ZeroAddress ? signer.address : evmAddress;
+    const sig = await signRegisterDID(signer, didHash, controller);
+    return identity.connect(signer).registerDID(didHash, publicKey, purpose, evmAddress, sig);
+  }
+
   async function deployFixture() {
     [admin, user1, user2, outsider] = await ethers.getSigners();
 
@@ -78,7 +122,7 @@ describe("ClawIdentity", function () {
 
   describe("registerDID", function () {
     it("should register a DID successfully", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
 
       expect(await identity.isActive(DID_HASH_1)).to.be.true;
       expect(await identity.getController(DID_HASH_1)).to.equal(user1.address);
@@ -87,14 +131,15 @@ describe("ClawIdentity", function () {
     });
 
     it("should emit DIDRegistered event", async function () {
+      const sig = await signRegisterDID(user1, DID_HASH_1, user1.address);
       await expect(
-        identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address),
+        identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address, sig),
       ).to.emit(identity, "DIDRegistered")
         .withArgs(DID_HASH_1, user1.address);
     });
 
     it("should store key record correctly", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_ASSERTION, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_ASSERTION, user1.address);
 
       const keyHash = ethers.keccak256(PUBKEY_1);
       const [pubKey, addedAt, revokedAt, purpose] = await identity.getKeyRecord(DID_HASH_1, keyHash);
@@ -105,28 +150,31 @@ describe("ClawIdentity", function () {
     });
 
     it("should use msg.sender as controller when evmAddress is zero", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, ethers.ZeroAddress);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, ethers.ZeroAddress);
       expect(await identity.getController(DID_HASH_1)).to.equal(user1.address);
     });
 
     it("should revert on duplicate DID registration", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      const dummySig = await signRegisterDID(user2, DID_HASH_1, user2.address);
       await expect(
-        identity.connect(user2).registerDID(DID_HASH_1, PUBKEY_2, KP_AUTH, user2.address),
+        identity.connect(user2).registerDID(DID_HASH_1, PUBKEY_2, KP_AUTH, user2.address, dummySig),
       ).to.be.revertedWithCustomError(identity, "DIDAlreadyExists");
     });
 
     it("should revert on invalid public key length (< 32 bytes)", async function () {
       const shortKey = ethers.hexlify(ethers.randomBytes(16));
+      const dummySig = await signRegisterDID(user1, DID_HASH_1, user1.address);
       await expect(
-        identity.connect(user1).registerDID(DID_HASH_1, shortKey, KP_AUTH, user1.address),
+        identity.connect(user1).registerDID(DID_HASH_1, shortKey, KP_AUTH, user1.address, dummySig),
       ).to.be.revertedWithCustomError(identity, "InvalidPublicKey");
     });
 
     it("should revert on invalid public key length (> 32 bytes)", async function () {
       const longKey = ethers.hexlify(ethers.randomBytes(64));
+      const dummySig = await signRegisterDID(user1, DID_HASH_1, user1.address);
       await expect(
-        identity.connect(user1).registerDID(DID_HASH_1, longKey, KP_AUTH, user1.address),
+        identity.connect(user1).registerDID(DID_HASH_1, longKey, KP_AUTH, user1.address, dummySig),
       ).to.be.revertedWithCustomError(identity, "InvalidPublicKey");
     });
   });
@@ -135,22 +183,24 @@ describe("ClawIdentity", function () {
 
   describe("rotateKey", function () {
     beforeEach(async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
     });
 
     it("controller can rotate key successfully", async function () {
-      const fakeProof = ethers.hexlify(ethers.randomBytes(64));
-      await identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_2, fakeProof);
+      const oldKeyHash = ethers.keccak256(PUBKEY_1);
+      const newKeyHash = ethers.keccak256(PUBKEY_2);
+      const proof = await signRotateKey(user1, DID_HASH_1, oldKeyHash, newKeyHash);
+      await identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_2, proof);
 
       expect(await identity.getActiveKey(DID_HASH_1)).to.equal(PUBKEY_2);
     });
 
     it("should revoke old key and add new key", async function () {
-      const fakeProof = ethers.hexlify(ethers.randomBytes(64));
       const oldKeyHash = ethers.keccak256(PUBKEY_1);
       const newKeyHash = ethers.keccak256(PUBKEY_2);
+      const proof = await signRotateKey(user1, DID_HASH_1, oldKeyHash, newKeyHash);
 
-      await identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_2, fakeProof);
+      await identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_2, proof);
 
       // Old key should be revoked
       const [, , revokedAt] = await identity.getKeyRecord(DID_HASH_1, oldKeyHash);
@@ -164,33 +214,37 @@ describe("ClawIdentity", function () {
     });
 
     it("should emit KeyRotated event", async function () {
-      const fakeProof = ethers.hexlify(ethers.randomBytes(64));
       const oldKeyHash = ethers.keccak256(PUBKEY_1);
       const newKeyHash = ethers.keccak256(PUBKEY_2);
+      const proof = await signRotateKey(user1, DID_HASH_1, oldKeyHash, newKeyHash);
 
       await expect(
-        identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_2, fakeProof),
+        identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_2, proof),
       ).to.emit(identity, "KeyRotated")
         .withArgs(DID_HASH_1, oldKeyHash, newKeyHash);
     });
 
     it("should revert if rotating to same key", async function () {
-      const fakeProof = ethers.hexlify(ethers.randomBytes(64));
+      const keyHash = ethers.keccak256(PUBKEY_1);
+      // Same key → reverts before sig check
+      const proof = await signRotateKey(user1, DID_HASH_1, keyHash, keyHash);
       await expect(
-        identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_1, fakeProof),
+        identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_1, proof),
       ).to.be.revertedWithCustomError(identity, "KeyAlreadyActive");
     });
 
     it("should revert if not controller", async function () {
-      const fakeProof = ethers.hexlify(ethers.randomBytes(64));
+      const oldKeyHash = ethers.keccak256(PUBKEY_1);
+      const newKeyHash = ethers.keccak256(PUBKEY_2);
+      const proof = await signRotateKey(outsider, DID_HASH_1, oldKeyHash, newKeyHash);
       await expect(
-        identity.connect(outsider).rotateKey(DID_HASH_1, PUBKEY_2, fakeProof),
+        identity.connect(outsider).rotateKey(DID_HASH_1, PUBKEY_2, proof),
       ).to.be.revertedWithCustomError(identity, "NotController");
     });
 
     it("should revert with invalid new key length", async function () {
       const shortKey = ethers.hexlify(ethers.randomBytes(16));
-      const fakeProof = ethers.hexlify(ethers.randomBytes(64));
+      const fakeProof = ethers.hexlify(ethers.randomBytes(65));
       await expect(
         identity.connect(user1).rotateKey(DID_HASH_1, shortKey, fakeProof),
       ).to.be.revertedWithCustomError(identity, "InvalidPublicKey");
@@ -198,14 +252,14 @@ describe("ClawIdentity", function () {
 
     it("should revert for revoked DID", async function () {
       await identity.connect(user1).revokeDID(DID_HASH_1);
-      const fakeProof = ethers.hexlify(ethers.randomBytes(64));
+      const fakeProof = ethers.hexlify(ethers.randomBytes(65));
       await expect(
         identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_2, fakeProof),
       ).to.be.revertedWithCustomError(identity, "DIDIsRevoked");
     });
 
     it("should revert for non-existent DID", async function () {
-      const fakeProof = ethers.hexlify(ethers.randomBytes(64));
+      const fakeProof = ethers.hexlify(ethers.randomBytes(65));
       const fakeHash = ethers.keccak256(ethers.toUtf8Bytes("did:claw:nonexistent"));
       await expect(
         identity.connect(user1).rotateKey(fakeHash, PUBKEY_2, fakeProof),
@@ -217,7 +271,7 @@ describe("ClawIdentity", function () {
 
   describe("revokeDID", function () {
     beforeEach(async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
     });
 
     it("controller can revoke DID", async function () {
@@ -260,7 +314,7 @@ describe("ClawIdentity", function () {
     const LINK_HASH_2 = ethers.keccak256(ethers.toUtf8Bytes("twitter:user1"));
 
     beforeEach(async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
     });
 
     it("controller can add platform link", async function () {
@@ -350,7 +404,7 @@ describe("ClawIdentity", function () {
     });
 
     it("should revert if any DID already exists in batch", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
 
       const hashes = [DID_HASH_1, DID_HASH_2];
       const pubkeys = [PUBKEY_1, PUBKEY_2];
@@ -386,7 +440,7 @@ describe("ClawIdentity", function () {
     });
 
     it("getPlatformLinks returns empty array for new DID", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
       const links = await identity.getPlatformLinks(DID_HASH_1);
       expect(links.length).to.equal(0);
     });
@@ -402,13 +456,14 @@ describe("ClawIdentity", function () {
 
     it("pause blocks registerDID", async function () {
       await identity.connect(admin).pause();
+      const sig = await signRegisterDID(user1, DID_HASH_1, user1.address);
       await expect(
-        identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address),
+        identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address, sig),
       ).to.be.revertedWithCustomError(identity, "EnforcedPause");
     });
 
     it("pause blocks rotateKey", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
       await identity.connect(admin).pause();
 
       const fakeProof = ethers.hexlify(ethers.randomBytes(64));
@@ -418,7 +473,7 @@ describe("ClawIdentity", function () {
     });
 
     it("pause blocks revokeDID", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
       await identity.connect(admin).pause();
 
       await expect(
@@ -427,7 +482,7 @@ describe("ClawIdentity", function () {
     });
 
     it("pause blocks addPlatformLink", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
       await identity.connect(admin).pause();
 
       const linkHash = ethers.keccak256(ethers.toUtf8Bytes("github:test"));
@@ -447,7 +502,7 @@ describe("ClawIdentity", function () {
       await identity.connect(admin).pause();
       await identity.connect(admin).unpause();
 
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
       expect(await identity.isActive(DID_HASH_1)).to.be.true;
     });
 
@@ -462,7 +517,7 @@ describe("ClawIdentity", function () {
 
   describe("Upgrade (UUPS)", function () {
     it("admin can upgrade and state is preserved", async function () {
-      await identity.connect(user1).registerDID(DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
+      await registerDID(user1, DID_HASH_1, PUBKEY_1, KP_AUTH, user1.address);
 
       const FactoryV2 = await ethers.getContractFactory("ClawIdentity");
       const upgraded = await upgrades.upgradeProxy(

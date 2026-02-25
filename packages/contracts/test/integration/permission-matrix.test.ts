@@ -23,6 +23,21 @@ import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signer
 import { keccak256, toUtf8Bytes, ZeroHash } from "ethers";
 
 describe("Permission Matrix Verification", function () {
+  // Helper: generate ECDSA signature for registerDID
+  async function signRegisterDID(
+    signer: HardhatEthersSigner,
+    didHash: string,
+    controller: string,
+  ): Promise<string> {
+    const ctrl = controller === ethers.ZeroAddress ? signer.address : controller;
+    const message = ethers.solidityPacked(
+      ["string", "bytes32", "address"],
+      ["clawnet:register:v1:", didHash, ctrl],
+    );
+    const digest = ethers.keccak256(message);
+    return signer.signMessage(ethers.getBytes(digest));
+  }
+
   // Contracts
   let token: any;
   let escrow: any;
@@ -325,7 +340,8 @@ describe("Permission Matrix Verification", function () {
     it("✅ REGISTRAR_ROLE (admin) can register DID", async () => {
       const didHash = keccak256(toUtf8Bytes("did:claw:permIdentity"));
       const pubKey = ethers.randomBytes(32);
-      await identity.connect(admin).registerDID(didHash, pubKey, 0, admin.address);
+      const evmSig = await signRegisterDID(admin, didHash, admin.address);
+      await identity.connect(admin).registerDID(didHash, pubKey, 0, admin.address, evmSig);
       expect(await identity.isActive(didHash)).to.be.true;
     });
 
@@ -333,7 +349,8 @@ describe("Permission Matrix Verification", function () {
       const didHash = keccak256(toUtf8Bytes("did:claw:badIdentity"));
       const pubKey = ethers.randomBytes(32);
       // registerDID has no role restriction — open to all
-      await identity.connect(user).registerDID(didHash, pubKey, 0, user.address);
+      const evmSig = await signRegisterDID(user, didHash, user.address);
+      await identity.connect(user).registerDID(didHash, pubKey, 0, user.address, evmSig);
       expect(await identity.isActive(didHash)).to.be.true;
     });
   });

@@ -472,7 +472,8 @@ describe("ClawEscrow", function () {
       await token.connect(admin).mint(outsider.address, 500);
 
       const eBefore = await escrow.getEscrow(ESCROW_ID);
-      await token.connect(outsider).approve(await escrow.getAddress(), 200);
+      // fund() now charges amount + incremental fee; approve generously
+      await token.connect(outsider).approve(await escrow.getAddress(), 500);
       await escrow.connect(outsider).fund(ESCROW_ID, 200);
 
       const eAfter = await escrow.getEscrow(ESCROW_ID);
@@ -480,7 +481,8 @@ describe("ClawEscrow", function () {
     });
 
     it("should emit EscrowFunded event", async function () {
-      await token.connect(depositor).approve(await escrow.getAddress(), 100);
+      // fund() charges amount + fee; approve generously
+      await token.connect(depositor).approve(await escrow.getAddress(), 200);
       await expect(escrow.connect(depositor).fund(ESCROW_ID, 100))
         .to.emit(escrow, "EscrowFunded")
         .withArgs(ESCROW_ID, depositor.address, 100);

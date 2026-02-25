@@ -17,6 +17,20 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("P0 Integration: Full On-Chain Flow", function () {
+  // Helper: generate ECDSA signature for registerDID
+  async function signRegisterDID(
+    signer: HardhatEthersSigner,
+    didHash: string,
+    controller: string,
+  ): Promise<string> {
+    const ctrl = controller === ethers.ZeroAddress ? signer.address : controller;
+    const message = ethers.solidityPacked(
+      ["string", "bytes32", "address"],
+      ["clawnet:register:v1:", didHash, ctrl],
+    );
+    const digest = ethers.keccak256(message);
+    return signer.signMessage(ethers.getBytes(digest));
+  }
   // Contracts
   let token: any;
   let escrow: any;
@@ -117,11 +131,13 @@ describe("P0 Integration: Full On-Chain Flow", function () {
     });
 
     it("should register Alice's DID", async function () {
+      const evmSig = await signRegisterDID(alice, aliceDidHash, ethers.ZeroAddress);
       await identity.connect(alice).registerDID(
         aliceDidHash,
         alicePubKey,
         0, // Authentication
         ethers.ZeroAddress,
+        evmSig,
       );
       expect(await identity.isActive(aliceDidHash)).to.be.true;
     });
@@ -299,11 +315,13 @@ describe("P0 Integration: Full On-Chain Flow", function () {
     const cycleEscrowId = ethers.keccak256(ethers.toUtf8Bytes("escrow-cycle"));
 
     it("should register Bob's DID", async function () {
+      const evmSig = await signRegisterDID(bob, bobDidHash, ethers.ZeroAddress);
       await identity.connect(bob).registerDID(
         bobDidHash,
         bobPubKey,
         0,
         ethers.ZeroAddress,
+        evmSig,
       );
       expect(await identity.isActive(bobDidHash)).to.be.true;
       expect(await identity.didCount()).to.equal(2);

@@ -18,6 +18,8 @@ contract ClawRouter is AccessControlUpgradeable, UUPSUpgradeable {
     // ─── Roles ───────────────────────────────────────────────────────
 
     bytes32 public constant REGISTRAR_ROLE = keccak256("REGISTRAR_ROLE");
+    /// @notice M-03 fix: only MULTICALL_ROLE can execute state-changing multicall.
+    bytes32 public constant MULTICALL_ROLE  = keccak256("MULTICALL_ROLE");
 
     // ─── Well-known module keys ──────────────────────────────────────
 
@@ -68,6 +70,7 @@ contract ClawRouter is AccessControlUpgradeable, UUPSUpgradeable {
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(REGISTRAR_ROLE, admin);
+        _grantRole(MULTICALL_ROLE, admin);
     }
 
     // ─── Module Registration ─────────────────────────────────────────
@@ -173,6 +176,7 @@ contract ClawRouter is AccessControlUpgradeable, UUPSUpgradeable {
     /**
      * @notice Execute multiple calls to registered modules in a single tx.
      *         Useful for frontend batching (e.g. read multiple contract states).
+     * @dev M-03 fix: restricted to MULTICALL_ROLE to prevent confused-deputy attacks.
      * @param targets Array of target contract addresses
      * @param data    Array of calldata for each call
      * @return results Array of return data from each call
@@ -180,7 +184,7 @@ contract ClawRouter is AccessControlUpgradeable, UUPSUpgradeable {
     function multicall(
         address[] calldata targets,
         bytes[] calldata data
-    ) external returns (bytes[] memory results) {
+    ) external onlyRole(MULTICALL_ROLE) returns (bytes[] memory results) {
         uint256 len = targets.length;
         if (len == 0) revert EmptyBatch();
         if (data.length != len) revert ArrayLengthMismatch();

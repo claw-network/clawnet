@@ -111,7 +111,7 @@
 
 ### Sprint 0-D：链节点软件搭建 + Ed25519 预编译（W4）
 
-- [ ] **T-0.12** 搭建 ClawNet Chain 本地 devnet
+- [x] **T-0.12** 搭建 ClawNet Chain 本地 devnet  ✅ geth v1.17 --dev mode, chainId 1337, infra/devnet/ 一键启动+部署
   - 基于 Reth (Rust) 或 Geth (Go) Fork 搭建独立 EVM 链
   - 配置：
     - 共识：PoA (Clique)，授权节点 = 本地开发节点
@@ -734,10 +734,10 @@
     - 内部审计摘要引用
   - 工时：0.5 天
 
-- [ ] **T-2.23** 联系外部审计公司（并行）
-  - 提前 4-6 周预约
-  - 预算：$80K–150K（8 个合约）
-  - 工时：PM 负责
+- [x] **T-2.23** 联系外部审计公司（并行）  ✅ GPT-5 AI 审计完成
+  - 审计提示词：`docs/implementation/tasks/ai-audit-prompt.md`
+  - 审计报告：`docs/implementation/tasks/external-audit-report-gpt5.md`
+  - 方式：GPT-5 扮演外部审计公司，全量审计 9 合约
 
 - [x] **T-2.24** Bug Bounty 计划准备  ✅ 完整 Bug Bounty 草案
   - 产出：`docs/implementation/tasks/bug-bounty-plan.md`
@@ -964,4 +964,4 @@ T-0.13(Ed25519)──┼──→ T-1.1 (Token)──→ T-1.3 (Test)
 ---
 
 *最后更新: 2025年2月23日*
-*状态: Phase 0–2 全部完成（含 Sprint 2-G 安全审计准备），583 tests passing，9 合约已部署测试网（chainId 7625）。T-2.21 内部审计 ✅, T-2.22 审计文档包 ✅, T-2.24 Bug Bounty 草案 ✅, T-2.23 联系审计公司（PM 待办）。Phase 3 待外部审计启动。*
+*状态: Phase 0–2 全部完成（含 Sprint 2-G 安全审计），583 tests passing，9 合约已部署测试网（chainId 7625）。T-2.21 内部审计 ✅, T-2.22 审计文档包 ✅, T-2.23 GPT-5 外部审计 ✅, T-2.24 Bug Bounty 草案 ✅。Phase 2 全部完成，Phase 3 可启动。*

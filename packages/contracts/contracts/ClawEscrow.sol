@@ -49,6 +49,7 @@ contract ClawEscrow is
         uint256 createdAt;
         uint256 expiresAt;
         EscrowStatus status;
+        uint64 disputeOpenedAt; // M-01: timestamp when dispute was opened (0 if not disputed)
     }
 
     // ─── State ───────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ contract ClawEscrow is
     error NotAuthorized();
     error InvalidStatus(EscrowStatus current, EscrowStatus expected);
     error NotExpiredYet(uint256 expiresAt, uint256 currentTime);
+    error DisputeTimeoutNotReached(uint256 disputeOpenedAt, uint256 currentTime);
 
     // ─── Initializer ─────────────────────────────────────────────────
 
@@ -187,23 +189,35 @@ contract ClawEscrow is
             amount: netAmount,
             createdAt: block.timestamp,
             expiresAt: expiresAt,
-            status: EscrowStatus.Active
+            status: EscrowStatus.Active,
+            disputeOpenedAt: 0
         });
 
         emit EscrowCreated(escrowId, msg.sender, beneficiary, arbiter, netAmount, fee, expiresAt);
     }
 
     /**
-     * @notice Add more funds to an active escrow. Caller must approve the additional amount.
+     * @notice Add more funds to an active escrow. Caller must approve amount + fee.
+     * @dev M-02 fix: charges incremental fee based on remaining holding days.
      * @param escrowId The escrow to fund.
-     * @param amount   Additional Token amount (no fee charged on top-ups).
+     * @param amount   Additional Token amount (fee is calculated on top).
      */
     function fund(bytes32 escrowId, uint256 amount) external whenNotPaused nonReentrant {
         EscrowRecord storage e = _getEscrow(escrowId);
         if (e.status != EscrowStatus.Active) revert InvalidStatus(e.status, EscrowStatus.Active);
         if (amount == 0) revert InvalidAmount();
 
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        // M-02: charge incremental fee based on remaining holding time
+        uint256 remainingDays = block.timestamp >= e.expiresAt
+            ? 0
+            : (e.expiresAt - block.timestamp + 86399) / 86400; // ceil division
+        uint256 fee = _calculateFee(amount, remainingDays);
+        uint256 total = amount + fee;
+
+        token.safeTransferFrom(msg.sender, address(this), total);
+        if (fee > 0) {
+            token.safeTransfer(treasury, fee);
+        }
         e.amount += amount;
 
         emit EscrowFunded(escrowId, msg.sender, amount);
@@ -268,6 +282,7 @@ contract ClawEscrow is
         if (msg.sender != e.depositor && msg.sender != e.beneficiary) revert NotAuthorized();
 
         e.status = EscrowStatus.Disputed;
+        e.disputeOpenedAt = uint64(block.timestamp);
 
         emit EscrowDisputed(escrowId, msg.sender);
     }
@@ -293,6 +308,28 @@ contract ClawEscrow is
         }
 
         emit EscrowResolved(escrowId, msg.sender, releaseToBeneficiary);
+    }
+
+    /**
+     * @notice Force-resolve a disputed escrow after a 7-day timeout.
+     *         If the arbiter has not acted within 7 days, the depositor gets a refund.
+     *         Callable by the depositor or the beneficiary.
+     * @dev M-01 fix: prevents permanent fund lock when arbiter is unavailable.
+     */
+    function forceResolveAfterTimeout(bytes32 escrowId) external whenNotPaused nonReentrant {
+        EscrowRecord storage e = _getEscrow(escrowId);
+        if (e.status != EscrowStatus.Disputed) revert InvalidStatus(e.status, EscrowStatus.Disputed);
+        if (msg.sender != e.depositor && msg.sender != e.beneficiary) revert NotAuthorized();
+
+        uint256 timeoutAt = uint256(e.disputeOpenedAt) + 7 days;
+        if (block.timestamp < timeoutAt) {
+            revert DisputeTimeoutNotReached(e.disputeOpenedAt, block.timestamp);
+        }
+
+        e.status = EscrowStatus.Refunded;
+        token.safeTransfer(e.depositor, e.amount);
+
+        emit EscrowRefunded(escrowId, msg.sender);
     }
 
     // ─── View helpers ────────────────────────────────────────────────

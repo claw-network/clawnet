@@ -122,6 +122,13 @@ describe("ClawDAO", function () {
     await token.mint(voter2.address, 30_000n);
     await token.mint(voter3.address, 20_000n);
     await token.mint(outsider.address, 10n);  // below threshold
+
+    // Activate ERC20Votes checkpoints via self-delegation
+    await token.connect(proposer).delegate(proposer.address);
+    await token.connect(voter1).delegate(voter1.address);
+    await token.connect(voter2).delegate(voter2.address);
+    await token.connect(voter3).delegate(voter3.address);
+    await token.connect(outsider).delegate(outsider.address);
   }
 
   beforeEach(async function () {
@@ -612,12 +619,11 @@ describe("ClawDAO", function () {
   // ═══════════════════════════════════════════════════════════════════
 
   describe("Emergency MultiSig", function () {
-    it("executes with 5/9 valid signatures", async function () {
+    it("executes with 9/9 valid signatures", async function () {
       await dao.setGovParams(PROPOSAL_THRESHOLD, DISCUSSION_PERIOD, VOTING_PERIOD, TIMELOCK_DELAY, 10n);
       const id = await createProposal(PT_EMERGENCY);
 
-      const fiveSigners = signers9.slice(0, 5);
-      const { addresses, signatures } = await signEmergency(id, fiveSigners);
+      const { addresses, signatures } = await signEmergency(id, signers9);
 
       await expect(
         dao.emergencyExecute(id, addresses, signatures)
@@ -635,10 +641,10 @@ describe("ClawDAO", function () {
       ).to.emit(dao, "EmergencyExecuted");
     });
 
-    it("reverts with fewer than 5 signatures", async function () {
+    it("reverts with fewer than 9 signatures", async function () {
       const id = await createProposal(PT_EMERGENCY);
-      const fourSigners = signers9.slice(0, 4);
-      const { addresses, signatures } = await signEmergency(id, fourSigners);
+      const eightSigners = signers9.slice(0, 8);
+      const { addresses, signatures } = await signEmergency(id, eightSigners);
       await expect(
         dao.emergencyExecute(id, addresses, signatures)
       ).to.be.revertedWithCustomError(dao, "InsufficientSignatures");
@@ -646,8 +652,7 @@ describe("ClawDAO", function () {
 
     it("reverts with invalid signature", async function () {
       const id = await createProposal(PT_EMERGENCY);
-      const fiveSigners = signers9.slice(0, 5);
-      const { addresses, signatures } = await signEmergency(id, fiveSigners);
+      const { addresses, signatures } = await signEmergency(id, signers9);
       // Corrupt one signature
       signatures[0] = signatures[0].slice(0, -2) + "ff";
       await expect(
@@ -657,8 +662,8 @@ describe("ClawDAO", function () {
 
     it("reverts with non-emergency signer", async function () {
       const id = await createProposal(PT_EMERGENCY);
-      // Use outsider + 4 valid signers
-      const invalidSet = [outsider, ...signers9.slice(0, 4)];
+      // Use outsider + 8 valid signers (total 9, but outsider is not an emergency signer)
+      const invalidSet = [outsider, ...signers9.slice(0, 8)];
       const { addresses, signatures } = await signEmergency(id, invalidSet);
       await expect(
         dao.emergencyExecute(id, addresses, signatures)
@@ -683,7 +688,7 @@ describe("ClawDAO", function () {
       );
       const id = dao.interface.parseLog({ topics: [...event!.topics], data: event!.data })!.args.proposalId;
 
-      const { addresses, signatures } = await signEmergency(id, signers9.slice(0, 5));
+      const { addresses, signatures } = await signEmergency(id, signers9);
       await dao.emergencyExecute(id, addresses, signatures);
 
       expect(await registry.getParam(key)).to.equal(77777n);
@@ -691,11 +696,11 @@ describe("ClawDAO", function () {
 
     it("reverts emergency on already-executed proposal", async function () {
       const id = await createProposal(PT_EMERGENCY);
-      const { addresses, signatures } = await signEmergency(id, signers9.slice(0, 5));
+      const { addresses, signatures } = await signEmergency(id, signers9);
       await dao.emergencyExecute(id, addresses, signatures);
 
       // Try again
-      const { addresses: a2, signatures: s2 } = await signEmergency(id, signers9.slice(0, 5));
+      const { addresses: a2, signatures: s2 } = await signEmergency(id, signers9);
       await expect(
         dao.emergencyExecute(id, a2, s2)
       ).to.be.revertedWithCustomError(dao, "NotInStatus");

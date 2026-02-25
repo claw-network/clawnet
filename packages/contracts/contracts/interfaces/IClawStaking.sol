@@ -39,4 +39,5 @@ interface IClawStaking {
     function isActiveValidator(address node) external view returns (bool);
     function getActiveValidators() external view returns (address[] memory);
     function activeValidatorCount() external view returns (uint256);
+    function getLockupMultiplier(address node) external view returns (uint256);
 }

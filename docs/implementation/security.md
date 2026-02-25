@@ -47,8 +47,23 @@ smart contracts:
   multi-sig or an emergency guardian can pause contracts during incidents.
 - **Access Control** — Role-based access via OpenZeppelin `AccessControl`.
   Sensitive operations (mint, burn, pause, upgrade) require specific roles.
-- **Flash loan defense** — Governance snapshots use a past block number for
-  voting power, preventing flash-loan vote manipulation.
+- **Flash loan defense** — Governance voting power uses `ERC20VotesUpgradeable`
+  checkpointing with `getPastVotes(voter, snapshotBlock)`, where the snapshot
+  block is locked at proposal creation time. This prevents both flash-loan
+  vote manipulation and token-transfer vote inflation (C-01 fix).
+- **Router access control** — `ClawRouter.multicall()` is restricted to
+  `MULTICALL_ROLE` holders, preventing confused-deputy privilege escalation
+  (M-03 fix).
+- **Emergency multisig** — Emergency execution requires 9-of-9 signatures
+  from designated emergency signers (H-02 fix, `EMERGENCY_THRESHOLD = 9`).
+- **DID proof-of-ownership** — `registerDID()` requires ECDSA signature from
+  the controller address, preventing DID squatting/hijacking (H-01 fix).
+- **Escrow dispute timeout** — Disputed escrows have a 7-day timeout after
+  which depositors can recover funds via `forceResolveAfterTimeout()`,
+  preventing permanent fund lock (M-01 fix).
+- **Parameter bounds** — Governance parameters (quorum, voting period,
+  timelock) have enforced min/max ranges in both `ClawDAO.setGovParams()`
+  and `ParamRegistry.setParam()` (M-04 fix).
 
 ## 3. Security Requirements
 
@@ -87,7 +102,8 @@ deployment:
 - High-value = top finality tier (see FINALITY_TIERS). Nodes SHOULD reject
   new high-value transfers during partition detection and rely on
   time-based finality only until the partition clears.
-- Critical bug: emergency DAO vote to pause affected modules
+- Critical bug: emergency DAO vote to pause affected modules (requires 9-of-9
+  emergency signer consensus for immediate action)
 
 ## 6. Security Testing
 

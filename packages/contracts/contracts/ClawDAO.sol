@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import "./ParamRegistry.sol";
 
 /**
@@ -13,12 +14,13 @@ import "./ParamRegistry.sol";
  * @notice DAO governance — proposals, weighted voting, timelock, emergency multisig.
  * @dev UUPS upgradeable. Combines T-2.4 (core), T-2.5 (timelock), T-2.6 (emergency multisig).
  *
- *  Voting power formula:
- *    power = sqrt(tokenBalance) * (1 + trustScore/1000) * lockupMultiplier
+ *  Voting power formula (C-01 fix: snapshot-based):
+ *    power = sqrt(getPastVotes(voter, snapshotBlock)) * (1 + trustScore/1000) * lockupMultiplier
+ *    snapshotBlock is fixed at proposal creation to prevent vote inflation via token transfers.
  *
  *  Proposal lifecycle:
  *    Discussion -> Voting -> Passed/Rejected -> Timelocked -> Executed
- *    Emergency path: emergencyExecute (5/9 multisig) bypasses voting + timelock.
+ *    Emergency path: emergencyExecute (9/9 multisig) bypasses voting + timelock.
  */
 contract ClawDAO is
     AccessControlUpgradeable,
@@ -122,9 +124,9 @@ contract ClawDAO is
     uint64  public timelockDelay;
     uint256 public quorumBps;
 
-    // Emergency MultiSig (T-2.6)
+    // Emergency MultiSig (T-2.6) — H-02 fix: enforce 9-of-9
     address[9] public emergencySigners;
-    uint8 public constant EMERGENCY_THRESHOLD = 5;
+    uint8 public constant EMERGENCY_THRESHOLD = 9;
 
     // ─── Events ──────────────────────────────────────────────────────
 
@@ -263,7 +265,7 @@ contract ClawDAO is
         Receipt storage r = receipts[proposalId][msg.sender];
         if (r.hasVoted) revert AlreadyVoted(proposalId, msg.sender);
 
-        uint256 weight = getVotingPower(msg.sender);
+        uint256 weight = getVotingPower(msg.sender, c.snapshotBlock);
         r.hasVoted = true;
         r.support = support;
         r.weight = weight;
@@ -375,13 +377,34 @@ contract ClawDAO is
 
     // ─── Voting Power ────────────────────────────────────────────────
 
-    function getVotingPower(address voter) public view returns (uint256 power) {
-        uint256 balance = token.balanceOf(voter);
+    /**
+     * @notice Calculate voting power for a voter at a given snapshot block.
+     * @dev C-01 fix: uses ERC20Votes.getPastVotes() instead of live balanceOf()
+     *      to prevent vote inflation via token transfers.
+     * @param voter         The voter address.
+     * @param snapshotBlock The block number at which to snapshot balances.
+     */
+    function getVotingPower(address voter, uint256 snapshotBlock) public view returns (uint256 power) {
+        uint256 balance = IVotes(address(token)).getPastVotes(voter, snapshotBlock);
         if (balance == 0) return 0;
 
         uint256 sqrtBal = _sqrt(balance);
         uint256 trustMul = 1000 + _getTrustScore(voter);   // 1000 = 1x
         uint256 lockMul  = _getLockupMultiplier(voter);     // 1000 = 1x
+        power = (sqrtBal * trustMul * lockMul) / 1_000_000;
+    }
+
+    /**
+     * @notice Calculate voting power at the current block (convenience overload).
+     * @dev Uses live balanceOf — provided for backward compatibility / off-chain queries.
+     */
+    function getVotingPower(address voter) public view returns (uint256 power) {
+        uint256 balance = token.balanceOf(voter);
+        if (balance == 0) return 0;
+
+        uint256 sqrtBal = _sqrt(balance);
+        uint256 trustMul = 1000 + _getTrustScore(voter);
+        uint256 lockMul  = _getLockupMultiplier(voter);
         power = (sqrtBal * trustMul * lockMul) / 1_000_000;
     }
 
@@ -469,6 +492,12 @@ contract ClawDAO is
         uint64  timelockDelay_,
         uint256 quorumBps_
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // M-04: enforce safety bounds on governance parameters
+        require(quorumBps_ >= 1 && quorumBps_ <= 5000, "quorum out of range [1,5000]");
+        require(votingPeriod_ >= 1 hours && votingPeriod_ <= 30 days, "voting period out of range [1h,30d]");
+        require(timelockDelay_ >= 1 hours && timelockDelay_ <= 30 days, "timelock out of range [1h,30d]");
+        require(discussionPeriod_ >= 1 hours && discussionPeriod_ <= 30 days, "discussion period out of range [1h,30d]");
+
         proposalThreshold = proposalThreshold_;
         discussionPeriod = discussionPeriod_;
         votingPeriod = votingPeriod_;

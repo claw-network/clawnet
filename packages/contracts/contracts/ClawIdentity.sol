@@ -4,15 +4,16 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /**
  * @title ClawIdentity
  * @notice On-chain DID registry — maps did:claw: identifiers to Ed25519 public keys and EVM addresses.
  *         Stores only hashes and minimal mappings on-chain; full DID documents live on IPFS/Ceramic.
  * @dev UUPS upgradeable. Supports key rotation, revocation, and platform link anchoring.
- *      Ed25519 signature verification for rotateKey is deferred to Phase 2 (T-0.13/T-0.14).
- *      Currently the rotation proof is stored but not cryptographically verified on-chain;
- *      only controller authorization is enforced.
+ *      H-01 fix: registerDID requires ECDSA signature from the controller to prove key ownership.
+ *      rotateKey verifies ECDSA proof from the controller authorizing rotation.
  */
 contract ClawIdentity is
     AccessControlUpgradeable,
@@ -83,6 +84,7 @@ contract ClawIdentity is
     error InvalidAddress();
     error KeyAlreadyActive(bytes32 keyHash);
     error InvalidLinkHash();
+    error InvalidSignature();
 
     // ─── Modifiers ───────────────────────────────────────────────────
 
@@ -116,23 +118,34 @@ contract ClawIdentity is
     // ─── Core functions ──────────────────────────────────────────────
 
     /**
-     * @notice Register a new DID on-chain. The caller becomes the controller.
+     * @notice Register a new DID on-chain.
+     * @dev H-01 fix: requires ECDSA signature from the controller proving ownership.
+     *      Digest: keccak256("clawnet:register:v1:", didHash, controller)
      * @param didHash    SHA-256 hash of the full DID string (e.g., keccak256("did:claw:z6Mk...")).
      * @param publicKey  Ed25519 public key (must be exactly 32 bytes).
      * @param purpose    Key purpose enum.
      * @param evmAddress EVM address derived from the public key (for cross-reference).
      *                   If zero, defaults to msg.sender.
+     * @param evmSig     ECDSA signature from the controller over the registration digest.
      */
     function registerDID(
         bytes32 didHash,
         bytes calldata publicKey,
         KeyPurpose purpose,
-        address evmAddress
+        address evmAddress,
+        bytes calldata evmSig
     ) external whenNotPaused {
         if (dids[didHash].controller != address(0)) revert DIDAlreadyExists(didHash);
         if (publicKey.length != 32) revert InvalidPublicKey();
 
         address controller = evmAddress == address(0) ? msg.sender : evmAddress;
+
+        // H-01: verify controller authorization via ECDSA
+        _verifyControllerSig(
+            abi.encodePacked("clawnet:register:v1:", didHash, controller),
+            evmSig,
+            controller
+        );
 
         bytes32 keyHash = keccak256(publicKey);
 
@@ -208,12 +221,12 @@ contract ClawIdentity is
 
     /**
      * @notice Rotate the active key for a DID.
-     *         Only the controller can rotate. The rotation proof is stored but
-     *         on-chain Ed25519 verification is deferred to Phase 2 (T-0.14).
+     *         Only the controller can rotate. Rotation proof is now verified on-chain.
+     * @dev H-01 fix: verifies ECDSA signature from controller authorizing key rotation.
      * @param didHash       The DID to rotate the key for.
      * @param newPublicKey  New Ed25519 public key (32 bytes).
-     * @param rotationProof Signature proof from the old key authorizing rotation
-     *                      (stored on-chain; cryptographic verification in Phase 2).
+     * @param rotationProof ECDSA signature from the controller over
+     *                      keccak256("clawnet:rotate:v1:", didHash, oldKeyHash, newKeyHash).
      */
     function rotateKey(
         bytes32 didHash,
@@ -221,14 +234,22 @@ contract ClawIdentity is
         bytes calldata rotationProof
     ) external whenNotPaused onlyController(didHash) {
         if (newPublicKey.length != 32) revert InvalidPublicKey();
-        // Suppress unused variable warning — proof stored/verified in Phase 2
-        rotationProof; // solhint-disable-line no-unused-vars
 
         DIDRecord storage d = dids[didHash];
         bytes32 oldKeyHash = d.activeKeyHash;
         bytes32 newKeyHash = keccak256(newPublicKey);
 
         if (oldKeyHash == newKeyHash) revert KeyAlreadyActive(newKeyHash);
+
+        // H-01: verify controller authorization via ECDSA
+        _verifyControllerSig(
+            abi.encodePacked("clawnet:rotate:v1:", didHash, oldKeyHash, newKeyHash),
+            rotationProof,
+            d.controller
+        );
+
+        // Cache purpose before revoking old key
+        KeyPurpose oldPurpose = keys[didHash][oldKeyHash].purpose;
 
         // Revoke old key
         keys[didHash][oldKeyHash].revokedAt = uint64(block.timestamp);
@@ -238,7 +259,7 @@ contract ClawIdentity is
             publicKey: newPublicKey,
             addedAt: uint64(block.timestamp),
             revokedAt: 0,
-            purpose: keys[didHash][oldKeyHash].purpose
+            purpose: oldPurpose
         });
 
         // Update DID record
@@ -349,6 +370,23 @@ contract ClawIdentity is
     }
 
     // ─── Internal ────────────────────────────────────────────────────
+
+    /**
+     * @dev Verify ECDSA signature from the expected controller.
+     * @param message  Raw message bytes to hash.
+     * @param sig      ECDSA signature (65 bytes).
+     * @param expected Expected signer address.
+     */
+    function _verifyControllerSig(
+        bytes memory message,
+        bytes calldata sig,
+        address expected
+    ) internal pure {
+        bytes32 digest = keccak256(message);
+        bytes32 ethHash = MessageHashUtils.toEthSignedMessageHash(digest);
+        address recovered = ECDSA.recover(ethHash, sig);
+        if (recovered != expected) revert InvalidSignature();
+    }
 
     function _authorizeUpgrade(
         address newImplementation
