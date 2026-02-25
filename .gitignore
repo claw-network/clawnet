@@ -9,3 +9,6 @@ package-lock.json
 *.tsbuildinfo
 localdev
 /.idea
+scripts/liquidity-bot/logs/
+scripts/liquidity-bot/config.local.json
+scripts/liquidity-bot/state.local.json

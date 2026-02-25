@@ -1,0 +1,15 @@
+# cron template for liquidity bot
+# Install with: crontab -e
+#
+# Adjust ROOT to your local absolute repo path.
+# All logs are written by run-scheduled.sh into scripts/liquidity-bot/logs/.
+
+SHELL=/bin/bash
+PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+
+ROOT=/Users/yourname/workspace/private-repo/Bots/clawnet
+LIQUIDITY_BOT_CONFIG=$ROOT/scripts/liquidity-bot/config.local.json
+LIQUIDITY_BOT_LOG_DIR=$ROOT/scripts/liquidity-bot/logs
+
+# Run every hour at minute 10
+10 * * * * cd "$ROOT" && "$ROOT/scripts/liquidity-bot/run-scheduled.sh" --count 1 --cycles 2

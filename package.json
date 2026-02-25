@@ -12,7 +12,13 @@
     "publish:dry": "bash scripts/publish.sh",
     "publish:release": "bash scripts/publish.sh --release",
     "format": "prettier --write .",
-    "codegen:p2p": "flatc --ts --gen-mutable --gen-object-api -o packages/protocol/src/p2p/generated docs/implementation/p2p-spec.fbs"
+    "codegen:p2p": "flatc --ts --gen-mutable --gen-object-api -o packages/protocol/src/p2p/generated docs/implementation/p2p-spec.fbs",
+    "liq:health": "node scripts/liquidity-bot/health-check.mjs",
+    "liq:fund": "node scripts/liquidity-bot/fund-operators.mjs",
+    "liq:publish": "node scripts/liquidity-bot/publish-listings.mjs",
+    "liq:trade": "node scripts/liquidity-bot/trade-cycles.mjs",
+    "liq:reconcile": "node scripts/liquidity-bot/reconcile.mjs",
+    "liq:run": "node scripts/liquidity-bot/run-once.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.24.0",
