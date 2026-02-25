@@ -190,6 +190,13 @@ bash deploy.sh
 - `Safe #1`：流动性资金托管（对应 `LIQUIDITY_ADDRESS`）
 - `Safe #2`：风险储备托管（对应 `RESERVE_ADDRESS`）
 
+如无 Safe UI，可使用仓库内脚本化流程：
+
+- `pnpm --filter @claw-network/contracts run safe:deploy:testnet`
+- `pnpm --filter @claw-network/contracts run safe:create:testnet`
+
+详细命令见：`infra/testnet/multisig-soft-wallet/README.md` Step 3。
+
 3. 将 Safe 地址写入部署配置
 
 编辑 `infra/testnet/prod/secrets.env`：
@@ -1177,8 +1184,10 @@ infra/
     │   └── secrets.env                ← 部署密钥与地址（本地保管）
     └── multisig-soft-wallet/
         ├── README.md                  ← 无硬件钱包场景的多签落地手册
+        ├── init-env.sh                ← signer 环境初始化（geth 或 docker 模式）
         ├── create-signer-wallet.sh    ← 生成 signer 本地 keystore + public-info
-        └── collect-owner-addresses.sh ← 聚合 3 个 signer 地址生成 Safe owner 清单
+        ├── collect-owner-addresses.sh ← 聚合 3 个 signer 地址生成 Safe owner 清单
+        └── create-safe-addresses.sh   ← 一键部署 Safe Core + 创建 Liquidity/Reserve Safe
 ```
 
 ---

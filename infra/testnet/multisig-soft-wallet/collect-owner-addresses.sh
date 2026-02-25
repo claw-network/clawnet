@@ -55,20 +55,19 @@ fi
 
 mkdir -p "$OUT_ROOT"
 
-mapfile -t ADDRESSES < <(
-  for f in "${INPUT_FILES[@]}"; do
-    if [[ ! -f "$f" ]]; then
-      echo "ERROR: file not found: $f" >&2
-      exit 1
-    fi
-    addr="$(grep '^SIGNER_ADDRESS=' "$f" | sed 's/^SIGNER_ADDRESS=//' | tr -d '[:space:]')"
-    if [[ -z "$addr" ]]; then
-      echo "ERROR: SIGNER_ADDRESS missing in: $f" >&2
-      exit 1
-    fi
-    echo "$addr"
-  done
-)
+ADDRESSES=()
+for f in "${INPUT_FILES[@]}"; do
+  if [[ ! -f "$f" ]]; then
+    echo "ERROR: file not found: $f" >&2
+    exit 1
+  fi
+  addr="$(grep '^SIGNER_ADDRESS=' "$f" | sed 's/^SIGNER_ADDRESS=//' | tr -d '[:space:]')"
+  if [[ -z "$addr" ]]; then
+    echo "ERROR: SIGNER_ADDRESS missing in: $f" >&2
+    exit 1
+  fi
+  ADDRESSES+=("$addr")
+done
 
 for addr in "${ADDRESSES[@]}"; do
   if [[ ! "$addr" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
@@ -77,7 +76,10 @@ for addr in "${ADDRESSES[@]}"; do
   fi
 done
 
-mapfile -t UNIQUE_ADDRESSES < <(printf '%s\n' "${ADDRESSES[@]}" | awk '!seen[tolower($0)]++')
+UNIQUE_ADDRESSES=()
+while IFS= read -r line; do
+  [[ -n "$line" ]] && UNIQUE_ADDRESSES+=("$line")
+done < <(printf '%s\n' "${ADDRESSES[@]}" | awk '!seen[tolower($0)]++')
 if [[ ${#UNIQUE_ADDRESSES[@]} -ne ${#ADDRESSES[@]} ]]; then
   echo "ERROR: duplicate signer addresses detected"
   printf 'Input addresses:\n'

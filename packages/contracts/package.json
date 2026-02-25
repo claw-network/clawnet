@@ -24,12 +24,15 @@
     "deploy:local": "hardhat run scripts/deploy-helpers.ts --network hardhat",
     "deploy:testnet": "hardhat run scripts/deploy-all.ts --network clawnetTestnet",
     "deploy:testnet:bootstrap": "BOOTSTRAP_MINT=true hardhat run scripts/deploy-all.ts --network clawnetTestnet",
+    "safe:deploy:testnet": "hardhat run scripts/deploy-safe-core.ts --network clawnetTestnet",
+    "safe:create:testnet": "hardhat run scripts/create-safe-wallet.ts --network clawnetTestnet",
     "bootstrap:testnet": "hardhat run scripts/bootstrap-mint.ts --network clawnetTestnet",
     "slither": "slither .",
     "lint:sol": "solhint 'contracts/**/*.sol'"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@safe-global/safe-contracts": "^1.4.1",
     "@openzeppelin/contracts": "^5.2.0",
     "@openzeppelin/contracts-upgradeable": "^5.2.0",
     "@openzeppelin/hardhat-upgrades": "^3.6.0",

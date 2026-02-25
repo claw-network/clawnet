@@ -4,15 +4,49 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT_ROOT="$SCRIPT_DIR/.generated"
 SIGNER_NAME=""
+BACKEND="auto"
 
 usage() {
   cat <<'EOF'
 Usage:
-  bash infra/testnet/multisig-soft-wallet/create-signer-wallet.sh --name <signer-name> [--out <dir>]
+  bash infra/testnet/multisig-soft-wallet/create-signer-wallet.sh --name <signer-name> [--out <dir>] [--backend auto|geth|docker]
 
 Example:
   bash infra/testnet/multisig-soft-wallet/create-signer-wallet.sh --name signer1
 EOF
+}
+
+choose_backend() {
+  case "$BACKEND" in
+    auto)
+      if command -v geth >/dev/null 2>&1; then
+        echo "geth"
+        return
+      fi
+      if command -v docker >/dev/null 2>&1; then
+        echo "docker"
+        return
+      fi
+      echo ""
+      ;;
+    geth)
+      if command -v geth >/dev/null 2>&1; then
+        echo "geth"
+        return
+      fi
+      echo ""
+      ;;
+    docker)
+      if command -v docker >/dev/null 2>&1; then
+        echo "docker"
+        return
+      fi
+      echo ""
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
 }
 
 while [[ $# -gt 0 ]]; do
@@ -29,6 +63,10 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
+    --backend)
+      BACKEND="${2:-}"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1"
       usage
@@ -43,8 +81,21 @@ if [[ -z "$SIGNER_NAME" ]]; then
   exit 1
 fi
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "ERROR: docker is required"
+if [[ "$BACKEND" != "auto" && "$BACKEND" != "geth" && "$BACKEND" != "docker" ]]; then
+  echo "ERROR: --backend must be one of: auto, geth, docker"
+  exit 1
+fi
+
+SELECTED_BACKEND="$(choose_backend)"
+if [[ -z "$SELECTED_BACKEND" ]]; then
+  if [[ "$BACKEND" == "auto" ]]; then
+    echo "ERROR: neither local geth nor docker is available"
+    echo "Install geth (preferred) or docker to proceed"
+  elif [[ "$BACKEND" == "geth" ]]; then
+    echo "ERROR: geth not found in PATH"
+  else
+    echo "ERROR: docker not found in PATH"
+  fi
   exit 1
 fi
 
@@ -56,6 +107,7 @@ mkdir -p "$KEYSTORE_DIR"
 
 echo "Creating signer wallet for: $SIGNER_NAME"
 echo "Output directory: $SIGNER_DIR"
+echo "Backend: $SELECTED_BACKEND"
 
 read -r -s -p "Enter wallet passphrase: " PASS_1
 echo
@@ -75,11 +127,15 @@ PASS_FILE="$(mktemp)"
 trap 'rm -f "$PASS_FILE"' EXIT
 printf '%s' "$PASS_1" > "$PASS_FILE"
 
-docker run --rm \
-  -v "$KEYSTORE_DIR:/wallet" \
-  -v "$PASS_FILE:/password.txt:ro" \
-  ethereum/client-go:v1.13.15 \
-  account new --datadir /wallet --password /password.txt >/dev/null
+if [[ "$SELECTED_BACKEND" == "geth" ]]; then
+  geth account new --datadir "$KEYSTORE_DIR" --password "$PASS_FILE" >/dev/null
+else
+  docker run --rm \
+    -v "$KEYSTORE_DIR:/wallet" \
+    -v "$PASS_FILE:/password.txt:ro" \
+    ethereum/client-go:v1.13.15 \
+    account new --datadir /wallet --password /password.txt >/dev/null
+fi
 
 KEYFILE_PATH="$(ls -1 "$KEYSTORE_DIR/keystore" | head -n1 || true)"
 if [[ -z "$KEYFILE_PATH" ]]; then

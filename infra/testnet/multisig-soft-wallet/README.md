@@ -20,8 +20,24 @@ This is safer than a single shared private key, but weaker than hardware-wallet 
 
 ## Prerequisites (Each Signer)
 
-- Docker installed locally.
-- `ethereum/client-go:v1.13.15` image pullable.
+- Preferred: local `geth` available in PATH.
+- Fallback: Docker installed locally, and `ethereum/client-go:v1.13.15` image pullable.
+
+You can initialize either path with:
+
+```bash
+bash infra/testnet/multisig-soft-wallet/init-env.sh
+```
+
+Non-interactive examples:
+
+```bash
+# Install local geth
+bash infra/testnet/multisig-soft-wallet/init-env.sh --mode geth --yes
+
+# Install docker and pull geth image
+bash infra/testnet/multisig-soft-wallet/init-env.sh --mode docker --yes
+```
 
 ## Step 1: Each Signer Creates One Wallet
 
@@ -29,6 +45,20 @@ Run on each signer's machine:
 
 ```bash
 bash infra/testnet/multisig-soft-wallet/create-signer-wallet.sh --name signer1
+```
+
+Backend selection:
+
+- Default `--backend auto`: use local `geth` first, fallback to Docker.
+- Force local geth: `--backend geth`
+- Force Docker: `--backend docker`
+
+Examples:
+
+```bash
+bash infra/testnet/multisig-soft-wallet/create-signer-wallet.sh --name signer1 --backend auto
+bash infra/testnet/multisig-soft-wallet/create-signer-wallet.sh --name signer2 --backend geth
+bash infra/testnet/multisig-soft-wallet/create-signer-wallet.sh --name signer3 --backend docker
 ```
 
 The script will:
@@ -64,6 +94,68 @@ Use the owners and threshold from `safe-owners.env` to create:
 
 - `SAFE_LIQUIDITY_TESTNET` (for `LIQUIDITY_ADDRESS`)
 - `SAFE_RESERVE_TESTNET` (for `RESERVE_ADDRESS`)
+
+### 3.1 Deploy Safe core contracts (singleton + proxy factory)
+
+Run once per network (on a machine that can access testnet RPC):
+
+```bash
+cd packages/contracts
+pnpm run safe:deploy:testnet
+```
+
+This writes:
+
+- `packages/contracts/deployments/safe-core-clawnetTestnet.json`
+
+### 3.0 One-command mode (recommended)
+
+If you already have `safe-owners.env`, run one command to deploy core + create liquidity/reserve safes:
+
+```bash
+bash infra/testnet/multisig-soft-wallet/create-safe-addresses.sh
+```
+
+Optional custom owners file:
+
+```bash
+bash infra/testnet/multisig-soft-wallet/create-safe-addresses.sh /path/to/safe-owners.env
+```
+
+At the end, script prints `LIQUIDITY_ADDRESS` and `RESERVE_ADDRESS` ready for `secrets.env`.
+
+### 3.2 Create the Liquidity Safe
+
+```bash
+cd /path/to/repo
+source infra/testnet/multisig-soft-wallet/.generated/safe-owners.env
+
+cd packages/contracts
+SAFE_LABEL="SAFE_LIQUIDITY_TESTNET" \
+SAFE_OWNERS="$SAFE_OWNERS_CSV" \
+SAFE_THRESHOLD="$SAFE_THRESHOLD" \
+pnpm run safe:create:testnet
+```
+
+### 3.3 Create the Reserve Safe
+
+Use a different nonce to avoid collision:
+
+```bash
+cd /path/to/repo
+source infra/testnet/multisig-soft-wallet/.generated/safe-owners.env
+
+cd packages/contracts
+SAFE_LABEL="SAFE_RESERVE_TESTNET" \
+SAFE_OWNERS="$SAFE_OWNERS_CSV" \
+SAFE_THRESHOLD="$SAFE_THRESHOLD" \
+SAFE_NONCE="$(date +%s)" \
+pnpm run safe:create:testnet
+```
+
+Created Safe addresses are appended into:
+
+- `packages/contracts/deployments/safe-wallets-clawnetTestnet.json`
 
 ## Step 4: Wire Addresses into Redeploy
 
