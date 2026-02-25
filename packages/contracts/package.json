@@ -32,10 +32,11 @@
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@safe-global/safe-contracts": "^1.4.1",
     "@openzeppelin/contracts": "^5.2.0",
     "@openzeppelin/contracts-upgradeable": "^5.2.0",
     "@openzeppelin/hardhat-upgrades": "^3.6.0",
+    "@safe-global/safe-contracts": "^1.4.1",
+    "@types/better-sqlite3": "^7.6.13",
     "dotenv": "^16.4.0",
     "hardhat": "^2.22.0",
     "hardhat-gas-reporter": "^2.2.0",

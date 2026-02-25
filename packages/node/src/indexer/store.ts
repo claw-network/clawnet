@@ -1,12 +1,12 @@
 /**
- * IndexerStore �?SQLite persistence for the Event Indexer.
+ * IndexerStore SQLite persistence for the Event Indexer.
  *
  * Manages all on-chain event data:
  * - Generic `events` table (raw event log)
- * - Module-specific materialized tables (transfers, contracts, proposals, �?
+ * - Module-specific materialized tables (transfers, contracts, proposals, votes, reviews, escrows)
  * - Indexer metadata (last indexed block, etc.)
  *
- * Uses `better-sqlite3` for synchronous, single-connection access �?
+ * Uses `better-sqlite3` for synchronous, single-connection access
  * ideal for a single-node daemon where reads and writes are serialised.
  */
 
