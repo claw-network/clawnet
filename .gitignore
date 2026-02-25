@@ -14,3 +14,4 @@ scripts/liquidity-bot/reports/
 scripts/liquidity-bot/schedule.env
 scripts/liquidity-bot/config.local.json
 scripts/liquidity-bot/state.local.json
+temp/

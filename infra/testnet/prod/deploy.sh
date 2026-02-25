@@ -362,6 +362,11 @@ run_remote "$SERVER_C" "cd /opt/clawnet && docker compose -f docker-compose.sync
 
 sleep 5
 echo "  Server C mining."
+
+# Get enode for Server C
+ENODE_C_RAW=$(run_remote "$SERVER_C" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"admin_nodeInfo\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"result\"][\"enode\"])"')
+ENODE_C=$(echo "$ENODE_C_RAW" | sed "s/127.0.0.1/$SERVER_C/")
+echo "  Server C enode: $ENODE_C"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
@@ -436,6 +441,7 @@ cat > "$SCRIPT_DIR/enodes.env" << EOF
 # ClawNet Testnet — Enode URLs (generated $(date -u +%Y-%m-%dT%H:%M:%SZ))
 ENODE_A=$ENODE_A
 ENODE_B=$ENODE_B
+ENODE_C=$ENODE_C
 EOF
 
 echo "  Saved: contracts.json, enodes.env"
