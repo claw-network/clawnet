@@ -14,6 +14,10 @@
     "taker": {
       "did": "did:claw:replace-taker-did",
       "passphrase": "replace-taker-passphrase"
+    },
+    "riskReserve": {
+      "did": "did:claw:replace-risk-reserve-did",
+      "passphrase": "replace-risk-reserve-passphrase"
     }
   },
   "funding": {
@@ -33,5 +37,10 @@
     "cycles": 3,
     "quantity": 1,
     "waitMs": 0
+  },
+  "reserve": {
+    "defaultSender": "riskReserve",
+    "maxPerTransfer": 200,
+    "maxBatchTotal": 2000
   }
 }

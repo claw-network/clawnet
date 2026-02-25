@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-import { createRuntime, parseArgs, printScriptHelp, toInt } from './bot-lib.mjs';
-import { runTradeCycles } from './steps.mjs';
+import { createRuntime, parseArgs, printScriptHelp, toInt } from '../lib/bot-lib.mjs';
+import { runTradeCycles } from '../lib/steps.mjs';
 
 async function main() {
   const args = parseArgs();
   if (args.help) {
     printScriptHelp(
-      'trade-cycles.mjs',
+      'cli/trade-cycles.mjs',
       'Optional flags:\n  --cycles <n>     Number of buy/deliver/confirm cycles to execute.',
     );
     return;

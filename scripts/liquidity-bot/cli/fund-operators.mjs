@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
-import { createRuntime, parseArgs, printScriptHelp } from './bot-lib.mjs';
-import { fundOperators } from './steps.mjs';
+import { createRuntime, parseArgs, printScriptHelp } from '../lib/bot-lib.mjs';
+import { fundOperators } from '../lib/steps.mjs';
 
 async function main() {
   const args = parseArgs();
   if (args.help) {
-    printScriptHelp('fund-operators.mjs');
+    printScriptHelp('cli/fund-operators.mjs');
     return;
   }
   const rt = await createRuntime(args);

@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 
-import { createRuntime, parseArgs, printScriptHelp, toInt } from './bot-lib.mjs';
+import { createRuntime, parseArgs, printScriptHelp, toInt } from '../lib/bot-lib.mjs';
 import {
   fundOperators,
   healthCheck,
   publishListings,
   reconcile,
   runTradeCycles,
-} from './steps.mjs';
+} from '../lib/steps.mjs';
 
 async function main() {
   const args = parseArgs();
   if (args.help) {
     printScriptHelp(
-      'run-once.mjs',
+      'cli/run-once.mjs',
       [
         'Optional flags:',
         '  --count <n>         Number of listings to publish this run.',

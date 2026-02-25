@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 
-import { createRuntime, parseArgs, printScriptHelp } from './bot-lib.mjs';
-import { reconcile } from './steps.mjs';
+import { createRuntime, parseArgs, printScriptHelp } from '../lib/bot-lib.mjs';
+import { healthCheck } from '../lib/steps.mjs';
 
 async function main() {
   const args = parseArgs();
   if (args.help) {
-    printScriptHelp('reconcile.mjs');
+    printScriptHelp('cli/health-check.mjs');
     return;
   }
   const rt = await createRuntime(args);
-  await reconcile(rt);
+  await healthCheck(rt);
 }
 
 main().catch((error) => {

@@ -10,6 +10,9 @@ export function parseArgs(argv = process.argv.slice(2)) {
   const args = {};
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
+    if (token === '--') {
+      continue;
+    }
     if (!token.startsWith('--')) {
       throw new Error(`Unexpected argument: ${token}`);
     }
@@ -77,6 +80,42 @@ function normalizeBaseUrl(urlRaw) {
   return base;
 }
 
+function isAutoDid(value) {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'auto' || normalized === 'self' || normalized === 'auto:self';
+}
+
+async function resolveAutoAccountDids(config, accountNames) {
+  const names = [...new Set((accountNames ?? []).map((name) => String(name)))];
+  if (!names.length) return;
+
+  let needsResolve = false;
+  for (const name of names) {
+    const account = config?.accounts?.[name];
+    if (account && typeof account === 'object' && isAutoDid(account.did)) {
+      needsResolve = true;
+      break;
+    }
+  }
+  if (!needsResolve) return;
+
+  const status = await apiRequest(config, 'GET', '/api/v1/node');
+  const nodeDid = typeof status?.did === 'string' ? status.did.trim() : '';
+  if (!nodeDid || !nodeDid.startsWith('did:claw:')) {
+    throw new Error(
+      'Failed to resolve node DID from GET /api/v1/node. Fill accounts.*.did explicitly.',
+    );
+  }
+
+  for (const name of names) {
+    const account = config?.accounts?.[name];
+    if (account && typeof account === 'object' && isAutoDid(account.did)) {
+      account.did = nodeDid;
+    }
+  }
+}
+
 function requireAccount(config, name) {
   const account = config?.accounts?.[name];
   if (!account || typeof account !== 'object') {
@@ -86,7 +125,7 @@ function requireAccount(config, name) {
   requiredString(account.passphrase, `accounts.${name}.passphrase`);
 }
 
-export async function loadConfig(configPathArg) {
+export async function loadConfig(configPathArg, options = {}) {
   const configPath = path.resolve(
     process.cwd(),
     configPathArg ?? path.join(THIS_DIR, 'config.local.json'),
@@ -97,7 +136,7 @@ export async function loadConfig(configPathArg) {
     file = await fs.readFile(configPath, 'utf8');
   } catch {
     throw new Error(
-      `Config not found: ${configPath}\nCopy scripts/liquidity-bot/config.example.json to this path and fill secrets.`,
+      `Config not found: ${configPath}\nCopy scripts/liquidity-bot/templates/config.example.json to this path and fill secrets.`,
     );
   }
 
@@ -115,9 +154,15 @@ export async function loadConfig(configPathArg) {
     config.stateFile ?? path.join(THIS_DIR, 'state.local.json'),
   );
 
-  requireAccount(config, 'liquidityVault');
-  requireAccount(config, 'maker');
-  requireAccount(config, 'taker');
+  const requiredAccounts = Array.isArray(options.requiredAccounts)
+    ? options.requiredAccounts
+    : ['liquidityVault', 'maker', 'taker'];
+  for (const name of requiredAccounts) {
+    requireAccount(config, String(name));
+  }
+
+  const configuredAccounts = Object.keys(config.accounts ?? {});
+  await resolveAutoAccountDids(config, [...requiredAccounts, ...configuredAccounts]);
 
   config.funding = {
     targetMakerBalance: toInt(config.funding?.targetMakerBalance, 300),
@@ -252,8 +297,8 @@ export async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function createRuntime(args) {
-  const config = await loadConfig(args.config);
+export async function createRuntime(args, options = {}) {
+  const config = await loadConfig(args.config, options);
   const state = await loadState(config.stateFile);
   return {
     config,

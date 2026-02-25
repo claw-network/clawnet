@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-import { createRuntime, parseArgs, printScriptHelp, toInt } from './bot-lib.mjs';
-import { publishListings } from './steps.mjs';
+import { createRuntime, parseArgs, printScriptHelp, toInt } from '../lib/bot-lib.mjs';
+import { publishListings } from '../lib/steps.mjs';
 
 async function main() {
   const args = parseArgs();
   if (args.help) {
     printScriptHelp(
-      'publish-listings.mjs',
+      'cli/publish-listings.mjs',
       'Optional flags:\n  --count <n>      Number of listings to publish in this run.',
     );
     return;

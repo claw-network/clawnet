@@ -13,12 +13,17 @@
     "publish:release": "bash scripts/publish.sh --release",
     "format": "prettier --write .",
     "codegen:p2p": "flatc --ts --gen-mutable --gen-object-api -o packages/protocol/src/p2p/generated docs/implementation/p2p-spec.fbs",
-    "liq:health": "node scripts/liquidity-bot/health-check.mjs",
-    "liq:fund": "node scripts/liquidity-bot/fund-operators.mjs",
-    "liq:publish": "node scripts/liquidity-bot/publish-listings.mjs",
-    "liq:trade": "node scripts/liquidity-bot/trade-cycles.mjs",
-    "liq:reconcile": "node scripts/liquidity-bot/reconcile.mjs",
-    "liq:run": "node scripts/liquidity-bot/run-once.mjs"
+    "liq:health": "node scripts/liquidity-bot/cli/health-check.mjs",
+    "liq:fund": "node scripts/liquidity-bot/cli/fund-operators.mjs",
+    "liq:publish": "node scripts/liquidity-bot/cli/publish-listings.mjs",
+    "liq:trade": "node scripts/liquidity-bot/cli/trade-cycles.mjs",
+    "liq:reconcile": "node scripts/liquidity-bot/cli/reconcile.mjs",
+    "liq:reserve": "node scripts/liquidity-bot/cli/reserve-compensate.mjs",
+    "liq:reserve:report": "node scripts/liquidity-bot/cli/reserve-daily-report.mjs",
+    "liq:reserve:report:period": "node scripts/liquidity-bot/cli/reserve-period-report.mjs",
+    "liq:reserve:report:week": "node scripts/liquidity-bot/cli/reserve-period-report.mjs --period week",
+    "liq:reserve:report:month": "node scripts/liquidity-bot/cli/reserve-period-report.mjs --period month",
+    "liq:run": "node scripts/liquidity-bot/cli/run-once.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.24.0",
