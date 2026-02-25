@@ -24,8 +24,8 @@ import * as path from 'path';
  *   BOOTSTRAP_TOTAL_SUPPLY  — Total tokens to mint (default: 1000000)
  *   NODE_ADDRESSES          — Comma-separated node wallet addresses for ecosystem allocation
  *   FAUCET_ADDRESS          — Faucet vault address (defaults to deployer)
- *   LIQUIDITY_ADDRESS       — Liquidity wallet address (defaults to treasury)
- *   RESERVE_ADDRESS         — Risk reserve address (defaults to treasury)
+ *   LIQUIDITY_ADDRESS       — Liquidity wallet address (required)
+ *   RESERVE_ADDRESS         — Risk reserve address (required)
  *
  * Usage:
  *   npx hardhat run scripts/bootstrap-mint.ts --network clawnetTestnet
@@ -44,6 +44,24 @@ interface MintAllocation {
   label: string;
   address: string;
   amount: number;
+}
+
+function parseAddress(value: string, envName: string): string {
+  try {
+    return ethers.getAddress(value);
+  } catch {
+    throw new Error(`${envName} must be a valid EVM address: ${value}`);
+  }
+}
+
+function requireEnvAddress(envName: string): string {
+  const raw = process.env[envName];
+  if (!raw || !raw.trim()) {
+    throw new Error(
+      `${envName} is required and must be explicitly configured (no fallback to treasury).`,
+    );
+  }
+  return parseAddress(raw.trim(), envName);
 }
 
 function loadDeployment(networkName: string): Record<string, unknown> | null {
@@ -75,18 +93,15 @@ async function main() {
   // ── Resolve addresses ─────────────────────────────────────────
 
   const deployment = loadDeployment(networkName);
-  const contracts = (deployment?.contracts ?? {}) as Record<
-    string,
-    { proxy: string }
-  >;
+  const contracts = (deployment?.contracts ?? {}) as Record<string, { proxy: string }>;
   const deploymentParams = (deployment?.params ?? {}) as Record<string, string>;
 
-  const tokenAddress =
-    process.env.TOKEN_ADDRESS ?? contracts.ClawToken?.proxy;
-  const daoAddress =
-    process.env.DAO_ADDRESS ?? contracts.ClawDAO?.proxy;
-  const treasuryAddress =
-    process.env.TREASURY_ADDRESS ?? deploymentParams.treasury ?? deployer.address;
+  const tokenAddress = process.env.TOKEN_ADDRESS ?? contracts.ClawToken?.proxy;
+  const daoAddress = process.env.DAO_ADDRESS ?? contracts.ClawDAO?.proxy;
+  const treasuryAddress = parseAddress(
+    process.env.TREASURY_ADDRESS ?? deploymentParams.treasury ?? deployer.address,
+    'TREASURY_ADDRESS',
+  );
 
   if (!tokenAddress) {
     throw new Error(
@@ -94,9 +109,7 @@ async function main() {
     );
   }
   if (!daoAddress) {
-    throw new Error(
-      'DAO_ADDRESS not set and no deployment record found. Run deploy-all.ts first.',
-    );
+    throw new Error('DAO_ADDRESS not set and no deployment record found. Run deploy-all.ts first.');
   }
 
   // ── Parameters ────────────────────────────────────────────────
@@ -117,9 +130,22 @@ async function main() {
     .map((s: string) => s.trim())
     .filter(Boolean);
 
-  const faucetAddress = process.env.FAUCET_ADDRESS ?? deployer.address;
-  const liquidityAddress = process.env.LIQUIDITY_ADDRESS ?? treasuryAddress;
-  const reserveAddress = process.env.RESERVE_ADDRESS ?? treasuryAddress;
+  const faucetAddress = parseAddress(
+    process.env.FAUCET_ADDRESS ?? deployer.address,
+    'FAUCET_ADDRESS',
+  );
+  const liquidityAddress = requireEnvAddress('LIQUIDITY_ADDRESS');
+  const reserveAddress = requireEnvAddress('RESERVE_ADDRESS');
+
+  if (liquidityAddress === treasuryAddress) {
+    throw new Error('LIQUIDITY_ADDRESS must be distinct from TREASURY_ADDRESS');
+  }
+  if (reserveAddress === treasuryAddress) {
+    throw new Error('RESERVE_ADDRESS must be distinct from TREASURY_ADDRESS');
+  }
+  if (liquidityAddress === reserveAddress) {
+    throw new Error('LIQUIDITY_ADDRESS must be distinct from RESERVE_ADDRESS');
+  }
 
   // ── Calculate allocations ─────────────────────────────────────
 
@@ -131,9 +157,7 @@ async function main() {
 
   // Split ecosystem allocation across nodes (equal share)
   const perNodeAmount =
-    nodeAddresses.length > 0
-      ? Math.floor(ecosystemAmount / nodeAddresses.length)
-      : 0;
+    nodeAddresses.length > 0 ? Math.floor(ecosystemAmount / nodeAddresses.length) : 0;
   const ecosystemRemainder =
     nodeAddresses.length > 0
       ? ecosystemAmount - perNodeAmount * nodeAddresses.length
@@ -160,8 +184,7 @@ async function main() {
 
   // If no node addresses provided or there's remainder, send ecosystem portion to deployer
   if (ecosystemRemainder > 0 || nodeAddresses.length === 0) {
-    const remainderTarget =
-      nodeAddresses.length > 0 ? nodeAddresses[0] : deployer.address;
+    const remainderTarget = nodeAddresses.length > 0 ? nodeAddresses[0] : deployer.address;
     const remainderLabel =
       nodeAddresses.length > 0 ? 'Node Wallet (remainder)' : 'Ecosystem (deployer)';
     allocations.push({
@@ -195,9 +218,7 @@ async function main() {
   // Verify total
   const allocatedTotal = allocations.reduce((sum, a) => sum + a.amount, 0);
   if (allocatedTotal !== totalSupply) {
-    throw new Error(
-      `Allocation mismatch: ${allocatedTotal} != ${totalSupply} (rounding error)`,
-    );
+    throw new Error(`Allocation mismatch: ${allocatedTotal} != ${totalSupply} (rounding error)`);
   }
 
   // ── Pre-flight checks ─────────────────────────────────────────

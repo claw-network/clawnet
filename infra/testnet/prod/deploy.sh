@@ -17,7 +17,7 @@
 #   - secrets.env and genesis.json in same directory as this script
 #
 # Usage:
-#   cd infra/testnet/deployments
+#   cd infra/testnet/prod
 #   bash deploy.sh
 # ==============================================================================
 set -euo pipefail
@@ -33,12 +33,86 @@ if [[ ! -f "$SECRETS_FILE" ]]; then
 fi
 source "$SECRETS_FILE"
 
+require_env() {
+  local name="$1"
+  local value="${!name:-}"
+  if [[ -z "$value" ]]; then
+    echo "ERROR: required variable '$name' is missing in $SECRETS_FILE"
+    exit 1
+  fi
+}
+
+require_address() {
+  local name="$1"
+  local value="${!name:-}"
+  if [[ ! "$value" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+    echo "ERROR: '$name' must be a valid 0x-prefixed EVM address: $value"
+    exit 1
+  fi
+}
+
+require_env TREASURY_ADDRESS
+require_env LIQUIDITY_ADDRESS
+require_env RESERVE_ADDRESS
+require_env DEPLOYER_PRIVATE_KEY
+require_env VALIDATOR_1_PRIVATE_KEY
+require_env VALIDATOR_2_PRIVATE_KEY
+require_env VALIDATOR_3_PRIVATE_KEY
+require_env VALIDATOR_1_ADDRESS
+require_env VALIDATOR_2_ADDRESS
+require_env VALIDATOR_3_ADDRESS
+require_env DEPLOYER_ADDRESS
+require_env VALIDATOR_PASSWORD
+
+require_address TREASURY_ADDRESS
+require_address LIQUIDITY_ADDRESS
+require_address RESERVE_ADDRESS
+require_address VALIDATOR_1_ADDRESS
+require_address VALIDATOR_2_ADDRESS
+require_address VALIDATOR_3_ADDRESS
+require_address DEPLOYER_ADDRESS
+
+require_private_key() {
+  local name="$1"
+  local value="${!name:-}"
+  if [[ ! "$value" =~ ^0x[0-9a-fA-F]{64}$ ]]; then
+    echo "ERROR: '$name' must be a valid 0x-prefixed private key"
+    exit 1
+  fi
+}
+
+require_private_key DEPLOYER_PRIVATE_KEY
+require_private_key VALIDATOR_1_PRIVATE_KEY
+require_private_key VALIDATOR_2_PRIVATE_KEY
+require_private_key VALIDATOR_3_PRIVATE_KEY
+
+if [[ "$LIQUIDITY_ADDRESS" == "$TREASURY_ADDRESS" ]]; then
+  echo "ERROR: LIQUIDITY_ADDRESS must be distinct from TREASURY_ADDRESS"
+  exit 1
+fi
+if [[ "$RESERVE_ADDRESS" == "$TREASURY_ADDRESS" ]]; then
+  echo "ERROR: RESERVE_ADDRESS must be distinct from TREASURY_ADDRESS"
+  exit 1
+fi
+if [[ "$LIQUIDITY_ADDRESS" == "$RESERVE_ADDRESS" ]]; then
+  echo "ERROR: LIQUIDITY_ADDRESS must be distinct from RESERVE_ADDRESS"
+  exit 1
+fi
+
 # Server config
 SERVER_A="66.94.125.242"
 SERVER_B="85.239.236.49"
 SERVER_C="85.239.235.67"
 SSH_PASS="${SSH_PASSWORD:-G66tdTcmvBz*k1sf}"
 SSH_CMD="sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no"
+
+require_local_command() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "ERROR: missing required local command: $cmd"
+    exit 1
+  fi
+}
 
 # Helper: run command on a remote server
 run_remote() {
@@ -55,6 +129,47 @@ scp_to() {
   sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no "$file" "root@$host:$dest"
 }
 
+rpc_block_number() {
+  local host="$1"
+  run_remote "$host" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"'
+}
+
+rpc_peer_count() {
+  local host="$1"
+  run_remote "$host" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"net_peerCount\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"'
+}
+
+echo ">>> Phase 0: Preflight checks..."
+require_local_command sshpass
+require_local_command ssh
+require_local_command scp
+require_local_command python3
+
+if [[ ! -f "$GENESIS_FILE" ]]; then
+  echo "ERROR: genesis file not found: $GENESIS_FILE"
+  exit 1
+fi
+if grep -q 'shanghaiTime' "$GENESIS_FILE"; then
+  echo "ERROR: genesis.json must not contain shanghaiTime (Clique incompatible)"
+  exit 1
+fi
+
+if [[ "$(uname)" != "Darwin" ]]; then
+  chmod 600 "$SECRETS_FILE" 2>/dev/null || true
+fi
+
+for HOST in $SERVER_A $SERVER_B $SERVER_C; do
+  echo "  [preflight] SSH check: $HOST"
+  run_remote "$HOST" 'echo ok >/dev/null'
+  echo "  [preflight] Runtime check on $HOST"
+  run_remote "$HOST" 'test -d /opt/clawnet && command -v docker >/dev/null && command -v git >/dev/null && command -v python3 >/dev/null'
+done
+
+echo "  [preflight] Local bootstrap script syntax"
+bash -n "$SCRIPT_DIR/deploy.sh"
+echo "  Preflight checks passed."
+echo ""
+
 echo "============================================================"
 echo "ClawNet Testnet — Full Redeployment"
 echo "============================================================"
@@ -64,6 +179,8 @@ echo "Server B  : $SERVER_B (Validator 2 — $VALIDATOR_2_ADDRESS)"
 echo "Server C  : $SERVER_C (Validator 3 — $VALIDATOR_3_ADDRESS)"
 echo "Deployer  : $DEPLOYER_ADDRESS"
 echo "Treasury  : $TREASURY_ADDRESS"
+echo "Liquidity : $LIQUIDITY_ADDRESS"
+echo "Reserve   : $RESERVE_ADDRESS"
 echo "============================================================"
 echo ""
 
@@ -273,6 +390,8 @@ echo ">>> Phase 10: Running bootstrap Token mint..."
 run_remote "$SERVER_A" "cd /opt/clawnet/packages/contracts && \
   DEPLOYER_PRIVATE_KEY='$DEPLOYER_PRIVATE_KEY' \
   TREASURY_ADDRESS='$TREASURY_ADDRESS' \
+  LIQUIDITY_ADDRESS='$LIQUIDITY_ADDRESS' \
+  RESERVE_ADDRESS='$RESERVE_ADDRESS' \
   CLAWNET_RPC_URL='http://127.0.0.1:8545' \
   FAUCET_ADDRESS='$DEPLOYER_ADDRESS' \
   NODE_ADDRESSES='$VALIDATOR_1_ADDRESS,$VALIDATOR_2_ADDRESS,$VALIDATOR_3_ADDRESS' \
@@ -290,7 +409,23 @@ echo ">>> Phase 11: Saving deployment record..."
 # Copy contracts deployment record from Server A
 sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
   "root@$SERVER_A:/opt/clawnet/packages/contracts/deployments/clawnetTestnet.json" \
-  "$SCRIPT_DIR/contracts.json" 2>/dev/null || echo "  Warning: could not copy deployment record"
+  "$SCRIPT_DIR/contracts.json"
+
+if [[ ! -s "$SCRIPT_DIR/contracts.json" ]]; then
+  echo "ERROR: contracts.json was not copied or is empty"
+  exit 1
+fi
+
+python3 - "$SCRIPT_DIR/contracts.json" <<'PY'
+import json,sys
+p = sys.argv[1]
+with open(p, "r", encoding="utf-8") as f:
+    data = json.load(f)
+token = (((data.get("contracts") or {}).get("ClawToken") or {}).get("proxy"))
+if not token:
+    raise SystemExit("ERROR: contracts.json missing contracts.ClawToken.proxy")
+print(f"  contracts.json verified: ClawToken proxy = {token}")
+PY
 
 # Save enode URLs
 cat > "$SCRIPT_DIR/enodes.env" << EOF
@@ -307,17 +442,32 @@ echo ""
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 12: Verifying cluster health..."
 
-echo "  Server A:"
-run_remote "$SERVER_A" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" && echo' && \
-run_remote "$SERVER_A" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"net_peerCount\",\"params\":[],\"id\":1}" && echo'
+A_BLOCK_FINAL=$(rpc_block_number "$SERVER_A")
+A_PEERS_FINAL=$(rpc_peer_count "$SERVER_A")
+B_BLOCK_FINAL=$(rpc_block_number "$SERVER_B")
+B_PEERS_FINAL=$(rpc_peer_count "$SERVER_B")
+C_BLOCK_FINAL=$(rpc_block_number "$SERVER_C")
+C_PEERS_FINAL=$(rpc_peer_count "$SERVER_C")
 
-echo "  Server B:"
-run_remote "$SERVER_B" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" && echo' && \
-run_remote "$SERVER_B" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"net_peerCount\",\"params\":[],\"id\":1}" && echo'
+echo "  Server A: block=$A_BLOCK_FINAL peers=$A_PEERS_FINAL"
+echo "  Server B: block=$B_BLOCK_FINAL peers=$B_PEERS_FINAL"
+echo "  Server C: block=$C_BLOCK_FINAL peers=$C_PEERS_FINAL"
 
-echo "  Server C:"
-run_remote "$SERVER_C" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"net_peerCount\",\"params\":[],\"id\":1}" && echo' && \
-run_remote "$SERVER_C" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"net_peerCount\",\"params\":[],\"id\":1}" && echo'
+if [[ "$A_BLOCK_FINAL" -le 0 || "$B_BLOCK_FINAL" -le 0 || "$C_BLOCK_FINAL" -le 0 ]]; then
+  echo "ERROR: one or more nodes report block number <= 0"
+  exit 1
+fi
+if [[ "$A_PEERS_FINAL" -lt 1 || "$B_PEERS_FINAL" -lt 1 || "$C_PEERS_FINAL" -lt 1 ]]; then
+  echo "ERROR: one or more nodes have peerCount < 1"
+  exit 1
+fi
+
+if [[ ! -s "$SCRIPT_DIR/enodes.env" ]]; then
+  echo "ERROR: enodes.env missing after deployment"
+  exit 1
+fi
+
+echo "  Cluster health checks passed."
 
 echo ""
 echo "============================================================"
