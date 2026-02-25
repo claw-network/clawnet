@@ -103,19 +103,6 @@ node run-tests.mjs --scenario 01,02,05
 node run-tests.mjs --verbose
 ```
 
-## 与旧版 Docker 测试的区别
-
-| 项目 | 旧版 (clawnet/) | 新版 (infra/testnet/scenarios/) |
-|------|-----------------|-------------------------------|
-| 运行环境 | 本地 Docker Compose 5 节点 | 真实测试网 3 节点 |
-| 协议 | HTTP (localhost) | HTTPS (Caddy 反代) |
-| Agent 数量 | 5 (alice-eve) | 3 (alice, bob, charlie) |
-| HTTP 客户端 | `http.request()` | `fetch()` (原生 HTTPS) |
-| 资金来源 | Dev faucet | `bootstrap-mint.ts` 预充值 |
-| P2P 超时 | 5-10s | 30s (真实网络延迟) |
-| 配置方式 | 硬编码 localhost:96xx | `.env` 环境变量 |
-| 状态管理 | `docker compose down -v` 重置 | 持久化（测试需幂等设计） |
-
 ## 设计原则
 
 1. **每个节点是独立 Agent**: 每个节点使用自己的密码短语派生 DID，只能代表自己
