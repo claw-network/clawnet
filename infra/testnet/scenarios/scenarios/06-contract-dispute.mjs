@@ -4,11 +4,7 @@
  * Alice (client) creates a contract with Bob (provider).
  * A dispute arises after a rejected milestone → resolution flow.
  *
- * v1 API changes:
- *   - POST /contracts/:id/actions/dispute    (open dispute)
- *   - POST /contracts/:id/actions/resolve    (resolve dispute)
- *   - POST /contracts/:id/milestones/:idx/actions/submit
- *   - POST /contracts/:id/milestones/:idx/actions/reject
+ * Agents: alice (Node A), bob (Node B)
  */
 import { test, assert, assertOk, assertOkOrConflict, vlog, sleep } from '../lib/helpers.mjs';
 import { waitForResource } from '../lib/wait-for-sync.mjs';
@@ -53,14 +49,13 @@ export default async function run({ alice, bob }) {
   });
 
   await test('Bob signs the contract', async () => {
-    await sleep(500);
+    await sleep(1000);
     let result = await bob.signContract(contractId);
     if (result.status === 404) {
       vlog('Waiting for P2P propagation...');
       await waitForResource(bob, `/api/v1/contracts/${contractId}`);
       result = await bob.signContract(contractId);
     }
-    // Accept 200 or 409 (already signed race)
     assertOkOrConflict(result.status, 'Bob sign');
     vlog(`Bob sign: ${result.status}`);
   });
@@ -74,7 +69,7 @@ export default async function run({ alice, bob }) {
 
   // ── 6.4 Bob submits milestone with substandard work ───────────────────
   await test('Bob submits milestone (incomplete deliverable)', async () => {
-    await sleep(500);
+    await sleep(1000);
     const { status, data } = await bob.submitMilestone(contractId, milestoneIdx, {
       deliverables: [{ name: 'docs-draft.html', hash: 'sha256:incomplete123' }],
       notes: 'Initial draft — missing interactive examples and error responses.',
@@ -89,7 +84,7 @@ export default async function run({ alice, bob }) {
 
   // ── 6.5 Alice rejects the milestone ───────────────────────────────────
   await test('Alice rejects incomplete milestone', async () => {
-    await sleep(500);
+    await sleep(1000);
     const { status, data } = await alice.rejectMilestone(contractId, milestoneIdx, {
       reason: 'Missing interactive examples and error response documentation',
     });
@@ -116,30 +111,24 @@ export default async function run({ alice, bob }) {
     assertOk(status, 'get contract');
     const state = data?.status || data?.state;
     vlog(`Contract state: ${state}`);
-    // Accept various state names: disputed, in_dispute, dispute, etc.
-    // (don't fail if wording differs — log and continue)
     if (state && !state.toLowerCase().includes('disput')) {
       vlog(`⚠ Expected 'disputed' state but got '${state}'`);
     }
   });
 
-  // ── 6.8 Bob responds to the dispute (optional) ───────────────────────
+  // ── 6.8 Bob responds to the dispute ───────────────────────────────────
   await test('Bob views dispute and adds response', async () => {
-    await sleep(500);
+    await sleep(1000);
     const { status, data } = await bob.getContract(contractId);
     if (status === 200) {
       vlog(`Bob sees contract state: ${data?.status || data?.state}`);
     } else if (status === 404) {
       vlog('P2P: contract not on Bob\'s node — soft pass');
     }
-    // In v1, Bob might respond to dispute via same endpoint or separate endpoint
-    // For now just verify he can see it
   });
 
   // ── 6.9 Resolve dispute — partial refund ──────────────────────────────
   await test('Dispute is resolved with partial refund', async () => {
-    // Resolution can be initiated by either party or by an arbiter.
-    // In v1 API: POST /contracts/:id/actions/resolve
     const { status, data } = await alice.resolveDispute(contractId, {
       resolution: 'partial_refund',
       clientRefund: 1000,

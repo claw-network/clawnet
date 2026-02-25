@@ -585,7 +585,7 @@ Hardhat Local Node (chainId 31337)
 - [x] 现有 SDK 单元测试全部通过
 - [x] 新增 Node 服务层单元测试覆盖所有新逻辑（75 tests across 5 services: wallet 19, contracts 17, dao 22, identity 10, reputation 7）
 - [x] 集成测试通过（SDK → REST → 链 → 查询完整链路）— integration harness + wallet-chain E2E test 已建立
-- [x] `clawnet/scenarios/` 中对应场景测试通过（104 passed, 0 failed — 见 clawnet/test-output.txt）
+- [x] 场景测试通过（104 passed, 0 failed — 旧 clawnet/scenarios/ 已迁移至 infra/testnet/scenarios/）
 - [x] 无 TypeScript 编译错误（tsc --noEmit 通过）
 - [x] 无 ESLint 警告（services + indexer + test/services + benchmark 全部 0 errors）
 

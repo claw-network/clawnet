@@ -1,15 +1,17 @@
 /**
  * Scenario 09: Full Economic Cycle
  * =================================
- * Alice publishes research → Dave purchases → Alice hires Bob to translate
- * → Bob uses Charlie's API → Charlie donates to DAO → mutual reputation
+ * Alice publishes research → Bob purchases → Alice hires Charlie to translate
+ * → Charlie uses Bob's API → Bob donates to DAO → mutual reputation
  *
  * End-to-end multi-agent economic flow spanning all markets and subsystems.
+ *
+ * Agents: alice (Node A), bob (Node B), charlie (Node C)
  */
 import { test, assert, assertOk, assertOkOrConflict, vlog, sleep } from '../lib/helpers.mjs';
 import { waitForListing, waitForBalance, waitForResource } from '../lib/wait-for-sync.mjs';
 
-export default async function run({ alice, bob, charlie, dave, eve }) {
+export default async function run({ alice, bob, charlie, agents }) {
 
   let researchListingId;
   let capabilityListingId;
@@ -17,7 +19,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   let contractId;
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PHASE 1: Information Market — Alice sells, Dave buys
+  // PHASE 1: Information Market — Alice sells, Bob buys
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   await test('P1: Alice publishes AI agent research report', async () => {
@@ -47,34 +49,34 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     vlog(`Research listing: ${researchListingId}`);
   });
 
-  await test('P1: Dave discovers and purchases the report', async () => {
-    await sleep(500);
-    let r = await dave.purchaseInfo(researchListingId);
+  await test('P1: Bob discovers and purchases the report', async () => {
+    await sleep(1000);
+    let r = await bob.purchaseInfo(researchListingId);
     if (r.status === 404) {
-      vlog('Waiting for listing to reach Dave...');
-      await waitForListing(dave, 'info', researchListingId);
-      r = await dave.purchaseInfo(researchListingId);
+      vlog('Waiting for listing to reach Bob...');
+      await waitForListing(bob, 'info', researchListingId);
+      r = await bob.purchaseInfo(researchListingId);
     }
     if (r.status === 404) {
-      vlog('P2P: listing not propagated to Dave — soft pass (P2P limitation)');
+      vlog('P2P: listing not propagated to Bob — soft pass');
     } else {
       assertOkOrConflict(r.status, 'purchase');
     }
-    vlog(`Dave purchase: ${r.status}`);
+    vlog(`Bob purchase: ${r.status}`);
   });
 
-  await test('P1: Dave rates Alice on quality', async () => {
-    const { status } = await dave.submitReputation(
+  await test('P1: Bob rates Alice on quality', async () => {
+    const { status } = await bob.submitReputation(
       alice.did, 'quality', 5, 'Outstanding research — comprehensive and well-cited');
     assertOk(status, 'reputation');
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PHASE 2: Capability Market — Charlie publishes API, Bob leases
+  // PHASE 2: Capability Market — Bob publishes API, Charlie leases
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  await test('P2: Charlie publishes translation API capability', async () => {
-    const { status, data } = await charlie.publishCapability({
+  await test('P2: Bob publishes translation API capability', async () => {
+    const { status, data } = await bob.publishCapability({
       capabilityType: 'rest_api',
       title: 'Neural Machine Translation Service',
       description: 'High-quality EN↔CN translation API powered by custom LLM',
@@ -88,7 +90,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
           custom: {
             protocol: 'REST',
             specification: '{"endpoint":"/translate","method":"POST"}',
-            endpoint: 'https://charlie-api.clawnet.local/translate',
+            endpoint: 'https://bob-api.clawnet.local/translate',
           },
         },
       },
@@ -103,7 +105,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
         rateLimits: [{ requests: 200, period: 60 }],
       },
       access: {
-        endpoint: 'https://charlie-api.clawnet.local/translate',
+        endpoint: 'https://bob-api.clawnet.local/translate',
         authentication: { type: 'api_key' },
       },
     });
@@ -113,24 +115,24 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     vlog(`Translation API: ${capabilityListingId}`);
   });
 
-  await test('P2: Bob leases Charlie\'s translation API', async () => {
-    await sleep(500);
-    let r = await bob.leaseCapability(capabilityListingId);
+  await test('P2: Charlie leases Bob\'s translation API', async () => {
+    await sleep(1000);
+    let r = await charlie.leaseCapability(capabilityListingId);
     if (r.status === 404) {
-      vlog('Waiting for capability to reach Bob...');
-      await waitForListing(bob, 'capability', capabilityListingId);
-      r = await bob.leaseCapability(capabilityListingId);
+      vlog('Waiting for capability to reach Charlie...');
+      await waitForListing(charlie, 'capability', capabilityListingId);
+      r = await charlie.leaseCapability(capabilityListingId);
     }
     if (r.status === 404) {
-      vlog('P2P: capability not propagated to Bob — soft pass (P2P limitation)');
+      vlog('P2P: capability not propagated to Charlie — soft pass');
     } else {
       assertOkOrConflict(r.status, 'lease');
     }
-    vlog(`Bob lease: ${r.status}`);
+    vlog(`Charlie lease: ${r.status}`);
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PHASE 3: Task Market — Alice posts translation task, Bob bids
+  // PHASE 3: Task Market — Alice posts translation task, Charlie bids
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   await test('P3: Alice posts translation task for her research', async () => {
@@ -164,38 +166,37 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     vlog(`Translation task: ${taskId}`);
   });
 
-  await test('P3: Bob bids on translation task (has API access)', async () => {
-    await sleep(500);
-    let r = await bob.bidOnTask(taskId, {
+  await test('P3: Charlie bids on translation task (has API access)', async () => {
+    await sleep(1000);
+    let r = await charlie.bidOnTask(taskId, {
       price: 450,
       timeline: 24,
-      approach: 'I have access to Charlie\'s Neural Translation API and can deliver quality CN translation within 24h',
+      approach: 'I have access to Bob\'s Neural Translation API and can deliver quality CN translation within 24h',
     });
     if (r.status === 404) {
-      vlog('Task not on Bob yet, waiting...');
-      await waitForListing(bob, 'task', taskId);
-      r = await bob.bidOnTask(taskId, {
+      vlog('Task not on Charlie yet, waiting...');
+      await waitForListing(charlie, 'task', taskId);
+      r = await charlie.bidOnTask(taskId, {
         price: 450,
         timeline: 24,
-        approach: 'I have access to Charlie\'s Neural Translation API',
+        approach: 'I have access to Bob\'s Neural Translation API',
       });
     }
     if (r.status === 404) {
-      vlog('P2P: task not propagated to Bob — soft pass (P2P limitation)');
+      vlog('P2P: task not propagated to Charlie — soft pass');
     } else {
       assertOkOrConflict(r.status, 'bid');
     }
-    vlog(`Bob bid: ${r.status}`);
+    vlog(`Charlie bid: ${r.status}`);
   });
 
-  await test('P3: Alice accepts Bob\'s bid', async () => {
-    await sleep(500);
-    // List bids to get Bob's bidId
+  await test('P3: Alice accepts Charlie\'s bid', async () => {
+    await sleep(1000);
     const bids = await alice.getTaskBids(taskId);
     const bidList = Array.isArray(bids.data) ? bids.data : (bids.data?.bids || []);
-    const bobBid = bidList.find(b => b.bidder === bob.did || b.did === bob.did) || bidList[0];
-    const bidId = bobBid?.id || bobBid?.bidId;
-    vlog(`Bob's bid ID: ${bidId}`);
+    const charlieBid = bidList.find(b => b.bidder === charlie.did || b.did === charlie.did) || bidList[0];
+    const bidId = charlieBid?.id || charlieBid?.bidId;
+    vlog(`Charlie's bid ID: ${bidId}`);
 
     if (bidId) {
       const r = await alice.acceptBid(taskId, bidId);
@@ -206,13 +207,13 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     }
   });
 
-  await test('P3: Bob delivers translation', async () => {
-    const { status } = await bob.deliverTask(taskId, {
-      deliveryNote: 'Translated using Charlie\'s Neural Translation API + manual review',
+  await test('P3: Charlie delivers translation', async () => {
+    const { status } = await charlie.deliverTask(taskId, {
+      deliveryNote: 'Translated using Bob\'s Neural Translation API + manual review',
       artifacts: [{ name: 'agentic-ai-2025-cn.pdf', hash: 'sha256:translated123' }],
     });
     if (status === 404) {
-      vlog('P2P: task/order not propagated to Bob — soft pass (P2P limitation)');
+      vlog('P2P: task/order not propagated to Charlie — soft pass');
     } else {
       assertOkOrConflict(status, 'deliver');
     }
@@ -220,10 +221,10 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   });
 
   await test('P3: Alice confirms delivery', async () => {
-    await sleep(500);
+    await sleep(1000);
     const { status } = await alice.confirmDelivery(taskId);
     if (status === 404) {
-      vlog('P2P: no delivery to confirm — soft pass (P2P limitation)');
+      vlog('P2P: no delivery to confirm — soft pass');
     } else {
       assertOkOrConflict(status, 'confirm');
     }
@@ -231,12 +232,12 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PHASE 4: Service Contract — Bob & Charlie formalise partnership
+  // PHASE 4: Service Contract — Charlie & Bob formalise partnership
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  await test('P4: Bob creates service contract with Charlie', async () => {
-    const { status, data } = await bob.createContract({
-      provider: charlie.did,
+  await test('P4: Charlie creates service contract with Bob', async () => {
+    const { status, data } = await charlie.createContract({
+      provider: bob.did,
       terms: {
         description: 'Monthly translation API subscription — 1000 API calls',
         startDate: new Date().toISOString(),
@@ -255,35 +256,35 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
     assertOk(status, 'contract');
     contractId = data?.contractId || data?.id;
     assert(contractId, 'contract created');
-    vlog(`Bob-Charlie contract: ${contractId}`);
+    vlog(`Charlie-Bob contract: ${contractId}`);
   });
 
   await test('P4: Both parties sign the contract', async () => {
-    const r1 = await bob.signContract(contractId);
-    assertOk(r1.status, 'Bob sign');
+    const r1 = await charlie.signContract(contractId);
+    assertOk(r1.status, 'Charlie sign');
 
-    await sleep(500);
-    let r2 = await charlie.signContract(contractId);
+    await sleep(1000);
+    let r2 = await bob.signContract(contractId);
     if (r2.status === 404) {
-      await waitForResource(charlie, '/api/v1/contracts/' + contractId);
-      r2 = await charlie.signContract(contractId);
+      await waitForResource(bob, '/api/v1/contracts/' + contractId);
+      r2 = await bob.signContract(contractId);
     }
-    vlog(`Sign: Bob=${r1.status}, Charlie=${r2.status}`);
+    vlog(`Sign: Charlie=${r1.status}, Bob=${r2.status}`);
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // PHASE 5: DAO Contribution — Charlie donates profits to treasury
+  // PHASE 5: DAO Contribution — Bob donates profits to treasury
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  await test('P5: Charlie donates 100 Tokens to DAO treasury', async () => {
-    const { status, data } = await charlie.depositTreasury(100, 'API revenue contribution to ecosystem');
+  await test('P5: Bob donates 100 Tokens to DAO treasury', async () => {
+    const { status, data } = await bob.depositTreasury(100, 'API revenue contribution to ecosystem');
     assertOk(status, 'treasury deposit');
     vlog(`Donation: ${status}`);
   });
 
-  await test('P5: Treasury reflects Charlie\'s donation', async () => {
-    await sleep(300);
-    const { status, data } = await charlie.getTreasury();
+  await test('P5: Treasury reflects Bob\'s donation', async () => {
+    await sleep(1000);
+    const { status, data } = await bob.getTreasury();
     assertOk(status, 'treasury');
     vlog(`Treasury: ${JSON.stringify(data).slice(0, 200)}`);
   });
@@ -292,27 +293,21 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   // PHASE 6: Cross-Agent Reputation — everyone rates everyone
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  await test('P6: Alice rates Bob on fulfillment (task delivery)', async () => {
+  await test('P6: Alice rates Charlie on fulfillment (task delivery)', async () => {
     const { status } = await alice.submitReputation(
-      bob.did, 'fulfillment', 5, 'Excellent translation delivered promptly using API tools');
+      charlie.did, 'fulfillment', 5, 'Excellent translation delivered promptly using API tools');
     assertOk(status, 'reputation');
   });
 
-  await test('P6: Bob rates Charlie on quality (API service)', async () => {
+  await test('P6: Charlie rates Bob on quality (API service)', async () => {
+    const { status } = await charlie.submitReputation(
+      bob.did, 'quality', 4, 'Translation API produced good results, minor tone issues');
+    assertOk(status, 'reputation');
+  });
+
+  await test('P6: Bob rates Alice on social contribution', async () => {
     const { status } = await bob.submitReputation(
-      charlie.did, 'quality', 4, 'Translation API produced good results, minor tone issues');
-    assertOk(status, 'reputation');
-  });
-
-  await test('P6: Eve audits and rates Alice on social contribution', async () => {
-    const { status } = await eve.submitReputation(
       alice.did, 'social', 5, 'Valuable research that drove economic activity in the network');
-    assertOk(status, 'reputation');
-  });
-
-  await test('P6: Dave rates the network (social reputation for Eve)', async () => {
-    const { status } = await dave.submitReputation(
-      eve.did, 'behavior', 4, 'Active auditor participant in governance and oversight');
     assertOk(status, 'reputation');
   });
 
@@ -321,7 +316,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   await test('P7: All agents have valid final balances', async () => {
-    for (const agent of [alice, bob, charlie, dave, eve]) {
+    for (const agent of agents) {
       const { status, data } = await agent.balance();
       assertOk(status, `${agent.name} balance`);
       const bal = data?.balance ?? data?.available ?? 0;
@@ -330,7 +325,7 @@ export default async function run({ alice, bob, charlie, dave, eve }) {
   });
 
   await test('P7: Reputation profiles exist for active agents', async () => {
-    for (const agent of [alice, bob, charlie]) {
+    for (const agent of agents) {
       const { status, data } = await agent.getReputation(agent.did);
       if (status === 200) {
         vlog(`${agent.name} reputation: ${JSON.stringify(data).slice(0, 200)}`);

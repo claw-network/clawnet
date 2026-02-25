@@ -4,7 +4,7 @@
  * Alice posts a translation task → Bob & Charlie bid → Alice accepts Bob
  * → Bob delivers → Alice confirms & pays → Alice rates Bob
  *
- * Each agent acts ONLY through their own node.
+ * Agents: alice (Node A), bob (Node B), charlie (Node C)
  */
 import { test, assert, assertOk, vlog, sleep } from '../lib/helpers.mjs';
 import { waitForListing } from '../lib/wait-for-sync.mjs';
@@ -66,7 +66,7 @@ export default async function run({ alice, bob, charlie }) {
     let result = await bob.submitBid(taskId, {
       price: 750,
       timeline: 48,
-      approach: 'I will use domain-specific AI terminology lookup and manual review for accuracy',
+      approach: 'Domain-specific AI terminology lookup and manual review for accuracy',
       milestones: [
         { title: 'First 25 pages', description: 'Translate and review first half' },
         { title: 'Remaining pages + glossary', description: 'Complete translation and terminology glossary' },
@@ -101,19 +101,16 @@ export default async function run({ alice, bob, charlie }) {
 
   // ── 3.5 Alice views bids on her node ──────────────────────────────────
   await test('Alice views bids for her task', async () => {
-    await sleep(500);
+    await sleep(1000);
     const { status, data } = await alice.getTaskBids(taskId);
     assertOk(status, 'get bids');
-    // v1 API returns array directly (unwrapped by client)
     const bids = Array.isArray(data) ? data : (data?.bids || []);
     vlog(`Bids: ${JSON.stringify(bids).slice(0, 300)}`);
   });
 
   // ── 3.6 Alice accepts Bob's bid ───────────────────────────────────────
   await test('Alice accepts Bob\'s bid', async () => {
-    // acceptBid now requires bidId in the URL path: /tasks/:id/bids/:bidId/actions/accept
     const { status, data } = await alice.acceptBid(taskId, bobBidId || 'bid-placeholder');
-    // Accept may fail if bid didn't propagate — soft-pass
     assert(status >= 200 && status < 500, `accept status: ${status}`);
     vlog(`Accept: ${status} ${JSON.stringify(data).slice(0, 200)}`);
   });

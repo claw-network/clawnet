@@ -852,7 +852,7 @@
 
 - [ ] **T-3.8** Testnet 全场景集成测试
   - 在测试网（chainId 7625，3 台 Geth PoA + 3 台 ClawNet Node）上端到端跑通所有业务流程
-  - 覆盖 `clawnet/scenarios/` 01–09 全部场景：
+  - 覆盖 `infra/testnet/scenarios/` 01–09 全部场景：
     1. Identity + Wallet（DID 注册、转账、余额查询）
     2. Info Market（信息市场发布、购买）
     3. Task Market（任务发布、申领、交付）

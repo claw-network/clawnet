@@ -4,20 +4,19 @@
  * Create events on one node → verify visibility on all others
  * → verify block heights converge → verify peer counts
  *
- * Tests the P2P gossip + range-sync / snapshot-sync backbone.
+ * Agents: alice (Node A), bob (Node B), charlie (Node C)
  */
 import { test, assert, assertEqual, assertOk, vlog, sleep } from '../lib/helpers.mjs';
 import { waitFor, waitForBalance, waitForAllNodes } from '../lib/wait-for-sync.mjs';
 
-export default async function run({ alice, bob, charlie, dave, eve, agents }) {
+export default async function run({ alice, bob, charlie, agents }) {
 
   // ── 8.1 All nodes are online and peered ──────────────────────────────
-  await test('All 5 nodes have at least 1 peer', async () => {
+  await test('All 3 nodes have at least 1 peer', async () => {
     let totalPeers = 0;
     for (const agent of agents) {
       const { status, data } = await agent.peers();
       assertOk(status, `${agent.name} peers`);
-      // v1: data may be an array of peer objects, a plain count, or { peers: [...] }
       let count;
       if (Array.isArray(data))          count = data.length;
       else if (typeof data === 'number') count = data;
@@ -25,7 +24,6 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
       totalPeers += count;
       vlog(`${agent.name}: ${count} peers`);
     }
-    // In Docker, peer discovery may be slow; check total rather than per-node
     vlog(`Total peer connections across network: ${totalPeers}`);
   });
 
@@ -39,35 +37,30 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
       heights.push({ name: agent.name, height: h });
       vlog(`${agent.name} block height: ${h}`);
     }
-    // All nodes should have some height (may diverge but all should be > 0 by now)
     for (const h of heights) {
       assert(h.height >= 0, `${h.name} height ≥ 0: ${h.height}`);
     }
   });
 
   // ── 8.3 Alice creates a transfer → verify on all nodes ──────────────
-  await test('Transfer from Alice propagates to all nodes', async () => {
-    // Record Dave's balance on his own node before transfer
-    const before = await dave.balance();
+  await test('Transfer from Alice propagates to Bob\'s node', async () => {
+    const before = await bob.balance();
     assertOk(before.status, 'before balance');
     const beforeBal = parseInt(before.data?.balance ?? before.data?.available ?? '0', 10);
-    vlog(`Dave balance before: ${beforeBal}`);
+    vlog(`Bob balance before: ${beforeBal}`);
 
-    // Alice sends 100 to Dave
-    const tx = await alice.transfer(dave.did, 100);
+    const tx = await alice.transfer(bob.did, 100);
     assertOk(tx.status, 'transfer');
 
-    // Wait for Dave to see the new balance on his own node
     const newMin = beforeBal + 100;
     try {
-      await waitForBalance(dave, dave.did, newMin);
-      const after = await dave.balance();
+      await waitForBalance(bob, bob.did, newMin);
+      const after = await bob.balance();
       const afterBal = parseInt(after.data?.balance ?? after.data?.available ?? '0', 10);
-      vlog(`Dave balance after (on Dave's node): ${afterBal}`);
-      assert(afterBal >= newMin, `Dave balance ≥ ${newMin}`);
+      vlog(`Bob balance after (on Bob's node): ${afterBal}`);
+      assert(afterBal >= newMin, `Bob balance ≥ ${newMin}`);
     } catch (e) {
       vlog(`Balance sync partial: ${e.message}`);
-      // Soft pass — the transfer succeeded on Alice's node
     }
   });
 
@@ -87,9 +80,9 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     }
   });
 
-  // ── 8.5 Eve publishes info → verify on Alice & Dave nodes ───────────
-  await test('Eve publishes info listing visible on other nodes', async () => {
-    const { status, data } = await eve.publishInfo({
+  // ── 8.5 Charlie publishes info → verify on Alice & Bob nodes ────────
+  await test('Charlie publishes info listing visible on other nodes', async () => {
+    const { status, data } = await charlie.publishInfo({
       infoType: 'analysis',
       title: 'Network Health Analysis',
       description: 'Comprehensive analysis of ClawNet P2P sync performance',
@@ -111,13 +104,12 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     });
     assertOk(status, 'publish info');
     const lid = data?.id || data?.listingId;
-    vlog(`Eve listing: ${lid}`);
+    vlog(`Charlie listing: ${lid}`);
 
     if (lid) {
-      // Check Alice's node can see it
       let aliceSees = false;
       try {
-        await waitFor('Alice sees Eve listing', async () => {
+        await waitFor('Alice sees Charlie listing', async () => {
           const { status, data } = await alice.searchInfo('Network Health');
           if (status === 200) {
             const items = Array.isArray(data) ? data : (data?.results || data?.listings || []);
@@ -126,44 +118,37 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
           return aliceSees;
         });
       } catch {
-        vlog('Alice didn\'t see Eve\'s listing via search');
+        vlog('Alice didn\'t see Charlie\'s listing via search');
       }
-      vlog(`Alice sees Eve listing: ${aliceSees}`);
+      vlog(`Alice sees Charlie listing: ${aliceSees}`);
     }
   });
 
   // ── 8.6 Multiple simultaneous transfers → check consistency ──────────
   await test('Parallel transfers maintain balance consistency', async () => {
-    // Get Alice's balance before
     const aliceBefore = await alice.balance();
     const aliceBal = parseInt(aliceBefore.data?.balance ?? aliceBefore.data?.available ?? '0', 10);
     vlog(`Alice before: ${aliceBal}`);
 
-    // Alice sends to 3 agents simultaneously
-    const [r1, r2, r3] = await Promise.all([
+    const [r1, r2] = await Promise.all([
       alice.transfer(bob.did, 10),
       alice.transfer(charlie.did, 10),
-      alice.transfer(dave.did, 10),
     ]);
 
-    vlog(`Transfers: ${r1.status}, ${r2.status}, ${r3.status}`);
+    vlog(`Transfers: ${r1.status}, ${r2.status}`);
 
-    // Allow sync
-    await sleep(1000);
+    await sleep(2000);
 
-    // Check Alice balance decreased
     const aliceAfter = await alice.balance();
     const afterBal = parseInt(aliceAfter.data?.balance ?? aliceAfter.data?.available ?? '0', 10);
-    vlog(`Alice after: ${afterBal} (expected ~${aliceBal - 30})`);
-    // At least some transfers should have gone through
+    vlog(`Alice after: ${afterBal} (expected ~${aliceBal - 20})`);
     assert(afterBal < aliceBal, 'Alice balance decreased');
   });
 
-  // ── 8.7 Event store heights converge over time ──────────────────────
+  // ── 8.7 Block heights converge over time ────────────────────────────
   await test('Block heights converge after sync period', async () => {
-    // Wait a sync interval then check again
-    vlog('Waiting 3s for sync...');
-    await sleep(3000);
+    vlog('Waiting 5s for sync...');
+    await sleep(5000);
 
     const heights = [];
     for (const agent of agents) {
@@ -176,8 +161,6 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     const min = Math.min(...heights);
     const divergence = max - min;
     vlog(`Height range: ${min}–${max}, divergence: ${divergence}`);
-    // After operations + sync, divergence should be bounded
-    // Allow generous tolerance since this is P2P
     assert(divergence < 100, `Height divergence < 100, got ${divergence}`);
   });
 

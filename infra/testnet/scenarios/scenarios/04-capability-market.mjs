@@ -3,6 +3,8 @@
  * ================================
  * Charlie publishes a developer API capability → Alice leases it
  * → Alice invokes the capability → Lease terminates
+ *
+ * Agents: alice (Node A), charlie (Node C)
  */
 import { test, assert, assertOk, vlog, sleep } from '../lib/helpers.mjs';
 import { waitForListing } from '../lib/wait-for-sync.mjs';

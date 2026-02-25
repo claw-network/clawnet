@@ -1,30 +1,26 @@
 /**
  * Scenario 02: Info Market Trade
  * ================================
- * Alice publishes a research report → Bob & Dave purchase it
+ * Alice publishes a research report → Bob & Charlie purchase it
  * Each agent operates on their OWN node.
  *
- * Flow:
- *   Alice (researcher) publishes info listing on alice's node
- *   Bob (buyer) discovers listing (via P2P) and purchases on bob's node
- *   Dave (buyer) also purchases on dave's node
- *   Buyers leave reputation reviews for Alice
+ * Agents: alice (Node A), bob (Node B), charlie (Node C)
  */
 import { test, assert, assertOk, vlog, sleep } from '../lib/helpers.mjs';
 import { waitForListing } from '../lib/wait-for-sync.mjs';
 
-export default async function run({ alice, bob, dave }) {
+export default async function run({ alice, bob, charlie }) {
   let listingId;
 
   // ── 2.1 Alice publishes research report ───────────────────────────────
   await test('Alice publishes research report to info market', async () => {
     const { status, data } = await alice.publishInfo({
       title: 'AI Agent Economic Model Analysis 2026',
-      description: 'Comprehensive analysis of agent-to-agent economic interactions on Moltbook',
+      description: 'Comprehensive analysis of agent-to-agent economic interactions',
       category: 'research',
       infoType: 'research',
-      content: { data: 'This is the encrypted research content about agent economic models...', format: 'text' },
-      tags: ['ai', 'economics', 'agents', 'moltbook'],
+      content: { data: 'Encrypted research content about agent economic models...', format: 'text' },
+      tags: ['ai', 'economics', 'agents'],
       pricing: {
         type: 'fixed',
         fixedPrice: 100,
@@ -59,7 +55,6 @@ export default async function run({ alice, bob, dave }) {
     if (listing) {
       vlog(`Bob found listing: ${listing.title || listing.id}`);
     } else {
-      // Listing not propagated yet — acceptable, will use Alice's node as fallback in purchase
       vlog('Listing not yet on Bob\'s node (P2P lag) — will fall back to search');
     }
   });
@@ -68,56 +63,50 @@ export default async function run({ alice, bob, dave }) {
   await test('Bob searches info market', async () => {
     const { status, data } = await bob.searchInfo('AI Agent');
     assertOk(status, 'search status');
-    // Paginated: data is the array of listings
     const listings = Array.isArray(data) ? data : (data?.listings || data?.results || []);
     vlog(`Bob search results: ${listings.length} listings`);
-    // The listing may or may not be visible depending on P2P propagation
   });
 
-  // ── 2.5 Bob purchases the report on his own node ─────────────────────
+  // ── 2.5 Bob purchases the report ─────────────────────────────────────
   await test('Bob purchases research report', async () => {
     let result = await bob.purchaseInfo(listingId);
     if (result.status === 404) {
       vlog('Listing not on Bob\'s node (P2P lag)');
     }
-    // Even if purchase fails due to P2P issue, we validate the attempt
     assert(result.status >= 200 && result.status < 500, `purchase status: ${result.status}`);
     vlog(`Bob purchase: ${result.status} ${JSON.stringify(result.data).slice(0, 200)}`);
   });
 
-  // ── 2.6 Dave also purchases ───────────────────────────────────────────
-  await test('Dave purchases research report', async () => {
-    let result = await dave.purchaseInfo(listingId);
+  // ── 2.6 Charlie also purchases ───────────────────────────────────────
+  await test('Charlie purchases research report', async () => {
+    let result = await charlie.purchaseInfo(listingId);
     if (result.status === 404) {
-      vlog('Listing not on Dave\'s node yet');
+      vlog('Listing not on Charlie\'s node yet');
     }
     assert(result.status >= 200 && result.status < 500, `purchase status: ${result.status}`);
-    vlog(`Dave purchase: ${result.status} ${JSON.stringify(result.data).slice(0, 200)}`);
+    vlog(`Charlie purchase: ${result.status} ${JSON.stringify(result.data).slice(0, 200)}`);
   });
 
-  // ── 2.7 Bob and Dave rate Alice ───────────────────────────────────────
+  // ── 2.7 Bob and Charlie rate Alice ────────────────────────────────────
   await test('Bob rates Alice on quality dimension', async () => {
     const { status, data } = await bob.submitReputation(alice.did, 'quality', 5, 'Excellent research!');
     assertOk(status, 'reputation status');
     vlog(`Bob→Alice reputation: ${JSON.stringify(data).slice(0, 200)}`);
   });
 
-  await test('Dave rates Alice on quality dimension', async () => {
-    const { status, data } = await dave.submitReputation(alice.did, 'quality', 4, 'Good analysis, needs more data');
+  await test('Charlie rates Alice on quality dimension', async () => {
+    const { status, data } = await charlie.submitReputation(alice.did, 'quality', 4, 'Good analysis, needs more data');
     assertOk(status, 'reputation status');
-    vlog(`Dave→Alice reputation: ${JSON.stringify(data).slice(0, 200)}`);
+    vlog(`Charlie→Alice reputation: ${JSON.stringify(data).slice(0, 200)}`);
   });
 
   // ── 2.8 Check Alice's reputation ──────────────────────────────────────
   await test('Alice has reputation profile', async () => {
-    await sleep(500);
-    // Reputation was submitted by Bob (on Bob's node) and Dave (on Dave's node).
-    // Check Bob's node since that's where his submission is stored.
+    await sleep(1000);
     const { status, data } = await bob.getReputation(alice.did);
     if (status === 200) {
       vlog(`Alice reputation (from Bob's node): score=${data?.score}, level=${data?.level}`);
     } else {
-      // Reputation data may not be queryable yet — soft pass
       vlog(`Alice reputation not yet available: ${status}`);
     }
   });

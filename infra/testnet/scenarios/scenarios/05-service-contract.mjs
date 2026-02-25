@@ -4,24 +4,15 @@
  * Alice (client) hires Charlie (provider) for a development project.
  * Contract with milestones → sign → fund (activate) → milestone submit/approve → complete
  *
- * Both agents act only on their OWN node.
- *
- * v1 API changes:
- *   - POST /contracts              → returns { contractId, milestones }
- *   - POST /contracts/:id/actions/sign
- *   - POST /contracts/:id/actions/activate   (was "fund")
- *   - POST /contracts/:id/milestones/:idx/actions/submit  (was "complete")
- *   - POST /contracts/:id/milestones/:idx/actions/approve
- *   - POST /contracts/:id/actions/complete
- *   - GET  /contracts (paginated)
+ * Agents: alice (Node A), charlie (Node C)
  */
 import { test, assert, assertOk, assertOkOrConflict, vlog, sleep } from '../lib/helpers.mjs';
 import { waitForResource, waitForContractState } from '../lib/wait-for-sync.mjs';
 
 export default async function run({ alice, charlie }) {
   let contractId;
-  let milestoneIdx0; // first milestone index (0-based or id-based)
-  let milestoneIdx1; // second milestone index
+  let milestoneIdx0;
+  let milestoneIdx1;
 
   // ── 5.1 Alice creates a service contract ──────────────────────────────
   await test('Alice creates a development service contract', async () => {
@@ -52,16 +43,13 @@ export default async function run({ alice, charlie }) {
       ],
     });
     assertOk(status, 'create contract');
-    // v1 API returns contractId (not id)
     contractId = data?.contractId || data?.id;
     assert(contractId, 'should return contract ID');
-    // Milestones may use index-based addressing in v1 (0, 1, ...)
     const milestones = data?.milestones || [];
     if (milestones.length >= 2) {
       milestoneIdx0 = milestones[0]?.id || milestones[0]?.index || 0;
       milestoneIdx1 = milestones[1]?.id || milestones[1]?.index || 1;
     } else {
-      // Fallback to original IDs
       milestoneIdx0 = 'ms-design';
       milestoneIdx1 = 'ms-impl';
     }
@@ -94,8 +82,7 @@ export default async function run({ alice, charlie }) {
 
   // ── 5.5 Charlie signs the contract (provider side) ───────────────────
   await test('Charlie (provider) signs the contract', async () => {
-    // Wait for contract to appear on Charlie's node
-    await sleep(500);
+    await sleep(1000);
     let result = await charlie.signContract(contractId);
     if (result.status === 404) {
       vlog('Contract not on Charlie\'s node yet, waiting for P2P...');
@@ -105,7 +92,7 @@ export default async function run({ alice, charlie }) {
       }
     }
     if (result.status === 404) {
-      vlog('P2P: contract not propagated to Charlie — soft pass (P2P limitation)');
+      vlog('P2P: contract not propagated to Charlie — soft pass');
     } else {
       assert(result.status >= 200 && result.status < 500, `Charlie sign: ${result.status}`);
     }
@@ -114,7 +101,7 @@ export default async function run({ alice, charlie }) {
 
   // ── 5.6 Alice funds (activates) the contract ─────────────────────────
   await test('Alice funds the contract (creates escrow)', async () => {
-    await sleep(500);
+    await sleep(1000);
     const { status, data } = await alice.fundContract(contractId, 5000);
     assertOkOrConflict(status, 'activate contract');
     vlog(`Activate: ${status} ${JSON.stringify(data).slice(0, 200)}`);
@@ -122,7 +109,7 @@ export default async function run({ alice, charlie }) {
 
   // ── 5.7 Charlie submits first milestone ───────────────────────────────
   await test('Charlie submits first milestone (API Design)', async () => {
-    await sleep(500);
+    await sleep(1000);
     const mid = milestoneIdx0;
     const { status, data } = await charlie.submitMilestone(contractId, mid, {
       deliverables: [{ name: 'architecture.pdf', hash: 'sha256:abc123' }],
@@ -138,7 +125,7 @@ export default async function run({ alice, charlie }) {
 
   // ── 5.8 Alice approves first milestone ────────────────────────────────
   await test('Alice approves first milestone', async () => {
-    await sleep(500);
+    await sleep(1000);
     const mid = milestoneIdx0;
     const { status, data } = await alice.approveMilestone(contractId, mid);
     assertOkOrConflict(status, 'approve milestone');
@@ -197,7 +184,6 @@ export default async function run({ alice, charlie }) {
   await test('Contract appears in Alice\'s contract list', async () => {
     const { status, data } = await alice.listContracts();
     assertOk(status, 'list contracts');
-    // v1 API: paginated response, data is the array (unwrapped by client)
     const contracts = Array.isArray(data) ? data : (data?.contracts || []);
     assert(Array.isArray(contracts), 'should be array');
     assert(contracts.length > 0, 'should have contracts');

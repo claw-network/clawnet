@@ -2,15 +2,16 @@
  * Scenario 01: Identity & Wallet
  * ================================
  * - Each Agent has a unique DID identity
- * - Agents fund themselves via faucet
- * - Cross-agent token transfers
+ * - Cross-agent Token transfers
  * - Balance verification across nodes (P2P propagation)
  * - Transaction history
+ *
+ * Agents: alice (Node A), bob (Node B), charlie (Node C)
  */
 import { test, assert, assertEqual, assertOk, vlog, sleep } from '../lib/helpers.mjs';
 import { waitForBalance } from '../lib/wait-for-sync.mjs';
 
-export default async function run({ alice, bob, charlie, dave, eve, agents }) {
+export default async function run({ alice, bob, charlie, agents }) {
 
   // ── 1.1 Verify all agents have unique DIDs ────────────────────────────
   await test('all agents have unique DID identities', async () => {
@@ -22,8 +23,8 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     }
   });
 
-  // ── 1.2 Verify initial balances ───────────────────────────────────────
-  await test('all agents have positive balance after faucet', async () => {
+  // ── 1.2 Verify positive balances ──────────────────────────────────────
+  await test('all agents have positive balance', async () => {
     for (const agent of agents) {
       const { status, data } = await agent.balance();
       assertOk(status, `${agent.name} balance status`);
@@ -46,7 +47,7 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
   });
 
   await test('Alice balance decreased after transfer', async () => {
-    await sleep(300);
+    await sleep(1000);
     const { data } = await alice.balance();
     const bal = Number(data?.balance ?? data?.available ?? 0);
     assert(bal < aliceBalBefore, `Alice balance should decrease: was ${aliceBalBefore}, now ${bal}`);
@@ -55,12 +56,10 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
 
   // ── 1.4 Bob sees incoming transfer on his own node (P2P sync) ────────
   await test('Bob sees received balance on his own node (P2P sync)', async () => {
-    // Bob's node needs to receive Alice's transfer event via P2P
-    const result = await waitForBalance(bob, bob.did, 100001);
+    const result = await waitForBalance(bob, bob.did, 1);
     if (result) {
       vlog(`Bob balance on own node: ${result}`);
     } else {
-      // If P2P didn't propagate yet, check from Alice's perspective
       const { data } = await alice.balance(bob.did);
       const bal = Number(data?.balance ?? data?.available ?? 0);
       assert(bal >= 500, `Bob should have >=500 on Alice node, got ${bal}`);
@@ -68,27 +67,26 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
     }
   });
 
-  // ── 1.5 Multiple transfers: Dave → Charlie, Eve → Alice ──────────────
-  await test('Dave transfers 200 Tokens to Charlie', async () => {
-    const { status, data } = await dave.transfer(charlie.did, 200, 'investment');
-    assertOk(status, 'Dave→Charlie transfer');
+  // ── 1.5 Charlie transfers to Alice ────────────────────────────────────
+  await test('Charlie transfers 200 Tokens to Alice', async () => {
+    const { status, data } = await charlie.transfer(alice.did, 200, 'investment');
+    assertOk(status, 'Charlie→Alice transfer');
     assert(data?.txHash, 'txHash present');
-    vlog(`Dave→Charlie: ${data.txHash}`);
+    vlog(`Charlie→Alice: ${data.txHash}`);
   });
 
-  await test('Eve transfers 300 Tokens to Alice', async () => {
-    const { status, data } = await eve.transfer(alice.did, 300, 'audit fee refund');
-    assertOk(status, 'Eve→Alice transfer');
+  await test('Bob transfers 300 Tokens to Charlie', async () => {
+    const { status, data } = await bob.transfer(charlie.did, 300, 'audit fee refund');
+    assertOk(status, 'Bob→Charlie transfer');
     assert(data?.txHash, 'txHash present');
-    vlog(`Eve→Alice: ${data.txHash}`);
+    vlog(`Bob→Charlie: ${data.txHash}`);
   });
 
   // ── 1.6 Transaction history ───────────────────────────────────────────
   await test('Alice has transaction history entries', async () => {
-    await sleep(300);
+    await sleep(1000);
     const { status, data, meta } = await alice.history();
     assertOk(status, 'history status');
-    // Paginated: data is the array of transactions
     const entries = Array.isArray(data) ? data : (data?.transactions || data?.history || []);
     assert(Array.isArray(entries), 'history should be array');
     assert(entries.length > 0, 'should have history entries');
@@ -101,7 +99,6 @@ export default async function run({ alice, bob, charlie, dave, eve, agents }) {
       const { status, data } = await agent.status();
       assertOk(status, `${agent.name} status`);
       assert(data?.blockHeight >= 0, `${agent.name} blockHeight`);
-      // In v1 API, peers is a count (number), not an array
       const peerCount = typeof data?.peers === 'number' ? data.peers : (data?.connections ?? 0);
       vlog(`${agent.name}: blockHeight=${data.blockHeight}, peers=${peerCount}`);
     }
