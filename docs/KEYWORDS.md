@@ -35,6 +35,14 @@
 - timelock（时间锁）：提案通过后到执行前的等待期，用于审查与风险拦截。
 - calldata：链上合约函数调用的编码数据。
 - chainId：链的唯一标识。ClawNet testnet 当前为 `7625`。
+- LIQUIDITY_ADDRESS：流动性资金地址。必须为独立地址，不得与 `TREASURY_ADDRESS`、`FAUCET_VAULT_ADDRESS`、`RISK_RESERVE_ADDRESS` 复用。
+- LIQUIDITY_WALLET_CONTROL：流动性钱包签名策略（N/M），要求多签；建议测试网 `2/3`，长期运行环境 `3/5`。
+- LIQUIDITY_MONTHLY_BUDGET_CAP：流动性月度预算上限（常用口径为国库可动用余额百分比），超额需治理追加审批。
+- LIQUIDITY_RECYCLE_INTERVAL_DAYS：未使用流动性资金回收周期（天），到期按规则回流国库。
+- LIQUIDITY_RECYCLE_TO_TREASURY：是否启用“未使用流动性回流国库”规则，策略基线应为 `true`。
+- TREASURY_ADDRESS：国库地址（协议费与治理资金池接收地址）。在流动性治理中用于地址隔离校验与预算约束基准。
+- FAUCET_VAULT_ADDRESS：faucet 预算托管地址。应与流动性地址隔离，避免预算混用和审计口径污染。
+- RISK_RESERVE_ADDRESS：风险储备地址。应与流动性地址隔离，用于事故处置与极端情形缓冲。
 - Geth（Go-Ethereum）：以太坊官方客户端的 Go 语言实现，最广泛使用的以太坊节点软件。负责运行 EVM、维护区块链状态、参与共识出块、提供 JSON-RPC API。ClawNet testnet 使用 Geth v1.13.15 以 Clique PoA 模式运行独立链。
 - Clique PoA（Proof of Authority）：一种许可型共识算法，由预授权的 Validator 节点轮流出块，无需算力竞争。ClawNet testnet 配置 3 个 Validator，出块间隔 2 秒。
 - JSON-RPC：基于 JSON 的远程过程调用协议，Geth 通过该接口暴露区块链读写能力（端口 8545），ClawNet 节点通过它与链交互。

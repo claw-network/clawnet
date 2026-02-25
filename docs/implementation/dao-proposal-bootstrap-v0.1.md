@@ -111,6 +111,8 @@ Note / 说明:
 
 - EN: If DAO can execute only one call per proposal, submit one proposal per destination (CNIP-002A/B/C).
 - 中文: 若 DAO 每提案仅支持一次调用，请拆分为三笔提案（CNIP-002A/B/C）。
+- EN: `BOOTSTRAP_LIQUIDITY_ADDRESS` MUST be dedicated and MUST NOT equal treasury/faucet/risk-reserve addresses.
+- 中文: `BOOTSTRAP_LIQUIDITY_ADDRESS` 必须为独立地址，且不得与 treasury/faucet/risk-reserve 地址复用。
 
 ### Propose Payload Example / 请求体示例
 
@@ -157,6 +159,10 @@ Adopt these off-chain policy parameters as governance commitments:
 | `FIRST_JOB_BONUS_AMOUNT`              | `30` Token                   |
 | `FIRST_JOB_MIN_SETTLEMENT`            | `20` Token                   |
 | `BOOTSTRAP_MAX_MONTHLY_MINT_RATIO`    | `<=1.0% circulating supply`  |
+| `LIQUIDITY_WALLET_CONTROL`            | `multisig (2/3 testnet)`     |
+| `LIQUIDITY_MONTHLY_BUDGET_CAP`        | `<=2% treasury liquid bal.`  |
+| `LIQUIDITY_RECYCLE_INTERVAL_DAYS`     | `30`                         |
+| `LIQUIDITY_RECYCLE_TO_TREASURY`       | `true`                       |
 
 ### Accountability / 责任追踪
 
@@ -208,6 +214,8 @@ To resolve the cold-start paradox and align incentives with verifiable agent pro
 
 - Monthly reward budget cap tied to treasury net inflow.
 - Faucet anti-sybil thresholds and DID/IP rate limits.
+- Dedicated liquidity wallet + multisig control (no treasury wallet reuse).
+- Monthly liquidity budget cap and periodic recycle-to-treasury rule.
 - KPI-triggered tightening if dispute or treasury metrics deteriorate.
 
 ### Success Metrics
@@ -243,6 +251,8 @@ Note / 说明:
 
 - EN: Current testnet config does not define dedicated faucet/liquidity/reserve wallets. The addresses above are temporary mappings derived from genesis/deployment records and should be replaced by dedicated multisigs in the next governance cycle.
 - 中文: 当前 testnet 配置未定义专用 faucet/liquidity/reserve 钱包。以上为根据创世与部署记录得到的临时映射，建议在下一治理周期替换为专用多签地址。
+- EN: Before enabling a live liquidity program, replace `BOOTSTRAP_LIQUIDITY` with a dedicated multisig address that is distinct from treasury.
+- 中文: 在开启真实流动性计划前，必须将 `BOOTSTRAP_LIQUIDITY` 替换为独立多签地址，且与 treasury 地址隔离。
 
 ### CNIP-001 Testnet Payload / CNIP-001 测试网请求体
 
@@ -320,6 +330,8 @@ CNIP-002C (risk reserve) / 发放风险储备预算:
 ### Final Pre-Vote Checklist / 投票前最终检查
 
 1. Confirm DAO treasury token balance can cover CNIP-002A/B/C total amount (`1,000,000` Token).
-2. Confirm temporary vault mapping (`FAUCET_VAULT=0x22D8...`, `BOOTSTRAP_LIQUIDITY=0x838C...`, `RISK_RESERVE=0x838C...`) or replace with dedicated multisigs.
-3. Re-encode calldata with exact addresses and verify on testnet fork.
-4. Publish risk disclosure including pause conditions from `value-anchor-monetary-policy-v0.1.md` section 13.5.
+2. Confirm `BOOTSTRAP_LIQUIDITY_ADDRESS` is dedicated and not reused by treasury/faucet/risk reserve.
+3. Confirm liquidity wallet signer model is multisig and matches governance-approved threshold.
+4. Confirm liquidity monthly budget cap + recycle-to-treasury schedule are documented in ops runbook.
+5. Re-encode calldata with exact addresses and verify on testnet fork.
+6. Publish risk disclosure including pause conditions from `value-anchor-monetary-policy-v0.1.md` section 13.5.

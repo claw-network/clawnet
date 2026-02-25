@@ -3,6 +3,7 @@
 import { ClawNetNode } from './index.js';
 import { createLogger } from './logger.js';
 import { loadConfig, resolveStoragePaths } from '@claw-network/core';
+import { validateLiquidityPolicyFromEnv } from './policy/liquidity-policy.js';
 
 interface DaemonArgs {
   dataDir?: string;
@@ -103,6 +104,17 @@ export async function startDaemon(
   stop: () => Promise<void>;
 }> {
   const args = parseArgs(argv);
+  const liquidityPolicyValidation = validateLiquidityPolicyFromEnv();
+
+  if (liquidityPolicyValidation.enabled && liquidityPolicyValidation.errors.length > 0) {
+    const details = liquidityPolicyValidation.errors.map((msg) => `- ${msg}`).join('\n');
+    console.error(
+      `[clawnetd] FATAL: invalid liquidity policy configuration.\n\n${details}\n\n` +
+        'Set a dedicated CLAW_LIQUIDITY_ADDRESS and keep it separate from treasury/faucet/reserve wallets.\n' +
+        'Required controls: multisig wallet, monthly budget cap, recycle-to-treasury policy.',
+    );
+    process.exit(1);
+  }
 
   // ── Passphrase is REQUIRED ──────────────────────────────────────────
   // Without a passphrase the node cannot create or decrypt its identity
@@ -161,6 +173,12 @@ Example:
   logger.info(`Peer Id  : ${node.getPeerId() ?? 'unknown'}`);
   logger.info(`DID      : ${node.getDid() ?? '(pending)'}`);
   logger.info(`Network  : ${config.network}`);
+  if (liquidityPolicyValidation.config) {
+    const lp = liquidityPolicyValidation.config;
+    logger.info(
+      `Liquidity policy: address=${lp.liquidityAddress}, multisig=${lp.liquidityWalletControl}, monthlyCap=${lp.liquidityMonthlyBudgetCap}%, recycleEvery=${lp.liquidityRecycleIntervalDays}d`,
+    );
+  }
   logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   let healthTimer: NodeJS.Timeout | undefined;

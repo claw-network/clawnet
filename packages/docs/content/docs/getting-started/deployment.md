@@ -205,6 +205,29 @@ For **Docker**, pass it as an environment variable:
 docker run -e CLAW_PASSPHRASE="my-secure-passphrase" ...
 ```
 
+### Liquidity Policy Guardrails (Optional but Enforced When Enabled)
+
+When `CLAW_LIQUIDITY_ADDRESS` is set, `clawnetd` validates liquidity governance guardrails at startup.
+If any rule fails, daemon startup is aborted with `FATAL`.
+
+| Environment Variable                   | Required When Enabled | Default | Description                                                    |
+| -------------------------------------- | --------------------- | ------- | -------------------------------------------------------------- |
+| `CLAW_LIQUIDITY_ADDRESS`               | Yes                   | —       | Dedicated liquidity wallet address (`0x...`)                   |
+| `CLAW_TREASURY_ADDRESS`                | Recommended           | —       | Treasury wallet for isolation checks                           |
+| `CLAW_FAUCET_VAULT_ADDRESS`            | Recommended           | —       | Faucet vault address for isolation checks                      |
+| `CLAW_RISK_RESERVE_ADDRESS`            | Recommended           | —       | Risk reserve address for isolation checks                      |
+| `CLAW_LIQUIDITY_WALLET_CONTROL`        | Yes                   | `2/3`   | Multisig threshold in `N/M` format; must satisfy `2 <= N <= M` |
+| `CLAW_LIQUIDITY_MONTHLY_BUDGET_CAP`    | Yes                   | `2`     | Monthly cap percentage (positive number)                       |
+| `CLAW_LIQUIDITY_RECYCLE_INTERVAL_DAYS` | Yes                   | `30`    | Recycle interval in days (positive integer)                    |
+| `CLAW_LIQUIDITY_RECYCLE_TO_TREASURY`   | Yes                   | `true`  | Must remain `true` by policy                                   |
+
+Enforced rules:
+
+- `CLAW_LIQUIDITY_ADDRESS` must be a valid address and must not equal treasury/faucet/risk-reserve addresses.
+- Wallet control must be multisig (`N/M`) with `N >= 2`.
+- Monthly cap and recycle interval must be positive values.
+- `CLAW_LIQUIDITY_RECYCLE_TO_TREASURY` must be `true`.
+
 ### P2P Configuration
 
 | Flag                      | Default  | Description                          |

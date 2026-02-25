@@ -218,6 +218,14 @@ Rules / 规则:
 - EN: Unused faucet budget is returned to treasury periodically.
 - 中文: 未使用的 faucet 预算按周期回流国库。
 
+Liquidity wallet operation guardrails / 流动性钱包实操护栏:
+
+- `LIQUIDITY_ADDRESS` MUST be a dedicated address, and MUST NOT equal treasury/faucet/risk-reserve wallets.
+- `LIQUIDITY_WALLET_CONTROL`: multisig required (recommendation: testnet `2/3`, long-running environments `3/5`).
+- `LIQUIDITY_MONTHLY_BUDGET_CAP`: monthly cap required (recommended baseline: <=`2%` of treasury liquid balance).
+- `LIQUIDITY_RECYCLE_INTERVAL_DAYS`: periodic unused-liquidity return window (recommended `30`).
+- `LIQUIDITY_RECYCLE_TO_TREASURY`: `true`
+
 ### 13.3 Faucet Policy Parameters / Faucet 策略参数
 
 Eligibility / 资格:
@@ -297,6 +305,9 @@ Monthly governance report MUST include / 月度治理报告必须包含:
 - `treasury_net_flow`
 - `faucet_sybil_rejection_rate`
 - `active_agents_from_faucet_ratio`
+- `liquidity_seeded_this_month`
+- `liquidity_utilized_this_month`
+- `liquidity_recycled_to_treasury`
 
 - EN: These metrics are required for any proposal that changes bootstrapping parameters.
 - 中文: 任何调整启动参数的治理提案都必须引用上述指标。
