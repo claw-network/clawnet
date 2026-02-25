@@ -286,7 +286,7 @@ echo ""
 # Phase 6: Start Server A (mining)
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 6: Starting Geth on Server A (mining mode)..."
-run_remote "$SERVER_A" 'cd /opt/clawnet && cp infra/chain-testnet/docker-compose.yml docker-compose.chain.yml && docker compose -f docker-compose.chain.yml up -d'
+run_remote "$SERVER_A" 'cd /opt/clawnet && cp infra/testnet/docker-compose.yml docker-compose.chain.yml && docker compose -f docker-compose.chain.yml up -d'
 
 echo "  Waiting 10s for Server A to start mining..."
 sleep 10
@@ -308,7 +308,7 @@ echo ""
 echo ">>> Phase 7: Starting Geth on Server B (sync → mine)..."
 
 # Create a sync compose with the correct enode
-run_remote "$SERVER_B" "cd /opt/clawnet && cp infra/chain-testnet/docker-compose.sync.yml docker-compose.sync.yml && \
+run_remote "$SERVER_B" "cd /opt/clawnet && cp infra/testnet/docker-compose.sync.yml docker-compose.sync.yml && \
   sed -i 's|enode://.*@66.94.125.242:30303|${ENODE_A}|g' docker-compose.sync.yml && \
   sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${ENODE_A#enode://}|g' docker-compose.sync.yml && \
   docker compose -f docker-compose.sync.yml up -d"
@@ -322,7 +322,7 @@ echo "  Server B block number: $B_BLOCK"
 # Switch to mining mode
 echo "  Switching Server B to mining mode..."
 run_remote "$SERVER_B" "cd /opt/clawnet && docker compose -f docker-compose.sync.yml down && \
-  cp infra/chain-testnet/docker-compose.peer.yml docker-compose.chain.yml && \
+  cp infra/testnet/docker-compose.peer.yml docker-compose.chain.yml && \
   sed -i 's|enode://.*@66.94.125.242:30303|${ENODE_A}|g' docker-compose.chain.yml && \
   sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${ENODE_A#enode://}|g' docker-compose.chain.yml && \
   docker compose -f docker-compose.chain.yml up -d"
@@ -342,7 +342,7 @@ ENODE_B=$(echo "$ENODE_B_RAW" | sed "s/127.0.0.1/$SERVER_B/")
 
 BOOTNODES_C="${ENODE_A},${ENODE_B}"
 
-run_remote "$SERVER_C" "cd /opt/clawnet && cp infra/chain-testnet/docker-compose.sync.yml docker-compose.sync.yml && \
+run_remote "$SERVER_C" "cd /opt/clawnet && cp infra/testnet/docker-compose.sync.yml docker-compose.sync.yml && \
   sed -i 's|enode://.*@66.94.125.242:30303|${BOOTNODES_C}|g' docker-compose.sync.yml && \
   sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${BOOTNODES_C#enode://}|g' docker-compose.sync.yml && \
   docker compose -f docker-compose.sync.yml up -d"
@@ -355,7 +355,7 @@ echo "  Server C block number: $C_BLOCK"
 
 echo "  Switching Server C to mining mode..."
 run_remote "$SERVER_C" "cd /opt/clawnet && docker compose -f docker-compose.sync.yml down && \
-  cp infra/chain-testnet/docker-compose.peer.yml docker-compose.chain.yml && \
+  cp infra/testnet/docker-compose.peer.yml docker-compose.chain.yml && \
   sed -i 's|enode://.*@66.94.125.242:30303|${BOOTNODES_C}|g' docker-compose.chain.yml && \
   sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${BOOTNODES_C#enode://}|g' docker-compose.chain.yml && \
   docker compose -f docker-compose.chain.yml up -d"

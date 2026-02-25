@@ -5,6 +5,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 OWNERS_ENV="${1:-$SCRIPT_DIR/.generated/safe-owners.env}"
 
+# Load testnet secrets (DEPLOYER_PRIVATE_KEY, CLAWNET_RPC_URL, etc.)
+SECRETS_ENV="${SECRETS_ENV:-$REPO_ROOT/infra/testnet/prod/secrets.env}"
+if [[ -f "$SECRETS_ENV" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$SECRETS_ENV"
+  set +a
+  echo "Loaded secrets from: $SECRETS_ENV"
+else
+  echo "WARNING: secrets file not found: $SECRETS_ENV"
+  echo "DEPLOYER_PRIVATE_KEY will fall back to hardhat default (no funds on testnet)."
+fi
+
 if [[ ! -f "$OWNERS_ENV" ]]; then
   echo "ERROR: owners manifest not found: $OWNERS_ENV"
   echo "Run collect-owner-addresses.sh first."
@@ -56,7 +69,7 @@ if [[ ! -f "$WALLETS_FILE" ]]; then
   exit 1
 fi
 
-readarray -t ADDR_LINES < <(python3 - "$WALLETS_FILE" <<'PY'
+ADDR_OUTPUT="$(python3 - "$WALLETS_FILE" <<'PY'
 import json,sys
 path = sys.argv[1]
 with open(path, 'r', encoding='utf-8') as f:
@@ -69,10 +82,10 @@ if not liq or not res:
 print(liq.get('address'))
 print(res.get('address'))
 PY
-)
+)"
 
-LIQ_ADDR="${ADDR_LINES[0]}"
-RES_ADDR="${ADDR_LINES[1]}"
+LIQ_ADDR="$(echo "$ADDR_OUTPUT" | sed -n '1p')"
+RES_ADDR="$(echo "$ADDR_OUTPUT" | sed -n '2p')"
 
 echo
 echo "Safe creation completed."
