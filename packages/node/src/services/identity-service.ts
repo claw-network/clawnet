@@ -16,7 +16,7 @@
  *   addPlatformLink and their view counterparts.
  */
 
-import { getBytes, keccak256, toUtf8Bytes } from 'ethers';
+import { getBytes, keccak256, solidityPacked, toUtf8Bytes } from 'ethers';
 
 import { createLogger } from '../logger.js';
 import type { ContractProvider } from './contract-provider.js';
@@ -217,24 +217,35 @@ export class IdentityService {
   ): Promise<DIDRegistrationResult> {
     const didHash = this.hashDid(did);
     const purposeNum = KEY_PURPOSE_MAP[purpose];
-    const controller = evmAddress ?? '0x0000000000000000000000000000000000000000';
+    const evmAddr = evmAddress ?? '0x0000000000000000000000000000000000000000';
+    // Contract defaults controller to msg.sender when evmAddress is zero
+    const controller = evmAddr === '0x0000000000000000000000000000000000000000'
+      ? this.contracts.signerAddress
+      : evmAddr;
 
     this.log.info('Identity register: %s (purpose=%s)', did, purpose);
+
+    // H-01: sign registration digest for on-chain verification
+    const message = solidityPacked(
+      ['string', 'bytes32', 'address'],
+      ['clawnet:register:v1:', didHash, controller],
+    );
+    const digest = keccak256(message);
+    const evmSig = await this.contracts.signer.signMessage(getBytes(digest));
 
     const tx = await this.contracts.identity.registerDID(
       didHash,
       publicKey,
       purposeNum,
-      controller,
+      evmAddr,
+      evmSig,
     );
     const receipt = await tx.wait();
 
     return {
       txHash: receipt.hash,
       did,
-      controller: controller === '0x0000000000000000000000000000000000000000'
-        ? this.contracts.signerAddress
-        : controller,
+      controller,
       timestamp: Date.now(),
     };
   }

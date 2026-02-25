@@ -96,6 +96,9 @@ export function createMockProvider(
   return {
     ...contracts,
     get: vi.fn((key: string) => (contracts as Record<string, MockContract>)[key]),
+    signer: {
+      signMessage: vi.fn().mockResolvedValue('0x' + 'ab'.repeat(65)),
+    },
     signerAddress: SIGNER_ADDRESS,
     getBlockNumber: vi.fn().mockResolvedValue(100),
     destroy: vi.fn(),
