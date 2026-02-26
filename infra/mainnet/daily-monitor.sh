@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ClawNet Testnet — Daily Stability Monitor
+# ClawNet Mainnet — Daily Stability Monitor
 # ==============================================================================
-# Runs a comprehensive daily health check for T-3.9 stability observation:
-#   1. Geth chain health (3 nodes: block height, freshness, peers, mining)
-#   2. ClawNet Node REST API health (3 nodes)
+# Runs a comprehensive daily health check for mainnet (5-node cluster):
+#   1. Geth chain health (Node 1 RPC + peer count ≥ 4 for Node 2-5)
+#   2. ClawNet Node REST API health (Node 1 via Caddy)
 #   3. On-chain ↔ off-chain reconciliation (4D: DID, balance, escrow, contract)
-#   4. Lightweight regression (Scenario 01: Identity & Wallet)
+#   4. Lightweight scenario regression
 #
 # Usage:
 #   ./daily-monitor.sh                          # Run once
@@ -17,12 +17,12 @@
 #   0 6 * * * /opt/clawnet/daily-monitor.sh 2>&1 | tee -a /opt/clawnet/logs/monitor.log
 #
 # Environment (override via .env or export):
-#   GETH_RPC_A, GETH_RPC_B, GETH_RPC_C — Geth JSON-RPC endpoints
-#   NODE_A_URL, NODE_B_URL, NODE_C_URL  — ClawNet Node REST API endpoints
-#   OBSERVATION_START                    — ISO date when T-3.9 started
+#   NODE_1_IP        — Node 1 server IP (derives GETH_RPC_1)
+#   GETH_RPC_1       — Geth JSON-RPC endpoint (Node 1 only)
+#   NODE_1_URL       — ClawNet Node REST API via Caddy
 #
 # Outputs:
-#   infra/testnet/reports/YYYY-MM-DD.json — structured daily report
+#   infra/mainnet/reports/YYYY-MM-DD.json — structured daily report
 #   stdout — human-readable summary
 # ==============================================================================
 
@@ -36,29 +36,37 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 REPORT_FILE="$REPORT_DIR/$DATE.json"
 
 # Load .env if present
-if [ -f "$SCRIPT_DIR/scenarios/.env" ]; then
+if [ -f "$SCRIPT_DIR/.env" ]; then
   set -a
   # shellcheck source=/dev/null
-  source "$SCRIPT_DIR/scenarios/.env"
+  source "$SCRIPT_DIR/.env"
   set +a
 fi
 
 # ── Server IPs (from prod/secrets.env) ────────────────────────────────────────
-# Server A exposes RPC publicly (0.0.0.0:8545) + Caddy.
-# Server B/C bind RPC to 127.0.0.1 only — not reachable remotely.
-# B/C liveness is verified via Server A's peer count (≥ 2).
-SERVER_A="66.94.125.242"
-GETH_RPC_A="${GETH_RPC_A:-http://${SERVER_A}:8545}"
+# Node 1 exposes RPC publicly (0.0.0.0:8545) + Caddy.
+# Node 2-5 bind RPC to 127.0.0.1 only — not reachable remotely.
+# Node 2-5 liveness is verified via Node 1's peer count (≥ 4).
+NODE_1_IP="${NODE_1_IP:-}"
 
-# ClawNet Node REST API — only Server A has Caddy (api.clawnetd.com → :9528)
-NODE_A_URL="${NODE_A_URL:-https://api.clawnetd.com}"
+# Geth RPC — only Node 1 is reachable remotely
+GETH_RPC_1="${GETH_RPC_1:-}"
+if [ -z "$GETH_RPC_1" ] && [ -n "$NODE_1_IP" ]; then
+  GETH_RPC_1="http://${NODE_1_IP}:8545"
+fi
+
+# ClawNet Node REST API — only Node 1 has Caddy (api.clawnet.io → :9528)
+NODE_1_URL="${NODE_1_URL:-https://api.clawnet.io}"
 
 # Contract addresses (from prod/contracts.json)
 CONTRACTS_JSON="$SCRIPT_DIR/prod/contracts.json"
 
 # Observation window
-OBSERVATION_START="${OBSERVATION_START:-2026-02-26}"
+OBSERVATION_START="${OBSERVATION_START:-2026-03-15}"
 OBSERVATION_DAYS=7
+
+# Expected cluster size
+EXPECTED_PEERS=4  # 5-node cluster: Node 1 should see 4 peers
 
 # CLI flags
 SKIP_SCENARIOS=false
@@ -87,27 +95,7 @@ info() { echo -e "  ${CYAN}ℹ${NC} $1"; }
 mkdir -p "$REPORT_DIR"
 
 # ── Report builder ────────────────────────────────────────────────────────────
-# We construct JSON incrementally using a temp file
 REPORT_TMP=$(mktemp)
-cat > "$REPORT_TMP" <<EOF
-{
-  "date": "$DATE",
-  "timestamp": "$TIMESTAMP",
-  "observationDay": 0,
-  "checks": {
-    "geth": {},
-    "nodeApi": {},
-    "reconciliation": {},
-    "scenarios": {}
-  },
-  "summary": {
-    "passed": 0,
-    "warned": 0,
-    "failed": 0,
-    "status": "unknown"
-  }
-}
-EOF
 
 PASS_COUNT=0
 WARN_COUNT=0
@@ -130,7 +118,7 @@ OBS_DAY=$(( (NOW_TS - OBS_START_TS) / 86400 + 1 ))
 
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║  ClawNet Testnet — Daily Stability Monitor              ║${NC}"
+echo -e "${BOLD}║  ClawNet Mainnet — Daily Stability Monitor              ║${NC}"
 echo -e "${BOLD}║  Date: $DATE  (Observation Day $OBS_DAY/$OBSERVATION_DAYS)           ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -148,113 +136,80 @@ fi
 # ==============================================================================
 # 1. GETH CHAIN HEALTH
 # ==============================================================================
-echo -e "${BOLD}=== 1. Geth Chain Health ===${NC}"
+echo -e "${BOLD}=== 1. Geth Chain Health (chainId 7626) ===${NC}"
 
-check_geth() {
-  local label=$1
-  local rpc=$2
+BLOCK_1=0
+CLUSTER_PEERS=0
 
+if [ -z "$GETH_RPC_1" ]; then
+  warn "GETH_RPC_1 not configured — set NODE_1_IP or GETH_RPC_1 in .env"
+  record_warn "GETH_RPC_1 not configured"
+else
   # Block number
-  local block_hex
-  block_hex=$(curl -sf --connect-timeout 5 -X POST "$rpc" \
+  BLOCK_HEX=$(curl -sf --connect-timeout 5 -X POST "$GETH_RPC_1" \
     -H "Content-Type: application/json" \
     -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
     2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
 
-  if [ -z "$block_hex" ]; then
-    fail "$label: Geth unreachable at $rpc"
-    record_fail "$label: Geth unreachable"
-    echo "\"$label\": {\"status\": \"unreachable\", \"rpc\": \"$rpc\"}"
-    return
-  fi
-
-  local block_num=$(( 16#${block_hex#0x} ))
-
-  # Block freshness
-  local block_data
-  block_data=$(curl -sf --connect-timeout 5 -X POST "$rpc" \
-    -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest",false],"id":2}' \
-    2>/dev/null || echo "{}")
-
-  local block_ts_hex
-  block_ts_hex=$(echo "$block_data" | jq -r '.result.timestamp // empty' 2>/dev/null || true)
-  local block_age=0
-  if [ -n "$block_ts_hex" ]; then
-    local block_ts=$(( 16#${block_ts_hex#0x} ))
-    local now_ts
-    now_ts=$(date +%s)
-    block_age=$(( now_ts - block_ts ))
-  fi
-
-  # Peer count
-  local peer_hex
-  peer_hex=$(curl -sf --connect-timeout 5 -X POST "$rpc" \
-    -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":3}' \
-    2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
-  local peer_count=0
-  if [ -n "$peer_hex" ]; then
-    peer_count=$(( 16#${peer_hex#0x} ))
-  fi
-
-  # Mining
-  local mining
-  mining=$(curl -sf --connect-timeout 5 -X POST "$rpc" \
-    -H "Content-Type: application/json" \
-    -d '{"jsonrpc":"2.0","method":"eth_mining","params":[],"id":4}' \
-    2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
-
-  # Evaluate
-  local status="ok"
-  if [ "$block_age" -gt 30 ]; then
-    warn "$label: block is ${block_age}s old (height: $block_num)"
-    record_warn "$label: stale block (${block_age}s)"
-    status="warn"
+  if [ -z "$BLOCK_HEX" ]; then
+    fail "Node-1: Geth unreachable at $GETH_RPC_1"
+    record_fail "Node-1: Geth unreachable"
   else
-    ok "$label: height=$block_num, age=${block_age}s, peers=$peer_count, mining=$mining"
-    record_pass
+    BLOCK_1=$(( 16#${BLOCK_HEX#0x} ))
+
+    # Block freshness
+    BLOCK_DATA=$(curl -sf --connect-timeout 5 -X POST "$GETH_RPC_1" \
+      -H "Content-Type: application/json" \
+      -d '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest",false],"id":2}' \
+      2>/dev/null || echo "{}")
+    BLOCK_TS_HEX=$(echo "$BLOCK_DATA" | jq -r '.result.timestamp // empty' 2>/dev/null || true)
+    BLOCK_AGE=0
+    if [ -n "$BLOCK_TS_HEX" ]; then
+      BLOCK_TS=$(( 16#${BLOCK_TS_HEX#0x} ))
+      BLOCK_AGE=$(( $(date +%s) - BLOCK_TS ))
+    fi
+
+    # Mining
+    MINING=$(curl -sf --connect-timeout 5 -X POST "$GETH_RPC_1" \
+      -H "Content-Type: application/json" \
+      -d '{"jsonrpc":"2.0","method":"eth_mining","params":[],"id":4}' \
+      2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
+
+    if [ "$BLOCK_AGE" -gt 30 ]; then
+      warn "Node-1: block is ${BLOCK_AGE}s old (height: $BLOCK_1)"
+      record_warn "Node-1: stale block (${BLOCK_AGE}s)"
+    else
+      ok "Node-1: height=$BLOCK_1, age=${BLOCK_AGE}s, mining=$MINING"
+      record_pass
+    fi
+
+    if [ "$MINING" != "true" ]; then
+      warn "Node-1: NOT mining"
+      record_warn "Node-1: not mining"
+    fi
+
+    # Verify Node 2-5 liveness via Node 1 peer count
+    echo ""
+    echo -e "  ${CYAN}Cluster peers (Node 2-5 via Node 1 peer count):${NC}"
+    PEER_HEX=$(curl -sf --connect-timeout 5 -X POST "$GETH_RPC_1" \
+      -H "Content-Type: application/json" \
+      -d '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":99}' \
+      2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
+    if [ -n "$PEER_HEX" ]; then
+      CLUSTER_PEERS=$(( 16#${PEER_HEX#0x} ))
+    fi
+
+    if [ "$CLUSTER_PEERS" -ge "$EXPECTED_PEERS" ]; then
+      ok "All 5 validators connected (peer count = $CLUSTER_PEERS)"
+      record_pass
+    elif [ "$CLUSTER_PEERS" -ge 1 ]; then
+      warn "Only $CLUSTER_PEERS of $EXPECTED_PEERS expected peers connected"
+      record_warn "Cluster: $CLUSTER_PEERS/$EXPECTED_PEERS peers"
+    else
+      fail "No peers — Node 2-5 may all be down"
+      record_fail "Cluster: 0 peers"
+    fi
   fi
-
-  if [ "$peer_count" -lt 1 ]; then
-    warn "$label: 0 peers"
-    record_warn "$label: no peers"
-    status="warn"
-  fi
-
-  if [ "$mining" != "true" ]; then
-    warn "$label: NOT mining"
-    record_warn "$label: not mining"
-    status="warn"
-  fi
-
-  echo "\"$label\": {\"status\": \"$status\", \"block\": $block_num, \"blockAge\": $block_age, \"peers\": $peer_count, \"mining\": $mining}"
-}
-
-GETH_A_JSON=$(check_geth "Server-A" "$GETH_RPC_A")
-BLOCK_A=$(echo "$GETH_A_JSON" | grep -o '"block": [0-9]*' | grep -o '[0-9]*' || echo 0)
-
-# Verify Server B/C liveness via Server A peer count
-echo ""
-echo -e "  ${CYAN}Cluster peers (B/C via Server A peer count):${NC}"
-PEER_HEX=$(curl -sf --connect-timeout 5 -X POST "$GETH_RPC_A" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":99}' \
-  2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
-CLUSTER_PEERS=0
-if [ -n "$PEER_HEX" ]; then
-  CLUSTER_PEERS=$(( 16#${PEER_HEX#0x} ))
-fi
-
-if [ "$CLUSTER_PEERS" -ge 2 ]; then
-  ok "All 3 validators connected (peer count = $CLUSTER_PEERS)"
-  record_pass
-elif [ "$CLUSTER_PEERS" -eq 1 ]; then
-  warn "Only 1 peer — one of Server B/C may be down"
-  record_warn "Cluster: only 1 peer connected"
-else
-  fail "No peers — Server B and C may both be down"
-  record_fail "Cluster: 0 peers"
 fi
 
 echo ""
@@ -268,14 +223,12 @@ check_node() {
   local label=$1
   local url=$2
 
-  # Skip if URL is empty (node has no external REST API endpoint)
   if [ -z "$url" ]; then
-    echo -e "  ${YELLOW}-${NC} $label: no REST API endpoint (port 9528 not exposed)"
-    record_pass  # not a failure — by design
+    echo -e "  ${YELLOW}-${NC} $label: no REST API endpoint configured"
+    record_pass
     return
   fi
 
-  # GET /api/v1/node
   local resp
   resp=$(curl -sf --connect-timeout 10 "$url/api/v1/node" 2>/dev/null || echo "")
 
@@ -296,7 +249,7 @@ check_node() {
   record_pass
 }
 
-check_node "Node-A" "$NODE_A_URL"
+check_node "Node-1" "$NODE_1_URL"
 
 echo ""
 
@@ -305,20 +258,16 @@ echo ""
 # ==============================================================================
 echo -e "${BOLD}=== 3. Reconciliation ===${NC}"
 
-# Try to run reconcile.ts if we can reach the hardhat project + have a DB
 RECONCILE_STATUS="skipped"
 RECONCILE_DISCREPANCIES=0
 
-# Check if we can reach the contracts directory
 CONTRACTS_DIR="$SCRIPT_DIR/../../packages/contracts"
 if [ -d "$CONTRACTS_DIR" ] && [ -f "$CONTRACTS_JSON" ]; then
-  # Extract addresses from contracts.json
   TOKEN_ADDR=$(jq -r '.contracts.ClawToken.proxy' "$CONTRACTS_JSON")
   ESCROW_ADDR=$(jq -r '.contracts.ClawEscrow.proxy' "$CONTRACTS_JSON")
   CONTRACTS_ADDR=$(jq -r '.contracts.ClawContracts.proxy' "$CONTRACTS_JSON")
   IDENTITY_ADDR=$(jq -r '.contracts.ClawIdentity.proxy' "$CONTRACTS_JSON")
 
-  # Find indexer DB (look in common locations)
   DB_PATH=""
   for candidate in \
     "$SCRIPT_DIR/../../data/indexer.sqlite" \
@@ -340,11 +289,10 @@ if [ -d "$CONTRACTS_DIR" ] && [ -f "$CONTRACTS_JSON" ]; then
       IDENTITY_ADDRESS="$IDENTITY_ADDR" \
       DB_PATH="$DB_PATH" \
       OUTPUT_FILE="$REPORT_DIR/reconcile-$DATE.json" \
-      npx hardhat run scripts/reconcile.ts --network clawnetTestnet 2>&1 || true)
+      npx hardhat run scripts/reconcile.ts --network clawnetMainnet 2>&1 || true)
 
     popd > /dev/null
 
-    # Parse result
     if echo "$RECONCILE_OUTPUT" | grep -q "0 discrepancies"; then
       ok "Reconciliation: 0 discrepancies"
       record_pass
@@ -391,7 +339,6 @@ else
     SCENARIO_OUTPUT=$(node run-tests.mjs --scenario 01 2>&1 || true)
     popd > /dev/null
 
-    # Parse results
     if echo "$SCENARIO_OUTPUT" | grep -q "passed.*0 failed"; then
       SCENARIO_PASSED=$(echo "$SCENARIO_OUTPUT" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "?")
       ok "Scenario 01: $SCENARIO_PASSED passed, 0 failed"
@@ -435,7 +382,8 @@ echo -e "  Failed:  ${RED}$FAIL_COUNT${NC}"
 echo -e "  Status:  $([ "$OVERALL" = "PASS" ] && echo -e "${GREEN}${OVERALL}${NC}" || ([ "$OVERALL" = "WARN" ] && echo -e "${YELLOW}${OVERALL}${NC}" || echo -e "${RED}${OVERALL}${NC}"))"
 echo ""
 
-if [ ${#ERRORS[@]} -gt 0 ]; then
+ERR_COUNT=${#ERRORS[@]}
+if [ "$ERR_COUNT" -gt 0 ]; then
   echo "  Issues:"
   for err in "${ERRORS[@]}"; do
     echo "    - $err"
@@ -447,11 +395,11 @@ fi
 DAYS_REMAINING=$(( OBSERVATION_DAYS - OBS_DAY ))
 if [ "$DAYS_REMAINING" -le 0 ]; then
   echo -e "  ${GREEN}🎉 Observation window complete!${NC}"
-  echo "  Ready to proceed to Sprint 3-D (Mainnet Deployment)"
+  echo "  Mainnet observation passed — ready for production traffic."
 elif [ "$OVERALL" = "PASS" ]; then
   echo -e "  ${CYAN}$DAYS_REMAINING day(s) remaining in observation window.${NC}"
 else
-  echo -e "  ${YELLOW}$DAYS_REMAINING day(s) remaining. Fix issues before mainnet.${NC}"
+  echo -e "  ${YELLOW}$DAYS_REMAINING day(s) remaining. Fix issues before production traffic.${NC}"
 fi
 
 # ── Write JSON report ────────────────────────────────────────────────────────
@@ -463,12 +411,12 @@ cat > "$REPORT_FILE" <<EOF
   "observationTotal": $OBSERVATION_DAYS,
   "checks": {
     "geth": {
-      "blockHeight": $BLOCK_A,
+      "blockHeight": $BLOCK_1,
       "clusterPeers": $CLUSTER_PEERS,
-      "expectedPeers": 2
+      "expectedPeers": $EXPECTED_PEERS
     },
     "nodeApi": {
-      "A": "$(curl -sf --connect-timeout 5 "$NODE_A_URL/api/v1/node" > /dev/null 2>&1 && echo "ok" || echo "unreachable")"
+      "node1": "$(curl -sf --connect-timeout 5 "$NODE_1_URL/api/v1/node" > /dev/null 2>&1 && echo "ok" || echo "unreachable")"
     },
     "reconciliation": {
       "status": "$RECONCILE_STATUS",
@@ -495,9 +443,9 @@ echo ""
 
 rm -f "$REPORT_TMP"
 
-# Exit code: 0 = PASS, 1 = FAIL, 2 = WARN
+# Exit code: 0 = PASS/WARN, 1 = FAIL
 case "$OVERALL" in
   PASS) exit 0 ;;
-  WARN) exit 0 ;;  # warnings are non-fatal
+  WARN) exit 0 ;;
   FAIL) exit 1 ;;
 esac

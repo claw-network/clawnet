@@ -120,7 +120,11 @@ export class ApiServer {
       void cors(req, res, async () => {
         await errorBoundary(req, res, async () => {
           await requestLogger(() => {})(req, res, async () => {
-            await router.handle(req, res);
+            const matched = await router.handle(req, res);
+            if (!matched && !res.headersSent) {
+              res.writeHead(404, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
+            }
           });
         });
       });

@@ -161,7 +161,7 @@ check_node() {
   fi
 
   local resp
-  resp=$(curl -sf --connect-timeout 10 "$url/api/v1/node/info" 2>/dev/null || echo "")
+  resp=$(curl -sf --connect-timeout 10 "$url/api/v1/node" 2>/dev/null || echo "")
 
   if [ -z "$resp" ]; then
     warn "$label: Node API unreachable at $url (clawnetd may not be running)"
