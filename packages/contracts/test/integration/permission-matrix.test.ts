@@ -150,32 +150,32 @@ describe("Permission Matrix Verification", function () {
   // ClawToken permissions
   // ──────────────────────────────────────────────────────────────────
   describe("ClawToken", () => {
-    it("✅ user EOA can transfer", async () => {
+    it("[allowed] user EOA can transfer", async () => {
       await token.connect(user).transfer(admin.address, 1);
     });
 
-    it("✅ MINTER_ROLE (admin) can mint", async () => {
+    it("[allowed] MINTER_ROLE (admin) can mint", async () => {
       await token.connect(admin).mint(user.address, 10);
     });
 
-    it("❌ user without MINTER_ROLE cannot mint", async () => {
+    it("[rejected] user without MINTER_ROLE cannot mint", async () => {
       await expect(token.connect(user).mint(user.address, 10)).to.be.reverted;
     });
 
-    it("✅ BURNER_ROLE (admin) can burn", async () => {
+    it("[allowed] BURNER_ROLE (admin) can burn", async () => {
       await token.connect(admin).burn(admin.address, 1);
     });
 
-    it("❌ user without BURNER_ROLE cannot burn", async () => {
+    it("[rejected] user without BURNER_ROLE cannot burn", async () => {
       await expect(token.connect(user).burn(user.address, 1)).to.be.reverted;
     });
 
-    it("✅ PAUSER_ROLE (admin) can pause", async () => {
+    it("[allowed] PAUSER_ROLE (admin) can pause", async () => {
       await token.connect(admin).pause();
       await token.connect(admin).unpause();
     });
 
-    it("❌ user without PAUSER_ROLE cannot pause", async () => {
+    it("[rejected] user without PAUSER_ROLE cannot pause", async () => {
       await expect(token.connect(user).pause()).to.be.reverted;
     });
   });
@@ -184,7 +184,7 @@ describe("Permission Matrix Verification", function () {
   // ClawEscrow permissions
   // ──────────────────────────────────────────────────────────────────
   describe("ClawEscrow", () => {
-    it("✅ user EOA can create escrow", async () => {
+    it("[allowed] user EOA can create escrow", async () => {
       const escrowAddr = await escrow.getAddress();
       await token.connect(admin).approve(escrowAddr, 10_000);
       const escrowId = keccak256(toUtf8Bytes("perm-escrow-1"));
@@ -195,7 +195,7 @@ describe("Permission Matrix Verification", function () {
       expect(info.depositor).to.equal(admin.address);
     });
 
-    it("❌ non-depositor/arbiter cannot release", async () => {
+    it("[rejected] non-depositor/arbiter cannot release", async () => {
       const escrowId = keccak256(toUtf8Bytes("perm-escrow-1"));
       await expect(escrow.connect(user).release(escrowId)).to.be.reverted;
     });
@@ -205,24 +205,24 @@ describe("Permission Matrix Verification", function () {
   // ClawStaking permissions
   // ──────────────────────────────────────────────────────────────────
   describe("ClawStaking", () => {
-    it("✅ user EOA can stake", async () => {
+    it("[allowed] user EOA can stake", async () => {
       const stakingAddr = await staking.getAddress();
       await token.connect(user).approve(stakingAddr, MIN_STAKE);
       await staking.connect(user).stake(MIN_STAKE, 0);
       expect(await staking.isActiveValidator(user.address)).to.be.true;
     });
 
-    it("✅ SLASHER_ROLE can slash", async () => {
+    it("[allowed] SLASHER_ROLE can slash", async () => {
       await staking.connect(slasher).slash(user.address, 100, keccak256(toUtf8Bytes("test-violation")));
     });
 
-    it("❌ user without SLASHER_ROLE cannot slash", async () => {
+    it("[rejected] user without SLASHER_ROLE cannot slash", async () => {
       await expect(
         staking.connect(user).slash(admin.address, 100, keccak256(toUtf8Bytes("test")))
       ).to.be.reverted;
     });
 
-    it("❌ user without DISTRIBUTOR_ROLE cannot distributeRewards", async () => {
+    it("[rejected] user without DISTRIBUTOR_ROLE cannot distributeRewards", async () => {
       await expect(
         staking.connect(user).distributeRewards([user.address], [10])
       ).to.be.reverted;
@@ -237,24 +237,24 @@ describe("Permission Matrix Verification", function () {
     const REVIEW_HASH = keccak256(toUtf8Bytes("review-perm-test"));
     const dims: [number, number, number, number, number] = [700, 700, 700, 700, 700];
 
-    it("✅ ANCHOR_ROLE can anchorReputation", async () => {
+    it("[allowed] ANCHOR_ROLE can anchorReputation", async () => {
       const merkleRoot = keccak256(toUtf8Bytes("merkle-perm"));
       await reputation.connect(anchor).anchorReputation(DID_HASH, 700, dims, merkleRoot);
       const [score] = await reputation.getReputation(DID_HASH);
       expect(score).to.equal(700);
     });
 
-    it("✅ ANCHOR_ROLE can recordReview", async () => {
+    it("[allowed] ANCHOR_ROLE can recordReview", async () => {
       const subjectDID = keccak256(toUtf8Bytes("did:claw:subject"));
       const txHash = keccak256(toUtf8Bytes("tx-perm"));
       await reputation.connect(anchor).recordReview(REVIEW_HASH, DID_HASH, subjectDID, txHash);
     });
 
-    it("✅ ANCHOR_ROLE can linkAddressToDID", async () => {
+    it("[allowed] ANCHOR_ROLE can linkAddressToDID", async () => {
       await reputation.connect(anchor).linkAddressToDID(anchor.address, DID_HASH);
     });
 
-    it("❌ user without ANCHOR_ROLE cannot anchorReputation", async () => {
+    it("[rejected] user without ANCHOR_ROLE cannot anchorReputation", async () => {
       const didHash2 = keccak256(toUtf8Bytes("did:claw:bad"));
       const merkleRoot = keccak256(toUtf8Bytes("bad-merkle"));
       await expect(
@@ -262,7 +262,7 @@ describe("Permission Matrix Verification", function () {
       ).to.be.reverted;
     });
 
-    it("❌ user without ANCHOR_ROLE cannot recordReview", async () => {
+    it("[rejected] user without ANCHOR_ROLE cannot recordReview", async () => {
       const reviewHash2 = keccak256(toUtf8Bytes("bad-review"));
       const subjectDID = keccak256(toUtf8Bytes("did:claw:subject"));
       const txHash = keccak256(toUtf8Bytes("tx-bad"));
@@ -271,14 +271,14 @@ describe("Permission Matrix Verification", function () {
       ).to.be.reverted;
     });
 
-    it("❌ user without ANCHOR_ROLE cannot linkAddressToDID", async () => {
+    it("[rejected] user without ANCHOR_ROLE cannot linkAddressToDID", async () => {
       const didHash2 = keccak256(toUtf8Bytes("did:claw:bad"));
       await expect(
         reputation.connect(user).linkAddressToDID(user.address, didHash2)
       ).to.be.reverted;
     });
 
-    it("✅ anyone can read getTrustScore (view)", async () => {
+    it("[allowed] anyone can read getTrustScore (view)", async () => {
       const score = await reputation.connect(user).getTrustScore(anchor.address);
       expect(score).to.equal(700);
     });
@@ -290,22 +290,22 @@ describe("Permission Matrix Verification", function () {
   describe("ParamRegistry", () => {
     const TEST_KEY = keccak256(toUtf8Bytes("TEST_PARAM"));
 
-    it("✅ GOVERNOR_ROLE (admin) can setParam", async () => {
+    it("[allowed] GOVERNOR_ROLE (admin) can setParam", async () => {
       await paramRegistry.connect(admin).setParam(TEST_KEY, 42);
       expect(await paramRegistry.getParam(TEST_KEY)).to.equal(42);
     });
 
-    it("❌ user without GOVERNOR_ROLE cannot setParam", async () => {
+    it("[rejected] user without GOVERNOR_ROLE cannot setParam", async () => {
       await expect(
         paramRegistry.connect(user).setParam(TEST_KEY, 99)
       ).to.be.reverted;
     });
 
-    it("✅ anyone can read getParam (view)", async () => {
+    it("[allowed] anyone can read getParam (view)", async () => {
       expect(await paramRegistry.connect(user).getParam(TEST_KEY)).to.equal(42);
     });
 
-    it("✅ anyone can read getParamWithDefault (view)", async () => {
+    it("[allowed] anyone can read getParamWithDefault (view)", async () => {
       const unknownKey = keccak256(toUtf8Bytes("UNKNOWN"));
       expect(await paramRegistry.connect(user).getParamWithDefault(unknownKey, 999)).to.equal(999);
     });
@@ -315,7 +315,7 @@ describe("Permission Matrix Verification", function () {
   // ClawContracts permissions
   // ──────────────────────────────────────────────────────────────────
   describe("ClawContracts", () => {
-    it("✅ user EOA can create service contract", async () => {
+    it("[allowed] user EOA can create service contract", async () => {
       const contractId = keccak256(toUtf8Bytes("perm-contract-1"));
       const deadline = (await time.latest()) + 86400 * 30;
       await serviceContracts.connect(admin).createContract(
@@ -325,7 +325,7 @@ describe("Permission Matrix Verification", function () {
       );
     });
 
-    it("❌ non-party cannot sign contract", async () => {
+    it("[rejected] non-party cannot sign contract", async () => {
       const contractId = keccak256(toUtf8Bytes("perm-contract-1"));
       await expect(
         serviceContracts.connect(anchor).signContract(contractId)
@@ -337,7 +337,7 @@ describe("Permission Matrix Verification", function () {
   // ClawIdentity permissions
   // ──────────────────────────────────────────────────────────────────
   describe("ClawIdentity", () => {
-    it("✅ REGISTRAR_ROLE (admin) can register DID", async () => {
+    it("[allowed] REGISTRAR_ROLE (admin) can register DID", async () => {
       const didHash = keccak256(toUtf8Bytes("did:claw:permIdentity"));
       const pubKey = ethers.randomBytes(32);
       const evmSig = await signRegisterDID(admin, didHash, admin.address);
@@ -345,7 +345,7 @@ describe("Permission Matrix Verification", function () {
       expect(await identity.isActive(didHash)).to.be.true;
     });
 
-    it("✅ registerDID is permissionless (any user can register)", async () => {
+    it("[allowed] registerDID is permissionless (any user can register)", async () => {
       const didHash = keccak256(toUtf8Bytes("did:claw:badIdentity"));
       const pubKey = ethers.randomBytes(32);
       // registerDID has no role restriction — open to all
@@ -379,17 +379,17 @@ describe("Permission Matrix Verification", function () {
   // UUPS upgrade permission (all contracts)
   // ──────────────────────────────────────────────────────────────────
   describe("UUPS upgrade: only DEFAULT_ADMIN", () => {
-    it("❌ user cannot upgrade ClawToken", async () => {
+    it("[rejected] user cannot upgrade ClawToken", async () => {
       const f = await ethers.getContractFactory("ClawToken", user);
       await expect(upgrades.upgradeProxy(await token.getAddress(), f)).to.be.reverted;
     });
 
-    it("❌ user cannot upgrade ParamRegistry", async () => {
+    it("[rejected] user cannot upgrade ParamRegistry", async () => {
       const f = await ethers.getContractFactory("ParamRegistry", user);
       await expect(upgrades.upgradeProxy(await paramRegistry.getAddress(), f)).to.be.reverted;
     });
 
-    it("❌ user cannot upgrade ClawReputation", async () => {
+    it("[rejected] user cannot upgrade ClawReputation", async () => {
       const f = await ethers.getContractFactory("ClawReputation", user);
       await expect(upgrades.upgradeProxy(await reputation.getAddress(), f)).to.be.reverted;
     });
