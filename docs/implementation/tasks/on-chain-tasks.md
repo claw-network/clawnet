@@ -850,29 +850,36 @@
 
 ### Sprint 3-C：Testnet 全业务验证（W2–W3）
 
-- [ ] **T-3.8** Testnet 全场景集成测试
+- [x] **T-3.8** Testnet 全场景集成测试  ✅ 2026-02-26 全部 9 场景通过
   - 在测试网（chainId 7625，3 台 Geth PoA + 3 台 ClawNet Node）上端到端跑通所有业务流程
   - 覆盖 `infra/testnet/scenarios/` 01–09 全部场景：
-    1. Identity + Wallet（DID 注册、转账、余额查询）
-    2. Info Market（信息市场发布、购买）
-    3. Task Market（任务发布、申领、交付）
-    4. Capability Market（能力市场）
-    5. Service Contract（创建、签约、milestone、完成）
-    6. Contract Dispute（争议、仲裁）
-    7. DAO Governance（提案、投票、执行）
-    8. Cross-node Sync（多节点 P2P 同步）
-    9. Economic Cycle（完整经济循环）
-  - 验收：全部 9 个场景通过，无链上异常
+    1. Identity + Wallet（DID 注册、转账、余额查询）✅
+    2. Info Market（信息市场发布、购买）✅
+    3. Task Market（任务发布、申领、交付）✅
+    4. Capability Market（能力市场）✅
+    5. Service Contract（创建、签约、milestone、完成）✅
+    6. Contract Dispute（争议、仲裁）✅
+    7. DAO Governance（提案、投票、执行）✅
+    8. Cross-node Sync（多节点 P2P 同步）✅
+    9. Economic Cycle（完整经济循环）✅
+  - 测试入口：`infra/testnet/scenarios/run-tests.mjs`
+  - 验收：全部 9 个场景通过，无链上异常 ✅
   - 工时：3 天
 
-- [ ] **T-3.9** Testnet 稳定性观察
+- [~] **T-3.9** Testnet 稳定性观察
   - 持续运行 5–7 天，监控：
     - Geth 出块稳定（2s 间隔，无分叉）
     - Node REST API 响应正常
     - 链上交易成功率 100%
     - EventIndexer 索引无遗漏（indexer block == chain head）
     - P2P gossipsub 消息同步正常
+  - 自动化工具：`infra/testnet/daily-monitor.sh`（cron 每日执行）
+    - 运行 `health-check.sh`（3 节点 Geth + Docker 状态）
+    - 运行 `reconcile.ts`（4 维链上链下对账）
+    - 运行 `run-tests.mjs --scenario 01`（轻量回归：Identity + Wallet）
+    - 输出日终报告到 `infra/testnet/reports/YYYY-MM-DD.json`
   - 每日运行 `reconcile.ts`，确认链上链下 0 差异
+  - 观察窗口：2026-02-26 → 2026-03-04（7 天）
   - 验收：连续 5 天无异常
   - 工时：5 天（含值班观察）
 
@@ -937,8 +944,8 @@
 ```
 ■ 外部审计完成，所有 Critical/High 已修复（GPT-5 审计 10 findings 全部修复，583 tests passing）
 ■ 迁移工具开发完成：snapshot-balances / migrate-balances / migrate-escrows / migrate-contracts / reconcile（5 脚本共 ~1190 行）
-□ Testnet 全场景（01–09）通过
-□ Testnet 稳定运行 5 天，每日对账 0 差异
+■ Testnet 全场景（01–09）通过（2026-02-26，`infra/testnet/scenarios/run-tests.mjs` 9/9 passed）
+□ Testnet 稳定运行 5 天，每日对账 0 差异（观察窗口：2026-02-26 → 2026-03-04）
 □ 主网 5 节点 Geth PoA 出块正常（chainId 7626）
 □ 主网 9 个合约部署成功
 □ 主网数据迁移完成，对账 0 差异
@@ -1006,5 +1013,5 @@ T-0.13(Ed25519)──┼──→ T-1.1 (Token)──→ T-1.3 (Test)
 
 ---
 
-*最后更新: 2026年2月25日*
-*状态: Phase 0–2 全部完成。Phase 3 Sprint 3-A（审计修复 ✅）+ Sprint 3-B（迁移工具 ✅）已完成。下一步：Sprint 3-C Testnet 全业务验证 → Sprint 3-D 主网升级部署（testnet 3 台 + 2 台新服务器 → 5 节点主网 PoA）。*
+*最后更新: 2026年2月26日*
+*状态: Phase 0–2 全部完成。Phase 3 Sprint 3-A（审计修复 ✅）+ Sprint 3-B（迁移工具 ✅）+ Sprint 3-C T-3.8（全场景验证 ✅）已完成。当前：T-3.9 Testnet 稳定性观察中（2026-02-26 → 2026-03-04）。下一步：Sprint 3-D 主网升级部署（testnet 3 台 + 2 台新服务器 → 5 节点主网 PoA）。*

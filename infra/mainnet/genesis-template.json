@@ -1,0 +1,52 @@
+{
+  "config": {
+    "chainId": 7626,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "berlinBlock": 0,
+    "londonBlock": 0,
+    "clique": {
+      "period": 2,
+      "epoch": 30000
+    }
+  },
+  "difficulty": "1",
+  "gasLimit": "0x1C9C380",
+  "extradata": "0x0000000000000000000000000000000000000000000000000000000000000000__VALIDATOR_1____VALIDATOR_2____VALIDATOR_3____VALIDATOR_4____VALIDATOR_5__0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "alloc": {
+    "__VALIDATOR_1__": {
+      "balance": "0x56BC75E2D63100000",
+      "comment": "100 ETH for gas — Validator 1"
+    },
+    "__VALIDATOR_2__": {
+      "balance": "0x56BC75E2D63100000",
+      "comment": "100 ETH for gas — Validator 2"
+    },
+    "__VALIDATOR_3__": {
+      "balance": "0x56BC75E2D63100000",
+      "comment": "100 ETH for gas — Validator 3"
+    },
+    "__VALIDATOR_4__": {
+      "balance": "0x56BC75E2D63100000",
+      "comment": "100 ETH for gas — Validator 4"
+    },
+    "__VALIDATOR_5__": {
+      "balance": "0x56BC75E2D63100000",
+      "comment": "100 ETH for gas — Validator 5"
+    },
+    "__DEPLOYER__": {
+      "balance": "0x033B2E3C9FD0803CE8000000",
+      "comment": "1B wei for contract deployment"
+    },
+    "__TREASURY__": {
+      "balance": "0x033B2E3C9FD0803CE8000000",
+      "comment": "1B wei for treasury"
+    }
+  }
+}

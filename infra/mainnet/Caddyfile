@@ -1,0 +1,111 @@
+# ClawNet Mainnet — Caddy Reverse Proxy (Node 1 only)
+# ==============================================================================
+# Location: /etc/caddy/Caddyfile on Mainnet Node 1
+#
+# Aligned with infra/testnet/Caddyfile — same structure, mainnet domains.
+# Domain: clawnet.io (testnet uses clawnetd.com)
+#
+# Install: cp infra/mainnet/Caddyfile /etc/caddy/Caddyfile
+#          systemctl restart caddy
+# ==============================================================================
+
+# ── Homepage ─────────────────────────────────────────────────────────────────
+clawnet.io {
+    # install.sh served from /var/www/clawnet
+    handle /install.sh {
+        root * /var/www/clawnet
+        header Content-Type "text/x-shellscript; charset=utf-8"
+        file_server
+    }
+
+    # Everything else: SPA from the homepage dist
+    handle {
+        root * /opt/clawnet/packages/homepage/dist
+        try_files {path} /index.html
+        file_server
+
+        header {
+            Strict-Transport-Security "max-age=63072000; includeSubDomains"
+            X-Content-Type-Options    nosniff
+            X-Frame-Options           SAMEORIGIN
+            Referrer-Policy           strict-origin-when-cross-origin
+            -Server
+        }
+    }
+
+    log {
+        output file /var/log/caddy/homepage-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
+
+# ── ClawNet Node REST API ────────────────────────────────────────────────────
+api.clawnet.io {
+    @write_ops {
+        method POST PUT DELETE PATCH
+        not header X-API-Key {env.CLAW_API_KEY}
+    }
+    respond @write_ops 401 {
+        body "Unauthorized: X-API-Key required"
+        close
+    }
+
+    reverse_proxy localhost:9528 {
+        transport http {
+            read_timeout  30s
+            write_timeout 30s
+        }
+    }
+
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains"
+        X-Content-Type-Options    nosniff
+        X-Frame-Options           DENY
+        Referrer-Policy           no-referrer
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/api-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
+
+# ── Chain JSON-RPC ───────────────────────────────────────────────────────────
+rpc.clawnet.io {
+    @not_post not method POST
+    respond @not_post 405 {
+        body "Method Not Allowed: JSON-RPC requires POST"
+        close
+    }
+
+    # NOTE: body_regexp is NOT available in Caddy v2.11.x
+    # Dangerous RPC method filtering must be done at Geth --http.api level
+
+    reverse_proxy localhost:8545 {
+        transport http {
+            read_timeout  30s
+            write_timeout 30s
+        }
+    }
+
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains"
+        X-Content-Type-Options    nosniff
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "POST, OPTIONS"
+        Access-Control-Allow-Headers "Content-Type, X-API-Key"
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/rpc-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}

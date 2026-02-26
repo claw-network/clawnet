@@ -1,0 +1,7 @@
+# Mainnet secrets — NEVER commit!
+*.env
+!.env.example
+secrets.env
+*.key
+*.pem
+chain-data/

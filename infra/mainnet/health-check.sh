@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ClawNet Testnet — Health Check Script (3-Node)
+# ClawNet Mainnet — Health Check Script (5-Node)
 # ==============================================================================
-# Checks all 3 testnet nodes (Geth + ClawNet Node), aligned with daily-monitor.sh.
+# Aligned with infra/testnet/health-check.sh — same structure, mainnet config.
 #
 # Usage:
-#   ./health-check.sh               # Check all 3 nodes remotely
+#   ./health-check.sh               # Check all 5 nodes remotely
 #   ./health-check.sh --local       # Check local node only (127.0.0.1)
 #   watch -n 60 ./health-check.sh   # Run every 60 seconds
 #
@@ -17,26 +17,31 @@
 
 set -euo pipefail
 
-# ── Configuration (aligned with daily-monitor.sh) ────────────────────────────
+# ── Configuration ────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Load .env if present (same source as daily-monitor.sh & run-tests.mjs)
-if [ -f "$SCRIPT_DIR/scenarios/.env" ]; then
+# Load .env if present
+if [ -f "$SCRIPT_DIR/.env" ]; then
   set -a
   # shellcheck source=/dev/null
-  source "$SCRIPT_DIR/scenarios/.env"
+  source "$SCRIPT_DIR/.env"
   set +a
 fi
 
-# Geth RPC endpoints — 3 testnet validators
-GETH_RPC_A="${GETH_RPC_A:-http://173.249.46.252:8545}"
-GETH_RPC_B="${GETH_RPC_B:-http://167.86.93.216:8545}"
-GETH_RPC_C="${GETH_RPC_C:-http://167.86.93.223:8545}"
+# Geth RPC endpoints — 5 mainnet validators
+# Override via environment or .env
+GETH_RPC_1="${GETH_RPC_1:-}"
+GETH_RPC_2="${GETH_RPC_2:-}"
+GETH_RPC_3="${GETH_RPC_3:-}"
+GETH_RPC_4="${GETH_RPC_4:-}"
+GETH_RPC_5="${GETH_RPC_5:-}"
 
 # ClawNet Node REST API endpoints — port 9528
-NODE_A_URL="${NODE_A_URL:-http://173.249.46.252:9528}"
-NODE_B_URL="${NODE_B_URL:-http://167.86.93.216:9528}"
-NODE_C_URL="${NODE_C_URL:-http://167.86.93.223:9528}"
+NODE_1_URL="${NODE_1_URL:-}"
+NODE_2_URL="${NODE_2_URL:-}"
+NODE_3_URL="${NODE_3_URL:-}"
+NODE_4_URL="${NODE_4_URL:-}"
+NODE_5_URL="${NODE_5_URL:-}"
 
 ALERT_WEBHOOK="${ALERT_WEBHOOK_URL:-}"
 HOSTNAME=$(hostname)
@@ -56,10 +61,10 @@ done
 
 # In local mode, only check localhost
 if $LOCAL_ONLY; then
-  GETH_RPC_A="${GETH_RPC:-http://127.0.0.1:8545}"
-  NODE_A_URL="${CLAW_API:-http://127.0.0.1:9528}"
-  GETH_RPC_B="" ; GETH_RPC_C=""
-  NODE_B_URL="" ; NODE_C_URL=""
+  GETH_RPC_1="${GETH_RPC:-http://127.0.0.1:8545}"
+  NODE_1_URL="${CLAW_API:-http://127.0.0.1:9528}"
+  GETH_RPC_2="" ; GETH_RPC_3="" ; GETH_RPC_4="" ; GETH_RPC_5=""
+  NODE_2_URL="" ; NODE_3_URL="" ; NODE_4_URL="" ; NODE_5_URL=""
 fi
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -82,7 +87,6 @@ check_geth() {
   local label=$1
   local rpc=$2
 
-  # 1. Geth reachable?
   local block_hex
   block_hex=$(curl -sf --connect-timeout 5 -X POST "$rpc" \
     -H "Content-Type: application/json" \
@@ -98,7 +102,6 @@ check_geth() {
   local block_num=$(( 16#${block_hex#0x} ))
   BLOCK_HEIGHTS+=("$block_num")
 
-  # 2. Block freshness
   local block_data
   block_data=$(curl -sf --connect-timeout 5 -X POST "$rpc" \
     -H "Content-Type: application/json" \
@@ -118,7 +121,6 @@ check_geth() {
     fi
   fi
 
-  # 3. Peer count
   local peer_hex
   peer_hex=$(curl -sf --connect-timeout 5 -X POST "$rpc" \
     -H "Content-Type: application/json" \
@@ -132,7 +134,6 @@ check_geth() {
     fi
   fi
 
-  # 4. Mining status (Clique)
   local mining
   mining=$(curl -sf --connect-timeout 5 -X POST "$rpc" \
     -H "Content-Type: application/json" \
@@ -172,17 +173,21 @@ check_node() {
 # ==============================================================================
 # 1. GETH CHAIN HEALTH
 # ==============================================================================
-echo "=== Geth (EVM Chain) ==="
+echo "=== Geth (EVM Chain — chainId 7626) ==="
 
 if $LOCAL_ONLY; then
-  check_geth "Local" "$GETH_RPC_A"
+  check_geth "Local" "$GETH_RPC_1"
 else
-  check_geth "Server-A" "$GETH_RPC_A"
-  check_geth "Server-B" "$GETH_RPC_B"
-  check_geth "Server-C" "$GETH_RPC_C"
+  for i in 1 2 3 4 5; do
+    rpc_var="GETH_RPC_$i"
+    rpc="${!rpc_var:-}"
+    if [ -n "$rpc" ]; then
+      check_geth "Node-$i" "$rpc"
+    fi
+  done
 
-  # Block consistency — all 3 nodes should be within 5 blocks
-  if [ ${#BLOCK_HEIGHTS[@]} -eq 3 ]; then
+  # Block consistency — all nodes should be within 5 blocks
+  if [ ${#BLOCK_HEIGHTS[@]} -ge 2 ]; then
     MAX_B=${BLOCK_HEIGHTS[0]}; MIN_B=${BLOCK_HEIGHTS[0]}
     for b in "${BLOCK_HEIGHTS[@]}"; do
       [ "$b" -gt "$MAX_B" ] 2>/dev/null && MAX_B=$b
@@ -190,9 +195,9 @@ else
     done
     DRIFT=$(( MAX_B - MIN_B ))
     if [ "$DRIFT" -le 5 ]; then
-      ok "Block drift: $DRIFT (A=${BLOCK_HEIGHTS[0]} B=${BLOCK_HEIGHTS[1]} C=${BLOCK_HEIGHTS[2]})"
+      ok "Block drift: $DRIFT blocks across ${#BLOCK_HEIGHTS[@]} nodes"
     else
-      warn "Block drift: $DRIFT (A=${BLOCK_HEIGHTS[0]} B=${BLOCK_HEIGHTS[1]} C=${BLOCK_HEIGHTS[2]}) — possible fork!"
+      warn "Block drift: $DRIFT blocks — possible fork!"
     fi
   fi
 fi
@@ -205,11 +210,15 @@ echo ""
 echo "=== ClawNet Node (REST API) ==="
 
 if $LOCAL_ONLY; then
-  check_node "Local" "$NODE_A_URL"
+  check_node "Local" "$NODE_1_URL"
 else
-  check_node "Node-A" "$NODE_A_URL"
-  check_node "Node-B" "$NODE_B_URL"
-  check_node "Node-C" "$NODE_C_URL"
+  for i in 1 2 3 4 5; do
+    url_var="NODE_${i}_URL"
+    url="${!url_var:-}"
+    if [ -n "$url" ]; then
+      check_node "Node-$i" "$url"
+    fi
+  done
 fi
 
 echo ""
@@ -223,7 +232,6 @@ for CONTAINER in clawnet-geth caddy; do
     UPTIME=$(docker inspect --format='{{.State.StartedAt}}' "$CONTAINER" 2>/dev/null || echo "")
     ok "$CONTAINER: running (since ${UPTIME:0:19})"
   elif [ "$STATUS" = "not found" ]; then
-    # Not all containers run on all servers (e.g., Caddy only on Server A)
     echo -e "  ${YELLOW}-${NC} $CONTAINER: not present (OK if not expected)"
   else
     fail "$CONTAINER: $STATUS"
@@ -262,14 +270,12 @@ else
     echo "  - $err"
   done
 
-  # ── Send Alert ─────────────────────────────────────────────────────────────
   if [ -n "$ALERT_WEBHOOK" ]; then
-    ALERT_MSG="[ClawNet Health] $HOSTNAME @ $TIMESTAMP\n"
+    ALERT_MSG="[ClawNet Mainnet Health] $HOSTNAME @ $TIMESTAMP\n"
     for err in "${ERRORS[@]}"; do
       ALERT_MSG+="• $err\n"
     done
 
-    # Generic webhook (works with Feishu/DingTalk/Slack if you adjust payload)
     curl -sf -X POST "$ALERT_WEBHOOK" \
       -H "Content-Type: application/json" \
       -d "{\"msg_type\":\"text\",\"content\":{\"text\":\"$ALERT_MSG\"}}" \

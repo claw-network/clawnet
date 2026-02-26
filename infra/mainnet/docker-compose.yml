@@ -1,0 +1,55 @@
+# ==============================================================================
+# ClawNet Mainnet — Docker Compose (Node 1: Primary Validator + API Gateway)
+# ==============================================================================
+# Geth v1.13.15 — DO NOT upgrade to v1.14+ (Clique PoA removed)
+#
+# Usage:
+#   cd /opt/clawnet
+#   docker compose -f docker-compose.chain.yml up -d
+# ==============================================================================
+
+services:
+  geth:
+    image: ethereum/client-go:v1.13.15
+    container_name: clawnet-geth
+    restart: unless-stopped
+    ports:
+      - "30303:30303/tcp"       # P2P TCP
+      - "30303:30303/udp"       # P2P Discovery
+      - "8545:8545/tcp"         # JSON-RPC (Caddy reverse-proxies; UFW blocks direct)
+    volumes:
+      - /opt/clawnet/chain-data:/data
+      - /opt/clawnet/config:/config:ro
+    entrypoint: >
+      geth
+        --datadir /data
+        --networkid 7626
+        --http
+        --http.addr 0.0.0.0
+        --http.port 8545
+        --http.api eth,net,web3,txpool,clique,admin
+        --http.corsdomain "*"
+        --http.vhosts "*"
+        --port 30303
+        --mine
+        --miner.etherbase ${VALIDATOR_ADDRESS}
+        --unlock ${VALIDATOR_ADDRESS}
+        --password /config/password.txt
+        --allow-insecure-unlock
+        --syncmode full
+        --gcmode archive
+        --bootnodes ""
+    healthcheck:
+      test: >
+        wget -qO- --post-data='{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+        --header='Content-Type: application/json'
+        http://127.0.0.1:8545 || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"

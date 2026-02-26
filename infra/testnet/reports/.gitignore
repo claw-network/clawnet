@@ -1,0 +1,4 @@
+# Daily monitor reports (generated, not committed)
+*.json
+# But keep the gitignore itself
+!.gitignore
