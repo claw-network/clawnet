@@ -22,7 +22,7 @@ json() { jq -r "$@"; }
 
 # ── 1. Create contract ──────────────────────────────────────
 echo "=== 1. Create Contract ==="
-RESULT=$(curl -s -X POST "$BASE/api/contracts" \
+RESULT=$(curl -s -X POST "$BASE/api/v1/contracts" \
   -H "Content-Type: application/json" \
   -d "{
     \"did\": \"$DID\",
@@ -41,9 +41,9 @@ RESULT=$(curl -s -X POST "$BASE/api/contracts" \
       \"escrowRequired\": true
     },
     \"milestones\": [
-      {\"id\": \"ms-1\", \"title\": \"Schema Design\", \"amount\": 60, \"percentage\": 30, \"deliverables\": [\"schema.sql\"]},
-      {\"id\": \"ms-2\", \"title\": \"ETL Code\",      \"amount\": 100, \"percentage\": 50, \"deliverables\": [\"pipeline.py\"]},
-      {\"id\": \"ms-3\", \"title\": \"Documentation\", \"amount\": 40,  \"percentage\": 20, \"deliverables\": [\"docs.md\"]}
+      {\"id\": \"0\", \"title\": \"Schema Design\", \"amount\": 60, \"percentage\": 30, \"deliverables\": [\"schema.sql\"]},
+      {\"id\": \"1\", \"title\": \"ETL Code\",      \"amount\": 100, \"percentage\": 50, \"deliverables\": [\"pipeline.py\"]},
+      {\"id\": \"2\", \"title\": \"Documentation\", \"amount\": 40,  \"percentage\": 20, \"deliverables\": [\"docs.md\"]}
     ]
   }")
 
@@ -55,7 +55,7 @@ NONCE=$((NONCE + 1))
 # ── 2. Sign contract ────────────────────────────────────────
 echo ""
 echo "=== 2. Sign Contract ==="
-curl -s -X POST "$BASE/api/contracts/$CONTRACT_ID/sign" \
+curl -s -X POST "$BASE/api/v1/contracts/$CONTRACT_ID/actions/sign" \
   -H "Content-Type: application/json" \
   -d "{
     \"did\": \"$DID\",
@@ -66,8 +66,8 @@ NONCE=$((NONCE + 1))
 
 # ── 3. Fund contract ────────────────────────────────────────
 echo ""
-echo "=== 3. Fund Contract ==="
-curl -s -X POST "$BASE/api/contracts/$CONTRACT_ID/fund" \
+echo "=== 3. Fund Escrow ==="
+curl -s -X POST "$BASE/api/v1/escrows" \
   -H "Content-Type: application/json" \
   -d "{
     \"did\": \"$DID\",
@@ -77,10 +77,10 @@ curl -s -X POST "$BASE/api/contracts/$CONTRACT_ID/fund" \
   }" | jq .
 NONCE=$((NONCE + 1))
 
-# ── 4. Submit milestone ms-1 ────────────────────────────────
+# ── 4. Submit milestone 0 (Schema Design) ───────────────────
 echo ""
-echo "=== 4. Submit Milestone ms-1 ==="
-curl -s -X POST "$BASE/api/contracts/$CONTRACT_ID/milestones/ms-1/submit" \
+echo "=== 4. Submit Milestone 0 ==="
+curl -s -X POST "$BASE/api/v1/contracts/$CONTRACT_ID/milestones/0/actions/submit" \
   -H "Content-Type: application/json" \
   -d "{
     \"did\": \"$DID\",
@@ -91,10 +91,10 @@ curl -s -X POST "$BASE/api/contracts/$CONTRACT_ID/milestones/ms-1/submit" \
   }" | jq .
 NONCE=$((NONCE + 1))
 
-# ── 5. Approve milestone ms-1 ───────────────────────────────
+# ── 5. Approve milestone 0 ───────────────────────────────────
 echo ""
-echo "=== 5. Approve Milestone ms-1 ==="
-curl -s -X POST "$BASE/api/contracts/$CONTRACT_ID/milestones/ms-1/approve" \
+echo "=== 5. Approve Milestone 0 ==="
+curl -s -X POST "$BASE/api/v1/contracts/$CONTRACT_ID/milestones/0/actions/approve" \
   -H "Content-Type: application/json" \
   -d "{
     \"did\": \"$DID\",
@@ -106,12 +106,12 @@ NONCE=$((NONCE + 1))
 # ── 6. Check contract status ────────────────────────────────
 echo ""
 echo "=== 6. Contract Status ==="
-curl -s "$BASE/api/contracts/$CONTRACT_ID" | jq .
+curl -s "$BASE/api/v1/contracts/$CONTRACT_ID" | jq .
 
 # ── 7. Complete contract ────────────────────────────────────
 echo ""
 echo "=== 7. Complete Contract ==="
-curl -s -X POST "$BASE/api/contracts/$CONTRACT_ID/complete" \
+curl -s -X POST "$BASE/api/v1/contracts/$CONTRACT_ID/actions/complete" \
   -H "Content-Type: application/json" \
   -d "{
     \"did\": \"$DID\",

@@ -51,9 +51,9 @@ for pkg_dir in "${NPM_PKGS[@]}"; do
   cd "$ROOT/$pkg_dir"
 
   if $DRY_RUN; then
-    npm publish --dry-run 2>&1 | sed 's/^/    /'
+    pnpm publish --dry-run --no-git-checks 2>&1 | sed 's/^/    /'
   else
-    npm publish --access public 2>&1 | sed 's/^/    /'
+    pnpm publish --access public --no-git-checks 2>&1 | sed 's/^/    /'
   fi
 
   cd "$ROOT"

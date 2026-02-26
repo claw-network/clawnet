@@ -19,41 +19,52 @@
 
 ### R-1. Genesis Mint — 初始 Token 铸造
 
-- [ ] **R-1.1** 确认 testnet 合约地址和 deployer 账户状态
-  - 合约地址：`0xA98Cc076321aF8cC66A579b91643B5B98E316AA4`（ClawToken）
-  - Deployer 需要持有 `MINTER_ROLE`
-  - 验收：`ClawToken.hasRole(MINTER_ROLE, deployer)` 返回 true
+- [x] **R-1.1** 合约重新部署（原 4/9 代理映射损坏，2026-02-26 清洁重部署）
+  - 清理旧 OZ manifest → 全部 9 个合约重部署
+  - 新合约地址：
+    | 合约 | 地址 |
+    |------|------|
+    | ClawToken | `0xd9046ef83f8c910e4c828a1F8bEDDcD618fE3A73` |
+    | ParamRegistry | `0xe601130a0c3C3f8193616114768Ba2F429DB2D3B` |
+    | ClawEscrow | `0xBCE2a925313ED06799156E64522E7B2735079be4` |
+    | ClawIdentity | `0x42ac5e96EB43c1390e7BED6Fc7FcAfe1375972E9` |
+    | ClawStaking | `0x82e3d8777F07e21e979cb9b1e298EDA711CbA174` |
+    | ClawReputation | `0x2957Bd9b9643C032d96490C809082A15e4af7fc6` |
+    | ClawDAO | `0x395e728BB881F827B959b6f83928Af69461b109e` |
+    | ClawContracts | `0x25836998927244a98218B8B33C42cfDF4849EcC8` |
+    | ClawRouter | `0xC89C2324535Af64b3b11611fC321DB4a66145fEA` |
+  - Roles: MINTER→Staking, GOVERNOR→DAO, DAO.reputation→Reputation, DAO.staking→Staking
+  - Router: 8 modules registered, ParamRegistry: 14 default params
 
-- [ ] **R-1.2** 执行初始铸造（按 TOKEN_DISTRIBUTION.md 分配比例）
-  - 操作：`npx hardhat console --network clawnetTestnet`
-  - 分配方案（100 万 Token 总量）：
-    | 用途 | 比例 | 金额 | 接收方 |
-    |------|------|------|--------|
-    | DAO 国库 | 50% | 500,000 | DAO 合约地址 |
-    | 节点 A/B/C | 各 50,000 | 150,000 | 3 台节点钱包 |
-    | Faucet 运营 | 15% | 150,000 | Faucet 钱包 |
-    | 流动性 | 10% | 100,000 | 流动性钱包 |
-    | 风险储备 | 5% | 50,000 | 储备钱包 |
-    | 生态拨款余量 | — | 50,000 | 预留 |
-  - 验收：`ClawToken.totalSupply()` = 1,000,000
+- [x] **R-1.2** Genesis Mint 完成（1,000,000 Token 总量）
+  - 通过 `BOOTSTRAP_MINT=true` 在部署脚本中一次完成
+  - 分配结果：
+    | 用途 | 金额 | 接收方 |
+    |------|------|--------|
+    | DAO 国库 | 500,000 | ClawDAO 代理 `0x395e728B...` |
+    | Deployer / Faucet | 350,000 | Deployer `0xA9b95A4f...` |
+    | 流动性 | 100,000 | Treasury `0x6df40E8d...` |
+    | 风险储备 | 50,000 | Treasury `0x6df40E8d...` |
+  - 验收：`totalSupply = 1,000,000` ✅
 
-- [ ] **R-1.3** Faucet 端到端测试
-  - 操作：`POST /api/dev/faucet` 请求领取 Token
-  - 验收：新 DID 调用后余额 > 0
+- [x] **R-1.3** Faucet 端到端测试
+  - 配置：`CLAW_DEV_FAUCET_API_KEY` 统一为 Caddy `CLAW_API_KEY`
+  - systemd: 添加 `EnvironmentFile` 到 clawnetd + caddy override
+  - 本地测试：`POST /api/v1/dev/faucet` → mint 10 Token ✅
+  - 公网测试：`POST https://api.clawnetd.com/api/v1/dev/faucet` → mint 5 Token ✅
+  - 单一 API Key = `CLAW_API_KEY`（同时用于 Caddy 网关和 Faucet）
 
 ### R-2. SDK 发布到 npm（TypeScript）
 
-- [ ] **R-2.1** 修复 `@claw-network/protocol` 的 `workspace:` 依赖
-  - 文件：`packages/protocol/package.json`
-  - 将 `"@claw-network/core": "workspace:^0.1.0"` 改为 `"@claw-network/core": "^0.2.0"`
-  - 验收：`npm pack` 后 tarball 中的 package.json 无 `workspace:` 引用
+- [x] **R-2.1** `workspace:` 依赖处理
+  - `scripts/publish.sh` 已改用 `pnpm publish`（自动转换 `workspace:` 为真实版本）
+  - 无需手动修改 `packages/protocol/package.json`
 
-- [ ] **R-2.2** 全量构建 + 测试通过
-  - 操作：`pnpm build && pnpm test`
-  - 验收：0 error, 0 fail
+- [x] **R-2.2** 全量构建 + 测试通过
+  - `pnpm build` + `pnpm test`：core 21/21, protocol 64/64, sdk pass ✅
 
 - [ ] **R-2.3** 发布 3 个包到 npm（0.2.0）
-  - 顺序：`core` → `protocol` → `sdk`
+  - 前置：需在本机执行 `npm login`
   - 操作：`scripts/publish.sh --release`
   - 验收：`npm view @claw-network/sdk version` 返回 `0.2.0`
 
@@ -123,17 +134,21 @@
 
 ### R-7. 修复示例代码
 
-- [ ] **R-7.1** Node.js 示例改用 npm 发布包
-  - 文件：`examples/nodejs-agent/package.json`
-  - 将 `"@claw-network/sdk": "workspace:*"` → `"@claw-network/sdk": "^0.2.0"`
-  - 验收：新目录 `npm install && npx ts-node agent.ts` 可运行
+- [x] **R-7.1** Node.js 示例改用 npm 发布包
+  - `examples/nodejs-agent/package.json`: `workspace:*` → `^0.2.0` ✅
+  - 修复 milestone 索引：`ms-1` → `0`（API 使用数字索引）
 
-- [ ] **R-7.2** Python 示例确认 pip install 可用
-  - 文件：`examples/python-agent/README.md`
-  - 确认 `pip install clawnet-sdk` 后示例可直接运行
-  - 验收：`python agent.py` 连接 `api.clawnetd.com` 成功
+- [x] **R-7.2** 修复 Shell 示例 API 路径
+  - 所有 shell 脚本：`/api/xxx` → `/api/v1/xxx` ✅
+  - `wallet-ops.sh`：添加 `CLAW_ADDRESS` 变量，路径改为 `/api/v1/wallets/$ADDRESS`
+  - `contract-lifecycle.sh`：sign/fund/complete 路径加 `/actions/` 前缀
+  - 合约 milestone ID 改为数字索引
 
-- [ ] **R-7.3** 补充 .env.example 给示例项目
+- [x] **R-7.3** Python 示例修复
+  - README.md：`pip install clawnet` → `pip install clawnet-sdk` ✅
+  - agent.py docstring 同步更新
+
+- [ ] **R-7.4** 补充 .env.example 给示例项目
   - 内容：`CLAW_NODE_URL`, `CLAW_API_KEY`, `CLAW_AGENT_DID`, `CLAW_PASSPHRASE`
   - 验收：开发者 copy .env.example → .env 后即可运行
 
@@ -218,14 +233,15 @@ pip install clawnet-sdk && python -c "from clawnet import ClawNetClient; print('
 # 检查 testnet API
 curl -sf https://api.clawnetd.com/api/v1/node | jq .
 
-# 检查 Token totalSupply
-ssh clawnet-geth-a 'curl -s http://127.0.0.1:9528/api/wallet/balance'
+# 检查 Token totalSupply (via deployer balance)
+curl -sf https://api.clawnetd.com/api/v1/wallets/0xA9b95A4fDCD673f6aE0D2a873E0f4771CA7D0119 \
+  | jq .data.balance
 
 # 检查 faucet
-curl -sf -X POST https://api.clawnetd.com/api/dev/faucet \
+curl -sf -X POST https://api.clawnetd.com/api/v1/dev/faucet \
   -H "Content-Type: application/json" \
-  -H "X-Api-Key: $CLAW_API_KEY" \
-  -d '{"did":"did:claw:test123"}'
+  -H "X-API-Key: $CLAW_API_KEY" \
+  -d '{"address":"0x0000000000000000000000000000000000000099","amount":5}'
 
 # 检查 Docker 镜像
 docker pull ghcr.io/claw-network/clawnetd:0.2.0

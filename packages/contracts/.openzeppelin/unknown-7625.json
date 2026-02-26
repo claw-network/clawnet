@@ -2,65 +2,55 @@
   "manifestVersion": "3.2",
   "proxies": [
     {
-      "address": "0xE1cf20376ef0372E26CEE715F84A15348bdbB5c6",
-      "txHash": "0xd0e59ac95e8b801ddef04eadc1f41b7adc82a3d86f387ab9884fe6201ff8fd86",
+      "address": "0xd9046ef83f8c910e4c828a1F8bEDDcD618fE3A73",
+      "txHash": "0xcc7b606b4677c9d0b6ea3255bdf7f33c1282d4a24f135e1a2aa1861fc932bbab",
       "kind": "uups"
     },
     {
-      "address": "0x08116e0598Cba600faa7D1f44ef493589B43d3bC",
-      "txHash": "0x92cd41a645c5ba7e04dc570e900644c8eee253937c025f7c963dfd001e664cc4",
+      "address": "0xe601130a0c3C3f8193616114768Ba2F429DB2D3B",
+      "txHash": "0xef2910d4e1091ed40644f9e1608e497a7117730f9d496a20e2e000ec3008a68b",
       "kind": "uups"
     },
     {
-      "address": "0x0e60c5EAf869fBDEbcE5cde4E52ddd195c1F1feD",
-      "txHash": "0xee684331a190cf513fc582c2d91b464e4fa17b80ad14556b038f443f89c859cf",
+      "address": "0xBCE2a925313ED06799156E64522E7B2735079be4",
+      "txHash": "0x526e1982a7b65e22a4f5e86b171a92c07fa54cea210d15abafdc4bb68b22c1ad",
       "kind": "uups"
     },
     {
-      "address": "0x55621841B74FAdbb0EDd5039bF3A239B458B32af",
-      "txHash": "0x7f31195300a83f64cb6d463c6c75f1b9b5caa210f80af4cb839ff23f8e20a75f",
+      "address": "0x42ac5e96EB43c1390e7BED6Fc7FcAfe1375972E9",
+      "txHash": "0xd94529148fd82f47459bb9eec3d729926c8d67506f4d588fd2f53aaf22d76802",
       "kind": "uups"
     },
     {
-      "address": "0xee9B2D7eb0CD51e1d0a14278bCA32b02548D1149",
-      "txHash": "0xf29587ee62f50fdcb4bba16466f0a19d46dbbf7f49a92d22641f9181bc46e7ea",
+      "address": "0x82e3d8777F07e21e979cb9b1e298EDA711CbA174",
+      "txHash": "0x58f6d0b54102e4478dc78e87e2e37dc63399763854e9810e3313e37f1d3838af",
       "kind": "uups"
     },
     {
-      "address": "0x6269D9358a8C4502fC8b629E8998Eb9C98961995",
-      "txHash": "0xf31f926043f9234668f7929933d01c344594c8137816d980a0dd91994821c85b",
+      "address": "0x2957Bd9b9643C032d96490C809082A15e4af7fc6",
+      "txHash": "0xec512655eba79f887764f1f222e76ba32d9b9b3969b9f01b4bb0bc571d2b7ffc",
       "kind": "uups"
     },
     {
-      "address": "0x9b28722bE8d488b31CF4cAd073De6ad52434b78c",
-      "txHash": "0x90faacfacfc8f7595dc9aace9497adc5a337d58a22790febbff1042b6f2b00c5",
+      "address": "0x395e728BB881F827B959b6f83928Af69461b109e",
+      "txHash": "0x7b1370c5e4a0184a94e26f6dd1718d1b75c8902843b4d7249dc7a76eff5e6fb7",
       "kind": "uups"
     },
     {
-      "address": "0x98f5280ceBEe1eD067A3Cb6729eaAF5ceb3f7Bd9",
-      "txHash": "0x3f27a46a66e293625551a808e2d30a6d7558c199a5497e9a72ec622beb04632b",
+      "address": "0x25836998927244a98218B8B33C42cfDF4849EcC8",
+      "txHash": "0x1435f3d3c7477ef469d26289bae01e1ab636d8d65c7c8e540bb88a4606446c3d",
       "kind": "uups"
     },
     {
-      "address": "0x7C558284776372A44C906E6f2c38cB83f23966A3",
-      "txHash": "0x0e253922028e8a279828bc4cb5a0a7ef2d5c0c556e9ebee530d499744db2bc24",
-      "kind": "uups"
-    },
-    {
-      "address": "0xb58187c2dca213e491110a9557234b3D3E097592",
-      "txHash": "0x79b702bebc0b798ae900ff3dce7695c8a6adcc977a35e6da561efae412d141df",
-      "kind": "uups"
-    },
-    {
-      "address": "0xC2acB9DFBc10c4F32417e179655b2664244a8dC6",
-      "txHash": "0xee11fd2ef4b7ffda73cc119e5c7404eba49486e46bb1795a70ff1581bdfa59d0",
+      "address": "0xC89C2324535Af64b3b11611fC321DB4a66145fEA",
+      "txHash": "0xf64f3460bd2ae6c4080e112dc744e3390958b89c6b593566408d5e967ad928cd",
       "kind": "uups"
     }
   ],
   "impls": {
-    "0d1015f11a3ddfbb13575a8a28eeafb39313dc8f63498e39ad8520701c36a842": {
-      "address": "0xC62870559b6765F3D49A8c35de3301687118edc7",
-      "txHash": "0x17d74dc0a211ac302f6968eccd8aaedd31fe7ca33d2a77e895804bf5bab202d3",
+    "2c06fd1c2a80dd00e1e023981225669f945b3299f32e1e07410935cf1177e87a": {
+      "address": "0xF9c35ae1A50c890aeED60C19C6838642278e27DF",
+      "txHash": "0xba58e626070f3c68e777f9c77470066446c82912bf58a002b4151feffcb1cc23",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [],
@@ -68,6 +58,10 @@
           "t_address": {
             "label": "address",
             "numberOfBytes": "20"
+          },
+          "t_array(t_struct(Checkpoint208)3645_storage)dyn_storage": {
+            "label": "struct Checkpoints.Checkpoint208[]",
+            "numberOfBytes": "32"
           },
           "t_bool": {
             "label": "bool",
@@ -77,12 +71,20 @@
             "label": "bytes32",
             "numberOfBytes": "32"
           },
+          "t_mapping(t_address,t_address)": {
+            "label": "mapping(address => address)",
+            "numberOfBytes": "32"
+          },
           "t_mapping(t_address,t_bool)": {
             "label": "mapping(address => bool)",
             "numberOfBytes": "32"
           },
           "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
             "label": "mapping(address => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(Trace208)3640_storage)": {
+            "label": "mapping(address => struct Checkpoints.Trace208)",
             "numberOfBytes": "32"
           },
           "t_mapping(t_address,t_uint256)": {
@@ -109,7 +111,55 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ERC20Storage)296_storage": {
+          "t_struct(Checkpoint208)3645_storage": {
+            "label": "struct Checkpoints.Checkpoint208",
+            "members": [
+              {
+                "label": "_key",
+                "type": "t_uint48",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_value",
+                "type": "t_uint208",
+                "offset": 6,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(EIP712Storage)975_storage": {
+            "label": "struct EIP712Upgradeable.EIP712Storage",
+            "members": [
+              {
+                "label": "_hashedName",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_hashedVersion",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_name",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "_version",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_struct(ERC20Storage)534_storage": {
             "label": "struct ERC20Upgradeable.ERC20Storage",
             "members": [
               {
@@ -145,7 +195,7 @@
             ],
             "numberOfBytes": "160"
           },
-          "t_struct(InitializableStorage)147_storage": {
+          "t_struct(InitializableStorage)385_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -163,7 +213,19 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)491_storage": {
+          "t_struct(NoncesStorage)794_storage": {
+            "label": "struct NoncesUpgradeable.NoncesStorage",
+            "members": [
+              {
+                "label": "_nonces",
+                "type": "t_mapping(t_address,t_uint256)",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(PausableStorage)848_storage": {
             "label": "struct PausableUpgradeable.PausableStorage",
             "members": [
               {
@@ -193,9 +255,53 @@
             ],
             "numberOfBytes": "64"
           },
+          "t_struct(Trace208)3640_storage": {
+            "label": "struct Checkpoints.Trace208",
+            "members": [
+              {
+                "label": "_checkpoints",
+                "type": "t_array(t_struct(Checkpoint208)3645_storage)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(VotesStorage)190_storage": {
+            "label": "struct VotesUpgradeable.VotesStorage",
+            "members": [
+              {
+                "label": "_delegatee",
+                "type": "t_mapping(t_address,t_address)",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_delegateCheckpoints",
+                "type": "t_mapping(t_address,t_struct(Trace208)3640_storage)",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "_totalCheckpoints",
+                "type": "t_struct(Trace208)3640_storage",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_uint208": {
+            "label": "uint208",
+            "numberOfBytes": "26"
+          },
           "t_uint256": {
             "label": "uint256",
             "numberOfBytes": "32"
+          },
+          "t_uint48": {
+            "label": "uint48",
+            "numberOfBytes": "6"
           },
           "t_uint64": {
             "label": "uint64",
@@ -221,6 +327,76 @@
               "src": "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol:62",
               "offset": 0,
               "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Votes": [
+            {
+              "contract": "VotesUpgradeable",
+              "label": "_delegatee",
+              "type": "t_mapping(t_address,t_address)",
+              "src": "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol:41",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "VotesUpgradeable",
+              "label": "_delegateCheckpoints",
+              "type": "t_mapping(t_address,t_struct(Trace208)3640_storage)",
+              "src": "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol:43",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "VotesUpgradeable",
+              "label": "_totalCheckpoints",
+              "type": "t_struct(Trace208)3640_storage",
+              "src": "@openzeppelin/contracts-upgradeable/governance/utils/VotesUpgradeable.sol:45",
+              "offset": 0,
+              "slot": "2"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Nonces": [
+            {
+              "contract": "NoncesUpgradeable",
+              "label": "_nonces",
+              "type": "t_mapping(t_address,t_uint256)",
+              "src": "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol:17",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.EIP712": [
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_hashedName",
+              "type": "t_bytes32",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:38",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_hashedVersion",
+              "type": "t_bytes32",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:40",
+              "offset": 0,
+              "slot": "1"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_name",
+              "type": "t_string_storage",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:42",
+              "offset": 0,
+              "slot": "2"
+            },
+            {
+              "contract": "EIP712Upgradeable",
+              "label": "_version",
+              "type": "t_string_storage",
+              "src": "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol:43",
+              "offset": 0,
+              "slot": "3"
             }
           ],
           "erc7201:openzeppelin.storage.ERC20": [
@@ -286,9 +462,9 @@
         }
       }
     },
-    "009423bac4ca4d0d52cae75068780bd25a1a2f94eab8c32d8da35e12e0e88c56": {
-      "address": "0x1B5B16b7D52Eb81888A0d551f14E84541B2aa775",
-      "txHash": "0xfed1b91d9a6619010f4e0b108bd2472dd8a3de2c1ba44f98bb92fe986988f57b",
+    "3237eeba7efd0ceface48f606789aecb6e5ea27c817656e932589524868c446a": {
+      "address": "0xe5b136ADF71C678e205dcC1Df90F708e46182c8C",
+      "txHash": "0x66c9d2fcfadec370ecfc7ccbe3a011250b3c8b45858220cb18466853cf8c829b",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [
@@ -439,9 +615,9 @@
         }
       }
     },
-    "6f949c6e89994e8de5c2afbce781f9b88e4f057a447251fa789ad69ff752c10a": {
-      "address": "0x850ad83Ba409adF87dF8538f96a470151C4518f6",
-      "txHash": "0x94669132953bccef54cebbe8aeb3b3c76b249b7d5fdb1b1fe4160f1e6476fb13",
+    "5ef65668097884da55e1df5a503e8e17372ebba978835cdeb35bbc6399dfb2cc": {
+      "address": "0x983e10b6CB6A005a104C2Def39465B747AeFA527",
+      "txHash": "0x25f3f7cf49dde67efc674f56163cb61cf87aea068003c684ffba0be74682ebd9",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [
@@ -449,9 +625,9 @@
             "label": "token",
             "offset": 0,
             "slot": "0",
-            "type": "t_contract(IERC20)2529",
+            "type": "t_contract(IERC20)1858",
             "contract": "ClawEscrow",
-            "src": "contracts/ClawEscrow.sol:68"
+            "src": "contracts/ClawEscrow.sol:69"
           },
           {
             "label": "treasury",
@@ -459,7 +635,7 @@
             "slot": "1",
             "type": "t_address",
             "contract": "ClawEscrow",
-            "src": "contracts/ClawEscrow.sol:68"
+            "src": "contracts/ClawEscrow.sol:69"
           },
           {
             "label": "baseRate",
@@ -467,7 +643,7 @@
             "slot": "2",
             "type": "t_uint256",
             "contract": "ClawEscrow",
-            "src": "contracts/ClawEscrow.sol:74"
+            "src": "contracts/ClawEscrow.sol:75"
           },
           {
             "label": "holdingRate",
@@ -475,7 +651,7 @@
             "slot": "3",
             "type": "t_uint256",
             "contract": "ClawEscrow",
-            "src": "contracts/ClawEscrow.sol:76"
+            "src": "contracts/ClawEscrow.sol:77"
           },
           {
             "label": "minEscrowFee",
@@ -483,23 +659,23 @@
             "slot": "4",
             "type": "t_uint256",
             "contract": "ClawEscrow",
-            "src": "contracts/ClawEscrow.sol:77"
+            "src": "contracts/ClawEscrow.sol:78"
           },
           {
             "label": "paramRegistry",
             "offset": 0,
             "slot": "5",
-            "type": "t_contract(ParamRegistry)13866",
+            "type": "t_contract(ParamRegistry)8087",
             "contract": "ClawEscrow",
-            "src": "contracts/ClawEscrow.sol:85"
+            "src": "contracts/ClawEscrow.sol:86"
           },
           {
             "label": "escrows",
             "offset": 0,
             "slot": "6",
-            "type": "t_mapping(t_bytes32,t_struct(EscrowRecord)8754_storage)",
+            "type": "t_mapping(t_bytes32,t_struct(EscrowRecord)5219_storage)",
             "contract": "ClawEscrow",
-            "src": "contracts/ClawEscrow.sol:86"
+            "src": "contracts/ClawEscrow.sol:87"
           }
         ],
         "types": {
@@ -553,7 +729,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)491_storage": {
+          "t_struct(PausableStorage)298_storage": {
             "label": "struct PausableUpgradeable.PausableStorage",
             "members": [
               {
@@ -565,7 +741,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)555_storage": {
+          "t_struct(ReentrancyGuardStorage)362_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -603,15 +779,15 @@
             "label": "uint64",
             "numberOfBytes": "8"
           },
-          "t_contract(IERC20)2529": {
+          "t_contract(IERC20)1858": {
             "label": "contract IERC20",
             "numberOfBytes": "20"
           },
-          "t_contract(ParamRegistry)13866": {
+          "t_contract(ParamRegistry)8087": {
             "label": "contract ParamRegistry",
             "numberOfBytes": "20"
           },
-          "t_enum(EscrowStatus)8738": {
+          "t_enum(EscrowStatus)5201": {
             "label": "enum ClawEscrow.EscrowStatus",
             "members": [
               "Active",
@@ -622,11 +798,11 @@
             ],
             "numberOfBytes": "1"
           },
-          "t_mapping(t_bytes32,t_struct(EscrowRecord)8754_storage)": {
+          "t_mapping(t_bytes32,t_struct(EscrowRecord)5219_storage)": {
             "label": "mapping(bytes32 => struct ClawEscrow.EscrowRecord)",
             "numberOfBytes": "32"
           },
-          "t_struct(EscrowRecord)8754_storage": {
+          "t_struct(EscrowRecord)5219_storage": {
             "label": "struct ClawEscrow.EscrowRecord",
             "members": [
               {
@@ -667,8 +843,14 @@
               },
               {
                 "label": "status",
-                "type": "t_enum(EscrowStatus)8738",
+                "type": "t_enum(EscrowStatus)5201",
                 "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "disputeOpenedAt",
+                "type": "t_uint64",
+                "offset": 1,
                 "slot": "6"
               }
             ],
@@ -727,9 +909,9 @@
         }
       }
     },
-    "7a89f14cbe06f6228a1d0a62922d1a28155ca7b0d01da0855ef68194e5447ca3": {
-      "address": "0xb3C0C9d2ee2054BB9906778EE0660C0cb429B4d7",
-      "txHash": "0x24f9c4936ae4cf35c0042aa9cf20e6b508fc3b282a881af5c0fd610ffad68aef",
+    "9265abab6a3bfaa72f946bc77760ace26f0bd4611c8cbeb7f8a36885551f9451": {
+      "address": "0xEd6466b9702e022fbf41606186A1b41260F0840C",
+      "txHash": "0x0fc67f9ad1af8fd71b260f3fab5d4119456b89e28770775b6b40394cb09a7e03",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [
@@ -737,17 +919,17 @@
             "label": "dids",
             "offset": 0,
             "slot": "0",
-            "type": "t_mapping(t_bytes32,t_struct(DIDRecord)9895_storage)",
+            "type": "t_mapping(t_bytes32,t_struct(DIDRecord)15867_storage)",
             "contract": "ClawIdentity",
-            "src": "contracts/ClawIdentity.sol:71"
+            "src": "contracts/ClawIdentity.sol:72"
           },
           {
             "label": "keys",
             "offset": 0,
             "slot": "1",
-            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_struct(KeyRecord)9905_storage))",
+            "type": "t_mapping(t_bytes32,t_mapping(t_bytes32,t_struct(KeyRecord)15877_storage))",
             "contract": "ClawIdentity",
-            "src": "contracts/ClawIdentity.sol:72"
+            "src": "contracts/ClawIdentity.sol:73"
           },
           {
             "label": "platformLinks",
@@ -755,7 +937,7 @@
             "slot": "2",
             "type": "t_mapping(t_bytes32,t_array(t_bytes32)dyn_storage)",
             "contract": "ClawIdentity",
-            "src": "contracts/ClawIdentity.sol:74"
+            "src": "contracts/ClawIdentity.sol:75"
           },
           {
             "label": "didCount",
@@ -763,7 +945,7 @@
             "slot": "3",
             "type": "t_uint256",
             "contract": "ClawIdentity",
-            "src": "contracts/ClawIdentity.sol:76"
+            "src": "contracts/ClawIdentity.sol:77"
           }
         ],
         "types": {
@@ -799,7 +981,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(InitializableStorage)147_storage": {
+          "t_struct(InitializableStorage)385_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {
@@ -817,7 +999,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)491_storage": {
+          "t_struct(PausableStorage)848_storage": {
             "label": "struct PausableUpgradeable.PausableStorage",
             "members": [
               {
@@ -859,7 +1041,7 @@
             "label": "bytes",
             "numberOfBytes": "32"
           },
-          "t_enum(KeyPurpose)9882": {
+          "t_enum(KeyPurpose)15854": {
             "label": "enum ClawIdentity.KeyPurpose",
             "members": [
               "Authentication",
@@ -873,19 +1055,19 @@
             "label": "mapping(bytes32 => bytes32[])",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_mapping(t_bytes32,t_struct(KeyRecord)9905_storage))": {
+          "t_mapping(t_bytes32,t_mapping(t_bytes32,t_struct(KeyRecord)15877_storage))": {
             "label": "mapping(bytes32 => mapping(bytes32 => struct ClawIdentity.KeyRecord))",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(DIDRecord)9895_storage)": {
+          "t_mapping(t_bytes32,t_struct(DIDRecord)15867_storage)": {
             "label": "mapping(bytes32 => struct ClawIdentity.DIDRecord)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(KeyRecord)9905_storage)": {
+          "t_mapping(t_bytes32,t_struct(KeyRecord)15877_storage)": {
             "label": "mapping(bytes32 => struct ClawIdentity.KeyRecord)",
             "numberOfBytes": "32"
           },
-          "t_struct(DIDRecord)9895_storage": {
+          "t_struct(DIDRecord)15867_storage": {
             "label": "struct ClawIdentity.DIDRecord",
             "members": [
               {
@@ -927,7 +1109,7 @@
             ],
             "numberOfBytes": "128"
           },
-          "t_struct(KeyRecord)9905_storage": {
+          "t_struct(KeyRecord)15877_storage": {
             "label": "struct ClawIdentity.KeyRecord",
             "members": [
               {
@@ -950,7 +1132,7 @@
               },
               {
                 "label": "purpose",
-                "type": "t_enum(KeyPurpose)9882",
+                "type": "t_enum(KeyPurpose)15854",
                 "offset": 16,
                 "slot": "1"
               }
@@ -1004,9 +1186,9 @@
         }
       }
     },
-    "a251a444e50ab3ec78720986f80bce504a8424fe36558d07d55da2febc1a6741": {
-      "address": "0xD8E08fF5Cf05E70E4D4421CCCbD6Fe411439Ecdf",
-      "txHash": "0x8ecfe6fe5f91cf22ed3eb645bad35a786b39768bfa3dc00d97df8737ac46ee86",
+    "105ed9857d4e3465cc15af15916ad0ce0a588b3f02e70c48b5d73e2dd95255e5": {
+      "address": "0x35345F9b8122af532C2515BE9Df65878b63aC93d",
+      "txHash": "0x502feece1a04933c672ab7eae1078ae227fc393366ed5ba146b45c11d1ee6658",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [
@@ -1014,7 +1196,7 @@
             "label": "token",
             "offset": 0,
             "slot": "0",
-            "type": "t_contract(IERC20)2529",
+            "type": "t_contract(IERC20)1858",
             "contract": "ClawStaking",
             "src": "contracts/ClawStaking.sol:71"
           },
@@ -1054,7 +1236,7 @@
             "label": "paramRegistry",
             "offset": 0,
             "slot": "5",
-            "type": "t_contract(ParamRegistry)13866",
+            "type": "t_contract(ParamRegistry)8087",
             "contract": "ClawStaking",
             "src": "contracts/ClawStaking.sol:84"
           },
@@ -1062,7 +1244,7 @@
             "label": "stakes",
             "offset": 0,
             "slot": "6",
-            "type": "t_mapping(t_address,t_struct(StakeInfo)12286_storage)",
+            "type": "t_mapping(t_address,t_struct(StakeInfo)6533_storage)",
             "contract": "ClawStaking",
             "src": "contracts/ClawStaking.sol:85"
           },
@@ -1134,7 +1316,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)491_storage": {
+          "t_struct(PausableStorage)298_storage": {
             "label": "struct PausableUpgradeable.PausableStorage",
             "members": [
               {
@@ -1146,7 +1328,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)555_storage": {
+          "t_struct(ReentrancyGuardStorage)362_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -1188,15 +1370,15 @@
             "label": "address[]",
             "numberOfBytes": "32"
           },
-          "t_contract(IERC20)2529": {
+          "t_contract(IERC20)1858": {
             "label": "contract IERC20",
             "numberOfBytes": "20"
           },
-          "t_contract(ParamRegistry)13866": {
+          "t_contract(ParamRegistry)8087": {
             "label": "contract ParamRegistry",
             "numberOfBytes": "20"
           },
-          "t_enum(NodeType)12270": {
+          "t_enum(NodeType)6517": {
             "label": "enum ClawStaking.NodeType",
             "members": [
               "Validator",
@@ -1207,7 +1389,7 @@
             ],
             "numberOfBytes": "1"
           },
-          "t_mapping(t_address,t_struct(StakeInfo)12286_storage)": {
+          "t_mapping(t_address,t_struct(StakeInfo)6533_storage)": {
             "label": "mapping(address => struct ClawStaking.StakeInfo)",
             "numberOfBytes": "32"
           },
@@ -1215,7 +1397,7 @@
             "label": "mapping(address => uint256)",
             "numberOfBytes": "32"
           },
-          "t_struct(StakeInfo)12286_storage": {
+          "t_struct(StakeInfo)6533_storage": {
             "label": "struct ClawStaking.StakeInfo",
             "members": [
               {
@@ -1250,7 +1432,7 @@
               },
               {
                 "label": "nodeType",
-                "type": "t_enum(NodeType)12270",
+                "type": "t_enum(NodeType)6517",
                 "offset": 0,
                 "slot": "4"
               },
@@ -1317,8 +1499,8 @@
       }
     },
     "8adb050e161dfb831241493e604ce80321df7859c697dcfc3966e90a0c72fdfe": {
-      "address": "0x77a7631615772307b45868F82346425E2230a25d",
-      "txHash": "0x6e996fe47762f4bbfb6af7461d3345f2501c457fe615d6e8bc3324660338c44c",
+      "address": "0xfB675931739C4fd25dc517e75D34696172Dd3389",
+      "txHash": "0x0c11ff3f985974b93f619d72bb17f3bf815dd39d5fedac52b9137330be3e0c6b",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [
@@ -1637,9 +1819,9 @@
         }
       }
     },
-    "55241db5c75e3de9eeae1871cf9630b9d05e0c8187b7ed5381112a25a375192e": {
-      "address": "0x606579c8EA86D895fCdc7b8A108FC90Acd3Ec147",
-      "txHash": "0x4bf55a6df0f68050ad8777892cd8f18e5193ca2700da2e3defeeb106b1e91b3e",
+    "89b7111859fbf9840e04e71ece4b58639f2d22b38af7a34eff15238b2f34a2a9": {
+      "address": "0xC56FCe3da16c31A84A3Ec117A75745B163068AfF",
+      "txHash": "0xdbf838085f3ae43f3d880641a9d858965db51c25ee0a1a990f324138a4aea2ba",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [
@@ -1647,17 +1829,17 @@
             "label": "token",
             "offset": 0,
             "slot": "0",
-            "type": "t_contract(IERC20)2529",
+            "type": "t_contract(IERC20)1858",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:115"
+            "src": "contracts/ClawDAO.sol:117"
           },
           {
             "label": "paramRegistry",
             "offset": 0,
             "slot": "1",
-            "type": "t_contract(ParamRegistry)13866",
+            "type": "t_contract(ParamRegistry)8087",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:116"
+            "src": "contracts/ClawDAO.sol:118"
           },
           {
             "label": "reputationContract",
@@ -1665,7 +1847,7 @@
             "slot": "2",
             "type": "t_address",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:116"
+            "src": "contracts/ClawDAO.sol:118"
           },
           {
             "label": "stakingContract",
@@ -1673,7 +1855,7 @@
             "slot": "3",
             "type": "t_address",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:118"
+            "src": "contracts/ClawDAO.sol:120"
           },
           {
             "label": "proposalCount",
@@ -1681,31 +1863,31 @@
             "slot": "4",
             "type": "t_uint256",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:119"
+            "src": "contracts/ClawDAO.sol:121"
           },
           {
             "label": "_cores",
             "offset": 0,
             "slot": "5",
-            "type": "t_mapping(t_uint256,t_struct(ProposalCore)6443_storage)",
+            "type": "t_mapping(t_uint256,t_struct(ProposalCore)2798_storage)",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:120"
+            "src": "contracts/ClawDAO.sol:122"
           },
           {
             "label": "_timelines",
             "offset": 0,
             "slot": "6",
-            "type": "t_mapping(t_uint256,t_struct(ProposalTimeline)6452_storage)",
+            "type": "t_mapping(t_uint256,t_struct(ProposalTimeline)2807_storage)",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:122"
+            "src": "contracts/ClawDAO.sol:124"
           },
           {
             "label": "_votes",
             "offset": 0,
             "slot": "7",
-            "type": "t_mapping(t_uint256,t_struct(ProposalVotes)6459_storage)",
+            "type": "t_mapping(t_uint256,t_struct(ProposalVotes)2814_storage)",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:125"
+            "src": "contracts/ClawDAO.sol:127"
           },
           {
             "label": "_callDatas",
@@ -1713,13 +1895,13 @@
             "slot": "8",
             "type": "t_mapping(t_uint256,t_bytes_storage)",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:126"
+            "src": "contracts/ClawDAO.sol:128"
           },
           {
             "label": "receipts",
             "offset": 0,
             "slot": "9",
-            "type": "t_mapping(t_uint256,t_mapping(t_address,t_struct(Receipt)6498_storage))",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_struct(Receipt)2853_storage))",
             "contract": "ClawDAO",
             "src": "contracts/ClawDAO.sol:129"
           },
@@ -1729,7 +1911,7 @@
             "slot": "10",
             "type": "t_uint256",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:131"
+            "src": "contracts/ClawDAO.sol:133"
           },
           {
             "label": "discussionPeriod",
@@ -1737,7 +1919,7 @@
             "slot": "11",
             "type": "t_uint64",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:131"
+            "src": "contracts/ClawDAO.sol:133"
           },
           {
             "label": "votingPeriod",
@@ -1745,7 +1927,7 @@
             "slot": "11",
             "type": "t_uint64",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:131"
+            "src": "contracts/ClawDAO.sol:133"
           },
           {
             "label": "timelockDelay",
@@ -1753,7 +1935,7 @@
             "slot": "11",
             "type": "t_uint64",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:131"
+            "src": "contracts/ClawDAO.sol:133"
           },
           {
             "label": "quorumBps",
@@ -1761,7 +1943,7 @@
             "slot": "12",
             "type": "t_uint256",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:132"
+            "src": "contracts/ClawDAO.sol:134"
           },
           {
             "label": "emergencySigners",
@@ -1769,7 +1951,7 @@
             "slot": "13",
             "type": "t_array(t_address)9_storage",
             "contract": "ClawDAO",
-            "src": "contracts/ClawDAO.sol:132"
+            "src": "contracts/ClawDAO.sol:134"
           }
         ],
         "types": {
@@ -1823,7 +2005,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(PausableStorage)491_storage": {
+          "t_struct(PausableStorage)298_storage": {
             "label": "struct PausableUpgradeable.PausableStorage",
             "members": [
               {
@@ -1835,7 +2017,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ReentrancyGuardStorage)555_storage": {
+          "t_struct(ReentrancyGuardStorage)362_storage": {
             "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
             "members": [
               {
@@ -1881,15 +2063,15 @@
             "label": "bytes",
             "numberOfBytes": "32"
           },
-          "t_contract(IERC20)2529": {
+          "t_contract(IERC20)1858": {
             "label": "contract IERC20",
             "numberOfBytes": "20"
           },
-          "t_contract(ParamRegistry)13866": {
+          "t_contract(ParamRegistry)8087": {
             "label": "contract ParamRegistry",
             "numberOfBytes": "20"
           },
-          "t_enum(ProposalStatus)6428": {
+          "t_enum(ProposalStatus)2783": {
             "label": "enum ClawDAO.ProposalStatus",
             "members": [
               "Discussion",
@@ -1903,7 +2085,7 @@
             ],
             "numberOfBytes": "1"
           },
-          "t_enum(ProposalType)6419": {
+          "t_enum(ProposalType)2774": {
             "label": "enum ClawDAO.ProposalType",
             "members": [
               "ParameterChange",
@@ -1914,7 +2096,7 @@
             ],
             "numberOfBytes": "1"
           },
-          "t_mapping(t_address,t_struct(Receipt)6498_storage)": {
+          "t_mapping(t_address,t_struct(Receipt)2853_storage)": {
             "label": "mapping(address => struct ClawDAO.Receipt)",
             "numberOfBytes": "32"
           },
@@ -1922,23 +2104,23 @@
             "label": "mapping(uint256 => bytes)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_mapping(t_address,t_struct(Receipt)6498_storage))": {
+          "t_mapping(t_uint256,t_mapping(t_address,t_struct(Receipt)2853_storage))": {
             "label": "mapping(uint256 => mapping(address => struct ClawDAO.Receipt))",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(ProposalCore)6443_storage)": {
+          "t_mapping(t_uint256,t_struct(ProposalCore)2798_storage)": {
             "label": "mapping(uint256 => struct ClawDAO.ProposalCore)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(ProposalTimeline)6452_storage)": {
+          "t_mapping(t_uint256,t_struct(ProposalTimeline)2807_storage)": {
             "label": "mapping(uint256 => struct ClawDAO.ProposalTimeline)",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_uint256,t_struct(ProposalVotes)6459_storage)": {
+          "t_mapping(t_uint256,t_struct(ProposalVotes)2814_storage)": {
             "label": "mapping(uint256 => struct ClawDAO.ProposalVotes)",
             "numberOfBytes": "32"
           },
-          "t_struct(ProposalCore)6443_storage": {
+          "t_struct(ProposalCore)2798_storage": {
             "label": "struct ClawDAO.ProposalCore",
             "members": [
               {
@@ -1949,13 +2131,13 @@
               },
               {
                 "label": "pType",
-                "type": "t_enum(ProposalType)6419",
+                "type": "t_enum(ProposalType)2774",
                 "offset": 20,
                 "slot": "0"
               },
               {
                 "label": "status",
-                "type": "t_enum(ProposalStatus)6428",
+                "type": "t_enum(ProposalStatus)2783",
                 "offset": 21,
                 "slot": "0"
               },
@@ -1980,7 +2162,7 @@
             ],
             "numberOfBytes": "128"
           },
-          "t_struct(ProposalTimeline)6452_storage": {
+          "t_struct(ProposalTimeline)2807_storage": {
             "label": "struct ClawDAO.ProposalTimeline",
             "members": [
               {
@@ -2010,7 +2192,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(ProposalVotes)6459_storage": {
+          "t_struct(ProposalVotes)2814_storage": {
             "label": "struct ClawDAO.ProposalVotes",
             "members": [
               {
@@ -2034,7 +2216,7 @@
             ],
             "numberOfBytes": "96"
           },
-          "t_struct(Receipt)6498_storage": {
+          "t_struct(Receipt)2853_storage": {
             "label": "struct ClawDAO.Receipt",
             "members": [
               {
@@ -2116,8 +2298,8 @@
       }
     },
     "320c98510c0ae7da8d0873a07014b8eae71a4b8b5d222209dc2423777e10d3e4": {
-      "address": "0x8992Ee0e3Ce8381c662DE2f5e0a4a4CDE34216ad",
-      "txHash": "0x0d66861c497ba35579b101516fc50160fbdef5180205ae76284faf4d34d50b20",
+      "address": "0xDF87D214ad6d4e564c090C0fc3135F772a33eCAC",
+      "txHash": "0x0ad1b970c66d3adce81d23e9cca256600abda59d6c4cf9920870dd8bb6d0e661",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [
@@ -2473,9 +2655,9 @@
         }
       }
     },
-    "2ea612abe374e42bcde3b1ef8a557136d24301f1d8ec1fd21d59b059f5492c11": {
-      "address": "0x9a440AEfc7156478c3C912c38c012d01355d293E",
-      "txHash": "0x79b5c67c380ab5361087686da798ffdca29c404356d080c80af65115594c45a3",
+    "804e3946eeec09ed9ae3a628b6578057a8aef093007f04d5ad11af2225d18f52": {
+      "address": "0x7EaB3423a72B7085bbEACD6111786FdeAFFfE436",
+      "txHash": "0xc3d894ac6ecd04571a483f6bf3e8387ce6dc546890f7419ba98d6cce41f4a574",
       "layout": {
         "solcVersion": "0.8.28",
         "storage": [
@@ -2485,7 +2667,7 @@
             "slot": "0",
             "type": "t_mapping(t_bytes32,t_address)",
             "contract": "ClawRouter",
-            "src": "contracts/ClawRouter.sol:44"
+            "src": "contracts/ClawRouter.sol:46"
           },
           {
             "label": "moduleKeys",
@@ -2493,7 +2675,7 @@
             "slot": "1",
             "type": "t_array(t_bytes32)dyn_storage",
             "contract": "ClawRouter",
-            "src": "contracts/ClawRouter.sol:47"
+            "src": "contracts/ClawRouter.sol:49"
           },
           {
             "label": "keyRegistered",
@@ -2501,7 +2683,7 @@
             "slot": "2",
             "type": "t_mapping(t_bytes32,t_bool)",
             "contract": "ClawRouter",
-            "src": "contracts/ClawRouter.sol:49"
+            "src": "contracts/ClawRouter.sol:51"
           }
         ],
         "types": {
@@ -2537,7 +2719,7 @@
             ],
             "numberOfBytes": "32"
           },
-          "t_struct(InitializableStorage)147_storage": {
+          "t_struct(InitializableStorage)385_storage": {
             "label": "struct Initializable.InitializableStorage",
             "members": [
               {

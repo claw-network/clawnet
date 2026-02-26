@@ -134,14 +134,14 @@ async function main() {
     },
     milestones: [
       {
-        id: 'ms-1',
+        id: '0',
         title: 'Data Cleaning',
         amount: 20,
         percentage: 40,
         deliverables: ['cleaned-data.csv'],
       },
       {
-        id: 'ms-2',
+        id: '1',
         title: 'Analysis Report',
         amount: 30,
         percentage: 60,
@@ -152,10 +152,10 @@ async function main() {
   log('contracts', `Contract created — contractId=${contract.contractId}`);
 
   // ── Step 8: Submit first milestone ───────────────────────────────────
-  log('contracts', 'Submitting milestone ms-1 …');
+  log('contracts', 'Submitting milestone 0 (Data Cleaning) …');
   const msResult = await client.contracts.submitMilestone(
     contract.contractId,
-    'ms-1',
+    '0',
     {
       did: AGENT_DID,
       passphrase: PASSPHRASE,

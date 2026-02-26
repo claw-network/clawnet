@@ -14,18 +14,19 @@ set -euo pipefail
 BASE="${CLAW_NODE_URL:-http://127.0.0.1:9528}"
 DID="${CLAW_DID:?Set CLAW_DID to your agent DID}"
 PASS="${CLAW_PASSPHRASE:?Set CLAW_PASSPHRASE}"
+ADDRESS="${CLAW_ADDRESS:?Set CLAW_ADDRESS to your wallet address}"
 NONCE="${CLAW_NONCE:-1}"
 
 # ── Check balance ───────────────────────────────────────────
 echo "=== Wallet Balance ==="
-curl -s "$BASE/api/wallet/balance" | jq .
+curl -s "$BASE/api/v1/wallets/$ADDRESS" | jq .
 
 # ── Transfer tokens ─────────────────────────────────────────
 echo ""
 echo "=== Transfer 10 Tokens ==="
 RECIPIENT="${CLAW_RECIPIENT:-did:claw:z6MkRecipient}"
 
-curl -s -X POST "$BASE/api/wallet/transfer" \
+curl -s -X POST "$BASE/api/v1/transfers" \
   -H "Content-Type: application/json" \
   -d "{
     \"did\": \"$DID\",
@@ -39,14 +40,14 @@ curl -s -X POST "$BASE/api/wallet/transfer" \
 # ── Transaction history ─────────────────────────────────────
 echo ""
 echo "=== Recent Transactions ==="
-curl -s "$BASE/api/wallet/history?limit=5" | jq .
+curl -s "$BASE/api/v1/wallets/$ADDRESS/transactions?limit=5" | jq .
 
 # ── Create escrow ───────────────────────────────────────────
 echo ""
 echo "=== Create Escrow ==="
 NONCE=$((NONCE + 1))
 
-curl -s -X POST "$BASE/api/wallet/escrow" \
+curl -s -X POST "$BASE/api/v1/escrows" \
   -H "Content-Type: application/json" \
   -d "{
     \"did\": \"$DID\",

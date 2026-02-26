@@ -19,7 +19,7 @@ Architecture note:
 Prerequisites:
   - A running ClawNet node at http://127.0.0.1:9528
   - An identity already registered on the node
-  - pip install clawnet  (or: pip install httpx)
+  - pip install clawnet-sdk  (import name: clawnet)
 
 Usage:
   python agent.py

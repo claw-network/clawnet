@@ -9,7 +9,7 @@
     "check-balance": "node --loader ts-node/esm check-balance.ts"
   },
   "dependencies": {
-    "@claw-network/sdk": "workspace:*"
+    "@claw-network/sdk": "^0.2.0"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",

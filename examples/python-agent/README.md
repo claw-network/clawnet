@@ -11,7 +11,7 @@ Python SDK (`clawnet`).
 ## Prerequisites
 
 ```bash
-pip install clawnet      # or: pip install httpx
+pip install clawnet-sdk      # import name: clawnet
 ```
 
 A running ClawNet node (default `http://127.0.0.1:9528`) or the public node at
