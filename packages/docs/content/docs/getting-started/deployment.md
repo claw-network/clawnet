@@ -197,6 +197,7 @@ For **systemd** services, add it to the unit file:
 ```ini
 [Service]
 Environment=CLAW_PASSPHRASE=my-secure-passphrase
+Environment=CLAW_PRIVATE_KEY=0x...   # Required for on-chain interaction (EventIndexer)
 ```
 
 For **Docker**, pass it as an environment variable:
@@ -235,6 +236,40 @@ Enforced rules:
 | `--listen <multiaddr>`    | Auto     | libp2p listen address (repeatable)   |
 | `--bootstrap <multiaddr>` | Built-in | Bootstrap peer (repeatable)          |
 | `--health-interval-ms`    | `30000`  | Health check interval (0 to disable) |
+
+### On-Chain Configuration (EventIndexer)
+
+To enable on-chain event indexing, add a `chain:` section to `config.yaml`:
+
+```yaml
+chain:
+  rpcUrl: http://127.0.0.1:8545
+  chainId: 7625
+  contracts:
+    token: '0x...'
+    escrow: '0x...'
+    identity: '0x...'
+    reputation: '0x...'
+    contracts: '0x...'
+    dao: '0x...'
+    staking: '0x...'
+    paramRegistry: '0x...'
+  signer:
+    type: env
+    envVar: CLAW_PRIVATE_KEY
+  artifactsDir: /opt/clawnet/packages/contracts/artifacts
+```
+
+The `CLAW_PRIVATE_KEY` environment variable must be set (with `0x` prefix). For **systemd**, add:
+
+```ini
+Environment=CLAW_PRIVATE_KEY=0x...
+```
+
+When configured, `clawnetd` will:
+- Create `indexer.sqlite` in the data directory
+- Poll the chain for contract events (every 5 s, batch 2 000 blocks)
+- Materialize events into queryable tables: `wallet_transfers`, `escrows`, `service_contracts`, `proposals`, `votes`, `reviews`, etc.
 
 Example:
 

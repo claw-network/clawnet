@@ -20,6 +20,7 @@ services:
     environment:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
+      # - CLAW_PRIVATE_KEY=        # Required for on-chain interaction (EventIndexer)
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/node/status"]

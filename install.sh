@@ -250,6 +250,7 @@ Environment=NODE_ENV=production
 Environment=CLAW_DATA_DIR=${DATA_DIR}
 Environment=CLAW_PASSPHRASE=${PASSPHRASE}
 Environment=CLAW_API_KEY=${API_KEY}
+Environment=CLAW_PRIVATE_KEY=\${CLAW_PRIVATE_KEY}
 LimitNOFILE=65536
 
 [Install]

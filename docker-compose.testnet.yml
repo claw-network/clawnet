@@ -31,6 +31,7 @@ services:
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
       - CLAW_PASSPHRASE=testnet-dev-passphrase
+      - CLAW_PRIVATE_KEY=${CLAW_PRIVATE_KEY:-}
       - NODE_ENV=development
     command: >
       node packages/node/dist/daemon.js
@@ -64,6 +65,7 @@ services:
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
       - CLAW_PASSPHRASE=testnet-dev-passphrase
+      - CLAW_PRIVATE_KEY=${CLAW_PRIVATE_KEY:-}
       - NODE_ENV=development
     command: >
       entrypoint-peer.sh
@@ -101,6 +103,7 @@ services:
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
       - CLAW_PASSPHRASE=testnet-dev-passphrase
+      - CLAW_PRIVATE_KEY=${CLAW_PRIVATE_KEY:-}
       - NODE_ENV=development
     command: >
       entrypoint-peer.sh

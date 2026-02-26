@@ -10,11 +10,13 @@
 # This script:
 #   1. Updates system packages
 #   2. Installs Docker Engine + Docker Compose
-#   3. Creates data directories
+#   3. Creates data directories (chain + clawnetd)
 #   4. Configures firewall (UFW)
 #   5. Applies kernel tuning for P2P networking
 #   6. Creates clawnet system user
-#   7. Installs Foundry (cast) for chain interaction
+#   7. Installs Node.js 20 + pnpm (for clawnetd)
+#   8. Installs sqlite3 (for EventIndexer inspection)
+#   9. Installs Foundry (cast) for chain interaction
 # ==============================================================================
 
 set -euo pipefail
@@ -38,7 +40,7 @@ info "OS: $(cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"')"
 echo ""
 
 # ── Step 1: System Update ────────────────────────────────────────────────────
-info "Step 1/7: Updating system packages..."
+info "Step 1/9: Updating system packages..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
@@ -61,7 +63,7 @@ info "System packages updated."
 echo ""
 
 # ── Step 2: Install Docker ───────────────────────────────────────────────────
-info "Step 2/7: Installing Docker Engine..."
+info "Step 2/9: Installing Docker Engine..."
 
 if command -v docker &>/dev/null; then
   warn "Docker already installed: $(docker --version)"
@@ -98,24 +100,27 @@ fi
 echo ""
 
 # ── Step 3: Create Data Directories ──────────────────────────────────────────
-info "Step 3/7: Creating data directories..."
+info "Step 3/9: Creating data directories..."
 
 mkdir -p /opt/clawnet/chain-data
 mkdir -p /opt/clawnet/config
+mkdir -p /opt/clawnet/clawnetd-data
 mkdir -p /var/log/caddy
 
 # Set permissions
 chmod 750 /opt/clawnet/chain-data
 chmod 750 /opt/clawnet/config
+chmod 750 /opt/clawnet/clawnetd-data
 
 info "Data directories created:"
-info "  /opt/clawnet/chain-data  — Geth chain data"
-info "  /opt/clawnet/config      — genesis.json + password.txt"
-info "  /var/log/caddy           — Caddy access logs"
+info "  /opt/clawnet/chain-data     — Geth chain data"
+info "  /opt/clawnet/config         — genesis.json + password.txt"
+info "  /opt/clawnet/clawnetd-data  — clawnetd state + indexer.sqlite"
+info "  /var/log/caddy              — Caddy access logs"
 echo ""
 
 # ── Step 4: Firewall (UFW) ───────────────────────────────────────────────────
-info "Step 4/7: Configuring firewall..."
+info "Step 4/9: Configuring firewall..."
 
 if command -v ufw &>/dev/null; then
   # Default deny incoming
@@ -150,7 +155,7 @@ fi
 echo ""
 
 # ── Step 5: Kernel Tuning ────────────────────────────────────────────────────
-info "Step 5/7: Applying kernel tuning for P2P networking..."
+info "Step 5/9: Applying kernel tuning for P2P networking..."
 
 SYSCTL_CONF="/etc/sysctl.d/99-clawnet.conf"
 
@@ -196,7 +201,7 @@ info "Kernel tuning applied."
 echo ""
 
 # ── Step 6: Create System User ───────────────────────────────────────────────
-info "Step 6/7: Creating clawnet system user..."
+info "Step 6/9: Creating clawnet system user..."
 
 if id "clawnet" &>/dev/null; then
   warn "User 'clawnet' already exists."
@@ -211,8 +216,40 @@ chown -R clawnet:clawnet /opt/clawnet
 
 echo ""
 
-# ── Step 7: Install Foundry (cast) ───────────────────────────────────────────
-info "Step 7/7: Installing Foundry (cast CLI for chain interaction)..."
+# ── Step 7: Install Node.js + pnpm ───────────────────────────────────────────
+info "Step 7/9: Installing Node.js 20 + pnpm (for clawnetd)..."
+
+if command -v node &>/dev/null; then
+  warn "Node.js already installed: $(node --version)"
+else
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y nodejs
+  info "Node.js installed: $(node --version)"
+fi
+
+if command -v pnpm &>/dev/null; then
+  warn "pnpm already installed: $(pnpm --version)"
+else
+  npm install -g pnpm
+  info "pnpm installed: $(pnpm --version)"
+fi
+
+echo ""
+
+# ── Step 8: Install sqlite3 ──────────────────────────────────────────────────
+info "Step 8/9: Installing sqlite3 (for EventIndexer DB inspection)..."
+
+if command -v sqlite3 &>/dev/null; then
+  warn "sqlite3 already installed: $(sqlite3 --version | head -1)"
+else
+  apt-get install -y sqlite3
+  info "sqlite3 installed: $(sqlite3 --version | head -1)"
+fi
+
+echo ""
+
+# ── Step 9: Install Foundry (cast) ───────────────────────────────────────────
+info "Step 9/9: Installing Foundry (cast CLI for chain interaction)..."
 
 if command -v cast &>/dev/null; then
   warn "Foundry already installed: $(cast --version 2>/dev/null || echo 'unknown')"

@@ -43,6 +43,7 @@ Environment=NODE_ENV=production
 Environment=CLAW_DATA_DIR=/var/lib/clawnet
 Environment=CLAW_API_KEY=<redacted>
 Environment=CLAW_PASSPHRASE=<redacted>
+Environment=CLAW_PRIVATE_KEY=<redacted>
 LimitNOFILE=65536
 
 [Install]

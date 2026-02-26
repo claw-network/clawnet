@@ -238,6 +238,38 @@ fi
 
 echo ""
 
+# ==============================================================================
+# 3. EVENT INDEXER (indexer.sqlite)
+# ==============================================================================
+echo "=== EventIndexer (on-chain → SQLite) ==="
+
+INDEXER_DB="/opt/clawnet/clawnetd-data/indexer.sqlite"
+if [ -f "$INDEXER_DB" ]; then
+  if command -v sqlite3 &>/dev/null; then
+    LAST_BLOCK=$(sqlite3 "$INDEXER_DB" "SELECT value FROM indexer_meta WHERE key='last_indexed_block';" 2>/dev/null || echo "?")
+    EVENT_COUNT=$(sqlite3 "$INDEXER_DB" "SELECT COUNT(*) FROM events;" 2>/dev/null || echo "?")
+    DB_SIZE=$(du -h "$INDEXER_DB" 2>/dev/null | awk '{print $1}')
+
+    # Compare with chain head if we have BLOCK_A
+    if [ -n "${BLOCK_HEIGHTS[0]:-}" ] && [ "${BLOCK_HEIGHTS[0]}" -gt 0 ] && [ "$LAST_BLOCK" != "?" ]; then
+      LAG=$(( BLOCK_HEIGHTS[0] - LAST_BLOCK ))
+      if [ "$LAG" -gt 100 ]; then
+        warn "EventIndexer lagging: last_block=$LAST_BLOCK chain_head=${BLOCK_HEIGHTS[0]} lag=$LAG"
+      else
+        ok "EventIndexer: last_block=$LAST_BLOCK events=$EVENT_COUNT size=$DB_SIZE lag=$LAG"
+      fi
+    else
+      ok "EventIndexer: last_block=$LAST_BLOCK events=$EVENT_COUNT size=$DB_SIZE"
+    fi
+  else
+    ok "indexer.sqlite exists (sqlite3 not installed — cannot inspect)"
+  fi
+else
+  echo -e "  ${YELLOW}-${NC} indexer.sqlite not found (OK if clawnetd chain config not enabled)"
+fi
+
+echo ""
+
 # ── Check Docker Containers (local only — runs on each server) ───────────────
 echo "=== Docker Containers ==="
 

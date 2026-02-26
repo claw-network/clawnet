@@ -77,7 +77,7 @@ bash infra/mainnet/multisig-soft-wallet/create-safe-addresses.sh
 
 ### 5. 部署顺序
 
-1. 生成密钥 → `secrets.env`
+1. 生成密钥 → `secrets.env`（含 `CLAW_PRIVATE_KEY`）
 2. 创建 Safe 多签 → `LIQUIDITY_ADDRESS` / `RESERVE_ADDRESS`
 3. 构建 genesis.json (chainId 7626, 5 validators)
 4. Node 1 先启动 mining
@@ -88,8 +88,10 @@ bash infra/mainnet/multisig-soft-wallet/create-safe-addresses.sh
 9. Safe 多签转入初始资金
 10. 数据迁移 (DID, 余额, Escrow, ServiceContract)
 11. 对账验证 (reconcile.ts)
-12. 启动 5 台 ClawNet Node
-13. DNS 切换
+12. Node 1 安装 clawnetd systemd 服务 + 写 config.yaml `chain:` 段 + 设置 `CLAW_PRIVATE_KEY`
+13. 启动 clawnetd → 验证 EventIndexer 运行（indexer.sqlite 创建 + 事件索引）
+14. 启动其余 ClawNet Node
+15. DNS 切换
 
 ## 文件清单
 
@@ -99,13 +101,19 @@ infra/mainnet/
 ├── genesis-template.json      # Genesis 模板 (chainId 7626)
 ├── docker-compose.yml         # Node 1 (primary validator + API GW)
 ├── docker-compose.peer.yml    # Node 2-5 (peer validators)
+├── docker-compose.sync.yml    # 新节点 sync-only 模式
 ├── Caddyfile                  # 反向代理 (rpc.clawnet.io)
-├── .env.example               # 环境变量模板
-├── setup-server.sh            # 服务器初始化 (复用 testnet 版)
-├── deploy.sh                  # 一键部署脚本
-└── multisig-soft-wallet/      # Safe 多签钱包 (3/5 门限)
-    ├── README.md              # 操作指南
-    ├── create-safe-addresses.sh  # 主网 Safe 创建
+├── .env.example               # 环境变量模板 (含 CLAW_PRIVATE_KEY)
+├── setup-server.sh            # 服务器初始化 (Node.js + sqlite3 + Docker + 防火墙)
+├── health-check.sh            # 健康检查 (Geth + REST API + EventIndexer)
+├── daily-monitor.sh           # 每日稳定性监控
+├── multisig-soft-wallet/      # Safe 多签钱包 (3/5 门限)
+│   ├── README.md              # 操作指南
+│   ├── create-safe-addresses.sh  # 主网 Safe 创建
+│   └── .gitignore
+└── prod/
+    ├── deploy.sh              # 一键部署脚本 (Phase 1-12: Geth + 合约 + clawnetd)
+    ├── secrets.env.example    # 密钥模板 (含 CLAW_PRIVATE_KEY)
     └── .gitignore
 ```
 
@@ -117,5 +125,6 @@ infra/mainnet/
 | Day 3 | 5 节点 Geth 启动 + 出块验证 | genesis 确认 |
 | Day 3 | 部署 9 个合约 | Geth 出块 |
 | Day 4 | 数据迁移 + 对账 | 合约部署 |
+| Day 4 | clawnetd + EventIndexer 部署验证 | 合约部署 |
 | Day 4 | ClawNet Node 上线 + DNS 切换 | 迁移完成 |
 | Day 5 | 文档更新 + 发布公告 | 全部上线 |

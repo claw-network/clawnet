@@ -480,6 +480,127 @@ fi
 echo "  Cluster health checks passed."
 
 echo ""
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 13: Deploy clawnetd (ClawNet Node) on Server A
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 13: Setting up clawnetd on Server A..."
+
+CLAWNETD_PRIVATE_KEY="${CLAW_PRIVATE_KEY:-$DEPLOYER_PRIVATE_KEY}"
+CLAWNETD_DATA_DIR="/opt/clawnet/clawnetd-data"
+
+# Extract contract addresses from contracts.json
+CONTRACTS_JSON_LOCAL="$SCRIPT_DIR/contracts.json"
+TOKEN_ADDR=$(python3 -c "import json; d=json.load(open('$CONTRACTS_JSON_LOCAL')); print(d['contracts']['ClawToken']['proxy'])")
+ESCROW_ADDR=$(python3 -c "import json; d=json.load(open('$CONTRACTS_JSON_LOCAL')); print(d['contracts']['ClawEscrow']['proxy'])")
+IDENTITY_ADDR=$(python3 -c "import json; d=json.load(open('$CONTRACTS_JSON_LOCAL')); print(d['contracts']['ClawIdentity']['proxy'])")
+REPUTATION_ADDR=$(python3 -c "import json; d=json.load(open('$CONTRACTS_JSON_LOCAL')); print(d['contracts']['ClawReputation']['proxy'])")
+CONTRACTS_ADDR=$(python3 -c "import json; d=json.load(open('$CONTRACTS_JSON_LOCAL')); print(d['contracts']['ClawContracts']['proxy'])")
+DAO_ADDR=$(python3 -c "import json; d=json.load(open('$CONTRACTS_JSON_LOCAL')); print(d['contracts']['ClawDAO']['proxy'])")
+STAKING_ADDR=$(python3 -c "import json; d=json.load(open('$CONTRACTS_JSON_LOCAL')); print(d['contracts']['ClawStaking']['proxy'])")
+PARAM_REGISTRY_ADDR=$(python3 -c "import json; d=json.load(open('$CONTRACTS_JSON_LOCAL')); print(d['contracts']['ParamRegistry']['proxy'])")
+
+echo "  Contract addresses extracted from contracts.json"
+
+# 13a. Create data directory
+run_remote "$SERVER_A" "mkdir -p $CLAWNETD_DATA_DIR"
+
+# 13b. Write config.yaml with chain section
+echo "  [Server A] Writing config.yaml with chain configuration..."
+run_remote "$SERVER_A" "cat > $CLAWNETD_DATA_DIR/config.yaml << 'CFGEOF'
+v: 1
+network: devnet
+
+p2p:
+  listen:
+    - /ip4/0.0.0.0/tcp/9527
+  bootstrap: []
+
+logging:
+  level: info
+
+storage: {}
+
+chain:
+  rpcUrl: http://127.0.0.1:8545
+  chainId: 7625
+  contracts:
+    token: '$TOKEN_ADDR'
+    escrow: '$ESCROW_ADDR'
+    identity: '$IDENTITY_ADDR'
+    reputation: '$REPUTATION_ADDR'
+    contracts: '$CONTRACTS_ADDR'
+    dao: '$DAO_ADDR'
+    staking: '$STAKING_ADDR'
+    paramRegistry: '$PARAM_REGISTRY_ADDR'
+  signer:
+    type: env
+    envVar: CLAW_PRIVATE_KEY
+  artifactsDir: /opt/clawnet/packages/contracts/artifacts
+CFGEOF"
+echo "  config.yaml written."
+
+# 13c. Install clawnetd systemd service
+echo "  [Server A] Installing clawnetd systemd service..."
+CLAW_PASSPHRASE="${CLAW_PASSPHRASE:-$(openssl rand -hex 32)}"
+CLAW_API_KEY="${CLAW_API_KEY:-$(openssl rand -hex 32)}"
+
+run_remote "$SERVER_A" "cat > /etc/systemd/system/clawnetd.service << 'SVCEOF'
+[Unit]
+Description=ClawNet Node (clawnetd)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/clawnet/packages/node
+ExecStart=/usr/bin/node dist/daemon.js --data-dir $CLAWNETD_DATA_DIR --api-host 127.0.0.1 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=CLAW_DATA_DIR=$CLAWNETD_DATA_DIR
+Environment=CLAW_PASSPHRASE=$CLAW_PASSPHRASE
+Environment=CLAW_API_KEY=$CLAW_API_KEY
+Environment=CLAW_PRIVATE_KEY=$CLAWNETD_PRIVATE_KEY
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+systemctl daemon-reload
+systemctl enable clawnetd"
+echo "  clawnetd systemd service installed."
+
+# 13d. Build node package
+echo "  [Server A] Building clawnetd..."
+run_remote "$SERVER_A" "cd /opt/clawnet && pnpm install && pnpm build"
+
+# 13e. Create yaml symlink if needed
+run_remote "$SERVER_A" "[ -d /opt/clawnet/packages/node/node_modules/yaml ] || \
+  ln -sf /opt/clawnet/node_modules/.pnpm/yaml@*/node_modules/yaml \
+         /opt/clawnet/packages/node/node_modules/yaml 2>/dev/null || true"
+
+# 13f. Start clawnetd and verify EventIndexer
+echo "  [Server A] Starting clawnetd..."
+run_remote "$SERVER_A" "systemctl restart clawnetd"
+
+echo "  Waiting 10s for EventIndexer to start..."
+sleep 10
+
+INDEXER_CHECK=$(run_remote "$SERVER_A" "test -f $CLAWNETD_DATA_DIR/indexer.sqlite && echo 'OK' || echo 'MISSING'")
+if [[ "$INDEXER_CHECK" == "OK" ]]; then
+  LAST_BLOCK=$(run_remote "$SERVER_A" "sqlite3 $CLAWNETD_DATA_DIR/indexer.sqlite 'SELECT value FROM indexer_meta WHERE key=\"last_indexed_block\";' 2>/dev/null || echo '0'")
+  EVENT_COUNT=$(run_remote "$SERVER_A" "sqlite3 $CLAWNETD_DATA_DIR/indexer.sqlite 'SELECT COUNT(*) FROM events;' 2>/dev/null || echo '0'")
+  echo "  EventIndexer running: last_block=$LAST_BLOCK events=$EVENT_COUNT"
+else
+  echo "  WARNING: indexer.sqlite not found — EventIndexer may not have started"
+  echo "  Check logs: journalctl -u clawnetd -n 50 --no-pager"
+fi
+
+echo "  clawnetd deployed on Server A."
+echo ""
 echo "============================================================"
 echo "Redeployment complete!"
 echo "============================================================"
