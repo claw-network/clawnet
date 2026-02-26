@@ -8,7 +8,9 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { Router } from './router.js';
 import { cors, errorBoundary, requestLogger } from './middleware.js';
+import { apiKeyAuth } from './auth.js';
 import type { RuntimeContext, ApiServerConfig } from './types.js';
+import type { ApiKeyStore } from './api-key-store.js';
 
 // Route modules
 import { nodeRoutes } from './routes/node.js';
@@ -25,6 +27,7 @@ import { marketsCapabilityRoutes } from './routes/markets-capabilities.js';
 import { marketsDisputeRoutes } from './routes/markets-disputes.js';
 import { marketsSearchRoutes } from './routes/markets-search.js';
 import { devRoutes } from './routes/dev.js';
+import { adminRoutes } from './routes/admin.js';
 
 export { ApiServerConfig } from './types.js';
 export type { RuntimeContext } from './types.js';
@@ -52,6 +55,7 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/markets/disputes', marketsDisputeRoutes(ctx));
   api.mount('/api/v1/markets/search', marketsSearchRoutes(ctx));
   api.mount('/api/v1/dev', devRoutes(ctx));
+  api.mount('/api/v1/admin', adminRoutes(ctx));
 
   return api;
 }
@@ -83,6 +87,7 @@ export class ApiServer {
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
       getNodeConfig?: () => Promise<Record<string, unknown>>;
+      apiKeyStore?: ApiKeyStore;
     },
   ) {
     // Build the RuntimeContext from constructor args
@@ -104,6 +109,7 @@ export class ApiServer {
       getNodeStatus: this.runtime.getNodeStatus,
       getNodePeers: this.runtime.getNodePeers,
       getNodeConfig: this.runtime.getNodeConfig,
+      apiKeyStore: this.runtime.apiKeyStore,
     };
 
     this.router = buildRouter(ctx);
@@ -114,17 +120,20 @@ export class ApiServer {
 
     // Set up middleware + router as request handler
     const router = this.router;
+    const authMiddleware = apiKeyAuth(this.runtime.apiKeyStore);
 
     this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      // Middleware chain: CORS → error boundary → logger → router
+      // Middleware chain: CORS → auth → error boundary → logger → router
       void cors(req, res, async () => {
-        await errorBoundary(req, res, async () => {
-          await requestLogger(() => {})(req, res, async () => {
-            const matched = await router.handle(req, res);
-            if (!matched && !res.headersSent) {
-              res.writeHead(404, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
-            }
+        await authMiddleware(req, res, async () => {
+          await errorBoundary(req, res, async () => {
+            await requestLogger(() => {})(req, res, async () => {
+              const matched = await router.handle(req, res);
+              if (!matched && !res.headersSent) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
+              }
+            });
           });
         });
       });

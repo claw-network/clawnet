@@ -104,21 +104,26 @@
 
 ### R-5. API Key 分发机制
 
-- [ ] **R-5.1** 设计 API Key 管理方案
-  - 当前：单一共享 `CLAW_API_KEY`（Caddy 层校验写操作）
-  - 目标：支持多个独立 Key，每 Key 有 label/创建时间/状态
-  - 存储：SQLite 或 LevelDB
+- [x] **R-5.1** 设计 API Key 管理方案（2026-02-27）
+  - 采用方案 A：Node 层中间件，SQLite 存储
+  - 实现：`packages/node/src/api/api-key-store.ts` — SQLite CRUD store
+  - Schema: `api_keys` 表 (id, key[64-hex], label, status, created_at, revoked_at, last_used_at)
+  - 向后兼容：0 active keys 时跳过验证
 
-- [ ] **R-5.2** 实现 Key CRUD 管理命令
-  - `clawnet api-key create <label>` → 生成新 Key
-  - `clawnet api-key list` → 列出所有 Key
-  - `clawnet api-key revoke <key-id>` → 吊销 Key
-  - 验收：创建 Key 后可用于 API 请求
+- [x] **R-5.2** 实现 Key CRUD 管理命令（2026-02-27）
+  - `clawnet api-key create <label>` → 生成新 Key ✅
+  - `clawnet api-key list [--all]` → 列出 Key（prefix 截断）✅
+  - `clawnet api-key revoke <id>` → 吊销 Key ✅
+  - Auth middleware: `packages/node/src/api/auth.ts`
+  - Admin API: `POST/GET /api/v1/admin/api-keys`（仅 localhost）
+  - 支持 `X-Api-Key` 和 `Authorization: Bearer` 两种方式
 
-- [ ] **R-5.3** 改造 Caddy / Node 层验证逻辑
-  - 方案 A（简单）：Node 层中间件查表验证 `X-Api-Key`
-  - 方案 B（高级）：Caddy forward_auth → Node 校验端点
-  - 验收：不同 Key 对应不同 Agent 身份，吊销后请求被拒
+- [x] **R-5.3** 改造 Node 层验证逻辑（2026-02-27）
+  - 采用方案 A：Node 层中间件查表验证
+  - Middleware chain: `cors → apiKeyAuth → errorBoundary → logger → router`
+  - 公共路由 `/api/v1/node` 始终开放（健康检查）
+  - 测试：16 tests (9 unit + 7 integration) 全部通过 ✅
+  - 下一步：部署后在 Server A 创建 key，移除 Caddy 层 API Key 校验
 
 ### R-6. 文档站部署
 
@@ -148,8 +153,9 @@
   - README.md：`pip install clawnet` → `pip install clawnet-sdk` ✅
   - agent.py docstring 同步更新
 
-- [ ] **R-7.4** 补充 .env.example 给示例项目
-  - 内容：`CLAW_NODE_URL`, `CLAW_API_KEY`, `CLAW_AGENT_DID`, `CLAW_PASSPHRASE`
+- [x] **R-7.4** 补充 .env.example 给示例项目
+  - 内容：`CLAW_NODE_URL`, `CLAW_API_KEY`, `CLAW_AGENT_DID`, `CLAW_PASSPHRASE` ✅
+  - 3 个示例目录均已创建 .env.example
   - 验收：开发者 copy .env.example → .env 后即可运行
 
 ### R-8. Docker 镜像发布
@@ -249,5 +255,5 @@ docker pull ghcr.io/claw-network/clawnetd:0.2.0
 
 ---
 
-*最后更新: 2026-02-26*
+*最后更新: 2026-02-27*
 *关联文档: on-chain-tasks.md (T-3.9 ~ T-3.15), TOKEN_DISTRIBUTION.md, OPENCLAW_INTEGRATION.md*

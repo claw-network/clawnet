@@ -55,6 +55,7 @@ import { ReputationService } from './services/reputation-service.js';
 import { ContractsService } from './services/contracts-service.js';
 import { DaoService } from './services/dao-service.js';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
+import { ApiKeyStore } from './api/api-key-store.js';
 
 export interface NodeRuntimeConfig {
   dataDir?: string;
@@ -126,6 +127,7 @@ export class ClawNetNode {
   private reputationService?: ReputationService;
   private contractsService?: ContractsService;
   private daoService?: DaoService;
+  private apiKeyStore?: ApiKeyStore;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
   private startedAt?: number;
@@ -260,6 +262,13 @@ export class ClawNetNode {
           void this.eventIndexer.start();
         }
 
+        // ── API Key store ────────────────────────────────────────────
+        {
+          const storagePaths2 = resolveStoragePaths(this.config.dataDir);
+          const apiKeysDbPath = join(storagePaths2.root, 'api-keys.sqlite');
+          this.apiKeyStore = new ApiKeyStore(apiKeysDbPath);
+        }
+
         const apiConfig: ApiServerConfig = {
           host: this.config.api?.host ?? '127.0.0.1',
           port: this.config.api?.port ?? 9528,
@@ -287,6 +296,7 @@ export class ClawNetNode {
           getNodeStatus: () => this.buildNodeStatus(),
           getNodePeers: () => this.buildNodePeers(),
           getNodeConfig: () => this.buildNodeConfig(),
+          apiKeyStore: this.apiKeyStore,
         });
         await this.apiServer.start();
       }
@@ -331,6 +341,7 @@ export class ClawNetNode {
 
     // Synchronous cleanup (SQLite)
     try { this.indexerStore?.close(); } catch { /* ignore */ }
+    try { this.apiKeyStore?.close(); } catch { /* ignore */ }
 
     this.apiServer = undefined;
     this.sync = undefined;
@@ -344,6 +355,7 @@ export class ClawNetNode {
     this.marketSearchStore = undefined;
     this.contractProvider = undefined;
     this.indexerStore = undefined;
+    this.apiKeyStore = undefined;
     this.eventIndexer = undefined;
     this.indexerQuery = undefined;
     this.walletService = undefined;
@@ -870,3 +882,7 @@ export class ClawNetNode {
 
 export { DEFAULT_P2P_SYNC_CONFIG } from './p2p/sync.js';
 export * from './p2p/sync.js';
+export { ApiKeyStore } from './api/api-key-store.js';
+export type { ApiKeyRecord, ApiKeySummary } from './api/api-key-store.js';
+export { getApiKeyAuth } from './api/auth.js';
+export type { ApiKeyAuth } from './api/auth.js';

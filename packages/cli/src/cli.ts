@@ -7,6 +7,7 @@ import {
   ClawNetNode,
   DEFAULT_P2P_SYNC_CONFIG,
   DEFAULT_SYNC_RUNTIME_CONFIG,
+  ApiKeyStore,
 } from '@claw-network/node';
 import type { NodeRuntimeConfig } from '@claw-network/node';
 import {
@@ -373,6 +374,23 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
       return;
     }
     fail(`unknown escrow subcommand: ${subcommand ?? ''}`);
+  }
+  if (command === 'api-key') {
+    const subcommand = argv[1];
+    const subArgs = argv.slice(2);
+    if (subcommand === 'create') {
+      await runApiKeyCreate(subArgs);
+      return;
+    }
+    if (subcommand === 'list') {
+      await runApiKeyList(subArgs);
+      return;
+    }
+    if (subcommand === 'revoke') {
+      await runApiKeyRevoke(subArgs);
+      return;
+    }
+    fail(`unknown api-key subcommand: ${subcommand ?? ''}`);
   }
   if (command === 'dao') {
     const subcommand = argv[1];
@@ -3420,6 +3438,95 @@ async function runDaoParams(rawArgs: string[]): Promise<void> {
   console.log(JSON.stringify(result, null, 2));
 }
 
+// ─── API Key Management ─────────────────────────────────────────
+
+function parseDataDirArgs(rawArgs: string[]): { dataDir?: string; rest: string[] } {
+  let dataDir: string | undefined;
+  const rest: string[] = [];
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--data-dir') {
+      dataDir = rawArgs[++i];
+      continue;
+    }
+    rest.push(arg);
+  }
+  return { dataDir, rest };
+}
+
+function openApiKeyStore(dataDir?: string): ApiKeyStore {
+  const paths = resolveStoragePaths(dataDir);
+  const dbPath = join(paths.root, 'api-keys.sqlite');
+  return new ApiKeyStore(dbPath);
+}
+
+async function runApiKeyCreate(rawArgs: string[]): Promise<void> {
+  const { dataDir, rest } = parseDataDirArgs(rawArgs);
+  const label = rest[0];
+  if (!label) {
+    fail('usage: clawnet api-key create <label> [--data-dir <path>]');
+  }
+  const store = openApiKeyStore(dataDir);
+  try {
+    const record = store.create(label);
+    console.log(`API key created:`);
+    console.log(`  ID:    ${record.id}`);
+    console.log(`  Label: ${record.label}`);
+    console.log(`  Key:   ${record.key}`);
+    console.log('');
+    console.log('⚠ Save this key now — it will not be shown again.');
+  } finally {
+    store.close();
+  }
+}
+
+async function runApiKeyList(rawArgs: string[]): Promise<void> {
+  const { dataDir, rest } = parseDataDirArgs(rawArgs);
+  const includeRevoked = rest.includes('--all');
+  const store = openApiKeyStore(dataDir);
+  try {
+    const keys = store.list(includeRevoked);
+    if (keys.length === 0) {
+      console.log('No API keys found.');
+      return;
+    }
+    console.log('ID  | Status  | Label                | Key Prefix | Created At');
+    console.log('----|---------|----------------------|------------|--------------------');
+    for (const k of keys) {
+      const id = String(k.id).padEnd(3);
+      const status = k.status.padEnd(7);
+      const label = k.label.padEnd(20).slice(0, 20);
+      const prefix = k.keyPrefix.padEnd(10);
+      const created = k.createdAt.slice(0, 19);
+      console.log(`${id} | ${status} | ${label} | ${prefix} | ${created}`);
+    }
+  } finally {
+    store.close();
+  }
+}
+
+async function runApiKeyRevoke(rawArgs: string[]): Promise<void> {
+  const { dataDir, rest } = parseDataDirArgs(rawArgs);
+  const idStr = rest[0];
+  if (!idStr) {
+    fail('usage: clawnet api-key revoke <id> [--data-dir <path>]');
+  }
+  const id = Number.parseInt(idStr, 10);
+  if (Number.isNaN(id) || id < 1) {
+    fail(`invalid key ID: ${idStr}`);
+  }
+  const store = openApiKeyStore(dataDir);
+  try {
+    const revoked = store.revoke(id);
+    if (!revoked) {
+      fail(`key #${id} not found or already revoked`);
+    }
+    console.log(`API key #${id} revoked.`);
+  } finally {
+    store.close();
+  }
+}
+
 function printHelp(): void {
   console.log(`
 clawnet daemon [options]
@@ -3440,6 +3547,7 @@ clawnet market capability list|get|publish|lease|lease-get|invoke|pause|resume|t
 clawnet market dispute open|respond|resolve [options]
 clawnet contract list|get|create|sign|fund|complete|milestone-complete|milestone-approve|milestone-reject|dispute|dispute-resolve|settlement [options]
 clawnet dao proposals|proposal|create-proposal|advance|vote|votes|delegate|revoke-delegation|delegations|treasury|deposit|timelock|execute|cancel|params [options]
+clawnet api-key create|list|revoke [options]
 
 Daemon options:
   --data-dir <path>              Override storage root
@@ -3612,6 +3720,12 @@ DAO governance options:
   clawnet dao params                         -- View governance parameters
   --api <url>                    Node API base URL (default: http://127.0.0.1:9528)
   --token <token>                API token (optional)
+
+API key options:
+  clawnet api-key create <label>   -- Create an API key with given label
+  clawnet api-key list [--all]     -- List active keys (--all includes revoked)
+  clawnet api-key revoke <id>      -- Revoke a key by numeric ID
+  --data-dir <path>              Override storage root
 `);
 }
 
