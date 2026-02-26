@@ -43,15 +43,15 @@ if [ -f "$SCRIPT_DIR/scenarios/.env" ]; then
   set +a
 fi
 
-# Geth RPC endpoints (each server's local Geth)
-GETH_RPC_A="${GETH_RPC_A:-http://173.249.46.252:8545}"
-GETH_RPC_B="${GETH_RPC_B:-http://167.86.93.216:8545}"
-GETH_RPC_C="${GETH_RPC_C:-http://167.86.93.223:8545}"
+# ── Server IPs (from prod/secrets.env) ────────────────────────────────────────
+# Server A exposes RPC publicly (0.0.0.0:8545) + Caddy.
+# Server B/C bind RPC to 127.0.0.1 only — not reachable remotely.
+# B/C liveness is verified via Server A's peer count (≥ 2).
+SERVER_A="66.94.125.242"
+GETH_RPC_A="${GETH_RPC_A:-http://${SERVER_A}:8545}"
 
-# ClawNet Node REST API endpoints
-NODE_A_URL="${NODE_A_URL:-http://173.249.46.252:9528}"
-NODE_B_URL="${NODE_B_URL:-http://167.86.93.216:9528}"
-NODE_C_URL="${NODE_C_URL:-http://167.86.93.223:9528}"
+# ClawNet Node REST API — only Server A has Caddy (api.clawnetd.com → :9528)
+NODE_A_URL="${NODE_A_URL:-https://api.clawnetd.com}"
 
 # Contract addresses (from prod/contracts.json)
 CONTRACTS_JSON="$SCRIPT_DIR/prod/contracts.json"
@@ -232,30 +232,29 @@ check_geth() {
 }
 
 GETH_A_JSON=$(check_geth "Server-A" "$GETH_RPC_A")
-GETH_B_JSON=$(check_geth "Server-B" "$GETH_RPC_B")
-GETH_C_JSON=$(check_geth "Server-C" "$GETH_RPC_C")
-
-# Check block consistency (all 3 should be within 5 blocks)
-echo ""
-echo -e "  ${CYAN}Block consistency:${NC}"
 BLOCK_A=$(echo "$GETH_A_JSON" | grep -o '"block": [0-9]*' | grep -o '[0-9]*' || echo 0)
-BLOCK_B=$(echo "$GETH_B_JSON" | grep -o '"block": [0-9]*' | grep -o '[0-9]*' || echo 0)
-BLOCK_C=$(echo "$GETH_C_JSON" | grep -o '"block": [0-9]*' | grep -o '[0-9]*' || echo 0)
 
-MAX_BLOCK=$BLOCK_A
-[ "$BLOCK_B" -gt "$MAX_BLOCK" ] 2>/dev/null && MAX_BLOCK=$BLOCK_B
-[ "$BLOCK_C" -gt "$MAX_BLOCK" ] 2>/dev/null && MAX_BLOCK=$BLOCK_C
-MIN_BLOCK=$BLOCK_A
-[ "$BLOCK_B" -lt "$MIN_BLOCK" ] 2>/dev/null && MIN_BLOCK=$BLOCK_B
-[ "$BLOCK_C" -lt "$MIN_BLOCK" ] 2>/dev/null && MIN_BLOCK=$BLOCK_C
-BLOCK_DRIFT=$(( MAX_BLOCK - MIN_BLOCK ))
+# Verify Server B/C liveness via Server A peer count
+echo ""
+echo -e "  ${CYAN}Cluster peers (B/C via Server A peer count):${NC}"
+PEER_HEX=$(curl -sf --connect-timeout 5 -X POST "$GETH_RPC_A" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":99}' \
+  2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
+CLUSTER_PEERS=0
+if [ -n "$PEER_HEX" ]; then
+  CLUSTER_PEERS=$(( 16#${PEER_HEX#0x} ))
+fi
 
-if [ "$BLOCK_DRIFT" -le 5 ]; then
-  ok "Block drift: $BLOCK_DRIFT (A=$BLOCK_A B=$BLOCK_B C=$BLOCK_C)"
+if [ "$CLUSTER_PEERS" -ge 2 ]; then
+  ok "All 3 validators connected (peer count = $CLUSTER_PEERS)"
   record_pass
+elif [ "$CLUSTER_PEERS" -eq 1 ]; then
+  warn "Only 1 peer — one of Server B/C may be down"
+  record_warn "Cluster: only 1 peer connected"
 else
-  warn "Block drift: $BLOCK_DRIFT (A=$BLOCK_A B=$BLOCK_B C=$BLOCK_C) — possible fork!"
-  record_warn "Block drift: $BLOCK_DRIFT"
+  fail "No peers — Server B and C may both be down"
+  record_fail "Cluster: 0 peers"
 fi
 
 echo ""
@@ -269,12 +268,19 @@ check_node() {
   local label=$1
   local url=$2
 
+  # Skip if URL is empty (node has no external REST API endpoint)
+  if [ -z "$url" ]; then
+    echo -e "  ${YELLOW}-${NC} $label: no REST API endpoint (port 9528 not exposed)"
+    record_pass  # not a failure — by design
+    return
+  fi
+
   # GET /api/v1/node/info
   local resp
   resp=$(curl -sf --connect-timeout 10 "$url/api/v1/node/info" 2>/dev/null || echo "")
 
   if [ -z "$resp" ]; then
-    fail "$label: Node API unreachable at $url"
+    warn "$label: Node API unreachable at $url (clawnetd may not be running)"
     record_fail "$label: Node API unreachable"
     return
   fi
@@ -291,8 +297,6 @@ check_node() {
 }
 
 check_node "Node-A" "$NODE_A_URL"
-check_node "Node-B" "$NODE_B_URL"
-check_node "Node-C" "$NODE_C_URL"
 
 echo ""
 
@@ -459,14 +463,12 @@ cat > "$REPORT_FILE" <<EOF
   "observationTotal": $OBSERVATION_DAYS,
   "checks": {
     "geth": {
-      "blockHeights": {"A": $BLOCK_A, "B": $BLOCK_B, "C": $BLOCK_C},
-      "blockDrift": $BLOCK_DRIFT,
-      "maxAcceptableDrift": 5
+      "blockHeight": $BLOCK_A,
+      "clusterPeers": $CLUSTER_PEERS,
+      "expectedPeers": 2
     },
     "nodeApi": {
-      "A": "$(curl -sf --connect-timeout 5 "$NODE_A_URL/api/v1/node/info" > /dev/null 2>&1 && echo "ok" || echo "unreachable")",
-      "B": "$(curl -sf --connect-timeout 5 "$NODE_B_URL/api/v1/node/info" > /dev/null 2>&1 && echo "ok" || echo "unreachable")",
-      "C": "$(curl -sf --connect-timeout 5 "$NODE_C_URL/api/v1/node/info" > /dev/null 2>&1 && echo "ok" || echo "unreachable")"
+      "A": "$(curl -sf --connect-timeout 5 "$NODE_A_URL/api/v1/node/info" > /dev/null 2>&1 && echo "ok" || echo "unreachable")"
     },
     "reconciliation": {
       "status": "$RECONCILE_STATUS",

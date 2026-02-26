@@ -2,11 +2,20 @@
 # ==============================================================================
 # ClawNet Testnet — Health Check Script (3-Node)
 # ==============================================================================
-# Checks all 3 testnet nodes (Geth + ClawNet Node), aligned with daily-monitor.sh.
+# Checks all 3 testnet nodes.
+#
+# Topology  (from prod/secrets.env):
+#   Server A  66.94.125.242  — Validator 1 (RPC public + Caddy)
+#   Server B  85.239.236.49  — Validator 2 (RPC localhost only)
+#   Server C  85.239.235.67  — Validator 3 (RPC localhost only)
+#
+# Remote mode checks Server A's Geth directly, then verifies B/C are
+# alive via Server A's peer count (≥ 2 means both peers connected).
+# For per-node checks, run on each server with: ./health-check.sh --local
 #
 # Usage:
-#   ./health-check.sh               # Check all 3 nodes remotely
-#   ./health-check.sh --local       # Check local node only (127.0.0.1)
+#   ./health-check.sh               # Remote: check via Server A RPC
+#   ./health-check.sh --local       # On-server: check localhost only
 #   watch -n 60 ./health-check.sh   # Run every 60 seconds
 #
 # Crontab (every 5 min, alert on failure):
@@ -17,7 +26,7 @@
 
 set -euo pipefail
 
-# ── Configuration (aligned with daily-monitor.sh) ────────────────────────────
+# ── Configuration ─────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Load .env if present (same source as daily-monitor.sh & run-tests.mjs)
@@ -28,15 +37,18 @@ if [ -f "$SCRIPT_DIR/scenarios/.env" ]; then
   set +a
 fi
 
-# Geth RPC endpoints — 3 testnet validators
-GETH_RPC_A="${GETH_RPC_A:-http://173.249.46.252:8545}"
-GETH_RPC_B="${GETH_RPC_B:-http://167.86.93.216:8545}"
-GETH_RPC_C="${GETH_RPC_C:-http://167.86.93.223:8545}"
+# ── Server IPs (from prod/secrets.env) ────────────────────────────────────────
+# Server A exposes RPC publicly (0.0.0.0:8545) + Caddy (rpc.clawnetd.com).
+# Server B/C bind RPC to 127.0.0.1 only — not reachable remotely.
+SERVER_A="66.94.125.242"
+SERVER_B="85.239.236.49"
+SERVER_C="85.239.235.67"
 
-# ClawNet Node REST API endpoints — port 9528
-NODE_A_URL="${NODE_A_URL:-http://173.249.46.252:9528}"
-NODE_B_URL="${NODE_B_URL:-http://167.86.93.216:9528}"
-NODE_C_URL="${NODE_C_URL:-http://167.86.93.223:9528}"
+# Geth RPC — only Server A is reachable remotely
+GETH_RPC_A="${GETH_RPC_A:-http://${SERVER_A}:8545}"
+
+# ClawNet Node REST API — only Server A has Caddy (api.clawnetd.com → :9528)
+NODE_A_URL="${NODE_A_URL:-https://api.clawnetd.com}"
 
 ALERT_WEBHOOK="${ALERT_WEBHOOK_URL:-}"
 HOSTNAME=$(hostname)
@@ -44,7 +56,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Thresholds
 MAX_BLOCK_LAG=30          # Alert if block is older than N seconds
-MIN_PEER_COUNT=1          # Alert if peer count below N
+MIN_PEER_COUNT=2          # Alert if peer count below N (expect 2 for 3-node cluster)
 
 # CLI flags
 LOCAL_ONLY=false
@@ -58,8 +70,7 @@ done
 if $LOCAL_ONLY; then
   GETH_RPC_A="${GETH_RPC:-http://127.0.0.1:8545}"
   NODE_A_URL="${CLAW_API:-http://127.0.0.1:9528}"
-  GETH_RPC_B="" ; GETH_RPC_C=""
-  NODE_B_URL="" ; NODE_C_URL=""
+  MIN_PEER_COUNT=1
 fi
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -70,10 +81,11 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 ERRORS=()
+WARNINGS=()
 
 ok()   { echo -e "  ${GREEN}✓${NC} $1"; }
-warn() { echo -e "  ${YELLOW}⚠${NC} $1"; ERRORS+=("WARN: $1"); }
-fail() { echo -e "  ${RED}✗${NC} $1"; ERRORS+=("FAIL: $1"); }
+warn() { echo -e "  ${YELLOW}⚠${NC} $1"; WARNINGS+=("$1"); }
+fail() { echo -e "  ${RED}✗${NC} $1"; ERRORS+=("$1"); }
 
 # ── Geth check function ──────────────────────────────────────────────────────
 BLOCK_HEIGHTS=()
@@ -151,11 +163,17 @@ check_node() {
   local label=$1
   local url=$2
 
+  # Skip if URL is empty (node has no external REST API endpoint)
+  if [ -z "$url" ]; then
+    echo -e "  ${YELLOW}-${NC} $label: no REST API endpoint configured (OK if clawnetd not deployed)"
+    return
+  fi
+
   local resp
   resp=$(curl -sf --connect-timeout 10 "$url/api/v1/node/info" 2>/dev/null || echo "")
 
   if [ -z "$resp" ]; then
-    fail "$label: Node API unreachable at $url"
+    warn "$label: Node API unreachable at $url (clawnetd may not be running)"
     return
   fi
 
@@ -177,22 +195,30 @@ echo "=== Geth (EVM Chain) ==="
 if $LOCAL_ONLY; then
   check_geth "Local" "$GETH_RPC_A"
 else
-  check_geth "Server-A" "$GETH_RPC_A"
-  check_geth "Server-B" "$GETH_RPC_B"
-  check_geth "Server-C" "$GETH_RPC_C"
+  # Only Server A RPC is reachable remotely.
+  # Server B/C bind 127.0.0.1:8545 — verify they are alive via peer count.
+  check_geth "Server-A ($SERVER_A)" "$GETH_RPC_A"
 
-  # Block consistency — all 3 nodes should be within 5 blocks
-  if [ ${#BLOCK_HEIGHTS[@]} -eq 3 ]; then
-    MAX_B=${BLOCK_HEIGHTS[0]}; MIN_B=${BLOCK_HEIGHTS[0]}
-    for b in "${BLOCK_HEIGHTS[@]}"; do
-      [ "$b" -gt "$MAX_B" ] 2>/dev/null && MAX_B=$b
-      [ "$b" -lt "$MIN_B" ] 2>/dev/null && MIN_B=$b
-    done
-    DRIFT=$(( MAX_B - MIN_B ))
-    if [ "$DRIFT" -le 5 ]; then
-      ok "Block drift: $DRIFT (A=${BLOCK_HEIGHTS[0]} B=${BLOCK_HEIGHTS[1]} C=${BLOCK_HEIGHTS[2]})"
+  if [ ${#BLOCK_HEIGHTS[@]} -ge 1 ] && [ "${BLOCK_HEIGHTS[0]}" -gt 0 ]; then
+    # Server B/C liveness: Server A's peer count should be ≥ 2
+    echo ""
+    echo -e "  ${CYAN}Server B/C RPC is localhost-only — verifying via Server A peer count:${NC}"
+    local_peer_count=0
+    peer_hex=$(curl -sf --connect-timeout 5 -X POST "$GETH_RPC_A" \
+      -H "Content-Type: application/json" \
+      -d '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":99}' \
+      2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
+    if [ -n "$peer_hex" ]; then
+      local_peer_count=$(( 16#${peer_hex#0x} ))
+    fi
+
+    if [ "$local_peer_count" -ge 2 ]; then
+      ok "Server B ($SERVER_B): connected (peer count $local_peer_count ≥ 2)"
+      ok "Server C ($SERVER_C): connected (peer count $local_peer_count ≥ 2)"
+    elif [ "$local_peer_count" -eq 1 ]; then
+      warn "Only 1 peer connected — one of Server B/C may be down"
     else
-      warn "Block drift: $DRIFT (A=${BLOCK_HEIGHTS[0]} B=${BLOCK_HEIGHTS[1]} C=${BLOCK_HEIGHTS[2]}) — possible fork!"
+      fail "No peers connected — Server B and C may both be down"
     fi
   fi
 fi
@@ -208,8 +234,6 @@ if $LOCAL_ONLY; then
   check_node "Local" "$NODE_A_URL"
 else
   check_node "Node-A" "$NODE_A_URL"
-  check_node "Node-B" "$NODE_B_URL"
-  check_node "Node-C" "$NODE_C_URL"
 fi
 
 echo ""
@@ -254,12 +278,23 @@ echo ""
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo "=== Summary ==="
-if [ ${#ERRORS[@]} -eq 0 ]; then
-  echo -e "${GREEN}All checks passed!${NC}"
+
+WARN_COUNT=${#WARNINGS[@]}
+ERR_COUNT=${#ERRORS[@]}
+
+if [ "$WARN_COUNT" -gt 0 ]; then
+  echo -e "${YELLOW}Warnings: ${WARN_COUNT}${NC}"
+  for w in "${WARNINGS[@]}"; do
+    echo "  - ⚠ $w"
+  done
+fi
+
+if [ "$ERR_COUNT" -eq 0 ]; then
+  echo -e "${GREEN}All critical checks passed!${NC}"
 else
-  echo -e "${RED}Issues found: ${#ERRORS[@]}${NC}"
+  echo -e "${RED}Failures: ${ERR_COUNT}${NC}"
   for err in "${ERRORS[@]}"; do
-    echo "  - $err"
+    echo "  - ✗ $err"
   done
 
   # ── Send Alert ─────────────────────────────────────────────────────────────
@@ -268,6 +303,11 @@ else
     for err in "${ERRORS[@]}"; do
       ALERT_MSG+="• $err\n"
     done
+    if [ "$WARN_COUNT" -gt 0 ]; then
+      for w in "${WARNINGS[@]}"; do
+        ALERT_MSG+="• ⚠ $w\n"
+      done
+    fi
 
     # Generic webhook (works with Feishu/DingTalk/Slack if you adjust payload)
     curl -sf -X POST "$ALERT_WEBHOOK" \

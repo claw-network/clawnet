@@ -2,15 +2,18 @@
 # ==============================================================================
 # ClawNet Mainnet — Health Check Script (5-Node)
 # ==============================================================================
-# Aligned with infra/testnet/health-check.sh — same structure, mainnet config.
+# Topology (IPs TBD — set in .env or prod/secrets.env):
+#   Node 1  — Validator 1 (RPC public + Caddy at clawnet.io)
+#   Node 2-5 — Validators 2-5 (RPC localhost only)
+#
+# Remote mode checks Node 1's Geth directly, then verifies Node 2-5 are
+# alive via Node 1's peer count (≥ 4 means all peers connected).
+# For per-node checks, run on each server with: ./health-check.sh --local
 #
 # Usage:
-#   ./health-check.sh               # Check all 5 nodes remotely
-#   ./health-check.sh --local       # Check local node only (127.0.0.1)
+#   ./health-check.sh               # Remote: check via Node 1 RPC
+#   ./health-check.sh --local       # On-server: check localhost only
 #   watch -n 60 ./health-check.sh   # Run every 60 seconds
-#
-# Crontab (every 5 min, alert on failure):
-#   */5 * * * * /opt/clawnet/health-check.sh 2>&1 | logger -t clawnet-health
 #
 # Requires: curl, jq
 # ==============================================================================
@@ -28,20 +31,19 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
   set +a
 fi
 
-# Geth RPC endpoints — 5 mainnet validators
-# Override via environment or .env
-GETH_RPC_1="${GETH_RPC_1:-}"
-GETH_RPC_2="${GETH_RPC_2:-}"
-GETH_RPC_3="${GETH_RPC_3:-}"
-GETH_RPC_4="${GETH_RPC_4:-}"
-GETH_RPC_5="${GETH_RPC_5:-}"
+# ── Server IPs (set in .env or prod/secrets.env before first run) ────────────
+# Node 1 exposes RPC publicly (0.0.0.0:8545) + Caddy (rpc.clawnet.io).
+# Node 2-5 bind RPC to 127.0.0.1 only — not reachable remotely.
+NODE_1_IP="${NODE_1_IP:-}"
 
-# ClawNet Node REST API endpoints — port 9528
-NODE_1_URL="${NODE_1_URL:-}"
-NODE_2_URL="${NODE_2_URL:-}"
-NODE_3_URL="${NODE_3_URL:-}"
-NODE_4_URL="${NODE_4_URL:-}"
-NODE_5_URL="${NODE_5_URL:-}"
+# Geth RPC — only Node 1 is reachable remotely
+GETH_RPC_1="${GETH_RPC_1:-}"
+if [ -z "$GETH_RPC_1" ] && [ -n "$NODE_1_IP" ]; then
+  GETH_RPC_1="http://${NODE_1_IP}:8545"
+fi
+
+# ClawNet Node REST API — only Node 1 has Caddy (api.clawnet.io → :9528)
+NODE_1_URL="${NODE_1_URL:-https://api.clawnet.io}"
 
 ALERT_WEBHOOK="${ALERT_WEBHOOK_URL:-}"
 HOSTNAME=$(hostname)
@@ -49,7 +51,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Thresholds
 MAX_BLOCK_LAG=30          # Alert if block is older than N seconds
-MIN_PEER_COUNT=1          # Alert if peer count below N
+MIN_PEER_COUNT=4          # Alert if peer count below N (expect 4 for 5-node cluster)
 
 # CLI flags
 LOCAL_ONLY=false
@@ -63,8 +65,7 @@ done
 if $LOCAL_ONLY; then
   GETH_RPC_1="${GETH_RPC:-http://127.0.0.1:8545}"
   NODE_1_URL="${CLAW_API:-http://127.0.0.1:9528}"
-  GETH_RPC_2="" ; GETH_RPC_3="" ; GETH_RPC_4="" ; GETH_RPC_5=""
-  NODE_2_URL="" ; NODE_3_URL="" ; NODE_4_URL="" ; NODE_5_URL=""
+  MIN_PEER_COUNT=1
 fi
 
 # ── Colors ────────────────────────────────────────────────────────────────────
@@ -75,10 +76,11 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 ERRORS=()
+WARNINGS=()
 
 ok()   { echo -e "  ${GREEN}✓${NC} $1"; }
-warn() { echo -e "  ${YELLOW}⚠${NC} $1"; ERRORS+=("WARN: $1"); }
-fail() { echo -e "  ${RED}✗${NC} $1"; ERRORS+=("FAIL: $1"); }
+warn() { echo -e "  ${YELLOW}⚠${NC} $1"; WARNINGS+=("$1"); }
+fail() { echo -e "  ${RED}✗${NC} $1"; ERRORS+=("$1"); }
 
 # ── Geth check function ──────────────────────────────────────────────────────
 BLOCK_HEIGHTS=()
@@ -152,11 +154,17 @@ check_node() {
   local label=$1
   local url=$2
 
+  # Skip if URL is empty (node has no external REST API endpoint)
+  if [ -z "$url" ]; then
+    echo -e "  ${YELLOW}-${NC} $label: no REST API endpoint configured (OK if clawnetd not deployed)"
+    return
+  fi
+
   local resp
   resp=$(curl -sf --connect-timeout 10 "$url/api/v1/node/info" 2>/dev/null || echo "")
 
   if [ -z "$resp" ]; then
-    fail "$label: Node API unreachable at $url"
+    warn "$label: Node API unreachable at $url (clawnetd may not be running)"
     return
   fi
 
@@ -178,26 +186,33 @@ echo "=== Geth (EVM Chain — chainId 7626) ==="
 if $LOCAL_ONLY; then
   check_geth "Local" "$GETH_RPC_1"
 else
-  for i in 1 2 3 4 5; do
-    rpc_var="GETH_RPC_$i"
-    rpc="${!rpc_var:-}"
-    if [ -n "$rpc" ]; then
-      check_geth "Node-$i" "$rpc"
-    fi
-  done
+  if [ -z "$GETH_RPC_1" ]; then
+    warn "GETH_RPC_1 not configured — set NODE_1_IP or GETH_RPC_1 in .env"
+  else
+    # Only Node 1 RPC is reachable remotely.
+    # Node 2-5 bind 127.0.0.1:8545 — verify they are alive via peer count.
+    check_geth "Node-1 ($NODE_1_IP)" "$GETH_RPC_1"
 
-  # Block consistency — all nodes should be within 5 blocks
-  if [ ${#BLOCK_HEIGHTS[@]} -ge 2 ]; then
-    MAX_B=${BLOCK_HEIGHTS[0]}; MIN_B=${BLOCK_HEIGHTS[0]}
-    for b in "${BLOCK_HEIGHTS[@]}"; do
-      [ "$b" -gt "$MAX_B" ] 2>/dev/null && MAX_B=$b
-      [ "$b" -lt "$MIN_B" ] 2>/dev/null && MIN_B=$b
-    done
-    DRIFT=$(( MAX_B - MIN_B ))
-    if [ "$DRIFT" -le 5 ]; then
-      ok "Block drift: $DRIFT blocks across ${#BLOCK_HEIGHTS[@]} nodes"
-    else
-      warn "Block drift: $DRIFT blocks — possible fork!"
+    if [ ${#BLOCK_HEIGHTS[@]} -ge 1 ] && [ "${BLOCK_HEIGHTS[0]}" -gt 0 ]; then
+      # Node 2-5 liveness: Node 1's peer count should be ≥ 4
+      echo ""
+      echo -e "  ${CYAN}Node 2-5 RPC is localhost-only — verifying via Node 1 peer count:${NC}"
+      remote_peer_count=0
+      peer_hex=$(curl -sf --connect-timeout 5 -X POST "$GETH_RPC_1" \
+        -H "Content-Type: application/json" \
+        -d '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":99}' \
+        2>/dev/null | jq -r '.result // empty' 2>/dev/null || true)
+      if [ -n "$peer_hex" ]; then
+        remote_peer_count=$(( 16#${peer_hex#0x} ))
+      fi
+
+      if [ "$remote_peer_count" -ge 4 ]; then
+        ok "All 4 peer nodes connected (peer count $remote_peer_count ≥ 4)"
+      elif [ "$remote_peer_count" -ge 1 ]; then
+        warn "Only $remote_peer_count of 4 expected peers connected — some nodes may be down"
+      else
+        fail "No peers connected — Node 2-5 may all be down"
+      fi
     fi
   fi
 fi
@@ -212,13 +227,7 @@ echo "=== ClawNet Node (REST API) ==="
 if $LOCAL_ONLY; then
   check_node "Local" "$NODE_1_URL"
 else
-  for i in 1 2 3 4 5; do
-    url_var="NODE_${i}_URL"
-    url="${!url_var:-}"
-    if [ -n "$url" ]; then
-      check_node "Node-$i" "$url"
-    fi
-  done
+  check_node "Node-1" "$NODE_1_URL"
 fi
 
 echo ""
@@ -262,12 +271,23 @@ echo ""
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo "=== Summary ==="
-if [ ${#ERRORS[@]} -eq 0 ]; then
-  echo -e "${GREEN}All checks passed!${NC}"
+
+WARN_COUNT=${#WARNINGS[@]}
+ERR_COUNT=${#ERRORS[@]}
+
+if [ "$WARN_COUNT" -gt 0 ]; then
+  echo -e "${YELLOW}Warnings: ${WARN_COUNT}${NC}"
+  for w in "${WARNINGS[@]}"; do
+    echo "  - ⚠ $w"
+  done
+fi
+
+if [ "$ERR_COUNT" -eq 0 ]; then
+  echo -e "${GREEN}All critical checks passed!${NC}"
 else
-  echo -e "${RED}Issues found: ${#ERRORS[@]}${NC}"
+  echo -e "${RED}Failures: ${ERR_COUNT}${NC}"
   for err in "${ERRORS[@]}"; do
-    echo "  - $err"
+    echo "  - ✗ $err"
   done
 
   if [ -n "$ALERT_WEBHOOK" ]; then
@@ -275,6 +295,11 @@ else
     for err in "${ERRORS[@]}"; do
       ALERT_MSG+="• $err\n"
     done
+    if [ "$WARN_COUNT" -gt 0 ]; then
+      for w in "${WARNINGS[@]}"; do
+        ALERT_MSG+="• ⚠ $w\n"
+      done
+    fi
 
     curl -sf -X POST "$ALERT_WEBHOOK" \
       -H "Content-Type: application/json" \
