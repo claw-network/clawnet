@@ -361,12 +361,11 @@ if [ -d "$CONTRACTS_DIR" ] && [ -f "$CONTRACTS_JSON" ]; then
       RECONCILE_STATUS="unknown"
     fi
   else
-    warn "Reconciliation: indexer.sqlite not found — skipping"
-    record_warn "Reconciliation: no DB"
+    info "Reconciliation: indexer.sqlite not found — skipping (only available on server)"
     RECONCILE_STATUS="skipped-no-db"
   fi
 else
-  warn "Reconciliation: packages/contracts not found — run from repo root"
+  info "Reconciliation: packages/contracts not found — run from repo root or on server"
   RECONCILE_STATUS="skipped-no-contracts"
 fi
 
@@ -386,28 +385,44 @@ if $SKIP_SCENARIOS; then
 else
   SCENARIOS_DIR="$SCRIPT_DIR/scenarios"
   if [ -f "$SCENARIOS_DIR/run-tests.mjs" ] && [ -f "$SCENARIOS_DIR/.env" ]; then
-    info "Running Scenario 01 (Identity & Wallet) as lightweight regression..."
+    # Auto-detect single-node: scenarios require 3 distinct nodes.
+    # If NODE_A/B/C all resolve to the same URL, skip with explanation.
+    _env_file="$SCENARIOS_DIR/.env"
+    _node_a=$(grep -E '^NODE_A_URL=' "$_env_file" 2>/dev/null | head -1 | cut -d= -f2-)
+    _node_b=$(grep -E '^NODE_B_URL=' "$_env_file" 2>/dev/null | head -1 | cut -d= -f2-)
+    _node_c=$(grep -E '^NODE_C_URL=' "$_env_file" 2>/dev/null | head -1 | cut -d= -f2-)
 
-    pushd "$SCENARIOS_DIR" > /dev/null
-    SCENARIO_OUTPUT=$(node run-tests.mjs --scenario 01 2>&1 || true)
-    popd > /dev/null
-
-    # Parse results
-    if echo "$SCENARIO_OUTPUT" | grep -q "passed.*0 failed"; then
-      SCENARIO_PASSED=$(echo "$SCENARIO_OUTPUT" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "?")
-      ok "Scenario 01: $SCENARIO_PASSED passed, 0 failed"
-      record_pass
-      SCENARIO_STATUS="passed"
-    elif echo "$SCENARIO_OUTPUT" | grep -qE "[0-9]+ failed"; then
-      SCENARIO_FAILED=$(echo "$SCENARIO_OUTPUT" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "?")
-      SCENARIO_PASSED=$(echo "$SCENARIO_OUTPUT" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
-      fail "Scenario 01: $SCENARIO_PASSED passed, $SCENARIO_FAILED failed"
-      record_fail "Scenario 01 regression: $SCENARIO_FAILED failures"
-      SCENARIO_STATUS="failed"
+    if [ -n "$_node_a" ] && [ "$_node_a" = "$_node_b" ] && [ "$_node_b" = "$_node_c" ]; then
+      info "Scenarios skipped — single-node testnet (all 3 URLs point to $_node_a)"
+      info "Scenario regression requires 3 distinct nodes; will auto-enable when multi-node is deployed"
+      SCENARIO_STATUS="skipped-single-node"
+    elif [ -z "$_node_a" ] || [ -z "$_node_b" ] || [ -z "$_node_c" ]; then
+      info "Scenarios skipped — NODE_A/B/C_URL not all configured in .env"
+      SCENARIO_STATUS="skipped-no-urls"
     else
-      warn "Scenario 01: could not parse output"
-      record_warn "Scenario 01: unparseable"
-      SCENARIO_STATUS="unknown"
+      info "Running Scenario 01 (Identity & Wallet) as lightweight regression..."
+
+      pushd "$SCENARIOS_DIR" > /dev/null
+      SCENARIO_OUTPUT=$(node run-tests.mjs --scenario 01 2>&1 || true)
+      popd > /dev/null
+
+      # Parse results
+      if echo "$SCENARIO_OUTPUT" | grep -q "passed.*0 failed"; then
+        SCENARIO_PASSED=$(echo "$SCENARIO_OUTPUT" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "?")
+        ok "Scenario 01: $SCENARIO_PASSED passed, 0 failed"
+        record_pass
+        SCENARIO_STATUS="passed"
+      elif echo "$SCENARIO_OUTPUT" | grep -qE "[0-9]+ failed"; then
+        SCENARIO_FAILED=$(echo "$SCENARIO_OUTPUT" | grep -oE "[0-9]+ failed" | grep -oE "[0-9]+" || echo "?")
+        SCENARIO_PASSED=$(echo "$SCENARIO_OUTPUT" | grep -oE "[0-9]+ passed" | grep -oE "[0-9]+" || echo "0")
+        fail "Scenario 01: $SCENARIO_PASSED passed, $SCENARIO_FAILED failed"
+        record_fail "Scenario 01 regression: $SCENARIO_FAILED failures"
+        SCENARIO_STATUS="failed"
+      else
+        warn "Scenario 01: could not parse output"
+        record_warn "Scenario 01: unparseable"
+        SCENARIO_STATUS="unknown"
+      fi
     fi
   else
     warn "Scenarios: run-tests.mjs or .env not found — skipping"
