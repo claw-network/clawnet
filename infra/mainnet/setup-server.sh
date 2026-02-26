@@ -17,6 +17,7 @@
 #   7. Installs Node.js 20 + pnpm (for clawnetd)
 #   8. Installs sqlite3 (for EventIndexer inspection)
 #   9. Installs Foundry (cast) for chain interaction
+#  10. Hardens SSH (disable password auth, key-only login)
 # ==============================================================================
 
 set -euo pipefail
@@ -40,7 +41,7 @@ info "OS: $(cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"')"
 echo ""
 
 # ── Step 1: System Update ────────────────────────────────────────────────────
-info "Step 1/9: Updating system packages..."
+info "Step 1/10: Updating system packages..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
@@ -63,7 +64,7 @@ info "System packages updated."
 echo ""
 
 # ── Step 2: Install Docker ───────────────────────────────────────────────────
-info "Step 2/9: Installing Docker Engine..."
+info "Step 2/10: Installing Docker Engine..."
 
 if command -v docker &>/dev/null; then
   warn "Docker already installed: $(docker --version)"
@@ -96,7 +97,7 @@ fi
 echo ""
 
 # ── Step 3: Create Data Directories ──────────────────────────────────────────
-info "Step 3/9: Creating data directories..."
+info "Step 3/10: Creating data directories..."
 
 mkdir -p /opt/clawnet/chain-data
 mkdir -p /opt/clawnet/config
@@ -115,7 +116,7 @@ info "  /var/log/caddy              — Caddy access logs"
 echo ""
 
 # ── Step 4: Firewall (UFW) ───────────────────────────────────────────────────
-info "Step 4/9: Configuring firewall..."
+info "Step 4/10: Configuring firewall..."
 
 if command -v ufw &>/dev/null; then
   ufw default deny incoming
@@ -139,7 +140,7 @@ fi
 echo ""
 
 # ── Step 5: Kernel Tuning ────────────────────────────────────────────────────
-info "Step 5/9: Applying kernel tuning for P2P networking..."
+info "Step 5/10: Applying kernel tuning for P2P networking..."
 
 SYSCTL_CONF="/etc/sysctl.d/99-clawnet.conf"
 
@@ -173,7 +174,7 @@ info "Kernel tuning applied."
 echo ""
 
 # ── Step 6: Create System User ───────────────────────────────────────────────
-info "Step 6/9: Creating clawnet system user..."
+info "Step 6/10: Creating clawnet system user..."
 
 if id "clawnet" &>/dev/null; then
   warn "User 'clawnet' already exists."
@@ -188,7 +189,7 @@ chown -R clawnet:clawnet /opt/clawnet
 echo ""
 
 # ── Step 7: Install Node.js + pnpm ───────────────────────────────────────────
-info "Step 7/9: Installing Node.js 20 + pnpm (for clawnetd)..."
+info "Step 7/10: Installing Node.js 20 + pnpm (for clawnetd)..."
 
 if command -v node &>/dev/null; then
   warn "Node.js already installed: $(node --version)"
@@ -208,7 +209,7 @@ fi
 echo ""
 
 # ── Step 8: Install sqlite3 ──────────────────────────────────────────────────
-info "Step 8/9: Installing sqlite3 (for EventIndexer DB inspection)..."
+info "Step 8/10: Installing sqlite3 (for EventIndexer DB inspection)..."
 
 if command -v sqlite3 &>/dev/null; then
   warn "sqlite3 already installed: $(sqlite3 --version | head -1)"
@@ -220,7 +221,7 @@ fi
 echo ""
 
 # ── Step 9: Install Foundry (cast) ───────────────────────────────────────────
-info "Step 9/9: Installing Foundry (cast CLI for chain interaction)..."
+info "Step 9/10: Installing Foundry (cast CLI for chain interaction)..."
 
 if command -v cast &>/dev/null; then
   warn "Foundry already installed: $(cast --version 2>/dev/null || echo 'unknown')"
@@ -238,10 +239,91 @@ fi
 
 echo ""
 
+# ── Step 10: Harden SSH ───────────────────────────────────────────────────────
+info "Step 10/10: Hardening SSH (disable password, key-only login)..."
+
+# Source .env if present (for ADMIN_SSH_PUBKEY)
+if [ -f /opt/clawnet/.env ]; then
+  source /opt/clawnet/.env 2>/dev/null || true
+fi
+
+# Accept admin public key: env var > .env file > command-line arg
+ADMIN_PUBKEY="${ADMIN_SSH_PUBKEY:-${1:-}}"
+
+if [ -n "$ADMIN_PUBKEY" ]; then
+  # Install the admin public key
+  mkdir -p /root/.ssh
+  chmod 700 /root/.ssh
+  echo "$ADMIN_PUBKEY" >> /root/.ssh/authorized_keys
+  sort -u /root/.ssh/authorized_keys -o /root/.ssh/authorized_keys
+  chmod 600 /root/.ssh/authorized_keys
+  info "Admin SSH public key installed."
+else
+  # Check if any authorized keys already exist
+  if [ ! -f /root/.ssh/authorized_keys ] || [ ! -s /root/.ssh/authorized_keys ]; then
+    warn "No ADMIN_SSH_PUBKEY provided and no existing authorized_keys found!"
+    warn "Skipping SSH hardening to avoid lockout."
+    warn "Run again with: ADMIN_SSH_PUBKEY='ssh-ed25519 AAAA...' bash setup-server.sh"
+    echo ""
+    SKIP_SSH_HARDEN=1
+  fi
+fi
+
+if [ "${SKIP_SSH_HARDEN:-0}" != "1" ]; then
+  # Backup sshd_config
+  cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak.$(date +%Y%m%d) 2>/dev/null || true
+
+  # Disable password authentication
+  sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+  sed -i 's/^#\?ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+  sed -i 's/^#\?KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' /etc/ssh/sshd_config
+  sed -i 's/^#\?UsePAM.*/UsePAM no/' /etc/ssh/sshd_config
+
+  # Ensure pubkey auth is enabled
+  sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+
+  # PermitRootLogin = key only
+  if grep -q "^PermitRootLogin" /etc/ssh/sshd_config; then
+    sed -i 's/^PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+  else
+    echo "PermitRootLogin prohibit-password" >> /etc/ssh/sshd_config
+  fi
+
+  # Handle sshd_config.d drop-in overrides (Ubuntu 24.04)
+  if [ -d /etc/ssh/sshd_config.d ]; then
+    for f in /etc/ssh/sshd_config.d/*.conf; do
+      [ -f "$f" ] || continue
+      sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/' "$f"
+      sed -i 's/^ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' "$f"
+      sed -i 's/^KbdInteractiveAuthentication.*/KbdInteractiveAuthentication no/' "$f"
+    done
+  fi
+
+  # Test config before restart
+  if sshd -t 2>/dev/null; then
+    systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
+    info "SSH hardened: password auth disabled, key-only login enabled."
+    info "  PermitRootLogin = prohibit-password"
+    info "  PasswordAuthentication = no"
+    info "  PubkeyAuthentication = yes"
+  else
+    warn "sshd config test failed! Reverting to backup..."
+    cp /etc/ssh/sshd_config.bak.$(date +%Y%m%d) /etc/ssh/sshd_config 2>/dev/null || true
+    systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
+    warn "SSH config reverted. Please check manually."
+  fi
+fi
+
+echo ""
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo "============================================================"
 echo -e "${GREEN}  ClawNet Mainnet Server Setup Complete!${NC}"
 echo "============================================================"
+echo ""
+echo "  Usage (with SSH hardening):"
+echo "    ADMIN_SSH_PUBKEY='ssh-ed25519 AAAA...' bash setup-server.sh"
+echo "    -- or pass existing authorized_keys, then run without arg --"
 echo ""
 echo "  Next steps:"
 echo "  1. Copy deployment files to /opt/clawnet/"
