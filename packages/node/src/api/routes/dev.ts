@@ -10,6 +10,7 @@ import { validate } from '../schemas/common.js';
 import { z } from 'zod';
 import type { RuntimeContext } from '../types.js';
 import { resolveAddress, resolvePrivateKey } from '../types.js';
+import { getApiKeyAuth } from '../auth.js';
 import { createWalletMintEnvelope } from '@claw-network/protocol';
 import type { IncomingMessage } from 'node:http';
 
@@ -110,19 +111,24 @@ export function devRoutes(ctx: RuntimeContext): Router {
 
   // ── POST /faucet — dev-mode token mint ────────────────────────
   r.post('/faucet', async (req, res, route) => {
-    if (!policy.apiKey) {
-      unauthorized(
-        res,
-        'Dev faucet disabled: configure CLAW_DEV_FAUCET_API_KEY to enable authenticated access',
-        route.url.pathname,
-      );
-      return;
-    }
+    // If the request was already authenticated by API key middleware, skip legacy check
+    const middlewareAuth = getApiKeyAuth(req);
+    if (!middlewareAuth) {
+      // Legacy flow: require CLAW_DEV_FAUCET_API_KEY env var
+      if (!policy.apiKey) {
+        unauthorized(
+          res,
+          'Dev faucet disabled: configure CLAW_DEV_FAUCET_API_KEY to enable authenticated access',
+          route.url.pathname,
+        );
+        return;
+      }
 
-    const providedKey = extractProvidedApiKey(req);
-    if (!providedKey || providedKey !== policy.apiKey) {
-      unauthorized(res, 'Invalid or missing API key', route.url.pathname);
-      return;
+      const providedKey = extractProvidedApiKey(req);
+      if (!providedKey || providedKey !== policy.apiKey) {
+        unauthorized(res, 'Invalid or missing API key', route.url.pathname);
+        return;
+      }
     }
 
     const v = validate(FaucetSchema, route.body);
