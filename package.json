@@ -24,7 +24,11 @@
     "liq:reserve:report:period": "node scripts/liquidity-bot/cli/reserve-period-report.mjs",
     "liq:reserve:report:week": "node scripts/liquidity-bot/cli/reserve-period-report.mjs --period week",
     "liq:reserve:report:month": "node scripts/liquidity-bot/cli/reserve-period-report.mjs --period month",
-    "liq:run": "node scripts/liquidity-bot/cli/run-once.mjs"
+    "liq:run": "node scripts/liquidity-bot/cli/run-once.mjs",
+    "secrets:keygen": "node scripts/secure-secrets.mjs gen-keypair",
+    "secrets:manifest:init": "node scripts/secure-secrets.mjs refresh-manifest --manifest infra/testnet/scenarios/init/secret-files.txt --roots infra/testnet,infra/devnet",
+    "secrets:encrypt:init": "pnpm secrets:manifest:init && node scripts/secure-secrets.mjs encrypt-manifest --manifest infra/testnet/scenarios/init/secret-files.txt --output infra/testnet/scenarios/init/secrets.bundle.enc",
+    "secrets:decrypt": "node scripts/secure-secrets.mjs decrypt"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.24.0",
