@@ -140,3 +140,98 @@ pnpm secrets:decrypt -- --input infra/testnet/scenarios/init/secrets.bundle.enc 
 
 - 推荐只提交 `*.enc` 和公钥，不提交私钥。
 - `infra/testnet/.gitignore` 已忽略明文 `.env`、`init/*.env`、`init/*.log`、`init/RUN_REPORT.md`。
+
+### secure-secrets.mjs 操作手册
+
+```bash
+# 查看帮助
+node scripts/secure-secrets.mjs help
+
+# 生成密钥对（可选：加密私钥）
+node scripts/secure-secrets.mjs gen-keypair \
+  --public-key infra/testnet/scenarios/init/secrets.pub.pem \
+  --private-key ~/.clawnet/secrets.pri.pem
+
+# 自动刷新敏感文件清单（testnet + devnet）
+node scripts/secure-secrets.mjs refresh-manifest \
+  --manifest infra/testnet/scenarios/init/secret-files.txt \
+  --roots infra/testnet,infra/devnet
+
+# 密码模式加密
+node scripts/secure-secrets.mjs encrypt-manifest \
+  --manifest infra/testnet/scenarios/init/secret-files.txt \
+  --output infra/testnet/scenarios/init/secrets.bundle.enc \
+  --mode password
+
+# 公钥模式加密
+node scripts/secure-secrets.mjs encrypt-manifest \
+  --manifest infra/testnet/scenarios/init/secret-files.txt \
+  --output infra/testnet/scenarios/init/secrets.bundle.enc \
+  --mode key \
+  --public-key infra/testnet/scenarios/init/secrets.pub.pem
+
+# 解密（密码模式）
+node scripts/secure-secrets.mjs decrypt \
+  --input infra/testnet/scenarios/init/secrets.bundle.enc \
+  --output .
+
+# 解密（私钥模式）
+node scripts/secure-secrets.mjs decrypt \
+  --input infra/testnet/scenarios/init/secrets.bundle.enc \
+  --output . \
+  --private-key ~/.clawnet/secrets.pri.pem
+```
+
+### 办公室 -> 家中恢复流程（推荐）
+
+这个流程用于“办公室机器已加密并提交，回家后恢复继续工作”。
+
+1. 在办公室机器执行并提交：
+
+```bash
+pnpm secrets:manifest:init
+pnpm secrets:encrypt:init
+git add infra/testnet/scenarios/init/secrets.bundle.enc infra/testnet/scenarios/init/secret-files.txt
+git commit -m "chore(secrets): refresh encrypted secret bundle"
+git push
+```
+
+2. 在办公室机器安全备份私钥（如果用 key 模式）：
+   - 私钥文件例如 `~/.clawnet/secrets.pri.pem`。
+   - 至少保留两份离线备份（例如 U 盘 + 密码管理器安全附件）。
+   - 不要上传到 git、网盘公开目录、聊天工具。
+
+3. 在家中机器拉取仓库并准备私钥：
+
+```bash
+git pull --ff-only
+mkdir -p ~/.clawnet
+chmod 700 ~/.clawnet
+# 把办公室备份的 secrets.pri.pem 放到 ~/.clawnet/
+chmod 600 ~/.clawnet/secrets.pri.pem
+```
+
+4. 在家中机器解密恢复：
+
+```bash
+pnpm secrets:decrypt -- \
+  --input infra/testnet/scenarios/init/secrets.bundle.enc \
+  --output . \
+  --private-key ~/.clawnet/secrets.pri.pem
+```
+
+5. 恢复后快速验证：
+
+```bash
+test -f infra/testnet/scenarios/.env && echo "scenarios env restored"
+test -f infra/testnet/scenarios/init/secrets.env && echo "init secrets restored"
+```
+
+### 丢失恢复建议（必须执行）
+
+- 如果私钥丢失且没有密码模式备份，`secrets.bundle.enc` 无法解密。
+- 建议同时保留一条“应急密码模式”链路：
+  1. 用强密码重新执行一次 `encrypt-manifest --mode password`；
+  2. 密码放入团队密码管理器；
+  3. 定期轮换（例如每月或人员变动后）。
+- 任一成员离岗或疑似泄露后，立即更新明文源文件并重新加密提交新 bundle。
