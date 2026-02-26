@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
+import { readFile } from 'node:fs/promises';
+import { parse } from 'yaml';
 import { ClawNetNode } from './index.js';
 import { createLogger } from './logger.js';
 import { loadConfig, resolveStoragePaths } from '@claw-network/core';
+import { type ChainConfig, ChainConfigSchema } from './services/chain-config.js';
 import { validateLiquidityPolicyFromEnv } from './policy/liquidity-policy.js';
 
 interface DaemonArgs {
@@ -146,9 +149,27 @@ Example:
     file: config.logging?.file,
   });
 
+  // ── Load optional chain config from config.yaml ─────────────────────
+  let chainConfig: ChainConfig | undefined;
+  try {
+    const raw = await readFile(paths.configFile, 'utf8');
+    const parsed = parse(raw) as Record<string, unknown>;
+    if (parsed?.chain) {
+      chainConfig = ChainConfigSchema.parse(parsed.chain);
+      logger.info('[clawnetd] On-chain config loaded — EventIndexer will start');
+    }
+  } catch (err) {
+    // If the file exists but chain section is invalid, warn but continue
+    if (err instanceof Error && 'issues' in err) {
+      logger.warn('[clawnetd] Invalid chain config in config.yaml — skipping: %s', err.message);
+    }
+    // ENOENT is fine — no config file means no chain config
+  }
+
   const node = new ClawNetNode({
     dataDir: args.dataDir,
     passphrase: args.passphrase,
+    chain: chainConfig,
     api: {
       enabled: args.noApi ? false : true,
       host: args.apiHost,

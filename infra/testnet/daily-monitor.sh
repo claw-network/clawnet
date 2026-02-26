@@ -321,6 +321,7 @@ if [ -d "$CONTRACTS_DIR" ] && [ -f "$CONTRACTS_JSON" ]; then
   # Find indexer DB (look in common locations)
   DB_PATH=""
   for candidate in \
+    "/opt/clawnet/clawnetd-data/indexer.sqlite" \
     "$SCRIPT_DIR/../../data/indexer.sqlite" \
     "$HOME/.clawnet/data/indexer.sqlite" \
     "/opt/clawnet/data/indexer.sqlite"; do

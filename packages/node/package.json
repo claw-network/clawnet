@@ -55,6 +55,7 @@
     "@libp2p/peer-id-factory": "^4.2.4",
     "better-sqlite3": "^11.10.0",
     "ethers": "^6.16.0",
+    "yaml": "^2.8.2",
     "zod": "^3.24.2"
   },
   "devDependencies": {
