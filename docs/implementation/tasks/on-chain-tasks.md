@@ -866,22 +866,39 @@
   - 验收：全部 9 个场景通过，无链上异常 ✅
   - 工时：3 天
 
-- [~] **T-3.9** Testnet 稳定性观察
+- [~] **T-3.9** Testnet 稳定性观察  🔄 监控工具已就绪，观察期进行中
   - 持续运行 5–7 天，监控：
     - Geth 出块稳定（2s 间隔，无分叉）
     - Node REST API 响应正常
     - 链上交易成功率 100%
     - EventIndexer 索引无遗漏（indexer block == chain head）
     - P2P gossipsub 消息同步正常
+  - **已完成 — 监控基础设施搭建（2026-02-26）：**
+    - [x] `infra/testnet/health-check.sh` — 3 节点 Geth + Docker + clawnetd 健康检查，8 检查项
+    - [x] `infra/testnet/daily-monitor.sh` — 每日综合稳定性监控（4 模块：健康检查 / 链指标 / 对账 / 场景回归）
+    - [x] `packages/contracts/scripts/reconcile.ts` 部署到服务器（420 行，4D 链上链下对账）
+    - [x] `infra/testnet/scenarios/.env` 配置 3 台专用场景服务器 IP（Alice/Bob/Charlie）
+    - [x] `infra/testnet/MONITORING.md` + `infra/mainnet/MONITORING.md` — 监控文档
+    - [x] 首次 daily-monitor 运行通过：**4 PASS / 0 WARN / 0 FAIL**
+    - [x] 智能检测：单节点环境自动跳过场景测试（避免误报）
+    - [x] 本地运行优化：缺少 indexer.sqlite / contracts 目录时显示 info 而非 warn
+  - **进行中 — 7 天观察窗口：**
+    - 观察窗口：2026-02-26 → 2026-03-04（7 天）
+    - Day 1 (02-26): ✅ 首次检查通过（健康 + 链指标 + 场景回归 9/9）
+    - Day 2 (02-27): ⏳ 待执行
+    - Day 3 (02-28): ⏳ 待执行
+    - Day 4 (03-01): ⏳ 待执行
+    - Day 5 (03-02): ⏳ 待执行
+    - Day 6 (03-03): ⏳ 待执行
+    - Day 7 (03-04): ⏳ 待执行
   - 自动化工具：`infra/testnet/daily-monitor.sh`（cron 每日执行）
     - 运行 `health-check.sh`（3 节点 Geth + Docker 状态）
     - 运行 `reconcile.ts`（4 维链上链下对账）
-    - 运行 `run-tests.mjs --scenario 01`（轻量回归：Identity + Wallet）
+    - 运行 `run-tests.mjs --scenario 01`（轻量回归：Identity + Wallet，9 用例）
     - 输出日终报告到 `infra/testnet/reports/YYYY-MM-DD.json`
-  - 每日运行 `reconcile.ts`，确认链上链下 0 差异
-  - 观察窗口：2026-02-26 → 2026-03-04（7 天）
   - 验收：连续 5 天无异常
   - 工时：5 天（含值班观察）
+  - 待办：在 Server A (66.94.125.242) 配置 crontab 每日自动执行
 
 ### Sprint 3-D：主网升级部署（W3–W4）
 
@@ -1014,4 +1031,4 @@ T-0.13(Ed25519)──┼──→ T-1.1 (Token)──→ T-1.3 (Test)
 ---
 
 *最后更新: 2026年2月26日*
-*状态: Phase 0–2 全部完成。Phase 3 Sprint 3-A（审计修复 ✅）+ Sprint 3-B（迁移工具 ✅）+ Sprint 3-C T-3.8（全场景验证 ✅）已完成。当前：T-3.9 Testnet 稳定性观察中（2026-02-26 → 2026-03-04）。下一步：Sprint 3-D 主网升级部署（testnet 3 台 + 2 台新服务器 → 5 节点主网 PoA）。*
+*状态: Phase 0–2 全部完成（T-0.1 ~ T-2.24）。Phase 3 Sprint 3-A/3-B/3-C 已完成（T-3.1 ~ T-3.8 ✅）。当前：T-3.9 Testnet 稳定性观察中 — 监控工具已就绪（daily-monitor.sh 4 PASS），7 天观察窗口 Day 1/7（2026-02-26 → 2026-03-04）。下一步：观察期结束后进入 Sprint 3-D 主网升级部署（T-3.10 ~ T-3.15，testnet 3 台 + 2 台新服务器 → 5 节点主网 PoA chainId 7626）。*
