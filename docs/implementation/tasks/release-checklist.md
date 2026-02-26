@@ -122,8 +122,12 @@
   - 采用方案 A：Node 层中间件查表验证
   - Middleware chain: `cors → apiKeyAuth → errorBoundary → logger → router`
   - 公共路由 `/api/v1/node` 始终开放（健康检查）
-  - 测试：16 tests (9 unit + 7 integration) 全部通过 ✅
-  - 下一步：部署后在 Server A 创建 key，移除 Caddy 层 API Key 校验
+  - 测试：20 tests (9 unit + 7 integration + 4 mainnet) 全部通过 ✅
+  - Server A 已部署：2 个 API Key 已创建，Caddy `@write_ops` 已移除
+  - Mainnet 安全加固（2026-02-27）：
+    - `--network mainnet` / `CLAW_NETWORK=mainnet` 支持
+    - Mainnet 不挂载 dev routes（faucet 404）
+    - Mainnet 0 key 时强制 401（不跳过验证）
 
 ### R-6. 文档站部署
 

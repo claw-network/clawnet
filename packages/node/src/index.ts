@@ -83,6 +83,8 @@ export interface NodeRuntimeConfig {
   chain?: ChainConfig;
   /** Optional overrides for the event indexer polling behaviour. */
   indexer?: EventIndexerConfig;
+  /** Network type override (mainnet|testnet|devnet). Overrides config.yaml value. */
+  network?: 'mainnet' | 'testnet' | 'devnet';
 }
 
 export const DEFAULT_SYNC_RUNTIME_CONFIG = {
@@ -273,6 +275,7 @@ export class ClawNetNode {
           host: this.config.api?.host ?? '127.0.0.1',
           port: this.config.api?.port ?? 9528,
           dataDir: this.config.dataDir,
+          network: this.config.network ?? persisted.network,
         };
         this.apiServer = new ApiServer(apiConfig, {
           publishEvent: (envelope) => this.publishEvent(envelope as EventEnvelope),
@@ -886,3 +889,4 @@ export { ApiKeyStore } from './api/api-key-store.js';
 export type { ApiKeyRecord, ApiKeySummary } from './api/api-key-store.js';
 export { getApiKeyAuth } from './api/auth.js';
 export type { ApiKeyAuth } from './api/auth.js';
+export type { NetworkType } from './api/types.js';

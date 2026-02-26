@@ -54,7 +54,12 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/markets/capabilities', marketsCapabilityRoutes(ctx));
   api.mount('/api/v1/markets/disputes', marketsDisputeRoutes(ctx));
   api.mount('/api/v1/markets/search', marketsSearchRoutes(ctx));
-  api.mount('/api/v1/dev', devRoutes(ctx));
+
+  // Dev routes (faucet, etc.) are NOT available on mainnet — prevents unauthorized minting.
+  if (ctx.config.network !== 'mainnet') {
+    api.mount('/api/v1/dev', devRoutes(ctx));
+  }
+
   api.mount('/api/v1/admin', adminRoutes(ctx));
 
   return api;
@@ -120,7 +125,7 @@ export class ApiServer {
 
     // Set up middleware + router as request handler
     const router = this.router;
-    const authMiddleware = apiKeyAuth(this.runtime.apiKeyStore);
+    const authMiddleware = apiKeyAuth(this.runtime.apiKeyStore, this.config.network);
 
     this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
       // Middleware chain: CORS → auth → error boundary → logger → router

@@ -17,6 +17,7 @@ interface DaemonArgs {
   bootstrap: string[];
   healthIntervalMs: number;
   passphrase?: string;
+  network?: 'mainnet' | 'testnet' | 'devnet';
 }
 
 function parseArgs(argv: string[]): DaemonArgs {
@@ -28,6 +29,7 @@ function parseArgs(argv: string[]): DaemonArgs {
   const bootstrap: string[] = [];
   let healthIntervalMs = 30_000;
   let passphrase: string | undefined;
+  let network: 'mainnet' | 'testnet' | 'devnet' | undefined;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -69,6 +71,15 @@ function parseArgs(argv: string[]): DaemonArgs {
       passphrase = argv[++i];
       continue;
     }
+    if (arg === '--network') {
+      const val = argv[++i];
+      if (val !== 'mainnet' && val !== 'testnet' && val !== 'devnet') {
+        console.error(`[clawnetd] invalid --network value: ${val} (must be mainnet|testnet|devnet)`);
+        process.exit(1);
+      }
+      network = val;
+      continue;
+    }
     if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -91,6 +102,7 @@ function parseArgs(argv: string[]): DaemonArgs {
     bootstrap,
     healthIntervalMs,
     passphrase: passphrase ?? process.env.CLAW_PASSPHRASE,
+    network: network ?? (process.env.CLAW_NETWORK as 'mainnet' | 'testnet' | 'devnet' | undefined),
   };
 }
 
@@ -170,6 +182,7 @@ Example:
     dataDir: args.dataDir,
     passphrase: args.passphrase,
     chain: chainConfig,
+    network: args.network,
     api: {
       enabled: args.noApi ? false : true,
       host: args.apiHost,
@@ -193,7 +206,11 @@ Example:
   logger.info(`Data Dir : ${paths.root}`);
   logger.info(`Peer Id  : ${node.getPeerId() ?? 'unknown'}`);
   logger.info(`DID      : ${node.getDid() ?? '(pending)'}`);
-  logger.info(`Network  : ${config.network}`);
+  const effectiveNetwork = args.network ?? config.network;
+  logger.info(`Network  : ${effectiveNetwork}`);
+  if (effectiveNetwork === 'mainnet') {
+    logger.info('[clawnetd] Mainnet mode: dev routes (faucet) disabled, API key required');
+  }
   if (liquidityPolicyValidation.config) {
     const lp = liquidityPolicyValidation.config;
     logger.info(
@@ -253,6 +270,7 @@ Options:
   --bootstrap <multiaddr>    Add bootstrap peer multiaddr (repeatable)
   --health-interval-ms <ms>  Health check interval (default: 30000, 0 to disable)
   --passphrase <str>         Passphrase for node identity key (REQUIRED, env: CLAW_PASSPHRASE)
+  --network <type>           Network type: mainnet|testnet|devnet (overrides config.yaml, env: CLAW_NETWORK)
   -h, --help                 Show help
 `);
 }

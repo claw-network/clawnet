@@ -43,10 +43,14 @@ export {
 
 // ─── Runtime Context ────────────────────────────────────────────
 
+export type NetworkType = 'mainnet' | 'testnet' | 'devnet';
+
 export interface ApiServerConfig {
   host: string;
   port: number;
   dataDir?: string;
+  /** Network type — controls dev route availability and auth strictness. */
+  network?: NetworkType;
 }
 
 export interface RuntimeContext {

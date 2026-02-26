@@ -193,3 +193,133 @@ describe('auth middleware', () => {
     expect(res.status).toBe(204);
   });
 });
+
+// ─── Mainnet-specific: network-aware behaviour ──────────────────
+
+describe('mainnet network restrictions', () => {
+  let tmpDir: string;
+  let store: ApiKeyStore;
+  let api: ApiServer;
+  let baseUrl: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'claw-mainnet-'));
+    store = new ApiKeyStore(join(tmpDir, 'api-keys.sqlite'));
+  });
+
+  afterEach(async () => {
+    await api.stop();
+    store.close();
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('enforces 401 on mainnet even with 0 keys', async () => {
+    api = new ApiServer(
+      { host: '127.0.0.1', port: 0, network: 'mainnet' },
+      {
+        publishEvent: async () => 'hash-1',
+        getNodeStatus: async () => ({
+          did: 'did:claw:test',
+          synced: true,
+          version: '0.0.0',
+        }),
+        apiKeyStore: store,
+      },
+    );
+    await api.start();
+    const addr = api.httpServer?.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${addr.port}`;
+
+    // 0 keys on mainnet — should still enforce 401
+    const res = await fetch(`${baseUrl}/api/v1/wallets/did:claw:test/balance`);
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.detail).toContain('No API keys configured');
+  });
+
+  it('still allows /api/v1/node on mainnet without key', async () => {
+    api = new ApiServer(
+      { host: '127.0.0.1', port: 0, network: 'mainnet' },
+      {
+        publishEvent: async () => 'hash-1',
+        getNodeStatus: async () => ({
+          did: 'did:claw:test',
+          synced: true,
+          version: '0.0.0',
+        }),
+        apiKeyStore: store,
+      },
+    );
+    await api.start();
+    const addr = api.httpServer?.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${addr.port}`;
+
+    const res = await fetch(`${baseUrl}/api/v1/node`);
+    expect(res.status).toBe(200);
+  });
+
+  it('does not mount dev routes on mainnet', async () => {
+    api = new ApiServer(
+      { host: '127.0.0.1', port: 0, network: 'mainnet' },
+      {
+        publishEvent: async () => 'hash-1',
+        getNodeStatus: async () => ({
+          did: 'did:claw:test',
+          synced: true,
+          version: '0.0.0',
+        }),
+        apiKeyStore: store,
+      },
+    );
+    await api.start();
+    const addr = api.httpServer?.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${addr.port}`;
+
+    // Create a key so auth passes
+    const key = store.create('test');
+
+    const res = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': key.key,
+      },
+      body: JSON.stringify({ address: '0x0000000000000000000000000000000000000099', amount: 1 }),
+    });
+    // Should be 404 (route not mounted), not 200 or 500
+    expect(res.status).toBe(404);
+  });
+
+  it('mounts dev routes on testnet (default)', async () => {
+    api = new ApiServer(
+      { host: '127.0.0.1', port: 0, network: 'testnet' },
+      {
+        publishEvent: async () => 'hash-1',
+        getNodeStatus: async () => ({
+          did: 'did:claw:test',
+          synced: true,
+          version: '0.0.0',
+        }),
+        apiKeyStore: store,
+      },
+    );
+    await api.start();
+    const addr = api.httpServer?.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${addr.port}`;
+
+    // Create a key
+    const key = store.create('test');
+
+    const res = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': key.key,
+      },
+      body: JSON.stringify({ address: '0x0000000000000000000000000000000000000099', amount: 1 }),
+    });
+    // Route exists — we get a response that's NOT 404
+    // (could be 400, 500 etc. depending on wallet setup, but not 404)
+    expect(res.status).not.toBe(404);
+  });
+});

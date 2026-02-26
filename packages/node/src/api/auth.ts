@@ -14,6 +14,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Middleware } from './router.js';
 import type { ApiKeyStore, ApiKeyRecord } from './api-key-store.js';
+import type { NetworkType } from './types.js';
 import { unauthorized } from './response.js';
 
 // ---------------------------------------------------------------------------
@@ -56,8 +57,9 @@ function isPublicRoute(url: string, method: string): boolean {
  * Create the API key auth middleware.
  *
  * @param store - optional ApiKeyStore. If undefined or has 0 keys, auth is skipped.
+ * @param network - network type. On mainnet, 0-key still enforces 401.
  */
-export function apiKeyAuth(store: ApiKeyStore | undefined): Middleware {
+export function apiKeyAuth(store: ApiKeyStore | undefined, network?: NetworkType): Middleware {
   return async (req: IncomingMessage, res: ServerResponse, next: () => Promise<void>) => {
     // No store configured → open access (backward-compatible)
     if (!store) {
@@ -75,8 +77,14 @@ export function apiKeyAuth(store: ApiKeyStore | undefined): Middleware {
       return;
     }
 
-    // If no keys have been created yet → open access (fresh node)
+    // If no keys have been created yet:
+    //  - mainnet: still enforce 401 (must create keys before API is usable)
+    //  - testnet/devnet: open access (fresh node, backwards-compatible)
     if (store.activeCount() === 0) {
+      if (network === 'mainnet') {
+        unauthorized(res, 'No API keys configured. Create a key with `clawnet api-key create <label>` before using mainnet API.', pathname);
+        return;
+      }
       await next();
       return;
     }
