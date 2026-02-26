@@ -76,14 +76,14 @@ const NODE_A_URL = process.env.NODE_A_URL || 'https://node-a.clawnetd.com';
 const NODE_B_URL = process.env.NODE_B_URL || 'https://node-b.clawnetd.com';
 const NODE_C_URL = process.env.NODE_C_URL || 'https://node-c.clawnetd.com';
 
-const ALICE_PASS   = process.env.ALICE_PASSPHRASE   || '';
-const BOB_PASS     = process.env.BOB_PASSPHRASE     || '';
+const ALICE_PASS = process.env.ALICE_PASSPHRASE || '';
+const BOB_PASS = process.env.BOB_PASSPHRASE || '';
 const CHARLIE_PASS = process.env.CHARLIE_PASSPHRASE || '';
 
 const MIN_BALANCE = parseInt(process.env.MIN_BALANCE || '10000', 10);
 
-const alice   = new Agent('alice',   NODE_A_URL, ALICE_PASS);
-const bob     = new Agent('bob',     NODE_B_URL, BOB_PASS);
+const alice = new Agent('alice', NODE_A_URL, ALICE_PASS);
+const bob = new Agent('bob', NODE_B_URL, BOB_PASS);
 const charlie = new Agent('charlie', NODE_C_URL, CHARLIE_PASS);
 
 const agents = [alice, bob, charlie];
@@ -92,15 +92,15 @@ const agents = [alice, bob, charlie];
 // Scenario registry
 // ---------------------------------------------------------------------------
 const SCENARIOS = [
-  { id: '01', name: 'Identity & Wallet',       file: './scenarios/01-identity-wallet.mjs' },
-  { id: '02', name: 'Info Market',              file: './scenarios/02-info-market.mjs' },
-  { id: '03', name: 'Task Market',              file: './scenarios/03-task-market.mjs' },
-  { id: '04', name: 'Capability Market',        file: './scenarios/04-capability-market.mjs' },
-  { id: '05', name: 'Service Contract',         file: './scenarios/05-service-contract.mjs' },
-  { id: '06', name: 'Contract Dispute',         file: './scenarios/06-contract-dispute.mjs' },
-  { id: '07', name: 'DAO Governance',           file: './scenarios/07-dao-governance.mjs' },
-  { id: '08', name: 'Cross-Node Sync',          file: './scenarios/08-cross-node-sync.mjs' },
-  { id: '09', name: 'Full Economic Cycle',      file: './scenarios/09-economic-cycle.mjs' },
+  { id: '01', name: 'Identity & Wallet', file: './scenarios/01-identity-wallet.mjs' },
+  { id: '02', name: 'Info Market', file: './scenarios/02-info-market.mjs' },
+  { id: '03', name: 'Task Market', file: './scenarios/03-task-market.mjs' },
+  { id: '04', name: 'Capability Market', file: './scenarios/04-capability-market.mjs' },
+  { id: '05', name: 'Service Contract', file: './scenarios/05-service-contract.mjs' },
+  { id: '06', name: 'Contract Dispute', file: './scenarios/06-contract-dispute.mjs' },
+  { id: '07', name: 'DAO Governance', file: './scenarios/07-dao-governance.mjs' },
+  { id: '08', name: 'Cross-Node Sync', file: './scenarios/08-cross-node-sync.mjs' },
+  { id: '09', name: 'Full Economic Cycle', file: './scenarios/09-economic-cycle.mjs' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,9 @@ async function main() {
   // 1. Validate passphrases
   for (const a of agents) {
     if (!a.passphrase) {
-      console.error(`✗ ${a.name}: missing passphrase — set ${a.name.toUpperCase()}_PASSPHRASE in .env`);
+      console.error(
+        `✗ ${a.name}: missing passphrase — set ${a.name.toUpperCase()}_PASSPHRASE in .env`,
+      );
       process.exit(1);
     }
   }
@@ -149,17 +151,46 @@ async function main() {
   // 4. Check minimum balances
   console.log('Checking balances...');
   let balanceOk = true;
+  const lowBalanceAgents = [];
   for (const a of agents) {
     const { status, data } = await a.balance();
     const bal = Number(data?.balance ?? data?.available ?? 0);
     const ok = bal >= MIN_BALANCE;
     if (!ok) balanceOk = false;
+    if (!ok) lowBalanceAgents.push(a);
     console.log(`  ${a.name}: ${bal} Tokens ${ok ? '✓' : '✗ (below ' + MIN_BALANCE + ')'}`);
   }
   if (!balanceOk) {
     console.warn('\n⚠  Some agents have insufficient balance.');
-    console.warn('   Run bootstrap-mint.ts to fund node wallets before testing.');
-    console.warn('   Continuing anyway — some scenarios may fail.\n');
+    console.warn('   Attempting auto-fund via /api/v1/dev/faucet ...');
+
+    for (const a of lowBalanceAgents) {
+      const amount = Math.max(MIN_BALANCE, 1000);
+      const result = await a.faucet(amount);
+      const msg = result.status >= 200 && result.status < 300 ? 'ok' : `failed (${result.status})`;
+      console.log(`  faucet ${a.name}: ${msg}`);
+      if (verbose && result.data) {
+        vlog(`  faucet response ${a.name}: ${JSON.stringify(result.data).slice(0, 240)}`);
+      }
+    }
+
+    await sleep(1500);
+    balanceOk = true;
+    console.log('\nRe-checking balances after faucet...');
+    for (const a of agents) {
+      const { data } = await a.balance();
+      const bal = Number(data?.balance ?? data?.available ?? 0);
+      const ok = bal >= MIN_BALANCE;
+      if (!ok) balanceOk = false;
+      console.log(`  ${a.name}: ${bal} Tokens ${ok ? '✓' : '✗ (below ' + MIN_BALANCE + ')'}`);
+    }
+
+    if (!balanceOk) {
+      console.warn('\n⚠  Balance still below threshold for some agents.');
+      console.warn('   Continuing anyway — some scenarios may fail.\n');
+    } else {
+      console.log('Balances topped up ✓\n');
+    }
   }
   console.log('');
 
