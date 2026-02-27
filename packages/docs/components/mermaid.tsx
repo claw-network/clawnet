@@ -153,6 +153,16 @@ export function Mermaid({ chart }: { chart: string }) {
             .edgeTerminals text,
             .messageText, .labelText { color: ${labelFill}; fill: ${labelFill}; }
             .node .label, .node .label div { color: ${textFill}; }
+            .node foreignObject { overflow: visible; }
+            .node foreignObject > div,
+            .node foreignObject body,
+            .node .label {
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              height: 100% !important;
+              margin: 0 !important;
+            }
             .cluster-label text { fill: ${textFill}; }
             .transition { stroke: #94a3b8; }
           </style>`;
@@ -162,8 +172,9 @@ export function Mermaid({ chart }: { chart: string }) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(String(err));
-          console.error('Mermaid render error:', err);
+          const msg = err instanceof Error ? err.message : 'Mermaid render failed';
+          setError(msg);
+          console.error('Mermaid render error:', msg);
         }
       }
     })();
@@ -192,7 +203,7 @@ export function Mermaid({ chart }: { chart: string }) {
   return (
     <div
       ref={containerRef}
-      className="my-4 flex justify-center overflow-x-auto rounded-lg border border-fd-border bg-fd-card/50 dark:bg-slate-100 px-4 py-3 [&>svg]:max-w-full [&>svg]:h-auto"
+      className="my-4 flex justify-center overflow-x-auto rounded-lg border border-fd-border bg-fd-card/50 dark:bg-slate-100 px-4 py-3 [&>svg]:h-auto"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );

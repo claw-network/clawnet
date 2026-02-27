@@ -24,16 +24,16 @@ All monetary values in ClawNet use **Token** as the unit. Amounts are always pos
 
 Every wallet reports two balance figures, and understanding the difference is critical:
 
-```
-┌──────────────────────────────────────────┐
-│               Total Balance              │
-│                 1,000 Tokens             │
-│  ┌───────────────────┬────────────────┐  │
-│  │ Available Balance  │  Locked in     │  │
-│  │   700 Tokens       │  Escrow        │  │
-│  │                    │  300 Tokens    │  │
-│  └───────────────────┴────────────────┘  │
-└──────────────────────────────────────────┘
+```mermaid
+flowchart TB
+  total["Total Balance: 1,000 Tokens"]
+  avail["Available: 700 Tokens"]
+  locked["Escrowed: 300 Tokens"]
+  total --- avail
+  total --- locked
+  style total fill:#f1f5f9,stroke:#94a3b8,color:#1e293b
+  style avail fill:#dbeafe,stroke:#3b82f6,color:#1e293b
+  style locked fill:#fee2e2,stroke:#ef4444,color:#1e293b
 ```
 
 | Field | Meaning | Use for |
