@@ -1,17 +1,98 @@
-#!/bin/sh
+#!/bin/bash
 #
 # pre-push hook — block push unless all tests pass
 #
+# Skip:  git push --no-verify
+#        SKIP_TESTS=1 git push
+#
 
-echo "🔒 Running tests before push..."
-pnpm run test
+# ── allow skipping ──────────────────────────────────────────────
+if [ "${SKIP_TESTS:-0}" = "1" ]; then
+  echo "⚠️  SKIP_TESTS=1 — skipping pre-push tests"
+  exit 0
+fi
 
-if [ $? -ne 0 ]; then
+# ── colours (disabled when not a tty) ──────────────────────────
+if [ -t 1 ]; then
+  BOLD="\033[1m"
+  DIM="\033[2m"
+  RED="\033[31m"
+  GREEN="\033[32m"
+  YELLOW="\033[33m"
+  CYAN="\033[36m"
+  RESET="\033[0m"
+else
+  BOLD="" DIM="" RED="" GREEN="" YELLOW="" CYAN="" RESET=""
+fi
+
+# ── package list (keep in dependency order) ─────────────────────
+PACKAGES=(
+  "core"
+  "protocol"
+  "contracts"
+  "node"
+  "sdk"
+  "cli"
+)
+
+TOTAL=${#PACKAGES[@]}
+PASSED=0
+FAILED=0
+FAILED_NAMES=""
+TOTAL_START=$(date +%s)
+
+# ── banner ──────────────────────────────────────────────────────
+echo ""
+echo -e "${BOLD}🔒 Pre-push: running tests across ${TOTAL} packages${RESET}"
+echo -e "${DIM}   Skip with: git push --no-verify${RESET}"
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+
+# ── run each package ────────────────────────────────────────────
+IDX=0
+for PKG in "${PACKAGES[@]}"; do
+  IDX=$((IDX + 1))
+  FILTER="@claw-network/${PKG}"
+  PKG_START=$(date +%s)
+
+  # Print progress header (no newline — will append result)
+  printf "  ${DIM}[%d/%d]${RESET} %-28s " "$IDX" "$TOTAL" "$FILTER"
+
+  # Run test, capture output and exit code
+  LOG=$(mktemp)
+  pnpm --filter "$FILTER" test > "$LOG" 2>&1
+  EC=$?
+  PKG_END=$(date +%s)
+  PKG_SECS=$((PKG_END - PKG_START))
+
+  if [ $EC -eq 0 ]; then
+    PASSED=$((PASSED + 1))
+    echo -e "${GREEN}✅ passed${RESET} ${DIM}(${PKG_SECS}s)${RESET}"
+  else
+    FAILED=$((FAILED + 1))
+    FAILED_NAMES="${FAILED_NAMES}  • ${FILTER}\n"
+    echo -e "${RED}❌ FAILED${RESET} ${DIM}(${PKG_SECS}s)${RESET}"
+    # Show last 30 lines of failed output for diagnosis
+    echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+    tail -30 "$LOG" | sed 's/^/    /'
+    echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  fi
+  rm -f "$LOG"
+done
+
+# ── summary ─────────────────────────────────────────────────────
+TOTAL_END=$(date +%s)
+TOTAL_SECS=$((TOTAL_END - TOTAL_START))
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+
+if [ $FAILED -gt 0 ]; then
+  echo -e "${RED}${BOLD}❌ ${FAILED} package(s) failed${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+  echo -e "${RED}${FAILED_NAMES}${RESET}"
+  echo -e "   Push aborted. Fix the failing tests and try again."
   echo ""
-  echo "❌ Tests failed. Push aborted."
-  echo "   Fix the failing tests and try again."
   exit 1
 fi
 
-echo "✅ All tests passed. Pushing..."
+echo -e "${GREEN}${BOLD}✅ All ${PASSED} packages passed${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+echo -e "   Pushing..."
+echo ""
 exit 0
