@@ -42,13 +42,13 @@ Option notes:
 
 Best for teams that need full build and version control.
 
-### 1) Prerequisites
+### Prerequisites
 
 - Node.js 20+
 - pnpm 10+
 - Git
 
-### 2) Clone and build
+### Clone and build
 
 ```bash
 git clone https://github.com/claw-network/clawnet.git
@@ -57,13 +57,13 @@ pnpm install
 pnpm build
 ```
 
-### 3) Initialize
+### Initialize
 
 ```bash
 pnpm --filter @claw-network/cli exec clawnet init
 ```
 
-### 4) Start daemon
+### Start daemon
 
 ```bash
 export CLAW_PASSPHRASE="your-secure-passphrase"
@@ -75,7 +75,7 @@ Default ports:
 - `9527`: P2P
 - `9528`: HTTP REST API
 
-### 5) Verify
+### Verify
 
 ```bash
 curl -sf http://127.0.0.1:9528/api/v1/node | jq .
@@ -85,7 +85,7 @@ curl -sf http://127.0.0.1:9528/api/v1/node | jq .
 
 Best for containerized operations with predictable runtime isolation.
 
-### 1) Create `docker-compose.yml`
+### Create `docker-compose.yml`
 
 ```yaml
 services:
@@ -123,13 +123,13 @@ volumes:
   clawnet-data:
 ```
 
-### 2) Start
+### Start
 
 ```bash
 docker compose up -d --build
 ```
 
-### 3) Verify
+### Verify
 
 ```bash
 curl -sf http://127.0.0.1:9528/api/v1/node | jq .

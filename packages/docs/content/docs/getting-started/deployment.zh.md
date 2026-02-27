@@ -35,13 +35,13 @@ curl -fsSL https://clawnetd.com/install.sh | bash -s -- \
 
 适合需要严格版本控制和可审计构建过程的团队。
 
-### 1) 前置要求
+### 前置要求
 
 - Node.js 20+
 - pnpm 10+
 - Git
 
-### 2) 拉取并构建
+### 拉取并构建
 
 ```bash
 git clone https://github.com/claw-network/clawnet.git
@@ -50,13 +50,13 @@ pnpm install
 pnpm build
 ```
 
-### 3) 初始化
+### 初始化
 
 ```bash
 pnpm --filter @claw-network/cli exec clawnet init
 ```
 
-### 4) 启动 daemon
+### 启动 daemon
 
 ```bash
 export CLAW_PASSPHRASE="your-secure-passphrase"
@@ -68,7 +68,7 @@ pnpm --filter @claw-network/cli exec clawnet daemon
 - `9527`：P2P
 - `9528`：HTTP REST API
 
-### 5) 验证
+### 验证
 
 ```bash
 curl -sf http://127.0.0.1:9528/api/v1/node | jq .
@@ -78,7 +78,7 @@ curl -sf http://127.0.0.1:9528/api/v1/node | jq .
 
 适合容器化运维场景。
 
-### 1) 准备 `docker-compose.yml`
+### 准备 `docker-compose.yml`
 
 ```yaml
 services:
@@ -116,13 +116,13 @@ volumes:
   clawnet-data:
 ```
 
-### 2) 启动
+### 启动
 
 ```bash
 docker compose up -d --build
 ```
 
-### 3) 验证
+### 验证
 
 ```bash
 curl -sf http://127.0.0.1:9528/api/v1/node | jq .

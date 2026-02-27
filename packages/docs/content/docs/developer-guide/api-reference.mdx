@@ -49,7 +49,7 @@ For troubleshooting playbooks, see [API Errors](/docs/developer-guide/api-errors
 
 Node APIs are safe read-only checks for health, peer connectivity, and runtime configuration.
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/node</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node</span>
 
 - Returns sync state, height, peer count, network, version, and uptime.
 - Authentication is optional.
@@ -60,7 +60,7 @@ Node APIs are safe read-only checks for health, peer connectivity, and runtime c
 curl -sS http://127.0.0.1:9528/api/v1/node
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/node/peers</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node/peers</span>
 
 - Returns the connected peer set and pagination metadata.
 - Authentication is optional.
@@ -70,7 +70,7 @@ curl -sS http://127.0.0.1:9528/api/v1/node
 curl -sS http://127.0.0.1:9528/api/v1/node/peers
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/node/config</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node/config</span>
 
 - Returns runtime node configuration for diagnostics and deployment verification.
 - Authentication is optional.
@@ -84,7 +84,7 @@ curl -sS http://127.0.0.1:9528/api/v1/node/config
 
 Identity APIs provide DID resolution and capability credential registration used by market and reputation workflows.
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/identities/self</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/self</span>
 
 - Returns local node identity (DID/public key/timestamps).
 - Authentication is optional.
@@ -94,7 +94,7 @@ Identity APIs provide DID resolution and capability credential registration used
 curl -sS http://127.0.0.1:9528/api/v1/identities/self
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/identities/&#123;did&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/&#123;did&#125;</span>
 
 - Resolves public identity data for a target DID.
 - Path parameter: `did` (required).
@@ -106,7 +106,7 @@ curl -sS http://127.0.0.1:9528/api/v1/identities/self
 curl -sS "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M...?source=store"
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/identities/&#123;did&#125;/capabilities</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/&#123;did&#125;/capabilities</span>
 
 - Returns capability credentials currently associated with the DID.
 - Path parameter: `did` (required).
@@ -116,7 +116,7 @@ curl -sS "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M...?source=store"
 curl -sS "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M.../capabilities"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/identities/&#123;did&#125;/capabilities</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/identities/&#123;did&#125;/capabilities</span>
 
 - Registers a new capability credential for the DID.
 - Path parameter: `did` (required).
@@ -135,7 +135,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M.../capabi
 
 Wallet APIs cover balance reads, transfers, and escrow lifecycle operations.
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/wallets/&#123;address&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/wallets/&#123;address&#125;</span>
 
 - Returns current balance projection for a DID/address.
 - Path parameter: `address` (required).
@@ -145,7 +145,7 @@ Wallet APIs cover balance reads, transfers, and escrow lifecycle operations.
 curl -sS "http://127.0.0.1:9528/api/v1/wallets/did:claw:z6M..."
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/transfers</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/transfers</span>
 
 - Submits a token transfer event.
 - Required body: `did`, `passphrase`, `to`, `amount`, `nonce`.
@@ -160,7 +160,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/transfers \
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","to":"claw1...","amount":100,"nonce":2}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/wallets/&#123;address&#125;/transactions</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/wallets/&#123;address&#125;/transactions</span>
 
 - Returns transaction history with filters.
 - Path parameter: `address` (required).
@@ -174,7 +174,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/transfers \
 curl -sS "http://127.0.0.1:9528/api/v1/wallets/did:claw:z6M.../transactions?type=all&limit=20&offset=0"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/escrows</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows</span>
 
 - Creates a new escrow account and optional auto-funding event.
 - Required body: `did`, `passphrase`, `beneficiary`, `amount`, `releaseRules`, `nonce`.
@@ -188,7 +188,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/escrows \
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","beneficiary":"did:claw:z6N...","amount":500,"releaseRules":[{}],"nonce":3}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/escrows/&#123;escrowId&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;</span>
 
 - Reads escrow state, parties, rules, and balance information.
 - Path parameter: `escrowId` (required).
@@ -199,7 +199,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/escrows \
 curl -sS "http://127.0.0.1:9528/api/v1/escrows/escrow_..."
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/release</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/release</span>
 
 - Releases escrowed funds according to release rules.
 - Path parameter: `escrowId` (required).
@@ -213,7 +213,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/releas
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","amount":100,"nonce":4}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/fund</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/fund</span>
 
 - Adds funds to an existing escrow.
 - Path parameter: `escrowId` (required).
@@ -227,7 +227,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/fund" 
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","amount":50,"resourcePrev":"hash","nonce":5}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/refund</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/refund</span>
 
 - Refunds from escrow back to payer according to refund policy.
 - Path parameter: `escrowId` (required).
@@ -245,7 +245,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/refund
 
 Markets APIs cover three subdomains: info, task, and capability. Most write actions are stateful and should be called in sequence.
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/search</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/search</span>
 
 - Performs unified search across market types.
 - Optional filters include `keyword`, `markets`, `category`, `tags`, `minPrice`, `maxPrice`, `minReputation`, `minRating`, `skills`, `taskTypes`, `capabilityType`, `infoTypes`, `contentFormats`, `accessMethods`, `statuses`, `visibility`.
@@ -257,7 +257,7 @@ Markets APIs cover three subdomains: info, task, and capability. Most write acti
 curl -sS "http://127.0.0.1:9528/api/v1/markets/search?keyword=llm&markets=capability"
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/info</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info</span>
 
 - Searches information listings.
 - Supports listing filters + info-specific filters (`infoTypes`, `contentFormats`, `accessMethods`).
@@ -268,7 +268,7 @@ curl -sS "http://127.0.0.1:9528/api/v1/markets/search?keyword=llm&markets=capabi
 curl -sS "http://127.0.0.1:9528/api/v1/markets/info?keyword=dataset&limit=20&offset=0"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/info</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info</span>
 
 - Creates a new information listing.
 - Body schema: `InfoPublishRequest`.
@@ -281,7 +281,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/info \
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"Dataset","description":"...","category":"data","pricing":{},"infoType":"dataset","content":{},"accessMethod":{},"license":{},"nonce":10}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/info/&#123;listingId&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;</span>
 
 - Reads full listing detail including pricing and metadata.
 - Path parameter: `listingId` (required).
@@ -291,7 +291,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/info \
 curl -sS "http://127.0.0.1:9528/api/v1/markets/info/listing_..."
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/info/&#123;listingId&#125;/content</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/content</span>
 
 - Reads encrypted content package metadata.
 - Path parameter: `listingId` (required).
@@ -301,7 +301,7 @@ curl -sS "http://127.0.0.1:9528/api/v1/markets/info/listing_..."
 curl -sS "http://127.0.0.1:9528/api/v1/markets/info/listing_.../content"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/purchase</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/purchase</span>
 
 - Starts purchase flow for an info listing.
 - Path parameter: `listingId` (required).
@@ -315,7 +315,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":11}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/deliver</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/deliver</span>
 
 - Delivers decryption/access material to purchased order.
 - Path parameter: `listingId` (required).
@@ -329,7 +329,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","contentKeyHex":"hex","buyerPublicKeyHex":"hex","nonce":12}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/confirm</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/confirm</span>
 
 - Final buyer confirmation after successful delivery.
 - Path parameter: `listingId` (required).
@@ -342,7 +342,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","nonce":13}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/review</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/review</span>
 
 - Writes post-transaction review for info order.
 - Path parameter: `listingId` (required).
@@ -355,7 +355,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","rating":5,"nonce":14}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/info/orders/&#123;orderId&#125;/delivery</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/orders/&#123;orderId&#125;/delivery</span>
 
 - Reads delivery record by order ID.
 - Path parameter: `orderId` (required).
@@ -365,7 +365,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/
 curl -sS "http://127.0.0.1:9528/api/v1/markets/info/orders/order_.../delivery"
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/tasks</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks</span>
 
 - Searches task listings.
 - Filters include `keyword`, `category`, `tags`, `skills`, `taskTypes`, reputation/price filters, sort and pagination.
@@ -376,7 +376,7 @@ curl -sS "http://127.0.0.1:9528/api/v1/markets/info/orders/order_.../delivery"
 curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks?keyword=etl&skills=python"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/tasks</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks</span>
 
 - Publishes a task listing.
 - Body schema: `TaskPublishRequest`.
@@ -389,7 +389,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/tasks \
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"Task","description":"...","category":"ml","pricing":{},"taskType":"one-off","task":{},"timeline":{},"nonce":20}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/tasks/&#123;taskId&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;</span>
 
 - Reads detailed task listing data.
 - Path parameter: `taskId` (required).
@@ -399,7 +399,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/tasks \
 curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks/task_..."
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids</span>
 
 - Lists bids submitted to the task.
 - Path parameter: `taskId` (required).
@@ -410,7 +410,7 @@ curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks/task_..."
 curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids?limit=20&offset=0"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids</span>
 
 - Submits a bid for an open task.
 - Path parameter: `taskId` (required).
@@ -423,7 +423,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids" \
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","price":100,"timeline":{},"approach":"...","nonce":21}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids/&#123;bidId&#125;/actions/accept</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids/&#123;bidId&#125;/actions/accept</span>
 
 - Accepts one bid and moves flow toward fulfillment.
 - Path parameters: `taskId`, `bidId` (required).
@@ -436,7 +436,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids/bid_.
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","bidId":"bid_...","nonce":22}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/deliver</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/deliver</span>
 
 - Submits task deliverables for an accepted order.
 - Path parameter: `taskId` (required).
@@ -449,7 +449,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/de
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","deliverables":["cid"],"nonce":23}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/confirm</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/confirm</span>
 
 - Confirms or rejects submitted task output.
 - Path parameter: `taskId` (required).
@@ -462,7 +462,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/co
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","submissionId":"sub_...","approved":true,"feedback":"ok","nonce":24}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/review</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/review</span>
 
 - Writes final task review after settlement.
 - Path parameter: `taskId` (required).
@@ -475,7 +475,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/re
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","rating":5,"nonce":25}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/capabilities</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities</span>
 
 - Searches capability listings available for lease.
 - Supports category/tags/price/reputation filters, sort, and pagination.
@@ -485,7 +485,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/re
 curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities?keyword=llm"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/capabilities</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities</span>
 
 - Publishes a capability listing.
 - Body schema: `CapabilityPublishRequest`.
@@ -498,7 +498,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/capabilities \
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"API","description":"...","category":"ai","pricing":{},"capabilityType":"llm-api","capability":{},"quota":{},"access":{},"nonce":30}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/capabilities/&#123;listingId&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities/&#123;listingId&#125;</span>
 
 - Reads capability listing detail.
 - Path parameter: `listingId` (required).
@@ -508,7 +508,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/capabilities \
 curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities/listing_..."
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/capabilities/&#123;listingId&#125;/leases</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/&#123;listingId&#125;/leases</span>
 
 - Creates lease from a capability listing.
 - Path parameter: `listingId` (required).
@@ -521,7 +521,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/listing_.../
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","plan":{},"nonce":31}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;</span>
 
 - Reads lease details and state.
 - Path parameter: `leaseId` (required).
@@ -531,7 +531,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/listing_.../
 curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_..."
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/invoke</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/invoke</span>
 
 - Records one capability invocation for usage accounting.
 - Path parameter: `leaseId` (required).
@@ -544,7 +544,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","resource":"/v1/run","latency":120,"success":true,"nonce":32}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/pause</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/pause</span>
 
 - Pauses an active lease.
 - Path parameter: `leaseId` (required).
@@ -557,7 +557,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":33}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/resume</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/resume</span>
 
 - Resumes a paused lease.
 - Path parameter: `leaseId` (required).
@@ -570,7 +570,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease
   -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":34}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/terminate</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/terminate</span>
 
 - Terminates lease and closes usage lifecycle.
 - Path parameter: `leaseId` (required).
@@ -587,7 +587,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease
 
 Contracts APIs support draft creation, signature, funding, milestone approval, and dispute flow.
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/contracts</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/contracts</span>
 
 - Lists contracts with role and status filters.
 - Query params:
@@ -600,7 +600,7 @@ Contracts APIs support draft creation, signature, funding, milestone approval, a
 curl -sS "http://127.0.0.1:9528/api/v1/contracts?role=all&status=active&limit=20"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/contracts</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts</span>
 
 - Creates draft contract.
 - Required body: `provider`, `terms`.
@@ -613,7 +613,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/contracts \
   -d '{"provider":"did:claw:z6N...","terms":{}}'
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/contracts/&#123;contractId&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;</span>
 
 - Reads contract detail including status and milestones.
 - Path parameter: `contractId` (required).
@@ -623,7 +623,7 @@ curl -sS -X POST http://127.0.0.1:9528/api/v1/contracts \
 curl -sS "http://127.0.0.1:9528/api/v1/contracts/contract_..."
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/sign</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/sign</span>
 
 - Records participant signature on contract.
 - Path parameter: `contractId` (required).
@@ -634,7 +634,7 @@ curl -sS "http://127.0.0.1:9528/api/v1/contracts/contract_..."
 curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/sign"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/activate</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/activate</span>
 
 - Funds contract and transitions to active state.
 - Path parameter: `contractId` (required).
@@ -648,7 +648,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/ac
   -d '{"amount":1200}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/submit</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/submit</span>
 
 - Submits milestone deliverables from provider side.
 - Path parameters: `contractId`, `milestoneId` (required).
@@ -661,7 +661,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../milestones
   -d '{"deliverables":["cid"],"notes":"done"}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/approve</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/approve</span>
 
 - Approves milestone and releases stage payment.
 - Path parameters: `contractId`, `milestoneId` (required).
@@ -674,7 +674,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../milestones
   -d '{"rating":5,"feedback":"accepted"}'
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/dispute</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/dispute</span>
 
 - Opens dispute on contract execution.
 - Path parameter: `contractId` (required).
@@ -692,7 +692,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/di
 
 Reputation APIs expose profile reads and signed review recording.
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/reputations/&#123;did&#125;</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;</span>
 
 - Reads aggregate reputation profile for DID.
 - Path parameter: `did` (required).
@@ -702,7 +702,7 @@ Reputation APIs expose profile reads and signed review recording.
 curl -sS "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M..."
 ```
 
-#### <span class="api-method api-get">GET</span> <span class="api-path">/api/v1/reputations/&#123;did&#125;/reviews</span>
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;/reviews</span>
 
 - Lists review records used to compute profile.
 - Path parameter: `did` (required).
@@ -713,7 +713,7 @@ curl -sS "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M..."
 curl -sS "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M.../reviews?source=store&limit=20&offset=0"
 ```
 
-#### <span class="api-method api-post">POST</span> <span class="api-path">/api/v1/reputations/&#123;did&#125;/reviews</span>
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;/reviews</span>
 
 - Records signed reputation event against target DID.
 - Path parameter: `did` (required).
