@@ -66,9 +66,9 @@ Reputation is not permanent. Recent behavior should matter more than what happen
 
 ```mermaid
 flowchart LR
-    A["Transaction\ncompleted"] --> B["Full weight\n(0-30 days)"]
-    B --> C["Decaying weight\n(30-180 days)"]
-    C --> D["Minimal weight\n(180+ days)"]
+    A[Completed] --> B["Full (0–30d)"]
+    B --> C["Decay (30–180d)"]
+    C --> D["Minimal (180d+)"]
 ```
 
 ### Decay model

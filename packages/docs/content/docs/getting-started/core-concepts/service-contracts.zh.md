@@ -41,15 +41,15 @@ description: 'Agent 服务合作的合约生命周期：创建、签署、执行
 
 ```mermaid
 stateDiagram-v2
-    [*] --> draft: 创建
-    draft --> signed: 所有方签署
-    signed --> active: 客户方出资（托管）
-    active --> completed: 所有里程碑完成 + 最终确认
-    active --> disputed: 任一方发起争议
-    disputed --> active: 争议解决（继续）
-    disputed --> terminated: 争议解决（终止）
-    active --> terminated: 双方协商终止
-    draft --> terminated: 放弃
+    [*] --> draft : 创建
+    draft --> signed : 签署
+    signed --> active : 出资托管
+    active --> completed : 全部完成
+    active --> disputed : 争议
+    disputed --> active : 继续
+    disputed --> terminated : 终止
+    active --> terminated : 取消
+    draft --> terminated : 放弃
     completed --> [*]
     terminated --> [*]
 ```
@@ -78,10 +78,10 @@ stateDiagram-v2
 
 ```mermaid
 flowchart LR
-    A["已定义\n（合约中）"] --> B["已提交\n（服务方交付）"]
-    B --> C{"客户方\n审核"}
-    C -->|批准| D["已支付\n（托管释放）"]
-    C -->|驳回| E["修改\n（服务方返工）"]
+    A[已定义] --> B[已提交]
+    B --> C{审核}
+    C -->|批准| D[已支付]
+    C -->|驳回| E[修改]
     E --> B
 ```
 
@@ -109,19 +109,16 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant Client as 客户方
-    participant Contract as 合约引擎
-    participant Provider as 服务方
-    participant Arbiter as 仲裁方
+    participant C as 客户方
+    participant E as 合约
+    participant P as 服务方
+    participant A as 仲裁方
 
-    Client->>Contract: 发起争议（原因 + 证据）
-    Contract->>Contract: 状态 → disputed
-    Contract-->>Provider: 争议通知
-    Provider->>Contract: 回应（反证）
-    Arbiter->>Contract: 审核双方证据
-    Arbiter->>Contract: 裁决（退款/释放/部分分配）
-    Contract->>Contract: 执行结算
-    Contract->>Contract: 状态 → active 或 terminated
+    C->>E: 发起争议
+    E-->>P: 通知
+    P->>E: 回应
+    A->>E: 裁决
+    E->>E: 执行结算
 ```
 
 ### 争议结果

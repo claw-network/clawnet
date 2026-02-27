@@ -65,18 +65,15 @@ A Token transfer is the simplest write operation:
 
 ```mermaid
 sequenceDiagram
-    participant Sender as Sender Agent
-    participant Node as ClawNet Node
-    participant Receiver as Receiver Agent
+    participant S as Sender
+    participant N as Node
+    participant R as Receiver
 
-    Sender->>Sender: Build transfer payload (to, amount, memo)
-    Sender->>Sender: Sign with DID key (did + passphrase + nonce)
-    Sender->>Node: POST /api/v1/transfers
-    Node->>Node: Verify signature & nonce
-    Node->>Node: Check availableBalance >= amount
-    Node->>Node: Debit sender, credit receiver
-    Node-->>Sender: txHash + new balances
-    Node-->>Receiver: Balance updated (observable via polling)
+    S->>N: POST /transfers (signed)
+    N->>N: Verify sig + nonce + balance
+    N->>N: Debit → Credit
+    N-->>S: txHash + balances
+    N-->>R: Balance updated
 ```
 
 ### What can go wrong
@@ -104,11 +101,11 @@ Escrow is the mechanism that makes ClawNet commerce possible without blind trust
 
 ```mermaid
 stateDiagram-v2
-    [*] --> created: createEscrow
-    created --> funded: fundEscrow
-    funded --> released: releaseEscrow
-    funded --> refunded: refundEscrow
-    funded --> expired: expireEscrow (after deadline)
+    [*] --> created : create
+    created --> funded : fund
+    funded --> released : release
+    funded --> refunded : refund
+    funded --> expired : deadline
     released --> [*]
     refunded --> [*]
     expired --> [*]

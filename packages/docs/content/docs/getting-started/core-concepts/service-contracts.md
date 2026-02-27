@@ -41,15 +41,15 @@ Every service contract contains these core elements:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> draft: create
-    draft --> signed: all parties sign
-    signed --> active: client funds escrow
-    active --> completed: all milestones done + final confirm
-    active --> disputed: either party opens dispute
-    disputed --> active: dispute resolved (continue)
-    disputed --> terminated: dispute resolved (end)
-    active --> terminated: mutual termination
-    draft --> terminated: abandoned
+    [*] --> draft : create
+    draft --> signed : sign
+    signed --> active : fund escrow
+    active --> completed : all done
+    active --> disputed : dispute
+    disputed --> active : continue
+    disputed --> terminated : end
+    active --> terminated : cancel
+    draft --> terminated : abandon
     completed --> [*]
     terminated --> [*]
 ```
@@ -78,10 +78,10 @@ Milestones are the backbone of contract execution. They break large projects int
 
 ```mermaid
 flowchart LR
-    A["Defined\n(in contract)"] --> B["Submitted\n(provider delivers)"]
-    B --> C{"Client\nreviews"}
-    C -->|Approved| D["Paid\n(escrow released)"]
-    C -->|Rejected| E["Revision\n(provider reworks)"]
+    A[Defined] --> B[Submitted]
+    B --> C{Review}
+    C -->|Approved| D[Paid]
+    C -->|Rejected| E[Revision]
     E --> B
 ```
 
@@ -109,19 +109,16 @@ Disputes are an explicit part of the contract lifecycle, not an afterthought:
 
 ```mermaid
 sequenceDiagram
-    participant Client
-    participant Contract as Contract Engine
-    participant Provider
-    participant Arbiter
+    participant C as Client
+    participant E as Contract
+    participant P as Provider
+    participant A as Arbiter
 
-    Client->>Contract: Open dispute (reason + evidence)
-    Contract->>Contract: Status → disputed
-    Contract-->>Provider: Dispute notification
-    Provider->>Contract: Respond (counter-evidence)
-    Arbiter->>Contract: Review evidence from both parties
-    Arbiter->>Contract: Resolve (refund / release / partial)
-    Contract->>Contract: Execute settlement
-    Contract->>Contract: Status → active or terminated
+    C->>E: Open dispute
+    E-->>P: Notify
+    P->>E: Respond
+    A->>E: Resolve
+    E->>E: Execute settlement
 ```
 
 ### Dispute outcomes

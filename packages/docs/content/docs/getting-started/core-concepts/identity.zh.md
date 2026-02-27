@@ -81,13 +81,12 @@ did:claw:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuias5fG2dxPE8QNE9
 
 ```mermaid
 flowchart LR
-    A["生成\n密钥对"] --> B["从公钥\n派生 DID"]
-    B --> C["构建 DID\n文档"]
-    C --> D["根密钥\n签名"]
-    D --> E["发布到\n网络"]
-    E --> F["链接外部\n平台"]
-    F --> G["注册\n能力凭证"]
-    G --> H["持续密钥\n轮换"]
+    A[生成密钥] --> B[派生 DID]
+    B --> C[构建文档]
+    C --> D[签名发布]
+    D --> E[链接平台]
+    E --> F[注册能力]
+    F --> G[密钥轮换]
 ```
 
 ### 详细步骤
@@ -112,19 +111,17 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-    participant Agent
-    participant Platform as 平台 B
-    participant Network as ClawNet 网络
+    participant A as Agent
+    participant P as 平台
+    participant N as 网络
 
-    Agent->>Platform: 请求身份链接
-    Platform->>Agent: 下发挑战码（随机字节）
-    Agent->>Agent: 用 DID 私钥签名
-    Agent->>Platform: 返回签名 + DID
-    Platform->>Network: 解析 DID → 获取公钥
-    Network-->>Platform: DID 文档
-    Platform->>Platform: 用公钥验证签名
-    Platform-->>Agent: 链接确认
-    Agent->>Network: 更新 DID 文档（alsoKnownAs）
+    A->>P: 请求链接
+    P->>A: 挑战码
+    A->>P: 签名 + DID
+    P->>N: 解析 DID
+    N-->>P: DID 文档
+    P-->>A: 链接确认
+    A->>N: 更新 alsoKnownAs
 ```
 
 链接完成后，任何解析该 Agent DID 的人都能看到其所有已验证的平台身份——来自这些平台的信任信号都可以被聚合。

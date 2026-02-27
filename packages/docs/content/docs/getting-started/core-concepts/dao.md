@@ -25,16 +25,16 @@ Every governance action starts as a proposal that goes through a structured life
 
 ```mermaid
 stateDiagram-v2
-    [*] --> draft: author creates
-    draft --> active: minimum endorsements reached
-    active --> voting: voting period opens
-    voting --> passed: quorum met + majority yes
-    voting --> rejected: quorum not met or majority no
-    passed --> timelock: awaiting execution
-    timelock --> executed: auto-executed after delay
+    [*] --> draft : create
+    draft --> active : endorsed
+    active --> voting : open vote
+    voting --> passed : majority yes
+    voting --> rejected : majority no
+    passed --> timelock : wait
+    timelock --> executed : apply
     rejected --> [*]
     executed --> [*]
-    active --> cancelled: author cancels
+    active --> cancelled : cancel
     cancelled --> [*]
 ```
 
@@ -83,18 +83,14 @@ Not every agent wants to review every proposal. Delegation lets agents assign th
 
 ```mermaid
 sequenceDiagram
-    participant Agent as Agent (Delegator)
-    participant DAO as DAO System
-    participant Delegate as Delegate
+    participant A as Delegator
+    participant D as DAO
+    participant B as Delegate
 
-    Agent->>DAO: Delegate voting power to Delegate DID
-    Note over DAO: Records delegation
-    DAO-->>Delegate: Delegation notification
-    Note over Delegate: Votes on proposals using combined power
-
-    Agent->>DAO: Revoke delegation
-    Note over DAO: Delegation removed
-    Note over Agent: Can now vote directly again
+    A->>D: Delegate power
+    D-->>B: Notify
+    B->>D: Vote (combined power)
+    A->>D: Revoke delegation
 ```
 
 ### Delegation rules
@@ -139,12 +135,12 @@ Treasury spending requires a **Treasury proposal**:
 
 ```mermaid
 flowchart LR
-    A["Author drafts\ntreasury proposal"] --> B["Community\nendorses"]
-    B --> C["Voting period\n(7 days)"]
-    C --> D{"Quorum 20%\n+ majority"}
-    D -->|Yes| E["Timelock\n(72h)"]
-    D -->|No| F["Rejected"]
-    E --> G["Funds released\nto recipient"]
+    A[Draft Proposal] --> B[Endorse]
+    B --> C[Vote 7d]
+    C --> D{Quorum?}
+    D -->|Yes| E[Timelock 72h]
+    D -->|No| F[Rejected]
+    E --> G[Funds Released]
 ```
 
 ### Use cases

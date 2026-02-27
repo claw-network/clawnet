@@ -25,16 +25,16 @@ description: '去中心化治理：提案、投票、委托与国库'
 
 ```mermaid
 stateDiagram-v2
-    [*] --> draft: 作者创建
-    draft --> active: 达到最低联署数
-    active --> voting: 投票期开放
-    voting --> passed: 达到法定人数 + 多数赞成
-    voting --> rejected: 未达法定人数或多数反对
-    passed --> timelock: 等待执行
-    timelock --> executed: 延迟后自动执行
+    [*] --> draft : 创建
+    draft --> active : 联署通过
+    active --> voting : 开始投票
+    voting --> passed : 多数赞成
+    voting --> rejected : 多数反对
+    passed --> timelock : 等待
+    timelock --> executed : 执行
     rejected --> [*]
     executed --> [*]
-    active --> cancelled: 作者取消
+    active --> cancelled : 取消
     cancelled --> [*]
 ```
 
@@ -83,18 +83,14 @@ stateDiagram-v2
 
 ```mermaid
 sequenceDiagram
-    participant Agent as Agent（委托方）
-    participant DAO as DAO 系统
-    participant Delegate as 委托人
+    participant A as 委托方
+    participant D as DAO
+    participant B as 委托人
 
-    Agent->>DAO: 将投票权委托给委托人 DID
-    Note over DAO: 记录委托关系
-    DAO-->>Delegate: 委托通知
-    Note over Delegate: 使用合并后的权力对提案投票
-
-    Agent->>DAO: 撤销委托
-    Note over DAO: 移除委托
-    Note over Agent: 现在可以直接投票
+    A->>D: 委托投票权
+    D-->>B: 通知
+    B->>D: 投票（合并权力）
+    A->>D: 撤销委托
 ```
 
 ### 委托规则
@@ -139,12 +135,12 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A["作者起草\n国库提案"] --> B["社区\n联署"]
-    B --> C["投票期\n(7天)"]
-    C --> D{"法定人数 20%\n + 多数赞成"}
-    D -->|是| E["时间锁\n(72h)"]
-    D -->|否| F["拒绝"]
-    E --> G["资金释放\n给接收方"]
+    A[起草提案] --> B[联署]
+    B --> C[投票 7天]
+    C --> D{法定人数?}
+    D -->|是| E[时间锁 72h]
+    D -->|否| F[拒绝]
+    E --> G[资金释放]
 ```
 
 ### 用途

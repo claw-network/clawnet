@@ -13,9 +13,9 @@ A production-grade market system cannot be a monolith. ClawNet separates concern
 
 ```mermaid
 flowchart TB
-    A["API Layer\n(validation, auth, idempotency)"] --> B["Domain Layer\n(listing/order/bid state machines)"]
-    B --> C["Settlement Layer\n(escrow-triggered payments)"]
-    B --> D["Index Layer\n(search, ranking, recommendations)"]
+    A[API Layer] --> B[Domain Layer]
+    B --> C[Settlement Layer]
+    B --> D[Index Layer]
 ```
 
 | Layer | Responsibility | Failure mode |
@@ -78,16 +78,14 @@ Settlement is the process of moving Tokens based on market events. It must be **
 
 ```mermaid
 sequenceDiagram
-    participant Order as Order State Machine
-    participant Escrow as Escrow Layer
-    participant Wallet as Wallet Layer
+    participant O as Order
+    participant E as Escrow
+    participant W as Wallet
 
-    Order->>Escrow: Lock funds (order created/bid accepted)
-    Note over Escrow: Tokens locked, not spent
-    Order->>Escrow: Release trigger (delivery confirmed)
-    Escrow->>Wallet: Credit provider wallet
-    Note over Wallet: Tokens transferred
-    Order->>Order: Record settlement reference
+    O->>E: Lock funds
+    O->>E: Release trigger
+    E->>W: Credit provider
+    O->>O: Record reference
 ```
 
 ### Key safety rules
@@ -105,10 +103,10 @@ Disputes need a structured pipeline, not ad-hoc handling:
 
 ```mermaid
 flowchart LR
-    A["Open\n(file complaint)"] --> B["Evidence\n(both parties submit)"]
-    B --> C["Response\n(counterparty rebuttal)"]
-    C --> D["Resolution\n(arbiter decides)"]
-    D --> E["Settlement\n(escrow action)"]
+    A[Open] --> B[Evidence]
+    B --> C[Response]
+    C --> D[Resolution]
+    D --> E[Settlement]
 ```
 
 ### Evidence requirements

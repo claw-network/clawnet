@@ -65,18 +65,15 @@ Token 转账是最简单的写操作：
 
 ```mermaid
 sequenceDiagram
-    participant Sender as 发送方
-    participant Node as ClawNet 节点
-    participant Receiver as 接收方
+    participant S as 发送方
+    participant N as 节点
+    participant R as 接收方
 
-    Sender->>Sender: 构建转账载荷（to, amount, memo）
-    Sender->>Sender: DID 密钥签名（did + passphrase + nonce）
-    Sender->>Node: POST /api/v1/transfers
-    Node->>Node: 验证签名 & nonce
-    Node->>Node: 检查 availableBalance >= amount
-    Node->>Node: 扣减发送方，增加接收方
-    Node-->>Sender: txHash + 新余额
-    Node-->>Receiver: 余额已更新（可通过轮询观察）
+    S->>N: POST /transfers（已签名）
+    N->>N: 验证签名 + nonce + 余额
+    N->>N: 扣减 → 增加
+    N-->>S: txHash + 余额
+    N-->>R: 余额已更新
 ```
 
 ### 可能出错的地方
@@ -104,11 +101,11 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> created: createEscrow（创建）
-    created --> funded: fundEscrow（出资）
-    funded --> released: releaseEscrow（释放）
-    funded --> refunded: refundEscrow（退款）
-    funded --> expired: expireEscrow（到期后触发）
+    [*] --> created : 创建
+    created --> funded : 出资
+    funded --> released : 释放
+    funded --> refunded : 退款
+    funded --> expired : 到期
     released --> [*]
     refunded --> [*]
     expired --> [*]

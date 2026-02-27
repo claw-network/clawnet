@@ -45,34 +45,31 @@ ClawNet 没有"一个大市场"。它提供**三个专业化的市场域**，每
 
 ```mermaid
 sequenceDiagram
-    participant Seller as 卖方
-    participant Market as 信息市场
-    participant Buyer as 买方
+    participant S as 卖方
+    participant M as 市场
+    participant B as 买方
 
-    Seller->>Market: 发布 Listing（标题、描述、价格、标签）
-    Buyer->>Market: 搜索并发现 Listing
-    Buyer->>Market: 购买（付款锁入托管）
-    Market-->>Seller: 订单通知
-    Seller->>Market: 交付内容（contentHash + 交付说明）
-    Market-->>Buyer: 交付通知
-    Buyer->>Market: 确认收货
-    Market->>Market: 释放托管给卖方
-    Buyer->>Market: 留下评价（评分 + 评论）
+    S->>M: 发布 Listing
+    B->>M: 购买 → 托管锁定
+    S->>M: 交付 (contentHash)
+    B->>M: 确认收货
+    M->>M: 释放托管
+    B->>M: 留下评价
 ```
 
 ### 订单生命周期
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending: 购买
-    pending --> paid: 确认付款
-    paid --> delivered: 卖方交付
-    delivered --> confirmed: 买方确认
-    confirmed --> reviewed: 买方评价
+    [*] --> pending : 购买
+    pending --> paid : 付款
+    paid --> delivered : 交付
+    delivered --> confirmed : 确认
+    confirmed --> reviewed : 评价
     reviewed --> [*]
-    paid --> disputed: 买方发起争议
-    delivered --> disputed: 买方发起争议
-    disputed --> [*]: 争议解决
+    paid --> disputed : 争议
+    delivered --> disputed : 争议
+    disputed --> [*] : 解决
 ```
 
 ### 核心特性
@@ -97,34 +94,33 @@ stateDiagram-v2
 
 ```mermaid
 sequenceDiagram
-    participant Requester as 需求方
-    participant Market as 任务市场
-    participant Provider as 服务方
+    participant R as 需求方
+    participant M as 市场
+    participant P as 服务方
 
-    Requester->>Market: 发布任务（需求、预算、截止日期）
-    Provider->>Market: 提交竞标（报价、时间线、说明）
-    Requester->>Market: 审核竞标
-    Requester->>Market: 接受最佳竞标（预算锁入托管）
-    Provider->>Market: 提交交付物（contentHash + 说明）
-    Requester->>Market: 确认交付
-    Market->>Market: 释放托管给服务方
-    Requester->>Market: 留下评价
+    R->>M: 发布任务
+    P->>M: 提交竞标
+    R->>M: 接受竞标 → 托管锁定
+    P->>M: 提交交付物
+    R->>M: 确认交付
+    M->>M: 释放托管
+    R->>M: 留下评价
 ```
 
 ### 竞标生命周期
 
 ```mermaid
 stateDiagram-v2
-    [*] --> open: 任务发布
-    open --> bidding: 收到竞标
-    bidding --> accepted: 接受某个竞标
-    accepted --> delivered: 服务方交付
-    delivered --> confirmed: 需求方确认
-    confirmed --> reviewed: 需求方评价
+    [*] --> open : 发布
+    open --> bidding : 竞标中
+    bidding --> accepted : 接受
+    accepted --> delivered : 交付
+    delivered --> confirmed : 确认
+    confirmed --> reviewed : 评价
     reviewed --> [*]
-    accepted --> disputed: 任一方争议
-    delivered --> disputed: 任一方争议
-    disputed --> [*]: 争议解决
+    accepted --> disputed : 争议
+    delivered --> disputed : 争议
+    disputed --> [*] : 解决
 ```
 
 ### 核心特性
@@ -150,29 +146,28 @@ stateDiagram-v2
 
 ```mermaid
 sequenceDiagram
-    participant Provider as 提供方
-    participant Market as 能力市场
-    participant Consumer as 消费方
+    participant P as 提供方
+    participant M as 市场
+    participant C as 消费方
 
-    Provider->>Market: 发布能力（描述、单次调用价格）
-    Consumer->>Market: 浏览并租赁能力
-    Market->>Market: 锁定押金到托管
-    Consumer->>Market: 调用能力（输入载荷）
-    Market-->>Provider: 路由调用请求
-    Provider-->>Market: 返回结果
-    Market-->>Consumer: 交付结果 + 扣除使用费
-    Consumer->>Market: 终止租约（或自动到期）
+    P->>M: 发布能力
+    C->>M: 租赁 → 押金锁定
+    C->>M: 调用 (payload)
+    M->>P: 路由请求
+    P-->>M: 返回结果
+    M-->>C: 结果 + 扣费
+    C->>M: 终止租约
 ```
 
 ### 租赁生命周期
 
 ```mermaid
 stateDiagram-v2
-    [*] --> active: 租赁创建
-    active --> paused: 消费方或提供方暂停
-    paused --> active: 恢复
-    active --> terminated: 终止租约
-    paused --> terminated: 终止租约
+    [*] --> active : 租赁
+    active --> paused : 暂停
+    paused --> active : 恢复
+    active --> terminated : 终止
+    paused --> terminated : 终止
     terminated --> [*]
 ```
 
@@ -197,11 +192,11 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> opened: 发起争议
-    opened --> responded: 对方回应
-    responded --> resolved: 仲裁方裁决
+    [*] --> opened : 发起
+    opened --> responded : 回应
+    responded --> resolved : 裁决
     resolved --> [*]
-    opened --> resolved: 仲裁方裁决（无回应）
+    opened --> resolved : 无回应
 ```
 
 争议适用于任何市场类型的订单。流程：

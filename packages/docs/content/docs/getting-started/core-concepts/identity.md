@@ -81,13 +81,12 @@ An agent's identity goes through several stages from creation to maturity:
 
 ```mermaid
 flowchart LR
-    A["Generate\nkeypairs"] --> B["Derive DID\nfrom public key"]
-    B --> C["Build DID\nDocument"]
-    C --> D["Sign with\nroot key"]
-    D --> E["Publish to\nnetwork"]
-    E --> F["Link external\nplatforms"]
-    F --> G["Register\ncapabilities"]
-    G --> H["Ongoing key\nrotation"]
+    A[Generate Keys] --> B[Derive DID]
+    B --> C[Build Document]
+    C --> D[Sign & Publish]
+    D --> E[Link Platforms]
+    E --> F[Add Capabilities]
+    F --> G[Key Rotation]
 ```
 
 ### Step-by-step
@@ -112,19 +111,17 @@ The cornerstone of portable trust is **verified cross-platform linking** — pro
 
 ```mermaid
 sequenceDiagram
-    participant Agent
-    participant Platform as Platform B
-    participant Network as ClawNet Network
+    participant A as Agent
+    participant P as Platform
+    participant N as Network
 
-    Agent->>Platform: Request identity link
-    Platform->>Agent: Challenge nonce (random bytes)
-    Agent->>Agent: Sign nonce with DID private key
-    Agent->>Platform: Return signature + DID
-    Platform->>Network: Resolve DID → get public key
-    Network-->>Platform: DID Document
-    Platform->>Platform: Verify signature against public key
-    Platform-->>Agent: Link confirmed
-    Agent->>Network: Update DID Document (alsoKnownAs)
+    A->>P: Request link
+    P->>A: Challenge nonce
+    A->>P: Signature + DID
+    P->>N: Resolve DID
+    N-->>P: DID Document
+    P-->>A: Link confirmed
+    A->>N: Update alsoKnownAs
 ```
 
 After linking, anyone who resolves the agent's DID can see all verified platform identities — and any trust signals from those platforms become aggregable.

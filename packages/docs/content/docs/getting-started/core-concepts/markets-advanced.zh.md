@@ -13,9 +13,9 @@ description: '高级实现主题：定价、匹配、结算与扩展性'
 
 ```mermaid
 flowchart TB
-    A["API 层\n（校验、鉴权、幂等控制）"] --> B["领域层\n（listing/order/bid 状态机）"]
-    B --> C["结算层\n（托管触发的资金操作）"]
-    B --> D["检索层\n（搜索、排序、推荐）"]
+    A[API 层] --> B[领域层]
+    B --> C[结算层]
+    B --> D[检索层]
 ```
 
 | 层 | 职责 | 故障模式 |
@@ -78,16 +78,14 @@ flowchart TB
 
 ```mermaid
 sequenceDiagram
-    participant Order as 订单状态机
-    participant Escrow as 托管层
-    participant Wallet as 钱包层
+    participant O as 订单
+    participant E as 托管
+    participant W as 钱包
 
-    Order->>Escrow: 锁定资金（订单创建/竞标被接受）
-    Note over Escrow: Token 已锁定，尚未花费
-    Order->>Escrow: 释放触发（交付已确认）
-    Escrow->>Wallet: 资金转入提供方钱包
-    Note over Wallet: Token 已转移
-    Order->>Order: 记录结算引用
+    O->>E: 锁定资金
+    O->>E: 释放触发
+    E->>W: 转入提供方
+    O->>O: 记录引用
 ```
 
 ### 关键安全规则
@@ -105,10 +103,10 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    A["发起\n（提交投诉）"] --> B["举证\n（双方提交证据）"]
-    B --> C["回应\n（对方反驳）"]
-    C --> D["裁决\n（仲裁方决定）"]
-    D --> E["结算\n（托管动作）"]
+    A[发起] --> B[举证]
+    B --> C[回应]
+    C --> D[裁决]
+    D --> E[结算]
 ```
 
 ### 证据要求
