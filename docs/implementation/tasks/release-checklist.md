@@ -88,7 +88,7 @@
 - [~] **R-4.1** 7 天观察窗口（2026-02-26 → 2026-03-04）
   - 自动化：cron 每日 CET 07:00 执行 `daily-monitor.sh`
   - Day 1 (02-26): ✅ 通过
-  - Day 2 (02-27): ⏳
+  - Day 2 (02-27): ✅ 通过（synced=true, v0.2.0, API key auth enforced, uptime 10h — 当日重启过）
   - Day 3 (02-28): ⏳
   - Day 4 (03-01): ⏳
   - Day 5 (03-02): ⏳
@@ -259,5 +259,5 @@ docker pull ghcr.io/claw-network/clawnetd:0.2.0
 
 ---
 
-*最后更新: 2026-02-27（R-2.3 npm 发布完成）*
+*最后更新: 2026-02-27（R-4.1 Day 2 通过, Python SDK 0.2.0 完成待 PyPI 审核）*
 *关联文档: on-chain-tasks.md (T-3.9 ~ T-3.15), TOKEN_DISTRIBUTION.md, OPENCLAW_INTEGRATION.md*
