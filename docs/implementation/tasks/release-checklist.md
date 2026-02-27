@@ -63,10 +63,10 @@
 - [x] **R-2.2** 全量构建 + 测试通过
   - `pnpm build` + `pnpm test`：core 21/21, protocol 64/64, sdk pass ✅
 
-- [ ] **R-2.3** 发布 3 个包到 npm（0.2.0）
+- [x] **R-2.3** 发布 3 个包到 npm（0.2.0）
   - 前置：需在本机执行 `npm login`
-  - 操作：`scripts/publish.sh --release`
-  - 验收：`npm view @claw-network/sdk version` 返回 `0.2.0`
+  - 操作：`scripts/publish.sh --release`（使用 automation token）
+  - 验收：`npm view @claw-network/sdk version` 返回 `0.2.0` ✅
 
 ### R-3. Python SDK 发布到 PyPI
 
@@ -259,5 +259,5 @@ docker pull ghcr.io/claw-network/clawnetd:0.2.0
 
 ---
 
-*最后更新: 2026-02-27*
+*最后更新: 2026-02-27（R-2.3 npm 发布完成）*
 *关联文档: on-chain-tasks.md (T-3.9 ~ T-3.15), TOKEN_DISTRIBUTION.md, OPENCLAW_INTEGRATION.md*
