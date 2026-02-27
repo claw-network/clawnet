@@ -16,48 +16,57 @@ class ContractsApi:
 
     def list(self, **params: Any) -> dict[str, Any]:
         """List contracts (with optional filters)."""
-        return self._http.get("/api/contracts", params or None)
+        return self._http.get("/api/v1/contracts", params or None)
 
     def get(self, contract_id: str) -> dict[str, Any]:
         """Get contract by ID."""
-        return self._http.get(f"/api/contracts/{quote(contract_id, safe='')}")
+        return self._http.get(f"/api/v1/contracts/{quote(contract_id, safe='')}")
 
     def create(self, **kwargs: Any) -> dict[str, Any]:
         """Create a new service contract."""
-        return self._http.post("/api/contracts", kwargs)
+        return self._http.post("/api/v1/contracts", kwargs)
 
     def sign(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
         """Sign a contract."""
-        return self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/sign", kwargs)
+        return self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/sign", kwargs
+        )
 
     def fund(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        """Fund a contract."""
-        return self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/fund", kwargs)
+        """Fund a contract (lock escrow)."""
+        return self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/activate", kwargs
+        )
 
     def complete(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        """Complete a contract."""
-        return self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/complete", kwargs)
+        """Mark contract as completed."""
+        return self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/complete", kwargs
+        )
 
     # -- Milestones ----------------------------------------------------------
 
     def submit_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
         """Submit a milestone deliverable."""
         return self._http.post(
-            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/complete",
+            f"/api/v1/contracts/{quote(contract_id, safe='')}"
+            f"/milestones/{quote(milestone_id, safe='')}/actions/submit",
             kwargs,
         )
 
     def approve_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
         """Approve a submitted milestone."""
         return self._http.post(
-            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/approve",
+            f"/api/v1/contracts/{quote(contract_id, safe='')}"
+            f"/milestones/{quote(milestone_id, safe='')}/actions/approve",
             kwargs,
         )
 
     def reject_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
         """Reject a submitted milestone."""
         return self._http.post(
-            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/reject",
+            f"/api/v1/contracts/{quote(contract_id, safe='')}"
+            f"/milestones/{quote(milestone_id, safe='')}/actions/reject",
             kwargs,
         )
 
@@ -65,17 +74,23 @@ class ContractsApi:
 
     def open_dispute(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
         """Open a dispute on a contract."""
-        return self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/dispute", kwargs)
+        return self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/dispute", kwargs
+        )
 
     def resolve_dispute(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
         """Resolve a contract dispute."""
-        return self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/dispute/resolve", kwargs)
+        return self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/resolve", kwargs
+        )
 
     # -- Settlement ----------------------------------------------------------
 
     def settlement(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        """Execute final settlement."""
-        return self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/settlement", kwargs)
+        """Execute final settlement (terminate)."""
+        return self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/terminate", kwargs
+        )
 
 
 class AsyncContractsApi:
@@ -85,46 +100,61 @@ class AsyncContractsApi:
         self._http = http
 
     async def list(self, **params: Any) -> dict[str, Any]:
-        return await self._http.get("/api/contracts", params or None)
+        return await self._http.get("/api/v1/contracts", params or None)
 
     async def get(self, contract_id: str) -> dict[str, Any]:
-        return await self._http.get(f"/api/contracts/{quote(contract_id, safe='')}")
+        return await self._http.get(f"/api/v1/contracts/{quote(contract_id, safe='')}")
 
     async def create(self, **kwargs: Any) -> dict[str, Any]:
-        return await self._http.post("/api/contracts", kwargs)
+        return await self._http.post("/api/v1/contracts", kwargs)
 
     async def sign(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        return await self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/sign", kwargs)
+        return await self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/sign", kwargs
+        )
 
     async def fund(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        return await self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/fund", kwargs)
+        return await self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/activate", kwargs
+        )
 
     async def complete(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        return await self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/complete", kwargs)
+        return await self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/complete", kwargs
+        )
 
     async def submit_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
         return await self._http.post(
-            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/complete",
+            f"/api/v1/contracts/{quote(contract_id, safe='')}"
+            f"/milestones/{quote(milestone_id, safe='')}/actions/submit",
             kwargs,
         )
 
     async def approve_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
         return await self._http.post(
-            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/approve",
+            f"/api/v1/contracts/{quote(contract_id, safe='')}"
+            f"/milestones/{quote(milestone_id, safe='')}/actions/approve",
             kwargs,
         )
 
     async def reject_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
         return await self._http.post(
-            f"/api/contracts/{quote(contract_id, safe='')}/milestones/{quote(milestone_id, safe='')}/reject",
+            f"/api/v1/contracts/{quote(contract_id, safe='')}"
+            f"/milestones/{quote(milestone_id, safe='')}/actions/reject",
             kwargs,
         )
 
     async def open_dispute(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        return await self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/dispute", kwargs)
+        return await self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/dispute", kwargs
+        )
 
     async def resolve_dispute(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        return await self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/dispute/resolve", kwargs)
+        return await self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/resolve", kwargs
+        )
 
     async def settlement(self, contract_id: str, **kwargs: Any) -> dict[str, Any]:
-        return await self._http.post(f"/api/contracts/{quote(contract_id, safe='')}/settlement", kwargs)
+        return await self._http.post(
+            f"/api/v1/contracts/{quote(contract_id, safe='')}/actions/terminate", kwargs
+        )

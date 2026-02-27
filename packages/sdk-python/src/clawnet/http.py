@@ -78,9 +78,14 @@ class HttpClient:
         _handle_error(resp)
         return resp.json()
 
-    def delete(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    def delete(
+        self,
+        path: str,
+        body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
         url = _build_url(self.base_url, path, params)
-        resp = self._client.delete(url)
+        resp = self._client.request("DELETE", url, json=body)
         _handle_error(resp)
         return resp.json()
 
@@ -137,9 +142,14 @@ class AsyncHttpClient:
         _handle_error(resp)
         return resp.json()
 
-    async def delete(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    async def delete(
+        self,
+        path: str,
+        body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
         url = _build_url(self.base_url, path, params)
-        resp = await self._client.delete(url)
+        resp = await self._client.request("DELETE", url, json=body)
         _handle_error(resp)
         return resp.json()
 

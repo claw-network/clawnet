@@ -16,7 +16,7 @@ class NodeApi:
 
     def get_status(self) -> dict[str, Any]:
         """Get node status (DID, sync state, block height, peers)."""
-        return self._http.get("/api/node/status")
+        return self._http.get("/api/v1/node")
 
     def get_peers(self, *, limit: int | None = None, offset: int | None = None) -> dict[str, Any]:
         """List connected peers."""
@@ -25,11 +25,12 @@ class NodeApi:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
-        return self._http.get("/api/node/peers", params or None)
+        return self._http.get("/api/v1/node/peers", params or None)
 
     def get_config(self) -> dict[str, Any]:
         """Get node configuration."""
-        return self._http.get("/api/node/config")
+        data = self._http.get("/api/v1/node")
+        return data.get("config", {}) if isinstance(data, dict) else {}
 
     def wait_for_sync(
         self,
@@ -58,7 +59,7 @@ class AsyncNodeApi:
         self._http = http
 
     async def get_status(self) -> dict[str, Any]:
-        return await self._http.get("/api/node/status")
+        return await self._http.get("/api/v1/node")
 
     async def get_peers(self, *, limit: int | None = None, offset: int | None = None) -> dict[str, Any]:
         params: dict[str, Any] = {}
@@ -66,10 +67,11 @@ class AsyncNodeApi:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
-        return await self._http.get("/api/node/peers", params or None)
+        return await self._http.get("/api/v1/node/peers", params or None)
 
     async def get_config(self) -> dict[str, Any]:
-        return await self._http.get("/api/node/config")
+        data = await self._http.get("/api/v1/node")
+        return data.get("config", {}) if isinstance(data, dict) else {}
 
     async def wait_for_sync(
         self,

@@ -16,7 +16,7 @@ class ReputationApi:
 
     def get_profile(self, did: str) -> dict[str, Any]:
         """Get reputation profile for a DID."""
-        return self._http.get(f"/api/reputation/{quote(did, safe='')}")
+        return self._http.get(f"/api/v1/reputations/{quote(did, safe='')}")
 
     def get_reviews(
         self,
@@ -34,11 +34,15 @@ class ReputationApi:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
-        return self._http.get(f"/api/reputation/{quote(did, safe='')}/reviews", params or None)
+        return self._http.get(
+            f"/api/v1/reputations/{quote(did, safe='')}/reviews", params or None
+        )
 
-    def record(self, **kwargs: Any) -> dict[str, Any]:
+    def record(self, target: str, **kwargs: Any) -> dict[str, Any]:
         """Record a reputation event (rate another agent)."""
-        return self._http.post("/api/reputation/record", kwargs)
+        return self._http.post(
+            f"/api/v1/reputations/{quote(target, safe='')}/reviews", kwargs
+        )
 
 
 class AsyncReputationApi:
@@ -48,7 +52,7 @@ class AsyncReputationApi:
         self._http = http
 
     async def get_profile(self, did: str) -> dict[str, Any]:
-        return await self._http.get(f"/api/reputation/{quote(did, safe='')}")
+        return await self._http.get(f"/api/v1/reputations/{quote(did, safe='')}")
 
     async def get_reviews(
         self,
@@ -65,7 +69,11 @@ class AsyncReputationApi:
             params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
-        return await self._http.get(f"/api/reputation/{quote(did, safe='')}/reviews", params or None)
+        return await self._http.get(
+            f"/api/v1/reputations/{quote(did, safe='')}/reviews", params or None
+        )
 
-    async def record(self, **kwargs: Any) -> dict[str, Any]:
-        return await self._http.post("/api/reputation/record", kwargs)
+    async def record(self, target: str, **kwargs: Any) -> dict[str, Any]:
+        return await self._http.post(
+            f"/api/v1/reputations/{quote(target, safe='')}/reviews", kwargs
+        )
