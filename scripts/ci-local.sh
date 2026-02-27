@@ -45,6 +45,21 @@ check_prereqs() {
   fi
 }
 
+# ── detect Colima and build extra act flags ─────────────────────
+build_act_flags() {
+  ACT_EXTRA_FLAGS=()
+
+  # When using Colima, the Docker socket on the host is at a macOS-specific
+  # path (e.g. ~/.colima/docker.sock).  Inside the Colima VM the daemon
+  # listens on the standard /var/run/docker.sock.  Tell act to use the
+  # in-VM path so the container doesn't try to mkdir the macOS path.
+  local current_ctx
+  current_ctx=$(docker context show 2>/dev/null || true)
+  if [[ "$current_ctx" == "colima"* ]] || colima status &>/dev/null 2>&1; then
+    ACT_EXTRA_FLAGS+=(--container-daemon-socket /var/run/docker.sock)
+  fi
+}
+
 # ── run one workflow ────────────────────────────────────────────
 run_workflow() {
   local name="$1"
@@ -67,6 +82,7 @@ run_workflow() {
   if act push \
     -W "$file" \
     --artifact-server-path /tmp/act-artifacts \
+    "${ACT_EXTRA_FLAGS[@]}" \
     2>&1 | while IFS= read -r line; do
       # Highlight step markers for readability
       if [[ "$line" == *"⭐ Run"* ]] || [[ "$line" == *"✅ "* ]]; then
@@ -109,6 +125,7 @@ list_workflows() {
 # ── main ────────────────────────────────────────────────────────
 main() {
   check_prereqs
+  build_act_flags
 
   local target="${1:-ci}"
 

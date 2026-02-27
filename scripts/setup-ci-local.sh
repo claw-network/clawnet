@@ -53,6 +53,37 @@ install_act() {
   fi
 }
 
+# ── fix Docker credential helper ────────────────────────────────
+# Docker Desktop installs "credsStore": "desktop" in ~/.docker/config.json.
+# When using Colima (no Docker Desktop), docker-credential-desktop is missing,
+# causing `act` (and docker pull) to fail. Remove the stale credsStore entry.
+fix_docker_creds_store() {
+  local cfg="$HOME/.docker/config.json"
+  if [[ ! -f "$cfg" ]]; then
+    return 0
+  fi
+
+  local creds_store
+  creds_store=$(python3 -c "import json; c=json.load(open('$cfg')); print(c.get('credsStore',''))" 2>/dev/null || true)
+
+  if [[ "$creds_store" == "desktop" ]]; then
+    if ! command -v docker-credential-desktop &>/dev/null; then
+      info "Removing stale \"credsStore\": \"desktop\" from ~/.docker/config.json ..."
+      python3 -c "
+import json, os
+cfg_path = os.path.expanduser('~/.docker/config.json')
+with open(cfg_path) as f:
+    cfg = json.load(f)
+del cfg['credsStore']
+with open(cfg_path, 'w') as f:
+    json.dump(cfg, f, indent='\t')
+    f.write('\n')
+"
+      ok "Removed stale credsStore entry"
+    fi
+  fi
+}
+
 # ── OrbStack setup ──────────────────────────────────────────────
 setup_orbstack() {
   echo ""
@@ -138,6 +169,9 @@ setup_colima() {
   else
     fail "Docker daemon not responding. Try: colima stop && colima start"
   fi
+
+  # Fix Docker credential helper (leftover from Docker Desktop)
+  fix_docker_creds_store
 
   # Install act
   install_act
