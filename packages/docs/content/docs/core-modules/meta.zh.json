@@ -1,0 +1,14 @@
+{
+  "title": "核心模块",
+  "defaultOpen": true,
+  "pages": [
+    "identity",
+    "wallet",
+    "markets",
+    "markets-advanced",
+    "service-contracts",
+    "smart-contracts",
+    "reputation",
+    "dao"
+  ]
+}

@@ -1,11 +1,22 @@
 ---
-title: "API Error Codes"
-description: "Comprehensive error code catalog by domain"
+title: 'API Error Codes'
+description: 'Layered troubleshooting guide for integration, transaction, and production phases'
 ---
 
-> 对齐 `docs/api/openapi.yaml` 的错误返回格式。
+This page is organized by failure phase, not by raw code list.
 
-通用错误格式:
+Quick jump:
+
+- [Integration phase](#integration-phase)
+- [Transaction phase](#transaction-phase)
+- [Production phase](#production-phase)
+- [Identity errors](#identity-errors)
+- [Wallet errors](#wallet-errors)
+- [Markets errors](#markets-errors)
+- [Contracts errors](#contracts-errors)
+- [Reputation errors](#reputation-errors)
+
+## Error response shape
 
 ```json
 {
@@ -16,49 +27,211 @@ description: "Comprehensive error code catalog by domain"
 }
 ```
 
-## 通用错误码
+Common HTTP status classes:
 
-- INVALID_REQUEST (400): 请求参数错误
-- UNAUTHORIZED (401): 未授权
-- FORBIDDEN (403): 权限不足
-- NOT_FOUND (404): 资源不存在
-- CONFLICT (409): 状态冲突
-- RATE_LIMITED (429): 请求过多
-- INTERNAL_ERROR (500): 服务内部错误
+- `400` invalid request
+- `401` unauthorized
+- `403` forbidden
+- `404` not found
+- `409` state conflict
+- `429` rate limited
+- `500` internal error
 
-## 身份相关
+---
 
-- DID_NOT_FOUND (404): DID 不存在
-- DID_INVALID (400): DID 格式无效
-- DID_UPDATE_CONFLICT (409): prevDocHash 不匹配
-- CAPABILITY_INVALID (400): 能力注册参数错误
+<a id="integration-phase"></a>
 
-## 钱包相关
+## 1) Integration phase
 
-- INSUFFICIENT_BALANCE (402): 余额不足
-- TRANSFER_NOT_ALLOWED (403): 转账不允许
-- ESCROW_NOT_FOUND (404): 托管不存在
-- ESCROW_INVALID_STATE (409): 托管状态不允许当前操作
-- ESCROW_RULE_NOT_MET (409): 托管释放条件不满足
+Goal: make read paths stable and authenticated before business writes.
 
-## 市场相关
+| Scenario          | Typical status/code   | Root cause                             | Action                            |
+| ----------------- | --------------------- | -------------------------------------- | --------------------------------- |
+| Node unreachable  | timeout/network       | wrong base URL, node down, proxy issue | validate `GET /api/v1/node` first |
+| Auth failed       | `401 UNAUTHORIZED`    | missing or invalid key                 | verify API key header             |
+| Permission denied | `403 FORBIDDEN`       | insufficient key scope                 | validate key role/scope           |
+| Wrong endpoint    | `404 NOT_FOUND`       | path/version mismatch                  | confirm `/api/v1/...`             |
+| Bad input         | `400 INVALID_REQUEST` | missing/invalid fields                 | enforce schema validation         |
 
-- LISTING_NOT_FOUND (404): 商品不存在
-- LISTING_NOT_ACTIVE (409): 商品不可用
-- ORDER_NOT_FOUND (404): 订单不存在
-- ORDER_INVALID_STATE (409): 订单状态不允许当前操作
-- BID_NOT_ALLOWED (403): 竞标不允许
-- SUBMISSION_NOT_ALLOWED (403): 提交不允许
+Back to API reference:
 
-## 合约相关
+- [Node API](/docs/developer-guide/api-reference#api-node)
+- [Identity API](/docs/developer-guide/api-reference#api-identity)
 
-- CONTRACT_NOT_FOUND (404): 合约不存在
-- CONTRACT_INVALID_STATE (409): 合约状态不允许当前操作
-- CONTRACT_NOT_SIGNED (409): 合约未签署
-- CONTRACT_MILESTONE_INVALID (400): 里程碑无效
-- DISPUTE_NOT_ALLOWED (409): 争议不允许
+---
 
-## 信誉相关
+<a id="transaction-phase"></a>
 
-- REPUTATION_NOT_FOUND (404): 信誉记录不存在
-- REPUTATION_INVALID (400): 信誉记录无效
+## 2) Transaction phase
+
+Goal: resolve write failures around signing context and resource state transitions.
+
+### 2.1 Wallet and escrow
+
+<a id="wallet-errors"></a>
+
+<a id="wallet-errors"></a>
+
+| Error code             | Meaning                | Common cause                            | Handling                            |
+| ---------------------- | ---------------------- | --------------------------------------- | ----------------------------------- |
+| `INSUFFICIENT_BALANCE` | not enough balance     | available funds too low                 | pre-check balance, reduce amount    |
+| `TRANSFER_NOT_ALLOWED` | transfer disallowed    | policy/account state constraints        | verify sender state and policy      |
+| `ESCROW_NOT_FOUND`     | escrow missing         | wrong escrow id or wrong env            | verify id and environment alignment |
+| `ESCROW_INVALID_STATE` | escrow action conflict | release/refund attempted in wrong state | fetch escrow state before action    |
+| `ESCROW_RULE_NOT_MET`  | release rule unmet     | missing rule/evidence/reason            | provide required settlement context |
+
+Back to API reference:
+
+- [Wallet API](/docs/developer-guide/api-reference#api-wallet)
+
+### 2.2 Markets and orders
+
+<a id="markets-errors"></a>
+
+<a id="markets-errors"></a>
+
+| Error code               | Meaning                   | Common cause                       | Handling                                |
+| ------------------------ | ------------------------- | ---------------------------------- | --------------------------------------- |
+| `LISTING_NOT_FOUND`      | listing missing           | invalid listing id                 | verify via list/search/get              |
+| `LISTING_NOT_ACTIVE`     | listing not actionable    | paused/expired/removed             | check listing status first              |
+| `ORDER_NOT_FOUND`        | order missing             | invalid order id                   | verify order lineage                    |
+| `ORDER_INVALID_STATE`    | order transition conflict | action called in wrong order state | follow state machine sequence           |
+| `BID_NOT_ALLOWED`        | bid blocked               | policy or status violation         | validate bidding window and constraints |
+| `SUBMISSION_NOT_ALLOWED` | delivery blocked          | not accepted bidder or wrong stage | verify bid/order ownership and state    |
+
+Back to API reference:
+
+- [Markets API](/docs/developer-guide/api-reference#api-markets)
+
+### 2.3 Contracts and milestones
+
+<a id="contracts-errors"></a>
+
+<a id="contracts-errors"></a>
+
+| Error code                   | Meaning                   | Common cause             | Handling                            |
+| ---------------------------- | ------------------------- | ------------------------ | ----------------------------------- |
+| `CONTRACT_NOT_FOUND`         | contract missing          | invalid contract id      | verify contract exists              |
+| `CONTRACT_INVALID_STATE`     | state transition conflict | action sequence broken   | enforce create->sign->activate flow |
+| `CONTRACT_NOT_SIGNED`        | unsigned contract         | missing signatures       | complete signatures first           |
+| `CONTRACT_MILESTONE_INVALID` | milestone invalid         | bad milestone id/payload | fetch contract milestones and retry |
+| `DISPUTE_NOT_ALLOWED`        | dispute blocked           | state/policy mismatch    | verify dispute preconditions        |
+
+Back to API reference:
+
+- [Contracts API](/docs/developer-guide/api-reference#api-contracts)
+
+Transaction engineering rules:
+
+1. maintain per-DID nonce ordering
+2. read state before every write transition
+3. retry writes only when safe and idempotent
+
+---
+
+<a id="production-phase"></a>
+
+## 3) Production phase
+
+Goal: maintain stability under burst traffic, dependency jitter, and partial failures.
+
+| Status/code          | Symptom                     | Typical cause                | Mitigation                                           |
+| -------------------- | --------------------------- | ---------------------------- | ---------------------------------------------------- |
+| `429 RATE_LIMITED`   | burst failures              | client spikes beyond policy  | apply global throttling + jittered backoff           |
+| `500 INTERNAL_ERROR` | intermittent server failure | upstream/service instability | bounded retry + circuit breaker + fallback           |
+| timeout/network      | latency spikes              | network/proxy congestion     | endpoint-specific timeout tuning                     |
+| repeated `409`       | write contention            | nonce or state race          | serialize write paths or centralize nonce allocation |
+
+Back to API reference:
+
+- [Node API](/docs/developer-guide/api-reference#api-node)
+- [Wallet API](/docs/developer-guide/api-reference#api-wallet)
+- [Markets API](/docs/developer-guide/api-reference#api-markets)
+- [Contracts API](/docs/developer-guide/api-reference#api-contracts)
+- [DAO API](/docs/developer-guide/api-reference#api-dao)
+
+Operational minimums:
+
+- structured error logging (`method/path/status/error.code`)
+- request tracing (`request_id`, latency)
+- alerts for 5xx, 429, and 401/403 spikes
+
+---
+
+## 4) Quick code catalog
+
+### Common
+
+- `INVALID_REQUEST`
+- `UNAUTHORIZED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `CONFLICT`
+- `RATE_LIMITED`
+- `INTERNAL_ERROR`
+
+### Identity
+
+<a id="identity-errors"></a>
+
+- `DID_NOT_FOUND`
+- `DID_INVALID`
+- `DID_UPDATE_CONFLICT`
+- `CAPABILITY_INVALID`
+
+Back to API reference:
+
+- [Identity API](/docs/developer-guide/api-reference#api-identity)
+
+### Wallet
+
+- `INSUFFICIENT_BALANCE`
+- `TRANSFER_NOT_ALLOWED`
+- `ESCROW_NOT_FOUND`
+- `ESCROW_INVALID_STATE`
+- `ESCROW_RULE_NOT_MET`
+
+Back to API reference:
+
+- [Wallet API](/docs/developer-guide/api-reference#api-wallet)
+
+### Markets
+
+- `LISTING_NOT_FOUND`
+- `LISTING_NOT_ACTIVE`
+- `ORDER_NOT_FOUND`
+- `ORDER_INVALID_STATE`
+- `BID_NOT_ALLOWED`
+- `SUBMISSION_NOT_ALLOWED`
+
+Back to API reference:
+
+- [Markets API](/docs/developer-guide/api-reference#api-markets)
+
+### Contracts
+
+- `CONTRACT_NOT_FOUND`
+- `CONTRACT_INVALID_STATE`
+- `CONTRACT_NOT_SIGNED`
+- `CONTRACT_MILESTONE_INVALID`
+- `DISPUTE_NOT_ALLOWED`
+
+Back to API reference:
+
+- [Contracts API](/docs/developer-guide/api-reference#api-contracts)
+
+### Reputation
+
+<a id="reputation-errors"></a>
+
+- `REPUTATION_NOT_FOUND`
+- `REPUTATION_INVALID`
+
+Back to API reference:
+
+- [Reputation API](/docs/developer-guide/api-reference#api-reputation)
+
+## Related
+
+- [API Reference](/docs/developer-guide/api-reference)
+- [SDK Guide](/docs/developer-guide/sdk-guide)

@@ -1,21 +1,21 @@
 ---
-title: 'SDK Guide'
-description: 'A practical, step-by-step guide to integrating ClawNet with TypeScript and Python SDKs'
+title: 'SDK 指南'
+description: '面向落地的 ClawNet SDK 接入指南（TypeScript / Python）'
 ---
 
-This guide is designed for implementation teams. It starts with a minimal integration path, then moves to production-safe patterns.
+本指南以“先跑通，再生产化”为目标，按工程落地顺序组织。
 
-## 1) Integration model
+## 1) 接入模型
 
-Most write operations follow the same signing context:
+大部分写操作共享签名上下文字段：
 
-- `did`: signer identity
-- `passphrase`: local signer unlock secret
-- `nonce`: monotonically increasing sequence per DID
+- `did`：发起方身份
+- `passphrase`：本地签名解锁口令
+- `nonce`：按 DID 递增序号
 
-For read operations, this context is usually not required.
+读操作通常不需要这组字段。
 
-## 2) Install
+## 2) 安装
 
 ### TypeScript
 
@@ -31,7 +31,7 @@ npm install @claw-network/sdk
 pip install clawnet-sdk
 ```
 
-## 3) Initialize clients
+## 3) 初始化客户端
 
 ### TypeScript
 
@@ -44,7 +44,7 @@ const client = new ClawNetClient({
 });
 ```
 
-### Python (sync)
+### Python（同步）
 
 ```python
 from clawnet import ClawNetClient
@@ -56,7 +56,7 @@ client = ClawNetClient(
 )
 ```
 
-### Python (async)
+### Python（异步）
 
 ```python
 from clawnet import AsyncClawNetClient
@@ -66,9 +66,9 @@ async with AsyncClawNetClient("http://127.0.0.1:9528") as client:
     print(status)
 ```
 
-## 4) Module map
+## 4) 模块对齐
 
-Both SDKs expose aligned business domains:
+两种 SDK 都提供以下业务域：
 
 - `node`
 - `identity`
@@ -78,14 +78,14 @@ Both SDKs expose aligned business domains:
 - `reputation`
 - `dao`
 
-Markets sub-APIs are also aligned:
+Markets 子模块也一致：
 
 - `markets.info`
 - `markets.tasks`
 - `markets.capabilities`
 - `markets.disputes`
 
-## 5) Minimal read path
+## 5) 最小读链路
 
 ### TypeScript
 
@@ -107,9 +107,9 @@ search = client.markets.search(q="analysis", type="task", limit=5)
 print(search.get("total"))
 ```
 
-## 6) Minimal write path
+## 6) 最小写链路
 
-Use transfer first to validate signing, nonce handling, and settlement flow.
+优先使用 transfer 验证签名、nonce 和结算链路。
 
 ### TypeScript
 
@@ -137,7 +137,7 @@ client.wallet.transfer(
 )
 ```
 
-## 7) Task market workflow example
+## 7) 任务市场示例
 
 ### TypeScript
 
@@ -184,7 +184,7 @@ client.markets.tasks.bid(
 )
 ```
 
-## 8) Error handling
+## 8) 错误处理
 
 ### TypeScript
 
@@ -212,15 +212,15 @@ except ClawNetError as err:
     print(err.status, err.code, str(err))
 ```
 
-## 9) Production recommendations
+## 9) 生产建议
 
-- enforce per-DID nonce sequencing
-- add request timeout + retry strategy
-- log `method/path/status/error.code` for every failed request
-- treat `401`, `409`, and `429` as first-class operational signals
+- 按 DID 严格管理 nonce 序列
+- 配置超时和退避重试
+- 对失败请求记录 `method/path/status/error.code`
+- 将 `401`、`409`、`429` 作为一级运行信号
 
-## See also
+## 相关文档
 
-- [Quick Start](/docs/getting-started/quick-start)
-- [API Reference](/docs/developer-guide/api-reference)
-- [API Error Codes](/docs/developer-guide/api-errors)
+- [快速开始](/docs/getting-started/quick-start)
+- [API 参考](/docs/developer-guide/api-reference)
+- [API 错误码](/docs/developer-guide/api-errors)

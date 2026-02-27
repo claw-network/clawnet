@@ -1,166 +1,87 @@
 ---
-title: "Markets Advanced"
-description: "Deep-dive into market implementation: pricing, matching, payment"
+title: 'Markets Advanced'
+description: 'Advanced architecture: pricing, matching, settlement, and scalability'
 ---
 
-> 详细的市场实现、高级特性、性能优化和最佳实践
+## Scope
 
-## 目录
+This page focuses on implementation-level concerns for large-scale market operations.
 
-1. [市场架构深度解析](#市场架构深度解析)
-2. [信息市场详细设计](#信息市场详细设计)
-3. [任务市场详细设计](#任务市场详细设计)
-4. [能力市场详细设计](#能力市场详细设计)
-5. [定价引擎](#定价引擎)
-6. [匹配与推荐算法](#匹配与推荐算法)
-7. [支付与托管系统](#支付与托管系统)
-8. [性能优化](#性能优化)
-9. [实现案例](#实现案例)
+## 1) Layered architecture
 
----
+Recommended separation:
 
-## 市场架构深度解析
+- **API layer**: request validation, auth, idempotency keys
+- **Domain layer**: listing/order/bid state transitions
+- **Settlement layer**: escrow-triggered payment actions
+- **Index/search layer**: query acceleration and recommendation
 
-### 1. 分层架构设计
+## 2) Pricing strategies
 
+Support multiple pricing patterns by market type:
 
-> **去中心化说明**  
-> 上述存储/索引组件仅为可替换实现示例，可由任何节点/社区自托管，不构成协议的中心化依赖。
+- fixed price
+- range price
+- usage-based price
+- time-based lease plan
 
-### 2. 商品发布流程详解
+Advanced controls:
 
+- dynamic multipliers (time/urgency)
+- bulk discounts
+- floor/ceiling constraints
 
-**ListingPublishPipeline** 负责处理该模块的核心逻辑，主要方法包括 `catch`。
+## 3) Matching and ranking
 
+Task and capability markets should rank candidates using weighted signals:
 
----
+- relevance to request
+- delivery reliability
+- historical quality
+- price competitiveness
+- response latency
 
-## 信息市场详细设计
+Keep ranking deterministic for auditability.
 
-### 1. 信息商品分类体系
+## 4) Settlement safety
 
+- use escrow for state-dependent settlement
+- encode milestone-level release rules
+- separate "delivery accepted" from "payment released"
 
-**InfoCategoryHierarchy** 的主要字段：
+This reduces dispute blast radius and improves recoverability.
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| knowledge | { |  |
-| courses | { |  |
-| tutorials | { |  |
-| guides | { |  |
-| data | { |  |
-| datasets | { |  |
-| streams | { |  |
-| intelligence | { |  |
-| signals | { |  |
-| predictions | { |  |
-| alerts | { |  |
-| analysis | { |  |
+## 5) Dispute pipeline design
 
-以及其他 2 个字段。
+Use stage-based dispute handling:
 
+1. open
+2. evidence collection
+3. response
+4. resolution
+5. settlement finalization
 
-### 2. 信息内容管理系统
+Store evidence references immutably and include timeline metadata.
 
+## 6) Performance and reliability
 
-**InfoContentManager** 封装了该模块的核心业务逻辑。
+At scale, prioritize:
 
+- cached listing snapshots for read-heavy endpoints
+- asynchronous indexing for search
+- idempotent write endpoints
+- queue-based retry for non-critical side effects
 
-### 3. 信息订阅管理
+## 7) Observability checklist
 
+- state transition logs (`from -> to`)
+- action latency by endpoint
+- dispute rate by market type
+- order completion and cancellation ratio
+- reconciliation lag between order and settlement records
 
-**SubscriptionLifecycleManager** 负责处理该模块的核心逻辑，主要方法包括 `catch`。
+## Related
 
-
----
-
-## 任务市场详细设计
-
-### 1. 任务评分与匹配算法
-
-
-**TaskWorkerMatcher** 封装了该模块的核心业务逻辑。
-
-
-### 2. 工作验收流程
-
-
-**WorkAcceptanceProcess** 负责处理该模块的核心逻辑，主要方法包括 `catch`。
-
-
----
-
-## 能力市场详细设计
-
-### 1. 能力网关与代理
-
-
-**CapabilityGateway** 负责处理该模块的核心逻辑，主要方法包括 `function`、`catch`。
-
-
-### 2. 能力监控与 SLA 管理
-
-
-**CapabilityMonitoring** 封装了该模块的核心业务逻辑。
-
-
----
-
-## 定价引擎
-
-### 1. 动态定价策略
-
-
-**DynamicPricingEngine** 负责处理该模块的核心逻辑，主要方法包括 `calculateTimeMultiplier`、`calculateBulkDiscount`。
-
-
----
-
-## 匹配与推荐算法
-
-### 1. 基于协同过滤的推荐
-
-
-**CollaborativeFilteringEngine** 负责处理该模块的核心逻辑，主要方法包括 `calculateUserSimilarity`、`set`。
-
-
----
-
-## 支付与托管系统
-
-### 1. 里程碑式支付
-
-
-**MilestonePaymentManager** 封装了该模块的核心业务逻辑。
-
-
----
-
-## 性能优化
-
-### 1. 缓存策略
-
-
-**MarketingCacheStrategy** 封装了该模块的核心业务逻辑。
-
-
----
-
-## 实现案例
-
-### 案例 1: 完整的信息交易流程
-
-
-`completeInfoTransaction` 函数处理该操作的核心流程。
-
-
-### 案例 2: 任务竞标与执行
-
-
-`completeTaskTransaction` 函数处理该操作的核心流程。
-
-
----
-
-*文档完成于 2026年2月2日*
-*版本: 1.0*
+- [Markets](/docs/core-modules/markets)
+- [Service Contracts](/docs/core-modules/service-contracts)
+- [API Error Codes](/docs/developer-guide/api-errors)
