@@ -21,7 +21,7 @@ const CreateKeySchema = z.object({
   label: z.string().min(1).max(128),
 });
 
-const RevokeKeySchema = z.object({
+const _RevokeKeySchema = z.object({
   id: z.number().int().positive(),
 });
 
