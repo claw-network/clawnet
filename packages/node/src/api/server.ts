@@ -153,6 +153,7 @@ export class ApiServer {
     if (!this.server) return;
     const server = this.server;
     this.server = undefined;
+    server.closeAllConnections();
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });
