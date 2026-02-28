@@ -268,6 +268,12 @@ if [ -d "$CONTRACTS_DIR" ] && [ -f "$CONTRACTS_JSON" ]; then
   CONTRACTS_ADDR=$(jq -r '.contracts.ClawContracts.proxy' "$CONTRACTS_JSON")
   IDENTITY_ADDR=$(jq -r '.contracts.ClawIdentity.proxy' "$CONTRACTS_JSON")
 
+  CLAWNETD_CONFIG="/opt/clawnet/clawnetd-data/config.yaml"
+  EXPECT_CHAIN_INDEXER=false
+  if [ -f "$CLAWNETD_CONFIG" ] && grep -q '^chain:' "$CLAWNETD_CONFIG"; then
+    EXPECT_CHAIN_INDEXER=true
+  fi
+
   DB_PATH=""
   for candidate in \
     "/opt/clawnet/clawnetd-data/indexer.sqlite" \
@@ -280,7 +286,11 @@ if [ -d "$CONTRACTS_DIR" ] && [ -f "$CONTRACTS_JSON" ]; then
     fi
   done
 
-  if [ -n "$DB_PATH" ]; then
+  if [ -f "$CLAWNETD_CONFIG" ] && ! grep -q '^chain:' "$CLAWNETD_CONFIG"; then
+    fail "Reconciliation: missing chain config in $CLAWNETD_CONFIG"
+    record_fail "Reconciliation: chain config missing"
+    RECONCILE_STATUS="failed-no-chain-config"
+  elif [ -n "$DB_PATH" ]; then
     info "Running reconcile.ts (DB: $DB_PATH)"
     pushd "$CONTRACTS_DIR" > /dev/null
 
@@ -309,8 +319,14 @@ if [ -d "$CONTRACTS_DIR" ] && [ -f "$CONTRACTS_JSON" ]; then
       RECONCILE_STATUS="unknown"
     fi
   else
-    info "Reconciliation: indexer.sqlite not found — skipping (only available on server)"
-    RECONCILE_STATUS="skipped-no-db"
+    if $EXPECT_CHAIN_INDEXER; then
+      fail "Reconciliation: indexer.sqlite missing while chain config is enabled ($CLAWNETD_CONFIG)"
+      record_fail "Reconciliation: indexer.sqlite missing (chain config enabled)"
+      RECONCILE_STATUS="failed-no-db"
+    else
+      info "Reconciliation: indexer.sqlite not found — skipping (only available on server)"
+      RECONCILE_STATUS="skipped-no-db"
+    fi
   fi
 else
   info "Reconciliation: packages/contracts not found — run from repo root or on server"

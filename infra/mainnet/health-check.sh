@@ -238,6 +238,7 @@ echo ""
 echo "=== EventIndexer (on-chain → SQLite) ==="
 
 INDEXER_DB="/opt/clawnet/clawnetd-data/indexer.sqlite"
+CLAWNETD_CONFIG="/opt/clawnet/clawnetd-data/config.yaml"
 if [ -f "$INDEXER_DB" ]; then
   if command -v sqlite3 &>/dev/null; then
     LAST_BLOCK=$(sqlite3 "$INDEXER_DB" "SELECT value FROM indexer_meta WHERE key='last_indexed_block';" 2>/dev/null || echo "?")
@@ -259,7 +260,13 @@ if [ -f "$INDEXER_DB" ]; then
     ok "indexer.sqlite exists (sqlite3 not installed — cannot inspect)"
   fi
 else
-  echo -e "  ${YELLOW}-${NC} indexer.sqlite not found (OK if clawnetd chain config not enabled)"
+  if [ -f "$CLAWNETD_CONFIG" ] && grep -q '^chain:' "$CLAWNETD_CONFIG"; then
+    fail "indexer.sqlite not found while chain config is enabled ($CLAWNETD_CONFIG)"
+  elif [ -f "$CLAWNETD_CONFIG" ] && ! grep -q '^chain:' "$CLAWNETD_CONFIG"; then
+    fail "clawnetd config missing chain section ($CLAWNETD_CONFIG)"
+  else
+    echo -e "  ${YELLOW}-${NC} indexer.sqlite not found (OK if clawnetd chain config not enabled)"
+  fi
 fi
 
 echo ""
@@ -268,7 +275,11 @@ echo ""
 echo "=== Docker Containers ==="
 
 for CONTAINER in clawnet-geth caddy; do
-  STATUS=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || echo "not found")
+  STATUS_RAW=$(docker inspect --format='{{.State.Status}}' "$CONTAINER" 2>/dev/null || true)
+  STATUS=$(echo "$STATUS_RAW" | tr -d '\r' | xargs || true)
+  if [ -z "$STATUS" ]; then
+    STATUS="not found"
+  fi
   if [ "$STATUS" = "running" ]; then
     UPTIME=$(docker inspect --format='{{.State.StartedAt}}' "$CONTAINER" 2>/dev/null || echo "")
     ok "$CONTAINER: running (since ${UPTIME:0:19})"

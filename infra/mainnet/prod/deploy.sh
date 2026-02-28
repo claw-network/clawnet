@@ -528,6 +528,21 @@ chain:
 CFGEOF"
 echo "  config.yaml written."
 
+# 12b.1 Validate config.yaml contains mandatory on-chain fields
+echo "  [Node 1] Validating config.yaml..."
+run_remote "$SERVER_1" "grep -q '^chain:' $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q '^  chainId: 7626$' $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q '^network: mainnet$' $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q \"token: '$TOKEN_ADDR'\" $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q \"escrow: '$ESCROW_ADDR'\" $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q \"identity: '$IDENTITY_ADDR'\" $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q \"reputation: '$REPUTATION_ADDR'\" $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q \"contracts: '$CONTRACTS_ADDR'\" $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q \"dao: '$DAO_ADDR'\" $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q \"staking: '$STAKING_ADDR'\" $CLAWNETD_DATA_DIR/config.yaml && \
+  grep -q \"paramRegistry: '$PARAM_REGISTRY_ADDR'\" $CLAWNETD_DATA_DIR/config.yaml"
+echo "  config.yaml validation passed."
+
 # 12c. Install clawnetd systemd service
 echo "  [Node 1] Installing clawnetd systemd service..."
 CLAW_PASSPHRASE="${CLAW_PASSPHRASE:-$(openssl rand -hex 32)}"
@@ -543,11 +558,14 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/clawnet/packages/node
+ExecStartPre=/usr/bin/test -f $CLAWNETD_DATA_DIR/config.yaml
+ExecStartPre=/usr/bin/grep -q '^chain:' $CLAWNETD_DATA_DIR/config.yaml
 ExecStart=/usr/bin/node dist/daemon.js --data-dir $CLAWNETD_DATA_DIR --api-host 127.0.0.1 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
 Environment=CLAW_DATA_DIR=$CLAWNETD_DATA_DIR
+Environment=CLAW_NETWORK=mainnet
 Environment=CLAW_PASSPHRASE=$CLAW_PASSPHRASE
 Environment=CLAW_API_KEY=$CLAW_API_KEY
 Environment=CLAW_PRIVATE_KEY=$CLAWNETD_PRIVATE_KEY
@@ -578,7 +596,10 @@ if [[ "$INDEXER_CHECK" == "OK" ]]; then
   EVENT_COUNT=$(run_remote "$SERVER_1" "sqlite3 $CLAWNETD_DATA_DIR/indexer.sqlite 'SELECT COUNT(*) FROM events;' 2>/dev/null || echo '0'")
   echo "  EventIndexer running: last_block=$LAST_BLOCK events=$EVENT_COUNT"
 else
-  echo "  WARNING: indexer.sqlite not found — EventIndexer may not have started"
+  echo "  ERROR: indexer.sqlite not found — EventIndexer failed to start"
+  echo "  Debug logs:"
+  run_remote "$SERVER_1" "journalctl -u clawnetd -n 80 --no-pager"
+  exit 1
 fi
 
 echo "  clawnetd deployed on Node 1."

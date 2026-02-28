@@ -89,7 +89,10 @@
   - 自动化：cron 每日 CET 07:00 执行 `daily-monitor.sh`
   - Day 1 (02-26): ✅ 通过
   - Day 2 (02-27): ✅ 通过（synced=true, v0.2.0, API key auth enforced, uptime 10h — 当日重启过）
-  - Day 3 (02-28): ⏳
+  - Day 3 (02-28): ✅ 通过（2026-02-28T08:36:01Z, report: `/opt/clawnet/infra/testnet/reports/2026-02-28.json`）
+    - clusterPeers=2（3 validators connected）
+    - Scenario 01: 9 passed / 0 failed
+    - Reconciliation: passed（0 discrepancies）
   - Day 4 (03-01): ⏳
   - Day 5 (03-02): ⏳
   - Day 6 (03-03): ⏳
