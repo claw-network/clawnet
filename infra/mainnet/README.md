@@ -89,9 +89,10 @@ bash infra/mainnet/multisig-soft-wallet/create-safe-addresses.sh
 10. 数据迁移 (DID, 余额, Escrow, ServiceContract)
 11. 对账验证 (reconcile.ts)
 12. Node 1 安装 clawnetd systemd 服务 + 写 config.yaml `chain:` 段 + 设置 `CLAW_PRIVATE_KEY`
-13. 启动 clawnetd → 验证 EventIndexer 运行（indexer.sqlite 创建 + 事件索引）
-14. 启动其余 ClawNet Node
-15. DNS 切换
+13. 启动 Node 1 clawnetd → 验证 EventIndexer 运行（indexer.sqlite 创建 + 事件索引）
+14. Node 2-5 自动安装 clawnetd systemd + node.env（bootstrap 到 Node 1）并验活
+15. 验证 mesh 收敛（Node 1 peers/connections ≥ 4）
+16. DNS 切换
 
 ## 文件清单
 
@@ -112,8 +113,8 @@ infra/mainnet/
 │   ├── create-safe-addresses.sh  # 主网 Safe 创建
 │   └── .gitignore
 └── prod/
-    ├── deploy.sh              # 一键部署脚本 (Phase 1-12: Geth + 合约 + clawnetd)
-    ├── secrets.env.example    # 密钥模板 (含 CLAW_PRIVATE_KEY)
+    ├── deploy.sh              # 一键部署脚本 (Phase 1-13: Geth + 合约 + 5 节点 clawnetd)
+    ├── secrets.env.example    # 密钥模板 (含 CLAW_PASSPHRASE / CLAW_API_KEY / CLAW_PRIVATE_KEY)
     └── .gitignore
 ```
 

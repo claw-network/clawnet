@@ -13,7 +13,8 @@
 #   8. Run bootstrap mint
 #
 # Prerequisites:
-#   - sshpass installed (brew install hudochenkov/sshpass/sshpass)
+#   - SSH key auth (recommended), default key: ~/.ssh/id_ed25519_clawnet
+#   - If key auth is unavailable, set SSH_PASSWORD and install sshpass
 #   - secrets.env and genesis.json in same directory as this script
 #
 # Usage:
@@ -67,6 +68,8 @@ require_env RESERVE_ADDRESS
 require_env DEPLOYER_PRIVATE_KEY
 require_env DEPLOYER_ADDRESS
 require_env VALIDATOR_PASSWORD
+require_env CLAW_PASSPHRASE
+require_env CLAW_API_KEY
 
 for i in 1 2 3 4 5; do
   require_env "VALIDATOR_${i}_PRIVATE_KEY"
@@ -103,7 +106,20 @@ SERVER_5="${SERVER_5:?ERROR: SERVER_5 IP not set in secrets.env}"
 
 ALL_SERVERS="$SERVER_1 $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5"
 
-SSH_PASS="${SSH_PASSWORD:?ERROR: SSH_PASSWORD not set in secrets.env}"
+SSH_USER="${SSH_USER:-root}"
+SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/.ssh/id_ed25519_clawnet}"
+SSH_PASS="${SSH_PASSWORD:-}"
+if [[ -f "$SSH_KEY_PATH" ]]; then
+  USE_SSH_KEY=true
+else
+  USE_SSH_KEY=false
+  if [[ -z "$SSH_PASS" ]]; then
+    echo "ERROR: neither SSH key nor SSH_PASSWORD is available."
+    echo "       Checked key path: $SSH_KEY_PATH"
+    echo "       Provide SSH_PASSWORD in secrets.env or set SSH_KEY_PATH to an existing private key."
+    exit 1
+  fi
+fi
 
 require_local_command() {
   local cmd="$1"
@@ -117,7 +133,11 @@ require_local_command() {
 run_remote() {
   local host="$1"
   shift
-  sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no "root@$host" "$@"
+  if [[ "$USE_SSH_KEY" == "true" ]]; then
+    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "${SSH_USER}@$host" "$@"
+  else
+    sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no "${SSH_USER}@$host" "$@"
+  fi
 }
 
 # Helper: copy file to remote server
@@ -125,7 +145,22 @@ scp_to() {
   local file="$1"
   local host="$2"
   local dest="$3"
-  sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no "$file" "root@$host:$dest"
+  if [[ "$USE_SSH_KEY" == "true" ]]; then
+    scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$file" "${SSH_USER}@$host:$dest"
+  else
+    sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no "$file" "${SSH_USER}@$host:$dest"
+  fi
+}
+
+scp_from() {
+  local host="$1"
+  local src="$2"
+  local dest="$3"
+  if [[ "$USE_SSH_KEY" == "true" ]]; then
+    scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "${SSH_USER}@$host:$src" "$dest"
+  else
+    sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no "${SSH_USER}@$host:$src" "$dest"
+  fi
 }
 
 rpc_block_number() {
@@ -145,14 +180,90 @@ rpc_enode() {
   echo "$raw" | sed "s/127.0.0.1/$host/"
 }
 
+install_peer_clawnetd_service() {
+  local host="$1"
+  local bootstrap_multiaddr="$2"
+
+  echo "  [$host] Writing /opt/clawnet/node-data/config.yaml..."
+  run_remote "$host" "mkdir -p /opt/clawnet/node-data"
+  run_remote "$host" "cat > /opt/clawnet/node-data/config.yaml << CFGEOF
+v: 1
+network: mainnet
+
+p2p:
+  listen:
+    - /ip4/0.0.0.0/tcp/9527
+  bootstrap:
+    - $bootstrap_multiaddr
+
+logging:
+  level: info
+
+storage: {}
+CFGEOF"
+
+  echo "  [$host] Writing /opt/clawnet/node.env..."
+  run_remote "$host" "cat > /opt/clawnet/node.env << ENVEOF
+NODE_ENV=production
+CLAW_NETWORK=mainnet
+CLAW_PASSPHRASE=$CLAW_PASSPHRASE
+CLAW_API_KEY=$CLAW_API_KEY
+ENVEOF
+chmod 600 /opt/clawnet/node.env"
+
+  echo "  [$host] Installing clawnetd.service..."
+  run_remote "$host" "cat > /etc/systemd/system/clawnetd.service << 'SVCEOF'
+[Unit]
+Description=ClawNet Node (clawnetd)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/clawnet
+EnvironmentFile=/opt/clawnet/node.env
+ExecStartPre=/usr/bin/test -f /opt/clawnet/node-data/config.yaml
+ExecStart=/usr/bin/node /opt/clawnet/packages/node/dist/daemon.js --api-host 0.0.0.0 --api-port 9528 --data-dir /opt/clawnet/node-data
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF"
+
+  echo "  [$host] Building node package..."
+  run_remote "$host" "cd /opt/clawnet && pnpm install && pnpm --filter @claw-network/node build"
+
+  echo "  [$host] Switching to systemd-managed daemon..."
+  run_remote "$host" "systemctl stop clawnetd 2>/dev/null || true
+pkill -f '/opt/clawnet/packages/node/dist/daemon.js' 2>/dev/null || true
+systemctl daemon-reload
+systemctl enable clawnetd
+systemctl restart clawnetd"
+
+  run_remote "$host" "sleep 3
+systemctl is-active clawnetd >/dev/null
+curl -sf http://127.0.0.1:9528/api/v1/node >/dev/null"
+  echo "  [$host] clawnetd active."
+}
+
 # ══════════════════════════════════════════════════════════════════
 # Phase 0: Preflight checks
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 0: Preflight checks..."
-require_local_command sshpass
 require_local_command ssh
 require_local_command scp
 require_local_command python3
+if [[ "$USE_SSH_KEY" != "true" ]]; then
+  require_local_command sshpass
+fi
+if [[ "$USE_SSH_KEY" == "true" ]]; then
+  echo "  [preflight] SSH auth: key ($SSH_KEY_PATH)"
+else
+  echo "  [preflight] SSH auth: password (sshpass)"
+fi
 
 if [[ ! -f "$GENESIS_FILE" ]]; then
   echo "ERROR: genesis file not found: $GENESIS_FILE"
@@ -399,8 +510,8 @@ echo ""
 echo ">>> Phase 10: Saving deployment record..."
 
 # Copy contracts deployment record from Node 1
-sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
-  "root@$SERVER_1:/opt/clawnet/packages/contracts/deployments/clawnetMainnet.json" \
+scp_from "$SERVER_1" \
+  "/opt/clawnet/packages/contracts/deployments/clawnetMainnet.json" \
   "$SCRIPT_DIR/contracts.json"
 
 if [[ ! -s "$SCRIPT_DIR/contracts.json" ]]; then
@@ -545,8 +656,15 @@ echo "  config.yaml validation passed."
 
 # 12c. Install clawnetd systemd service
 echo "  [Node 1] Installing clawnetd systemd service..."
-CLAW_PASSPHRASE="${CLAW_PASSPHRASE:-$(openssl rand -hex 32)}"
-CLAW_API_KEY="${CLAW_API_KEY:-$(openssl rand -hex 32)}"
+run_remote "$SERVER_1" "cat > /opt/clawnet/node.env << ENVEOF
+NODE_ENV=production
+CLAW_DATA_DIR=$CLAWNETD_DATA_DIR
+CLAW_NETWORK=mainnet
+CLAW_PASSPHRASE=$CLAW_PASSPHRASE
+CLAW_API_KEY=$CLAW_API_KEY
+CLAW_PRIVATE_KEY=$CLAWNETD_PRIVATE_KEY
+ENVEOF
+chmod 600 /opt/clawnet/node.env"
 
 run_remote "$SERVER_1" "cat > /etc/systemd/system/clawnetd.service << 'SVCEOF'
 [Unit]
@@ -558,17 +676,12 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/clawnet/packages/node
+EnvironmentFile=/opt/clawnet/node.env
 ExecStartPre=/usr/bin/test -f $CLAWNETD_DATA_DIR/config.yaml
 ExecStartPre=/usr/bin/grep -q '^chain:' $CLAWNETD_DATA_DIR/config.yaml
 ExecStart=/usr/bin/node dist/daemon.js --data-dir $CLAWNETD_DATA_DIR --api-host 127.0.0.1 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527
 Restart=always
 RestartSec=5
-Environment=NODE_ENV=production
-Environment=CLAW_DATA_DIR=$CLAWNETD_DATA_DIR
-Environment=CLAW_NETWORK=mainnet
-Environment=CLAW_PASSPHRASE=$CLAW_PASSPHRASE
-Environment=CLAW_API_KEY=$CLAW_API_KEY
-Environment=CLAW_PRIVATE_KEY=$CLAWNETD_PRIVATE_KEY
 LimitNOFILE=65536
 
 [Install]
@@ -604,6 +717,43 @@ fi
 
 echo "  clawnetd deployed on Node 1."
 echo ""
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 13: Deploy clawnetd on Nodes 2-5 via systemd + node.env
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 13: Setting up clawnetd on Nodes 2-5..."
+
+NODE_1_PEER_ID=$(run_remote "$SERVER_1" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'")
+if [[ -z "$NODE_1_PEER_ID" ]]; then
+  echo "ERROR: failed to read Node 1 peerId from clawnetd API"
+  exit 1
+fi
+NODE_1_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_1/tcp/9527/p2p/$NODE_1_PEER_ID"
+echo "  Node 1 bootstrap addr: $NODE_1_BOOTSTRAP_MULTIADDR"
+
+for HOST in $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5; do
+  install_peer_clawnetd_service "$HOST" "$NODE_1_BOOTSTRAP_MULTIADDR"
+done
+
+echo "  Waiting 10s for mesh convergence..."
+sleep 10
+
+NODE_1_CLAWNET_PEERS=$(run_remote "$SERVER_1" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"peers\", 0)))'")
+NODE_1_CLAWNET_CONNECTIONS=$(run_remote "$SERVER_1" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"connections\", 0)))'")
+echo "  Node 1 clawnetd mesh: peers=$NODE_1_CLAWNET_PEERS connections=$NODE_1_CLAWNET_CONNECTIONS"
+
+if [[ "$NODE_1_CLAWNET_PEERS" -lt 4 || "$NODE_1_CLAWNET_CONNECTIONS" -lt 4 ]]; then
+  echo "ERROR: clawnetd mesh not converged on Node 1 (expected peers/connections >= 4)"
+  run_remote "$SERVER_1" "systemctl status clawnetd --no-pager -n 80 || true"
+  for HOST in $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5; do
+    run_remote "$HOST" "systemctl status clawnetd --no-pager -n 80 || true"
+  done
+  exit 1
+fi
+
+echo "  Nodes 2-5 clawnetd deployed and managed by systemd."
+echo ""
+
 echo "============================================================"
 echo "Deployment complete!"
 echo "============================================================"
