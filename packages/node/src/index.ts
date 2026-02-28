@@ -398,7 +398,11 @@ export class ClawNetNode {
 
   private async buildNodeStatus(): Promise<Record<string, unknown>> {
     const did = await this.resolveLocalDid();
-    const blockHeight = this.eventStore ? await this.eventStore.getLogLength() : 0;
+    // In chain-enabled mode, expose indexed chain height (authoritative for API clients).
+    // Fall back to event log length for pure P2P/off-chain mode.
+    const blockHeight =
+      this.indexerStore?.lastIndexedBlock ??
+      (this.eventStore ? await this.eventStore.getLogLength() : 0);
     const peers = this.p2p?.getPeers().length ?? 0;
     const connections = this.p2p?.getConnections().length ?? 0;
     const network = this.resolveNetwork();
