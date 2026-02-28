@@ -63,6 +63,8 @@ require_env VALIDATOR_2_ADDRESS
 require_env VALIDATOR_3_ADDRESS
 require_env DEPLOYER_ADDRESS
 require_env VALIDATOR_PASSWORD
+require_env CLAW_PASSPHRASE
+require_env CLAW_API_KEY
 
 require_address TREASURY_ADDRESS
 require_address LIQUIDITY_ADDRESS
@@ -105,6 +107,7 @@ SERVER_B="${SERVER_B:-167.86.93.216}"
 SERVER_C="${SERVER_C:-167.86.93.223}"
 SSH_PASS="${SSH_PASSWORD:-G66tdTcmvBz*k1sf}"
 SSH_CMD="sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no"
+SERVER_A_CLAWNET_PEER_ID="${SERVER_A_CLAWNET_PEER_ID:-12D3KooWQnQQNGBG5yhuhiaxwcHmksDYy9ZbMiC8uoJp4D6oB5QM}"
 
 require_local_command() {
   local cmd="$1"
@@ -137,6 +140,74 @@ rpc_block_number() {
 rpc_peer_count() {
   local host="$1"
   run_remote "$host" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"net_peerCount\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"'
+}
+
+install_peer_clawnetd_service() {
+  local host="$1"
+  local bootstrap_multiaddr="$2"
+
+  echo "  [$host] Writing /opt/clawnet/node-data/config.yaml..."
+  run_remote "$host" "mkdir -p /opt/clawnet/node-data"
+  run_remote "$host" "cat > /opt/clawnet/node-data/config.yaml << CFGEOF
+v: 1
+network: testnet
+
+p2p:
+  listen:
+    - /ip4/0.0.0.0/tcp/9527
+  bootstrap:
+    - $bootstrap_multiaddr
+
+logging:
+  level: info
+
+storage: {}
+CFGEOF"
+
+  echo "  [$host] Writing /opt/clawnet/node.env..."
+  run_remote "$host" "cat > /opt/clawnet/node.env << ENVEOF
+NODE_ENV=production
+CLAW_PASSPHRASE=$CLAW_PASSPHRASE
+CLAW_API_KEY=$CLAW_API_KEY
+ENVEOF
+chmod 600 /opt/clawnet/node.env"
+
+  echo "  [$host] Installing clawnetd.service..."
+  run_remote "$host" "cat > /etc/systemd/system/clawnetd.service << 'SVCEOF'
+[Unit]
+Description=ClawNet Node (clawnetd)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/clawnet
+EnvironmentFile=/opt/clawnet/node.env
+ExecStartPre=/usr/bin/test -f /opt/clawnet/node-data/config.yaml
+ExecStart=/usr/bin/node /opt/clawnet/packages/node/dist/daemon.js --api-host 0.0.0.0 --api-port 9528 --data-dir /opt/clawnet/node-data
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF"
+
+  echo "  [$host] Building node package..."
+  run_remote "$host" "cd /opt/clawnet && pnpm install && pnpm --filter @claw-network/node build"
+
+  echo "  [$host] Switching to systemd-managed daemon..."
+  run_remote "$host" "systemctl stop clawnetd 2>/dev/null || true
+pkill -f '/opt/clawnet/packages/node/dist/daemon.js' 2>/dev/null || true
+systemctl daemon-reload
+systemctl enable clawnetd
+systemctl restart clawnetd"
+
+  run_remote "$host" "sleep 3
+systemctl is-active clawnetd >/dev/null
+curl -sf http://127.0.0.1:9528/api/v1/node >/dev/null"
+  echo "  [$host] clawnetd active."
 }
 
 echo ">>> Phase 0: Preflight checks..."
@@ -478,6 +549,40 @@ if [[ ! -s "$SCRIPT_DIR/enodes.env" ]]; then
 fi
 
 echo "  Cluster health checks passed."
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 13: Deploy clawnetd on Server B/C via systemd + node.env
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 13: Setting up clawnetd on Server B/C..."
+
+A_NODE_PEER_ID=$(run_remote "$SERVER_A" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
+if [[ -n "$A_NODE_PEER_ID" ]]; then
+  SERVER_A_CLAWNET_PEER_ID="$A_NODE_PEER_ID"
+else
+  echo "  WARN: Server A clawnetd API not reachable; fallback peerId will be used: $SERVER_A_CLAWNET_PEER_ID"
+fi
+
+A_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_A/tcp/9527/p2p/$SERVER_A_CLAWNET_PEER_ID"
+echo "  Server A bootstrap addr: $A_BOOTSTRAP_MULTIADDR"
+
+install_peer_clawnetd_service "$SERVER_B" "$A_BOOTSTRAP_MULTIADDR"
+install_peer_clawnetd_service "$SERVER_C" "$A_BOOTSTRAP_MULTIADDR"
+
+echo "  Waiting 8s for mesh convergence..."
+sleep 8
+
+B_NODE_PEERS=$(run_remote "$SERVER_B" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"peers\", 0)))'")
+C_NODE_PEERS=$(run_remote "$SERVER_C" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"peers\", 0)))'")
+echo "  Server B/C clawnetd peers: B=$B_NODE_PEERS C=$C_NODE_PEERS"
+
+if [[ "$B_NODE_PEERS" -lt 1 || "$C_NODE_PEERS" -lt 1 ]]; then
+  echo "ERROR: clawnetd peer mesh not healthy on B/C (expected peers >= 1)"
+  run_remote "$SERVER_B" "systemctl status clawnetd --no-pager -n 80 || true"
+  run_remote "$SERVER_C" "systemctl status clawnetd --no-pager -n 80 || true"
+  exit 1
+fi
+
+echo "  Server B/C clawnetd deployed and managed by systemd."
 
 echo ""
 echo "============================================================"
