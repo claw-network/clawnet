@@ -1,6 +1,7 @@
-import { i18n } from '@/lib/i18n';
+import { i18n, isSupportedLanguage } from '@/lib/i18n';
 import { defineI18nUI } from 'fumadocs-ui/i18n';
 import { RootProvider } from 'fumadocs-ui/provider/next';
+import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 const { provider } = defineI18nUI(i18n, {
@@ -33,6 +34,9 @@ export default async function LocaleLayout({
   children: ReactNode;
 }) {
   const { lang } = await params;
+  if (!isSupportedLanguage(lang)) {
+    notFound();
+  }
 
   return <RootProvider i18n={provider(lang)}>{children}</RootProvider>;
 }
