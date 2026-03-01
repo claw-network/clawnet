@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# pre-push hook — block push unless all tests pass
+# pre-push hook — block push unless build + tests pass
 #
 # Skip:  git push --no-verify
 #        SKIP_TESTS=1 git push
@@ -43,11 +43,57 @@ TOTAL_START=$(date +%s)
 
 # ── banner ──────────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}🔒 Pre-push: running tests across ${TOTAL} packages${RESET}"
+echo -e "${BOLD}🔒 Pre-push: build + test across ${TOTAL} packages${RESET}"
 echo -e "${DIM}   Skip with: git push --no-verify${RESET}"
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 
-# ── run each package ────────────────────────────────────────────
+# ── phase 1: build ──────────────────────────────────────────────
+BUILD_FAILED=0
+BUILD_FAILED_NAMES=""
+echo -e "${BOLD}📦 Phase 1/2 — Build${RESET}"
+
+BUILD_IDX=0
+for PKG in "${PACKAGES[@]}"; do
+  BUILD_IDX=$((BUILD_IDX + 1))
+  FILTER="@claw-network/${PKG}"
+  BUILD_START=$(date +%s)
+
+  printf "  ${DIM}[%d/%d]${RESET} %-28s " "$BUILD_IDX" "$TOTAL" "$FILTER"
+
+  BUILD_LOG=$(mktemp)
+  pnpm --filter "$FILTER" build > "$BUILD_LOG" 2>&1
+  BUILD_EC=$?
+  BUILD_END=$(date +%s)
+  BUILD_SECS=$((BUILD_END - BUILD_START))
+
+  if [ $BUILD_EC -eq 0 ]; then
+    echo -e "${GREEN}✅ built${RESET} ${DIM}(${BUILD_SECS}s)${RESET}"
+  else
+    BUILD_FAILED=$((BUILD_FAILED + 1))
+    BUILD_FAILED_NAMES="${BUILD_FAILED_NAMES}  • ${FILTER}\n"
+    echo -e "${RED}❌ BUILD FAILED${RESET} ${DIM}(${BUILD_SECS}s)${RESET}"
+    echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+    tail -30 "$BUILD_LOG" | sed 's/^/    /'
+    echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  fi
+  rm -f "$BUILD_LOG"
+done
+
+if [ $BUILD_FAILED -gt 0 ]; then
+  TOTAL_END=$(date +%s)
+  TOTAL_SECS=$((TOTAL_END - TOTAL_START))
+  echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${RED}${BOLD}❌ ${BUILD_FAILED} package(s) failed to build${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+  echo -e "${RED}${BUILD_FAILED_NAMES}${RESET}"
+  echo -e "   Push aborted. Fix the build errors and try again."
+  echo ""
+  exit 1
+fi
+
+echo ""
+
+# ── phase 2: test ───────────────────────────────────────────────
+echo -e "${BOLD}🧪 Phase 2/2 — Test${RESET}"
 IDX=0
 for PKG in "${PACKAGES[@]}"; do
   IDX=$((IDX + 1))
@@ -85,14 +131,14 @@ TOTAL_SECS=$((TOTAL_END - TOTAL_START))
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 
 if [ $FAILED -gt 0 ]; then
-  echo -e "${RED}${BOLD}❌ ${FAILED} package(s) failed${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+  echo -e "${RED}${BOLD}❌ ${FAILED} package(s) failed tests${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
   echo -e "${RED}${FAILED_NAMES}${RESET}"
   echo -e "   Push aborted. Fix the failing tests and try again."
   echo ""
   exit 1
 fi
 
-echo -e "${GREEN}${BOLD}✅ All ${PASSED} packages passed${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+echo -e "${GREEN}${BOLD}✅ Build + test: all ${PASSED} packages passed${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
 echo -e "   Pushing..."
 echo ""
 exit 0
