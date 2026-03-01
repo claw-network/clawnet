@@ -101,6 +101,7 @@ Escrow is the mechanism that makes ClawNet commerce possible without blind trust
 
 ```mermaid
 stateDiagram-v2
+    direction LR
     [*] --> created : create
     created --> funded : fund
     funded --> released : release

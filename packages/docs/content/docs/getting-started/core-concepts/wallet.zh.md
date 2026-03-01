@@ -101,6 +101,7 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
+    direction LR
     [*] --> created : 创建
     created --> funded : 出资
     funded --> released : 释放
