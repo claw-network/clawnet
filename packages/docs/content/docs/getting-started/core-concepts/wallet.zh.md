@@ -109,10 +109,10 @@ flowchart LR
     released --> E1(( ))
     refunded --> E2(( ))
     expired --> E3(( ))
-    style S fill:#374151,stroke:#374151,color:#374151
-    style E1 fill:#374151,stroke:#374151,color:#374151
-    style E2 fill:#374151,stroke:#374151,color:#374151
-    style E3 fill:#374151,stroke:#374151,color:#374151
+    style S fill:#374151,stroke:#374151,color:#374151,font-size:0px
+    style E1 fill:#374151,stroke:#374151,color:#374151,font-size:0px
+    style E2 fill:#374151,stroke:#374151,color:#374151,font-size:0px
+    style E3 fill:#374151,stroke:#374151,color:#374151,font-size:0px
 ```
 
 | 状态 | 资金位置 | 下一步可能的操作 |
