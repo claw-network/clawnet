@@ -40,6 +40,7 @@ Every market uses the same types — a dataset delivered through the Info Market
 Every deliverable is wrapped in an **envelope** — a metadata record that travels alongside (but separate from) the actual content. The envelope answers five critical questions:
 
 ```mermaid
+%%{init: {'themeVariables': {'fontSize': '24px'}}}%%
 flowchart TD
     A([Envelope]) --> B[Type] & C[Hash] & D[Signature] & E[Encryption] & F[Transport]
 ```
@@ -85,6 +86,7 @@ The domain prefix (`clawnet:deliverable:v1:`) ensures that a deliverable signatu
 By default, deliverables are **end-to-end encrypted**. Only the buyer and seller can read the content — not relays, not other nodes, not anyone eavesdropping on the P2P network.
 
 ```mermaid
+%%{init: {'themeVariables': {'fontSize': '24px'}}}%%
 sequenceDiagram
     participant P as Producer
     participant N as Network
@@ -134,6 +136,7 @@ The 750 KB limit comes from the P2P protocol's 1 MB event size limit, minus over
 Small deliverables ride along with the P2P event itself — no extra round trips needed:
 
 ```mermaid
+%%{init: {'themeVariables': {'fontSize': '24px'}}}%%
 sequenceDiagram
     participant P as Producer
     participant G as Gossipsub
@@ -149,6 +152,7 @@ sequenceDiagram
 Larger content is stored separately and fetched on demand:
 
 ```mermaid
+%%{init: {'themeVariables': {'fontSize': '24px'}}}%%
 sequenceDiagram
     participant P as Producer
     participant G as Gossipsub
@@ -192,14 +196,15 @@ A single `bytes32` on-chain anchors the entire envelope — content hash, format
 ClawNet verifies deliverables progressively — starting with basic integrity checks and adding more sophisticated validation over time. Think of it as a series of increasingly strict checkpoints: each layer passes or rejects the deliverable before the next layer runs.
 
 ```mermaid
-flowchart TD
-    D[Deliverable received] --> L1{Layer 1\nIntegrity + Provenance}
-    L1 -- Pass --> L2{Layer 2\nSchema Validation}
-    L1 -- Fail --> R1[Reject + auto-dispute]
-    L2 -- Pass --> L3{Layer 3\nAcceptance Tests}
-    L2 -- Fail --> R2[Reject with reason]
+%%{init: {'themeVariables': {'fontSize': '24px'}}}%%
+flowchart LR
+    D[Received] --> L1{L1 Integrity}
+    L1 -- Pass --> L2{L2 Schema}
+    L1 -- Fail --> R1[Dispute]
+    L2 -- Pass --> L3{L3 Acceptance}
+    L2 -- Fail --> R2[Reject]
     L3 -- Pass --> A[Accepted]
-    L3 -- Fail --> R3[Reject or escalate]
+    L3 -- Fail --> R3[Escalate]
 ```
 
 ### Layer 1 — Integrity + Provenance (current)
@@ -275,6 +280,7 @@ The Info Market trades **knowledge products** — datasets, reports, analyses. T
 - **Delivery record**: The existing `InfoDeliveryRecord` is preserved and extended with an `envelopeHash` field, linking the market's order system to the cryptographic proof.
 
 ```mermaid
+%%{init: {'themeVariables': {'fontSize': '24px'}}}%%
 sequenceDiagram
     participant S as Seller
     participant M as Market
@@ -313,6 +319,7 @@ Service contracts are **multi-phase, milestone-based agreements** — the most c
 - **Dispute evidence**: If a dispute arises, both parties submit evidence as `composite`-type deliverable envelopes. The arbitration panel receives encrypted copies, ensuring only authorized reviewers can see the evidence.
 
 ```mermaid
+%%{init: {'themeVariables': {'fontSize': '24px'}}}%%
 flowchart LR
     subgraph Contract
         M1[Milestone 1] --> M2[Milestone 2] --> M3[Milestone 3]
