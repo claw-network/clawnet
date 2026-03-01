@@ -61,7 +61,15 @@ for PKG in "${PACKAGES[@]}"; do
   printf "  ${DIM}[%d/%d]${RESET} %-28s " "$BUILD_IDX" "$TOTAL" "$FILTER"
 
   BUILD_LOG=$(mktemp)
-  pnpm --filter "$FILTER" build > "$BUILD_LOG" 2>&1
+
+  # contracts uses "compile" (hardhat); others use "build" (tsc)
+  if [ "$PKG" = "contracts" ]; then
+    BUILD_CMD="compile"
+  else
+    BUILD_CMD="build"
+  fi
+
+  pnpm --filter "$FILTER" "$BUILD_CMD" > "$BUILD_LOG" 2>&1
   BUILD_EC=$?
   BUILD_END=$(date +%s)
   BUILD_SECS=$((BUILD_END - BUILD_START))
