@@ -300,6 +300,8 @@ class ContractMilestone(TypedDict, total=False):
     deadline: int | None
     status: str
     deliverables: list[str] | None
+    # BLAKE3(JCS(envelope)) hex — Phase 1+ envelope-based delivery
+    envelopeDigest: str | None
 
 
 class Contract(TypedDict, total=False):

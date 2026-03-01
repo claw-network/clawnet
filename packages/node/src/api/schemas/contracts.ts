@@ -44,6 +44,12 @@ export const ContractMilestoneSubmitSchema = z
     submissionId: z.string().optional(),
     deliverables: z.array(z.record(z.unknown())).optional(),
     notes: z.string().optional(),
+    /** Pre-computed BLAKE3(JCS(envelope)) hex — when present, bypasses legacy keccak256 path */
+    envelopeDigest: z.string().optional(),
+    /** New delivery envelope (Phase 1 transition) */
+    delivery: z.object({
+      envelope: z.record(z.unknown()),
+    }).optional(),
   })
   .passthrough();
 

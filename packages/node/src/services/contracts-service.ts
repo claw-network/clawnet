@@ -317,17 +317,22 @@ export class ContractsService {
 
   /**
    * Submit a milestone deliverable (provider only).
+   *
+   * @param envelopeDigest  Pre-computed BLAKE3(JCS(envelope)) hex — passed
+   *   directly to the contract with **no** re-hashing.  Callers compute the
+   *   digest themselves (see `envelopeDigest()` in @claw-network/core).
    */
   async submitMilestone(
     contractId: string,
     index: number,
-    deliverableHash: string,
+    envelopeDigest: string,
   ): Promise<MilestoneTxResult> {
     const id = this.hash(contractId);
-    const hash = this.hash(deliverableHash);
+    // envelopeDigest is already a BLAKE3 hex digest — pass directly, no double-hash.
+    const digest = envelopeDigest.startsWith('0x') ? envelopeDigest : `0x${envelopeDigest}`;
     this.log.info('Submitting milestone %d for contract %s', index, contractId);
 
-    const tx = await this.contracts.serviceContracts.submitMilestone(id, index, hash);
+    const tx = await this.contracts.serviceContracts.submitMilestone(id, index, digest);
     const receipt = await tx.wait();
 
     return {

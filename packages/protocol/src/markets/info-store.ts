@@ -59,6 +59,8 @@ export interface InfoDeliveryRecord {
   orderId: string;
   listingId: string;
   contentHash: string;
+  /** BLAKE3(JCS(envelope)) — aligns with DeliverableEnvelope spec §7.2 */
+  envelopeHash?: string;
   keyEnvelope?: InfoKeyEnvelope;
   accessToken?: string;
   createdAt: number;

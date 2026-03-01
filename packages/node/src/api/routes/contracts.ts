@@ -45,6 +45,12 @@ import {
   type ContractParties,
   type ContractMilestone,
 } from '@claw-network/protocol';
+import { keccak256, toUtf8Bytes } from 'ethers';
+
+/** Legacy helper: keccak256(utf8(value)) — for backward-compat when no envelopeDigest is provided. */
+function legacyHash(value: string): string {
+  return keccak256(toUtf8Bytes(value));
+}
 
 export function contractRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -585,10 +591,18 @@ export function contractRoutes(ctx: RuntimeContext): Router {
 
     if (ctx.contractsService) {
       try {
-        const deliverable = body.deliverables
-          ? JSON.stringify(body.deliverables)
-          : (body.notes ?? '');
-        const result = await ctx.contractsService.submitMilestone(id, index, deliverable);
+        let digest: string;
+        if (body.envelopeDigest) {
+          // New path: caller provides pre-computed BLAKE3(JCS(envelope)) hex
+          digest = body.envelopeDigest;
+        } else {
+          // Legacy path: hash JSON-stringified deliverables via keccak256
+          const raw = body.deliverables
+            ? JSON.stringify(body.deliverables)
+            : (body.notes ?? '');
+          digest = legacyHash(raw);
+        }
+        const result = await ctx.contractsService.submitMilestone(id, index, digest);
         ok(res, result, { self: `/api/v1/contracts/${id}/milestones/${idx}` });
         return;
       } catch (err) {

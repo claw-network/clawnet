@@ -371,6 +371,8 @@ export interface TaskDeliverParams extends EventFields {
   submission: Record<string, unknown>;
   message?: string;
   resourcePrev?: string;
+  /** New delivery envelope (Phase 1 transition) */
+  delivery?: { envelope: Record<string, unknown> };
 }
 
 export interface TaskConfirmParams extends EventFields {
@@ -584,6 +586,10 @@ export interface MilestoneSubmitParams extends EventFields {
   deliverables?: string[];
   message?: string;
   resourcePrev?: string;
+  /** Pre-computed BLAKE3(JCS(envelope)) hex — bypasses legacy keccak256 path */
+  envelopeDigest?: string;
+  /** New delivery envelope (Phase 1 transition) */
+  delivery?: { envelope: Record<string, unknown> };
 }
 
 export interface MilestoneApproveParams extends EventFields {

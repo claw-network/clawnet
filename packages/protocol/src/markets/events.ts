@@ -1053,11 +1053,21 @@ export function parseMarketSubmissionSubmitPayload(
   if (payload.resourcePrev !== undefined && payload.resourcePrev !== null) {
     throw new Error('resourcePrev must be null for submission submit');
   }
+
+  // Phase 1 transition: pass through delivery envelope when present
+  let delivery: MarketSubmissionSubmitPayload['delivery'];
+  if (payload.delivery !== undefined && payload.delivery !== null) {
+    const deliveryRecord = assertRecord(payload.delivery, 'delivery');
+    const envelope = assertRecord(deliveryRecord.envelope, 'delivery.envelope');
+    delivery = { envelope };
+  }
+
   return {
     orderId,
     submissionId,
     worker,
     deliverables,
+    delivery,
     notes,
     resourcePrev: undefined,
   };

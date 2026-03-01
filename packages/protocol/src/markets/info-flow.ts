@@ -314,6 +314,8 @@ export interface InfoDeliveryPrepareParams {
   orderId: string;
   listingId: string;
   contentHash: string;
+  /** BLAKE3(JCS(envelope)) — when envelope-based delivery is used */
+  envelopeHash?: string;
   buyerPublicKey?: Uint8Array;
   contentKey?: Uint8Array;
   keyEnvelope?: InfoKeyEnvelope;
@@ -335,6 +337,7 @@ export async function prepareInfoDeliveryRecord(
     orderId: params.orderId,
     listingId: params.listingId,
     contentHash: params.contentHash,
+    envelopeHash: params.envelopeHash,
     keyEnvelope: envelope,
     accessToken: params.accessToken,
     createdAt: params.createdAt ?? Date.now(),
