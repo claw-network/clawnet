@@ -130,8 +130,38 @@ async function getMermaid(isDark: boolean) {
   return mermaidMod;
 }
 
-/** Patch text colours into the rendered SVG. */
+/** Patch text colours into the rendered SVG and normalize sizing. */
 function patchSvg(raw: string): string {
+  let result = raw;
+
+  // ── Normalize SVG dimensions ────────────────────────────────────────────
+  // Mermaid v11 outputs <svg style="max-width: Npx;" viewBox="..."> with no
+  // explicit width/height. Browsers compute intrinsic size from the viewBox,
+  // but in flex containers or during hydration this can produce very tall or
+  // very wide diagrams. We force responsive sizing: width fills container
+  // (capped at natural width), height scales proportionally.
+  result = result.replace(/<svg([^>]*)>/, (_match, attrs: string) => {
+    const vbMatch = attrs.match(
+      /viewBox=["'][\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)["']/,
+    );
+    const maxW = vbMatch ? parseFloat(vbMatch[1]) : null;
+
+    // Strip existing width / height attributes
+    let cleaned = attrs
+      .replace(/\bwidth="[^"]*"/g, '')
+      .replace(/\bheight="[^"]*"/g, '');
+
+    // Strip max-width from Mermaid's inline style (we re-apply it below)
+    cleaned = cleaned.replace(/style="([^"]*)"/g, (_s: string, css: string) => {
+      const rest = css.replace(/max-width:\s*[^;]+;?/g, '').trim();
+      return rest ? `style="${rest}"` : '';
+    });
+
+    const mw = maxW ? `max-width:${Math.ceil(maxW)}px;` : '';
+    return `<svg${cleaned} style="width:100%;${mw}height:auto;">`;
+  });
+
+  // ── Inject text-colour overrides ────────────────────────────────────────
   const textFill = '#1e293b';
   const labelFill = '#475569';
   const patchStyle = `<style>
@@ -148,13 +178,14 @@ function patchSvg(raw: string): string {
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      height: 100% !important;
       margin: 0 !important;
     }
     .cluster-label text { fill: ${textFill}; }
     .transition { stroke: #94a3b8; }
   </style>`;
-  return raw.replace(/<style>/, patchStyle + '<style>');
+  result = result.replace(/<style>/, patchStyle + '<style>');
+
+  return result;
 }
 
 export function Mermaid({ chart }: { chart: string }) {
@@ -167,16 +198,20 @@ export function Mermaid({ chart }: { chart: string }) {
     let cancelled = false;
 
     // Chain onto the global queue so only one render executes at a time.
-    // This eliminates the race where concurrent initialize() calls corrupt
-    // Mermaid's global state (most commonly: flowchart direction reset to TB).
     renderQueue = renderQueue
       .then(async () => {
         if (cancelled) return;
         const isDark = document.documentElement.classList.contains('dark');
         const mermaid = await getMermaid(isDark);
+
+        // Pass the real, mounted container so Mermaid measures the diagram at
+        // the correct available width.  Without this, Mermaid creates an
+        // off-screen container whose width may be 0, causing dagre to stack
+        // nodes vertically → very tall SVG.
         const { svg: rendered } = await mermaid.render(
           `mermaid-${id}`,
           chart.trim(),
+          containerRef.current ?? undefined,
         );
         if (!cancelled) {
           setSvg(patchSvg(rendered));
@@ -204,19 +239,21 @@ export function Mermaid({ chart }: { chart: string }) {
     );
   }
 
-  if (!svg) {
-    return (
-      <div className="flex items-center justify-center py-6 text-fd-muted-foreground text-sm">
-        Loading diagram…
-      </div>
-    );
-  }
-
   return (
     <div
       ref={containerRef}
-      className="my-4 flex justify-center overflow-x-auto rounded-lg border border-fd-border bg-fd-card/50 dark:bg-slate-100 px-4 py-3 [&>svg]:h-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+      className="my-4 overflow-x-auto rounded-lg border border-fd-border bg-fd-card/50 dark:bg-slate-100 px-4 py-3"
+    >
+      {svg ? (
+        <div
+          className="flex justify-center [&>svg]:max-w-full"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      ) : (
+        <div className="flex items-center justify-center py-6 text-fd-muted-foreground text-sm">
+          Loading diagram…
+        </div>
+      )}
+    </div>
   );
 }
