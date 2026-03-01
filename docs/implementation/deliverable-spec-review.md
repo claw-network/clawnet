@@ -224,3 +224,209 @@
 - 本报告未执行运行时压测或跨节点互操作实验。
 - 本报告不修改 `SPEC_FREEZE.md` 结论，仅指出当前草案与现有实现的冲突点。
 
+---
+
+## 7. 复审（v0.2.0，2026-03-01）
+
+| Field | Value |
+|---|---|
+| Date | 2026-03-01 |
+| Target Doc | `docs/implementation/deliverable-spec.md` |
+| Target Version | v0.2.0 (Draft) |
+| Review Type | Follow-up review after revision |
+
+### 7.1 本轮确认已改进项
+
+- 已移除 gossip-visible envelope 中的明文 `sessionToken` / `accessToken`，改为 `tokenHash` + 点对点下发。
+- 已把事件接入策略从独立 `delivery.*` 调整为复用 `market.submission.*` / `market.order.*` 扩展字段。
+- 已补充二次哈希问题说明，明确 `deliverableHash` 应直接透传 digest。
+- 已补充 `InfoKeyEnvelope` 到新结构的兼容映射。
+- 已明确 `composite` 的顺序语义（按 `parts` 声明顺序计算）。
+- 已将 inline 阈值改为 750 KB，并解释序列化字节上限背景。
+
+### 7.2 Findings（按严重级别）
+
+#### High
+
+##### DS2-001 `id` 规则依赖 `orderId`，但 envelope 未定义 `orderId` 字段
+
+- 现象：
+  - `id` 被定义为 `SHA-256(orderId + producer + nonce + createdAt)`。
+  - `DeliverableEnvelope` 字段列表未包含 `orderId`。
+  - 该规则对能力市场等非订单语境不通用。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:118`
+  - `docs/implementation/deliverable-spec.md:529`
+  - `docs/implementation/deliverable-spec.md:652`
+- 风险：
+  - 不同实现会引入外部上下文拼接，导致 ID 与重放校验不可互认。
+- 建议：
+  - 二选一：
+  - 在 envelope 显式增加 `orderId` 字段并声明适用范围。
+  - 改为不依赖外部业务上下文的 ID 公式，并把幂等键单独定义。
+
+##### DS2-002 签名章节仍存在内部表述冲突
+
+- 现象：
+  - 同一节同时出现 `signatureInput = SHA-256(signingBytes)` 与 `Ed25519.sign(signingBytes)`。
+  - “与 P2P event 签名关系”描述中把 event 签名表述为“prefix + SHA-256”，与现实现不一致（event 签名是对 `prefix + canonical bytes` 直接签名，SHA-256用于 `hash` 字段）。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:266`
+  - `docs/implementation/deliverable-spec.md:267`
+  - `docs/implementation/deliverable-spec.md:276`
+  - `packages/core/src/protocol/event-hash.ts:29`
+  - `packages/core/src/protocol/event-hash.ts:35`
+- 风险：
+  - 开发实现可能走两套验签逻辑，出现互操作失败。
+- 建议：
+  - 删除 `signatureInput` 或明确其非签名输入用途。
+  - 将 event 对照描述修正为与 `eventSigningBytes` 实现一致。
+
+#### Medium
+
+##### DS2-003 尺寸分层与小节标题不一致
+
+- 现象：
+  - 分层表已改为 `<= 750 KB` / `750 KB - 1 GB`。
+  - 小节标题仍写 `Inline delivery (≤ 1 MB)` 和 `External delivery (1 MB - 1 GB)`。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:338`
+  - `docs/implementation/deliverable-spec.md:345`
+  - `docs/implementation/deliverable-spec.md:358`
+- 风险：
+  - 实现阈值与测试用例按标题理解会偏离。
+- 建议：
+  - 统一标题与分层表，全部以 750 KB 边界为准。
+
+##### DS2-004 “旧节点 graceful degradation”前提未写完整
+
+- 现象：
+  - 文档声明新增 `payload.delivery.envelope` 可向后兼容。
+  - 当前 `market.submission.submit` 解析仍强制 `deliverables` 数组存在。
+  - 若新实现只发 `delivery.envelope`，旧节点会在 parser 层 reject。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:558`
+  - `docs/implementation/deliverable-spec.md:565`
+  - `packages/protocol/src/markets/events.ts:999`
+  - `packages/protocol/src/markets/events.ts:1048`
+- 风险：
+  - 过渡期跨版本节点提交失败，无法实现文档描述的平滑兼容。
+- 建议：
+  - 在规范中明确：Phase 1 过渡期必须同时携带 legacy `deliverables` + 新 `delivery.envelope`。
+
+##### DS2-005 `legacy envelope` 无签名策略与 Layer 1 强制验签冲突
+
+- 现象：
+  - REST 迁移策略写明旧格式自动包装为 `legacy envelope` 且“不签名”。
+  - Layer 1 又将 envelope 验签定义为自动拒绝项，且 `signature` 字段为必需语义。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:149`
+  - `docs/implementation/deliverable-spec.md:467`
+  - `docs/implementation/deliverable-spec.md:642`
+- 风险：
+  - 同一规范内出现“必须验签”和“允许无签名”双规则。
+- 建议：
+  - 明确单一路径：
+  - 方案 A：legacy 也必须签名。
+  - 方案 B：legacy 允许无签名，但强制进入降级流程并不计入 Layer 1 自动通过。
+
+#### Low
+
+##### DS2-006 新增 `/clawnet/1.0.0/delivery-auth` 协议与冻结文档关系描述偏弱
+
+- 现象：
+  - 文档新增点对点协议流用于下发令牌。
+  - 同时声明“这不涉及冻结文档”，但互操作实现仍需要统一登记。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:678`
+- 风险：
+  - 不同实现方可能漏实现该通道，导致 token 下发不可互通。
+- 建议：
+  - 在 Relation to frozen specs 中补一句：新协议至少需在实现规范附录或注册表登记（即便不改冻结正文）。
+
+### 7.3 复审结论
+
+- v0.2.0 相比 v0.1.0 已显著收敛，前一轮 P0 高风险项大部分已被正确处理。
+- 当前主要剩余问题是“规范内部一致性”和“过渡兼容条件”。
+- 建议先修复 DS2-001 到 DS2-005，再启动大规模实现，以减少返工与跨版本互操作风险。
+
+---
+
+## 8. 最终复审（v0.3.0，2026-03-01）
+
+| Field | Value |
+|---|---|
+| Date | 2026-03-01 |
+| Target Doc | `docs/implementation/deliverable-spec.md` |
+| Target Version | v0.3.0 (Draft) |
+| Review Type | Final pass before implementation handoff |
+
+### 8.1 总体结论
+
+- v0.3.0 已解决前两轮大部分核心问题（安全、签名、事件命名、二次哈希、兼容策略）。
+- 当前剩余问题主要是示例与约束的同步，属于可快速修复项。
+- 结论：**可进入开发评审阶段，但建议先修复下列 3 个问题再开始大规模编码**。
+
+### 8.2 Findings（最终轮）
+
+#### Medium
+
+##### DS3-001 `market.submission.submit` 示例 payload 与事件约束不一致
+
+- 现象：
+  - §6.2 示例写为 `payload: { orderId, envelope }`。
+  - 但文档后文已定义新字段应放在 `delivery.envelope`，并且过渡期必须同时携带 legacy `deliverables`。
+  - 现有 parser 还强制要求 `submissionId`、`worker`、`deliverables`。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:355`
+  - `docs/implementation/deliverable-spec.md:358`
+  - `docs/implementation/deliverable-spec.md:571`
+  - `docs/implementation/deliverable-spec.md:580`
+  - `packages/protocol/src/markets/events.ts:125`
+  - `packages/protocol/src/markets/events.ts:999`
+  - `packages/protocol/src/markets/events.ts:1048`
+- 风险：
+  - 开发者按示例实现会构造出 parser 无法通过的事件。
+- 建议：
+  - 将 §6.2 示例改为包含：
+  - `submissionId`、`worker`、`deliverables`（legacy）；
+  - `delivery: { envelope }`（new）；
+  - 并明确 `resourcePrev`/`prev` 规则。
+
+##### DS3-002 `market.order.update` 流式示例缺少必需字段说明
+
+- 现象：
+  - §6.4 仅展示了 `market.order.update + delivery`。
+  - 现有 `parseMarketOrderUpdatePayload` 对 `order.update` 仍要求 `orderId`、`resourcePrev`、`status`。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:378`
+  - `docs/implementation/deliverable-spec.md:380`
+  - `packages/protocol/src/markets/events.ts:92`
+  - `packages/protocol/src/markets/events.ts:933`
+  - `packages/protocol/src/markets/events.ts:938`
+  - `packages/protocol/src/markets/events.ts:939`
+- 风险：
+  - 实现方可能遗漏 `status/resourcePrev`，导致事件被拒绝。
+- 建议：
+  - 在 §6.4 增补完整示例（含 `orderId`、`resourcePrev`、`status` + `delivery` 扩展字段）。
+
+##### DS3-003 Layer 1 自动拒绝规则与 legacy 降级流程仍有表述冲突
+
+- 现象：
+  - §8.1 写“来源验证失败 → 自动拒绝”。
+  - §12.5 定义 legacy envelope 可由 node 签名并进入 `degraded` 流程（非自动通过、需人工确认）。
+  - 两处未明确“legacy 模式属于 Layer 1 的受控例外”。
+- 证据：
+  - `docs/implementation/deliverable-spec.md:473`
+  - `docs/implementation/deliverable-spec.md:474`
+  - `docs/implementation/deliverable-spec.md:658`
+  - `docs/implementation/deliverable-spec.md:661`
+- 风险：
+  - QA 与实现团队对 legacy 场景判定标准不一致。
+- 建议：
+  - 在 §8.1 增加注释行：`legacy=true` 且 `signedBy='node'` 时走 `degraded` 分支，不自动拒绝，但也不自动通过。
+
+### 8.3 最终建议
+
+- 先修 DS3-001 到 DS3-003（文档层改动，低成本）。
+- 修复后即可把该规范作为 Phase 1 实施基线发给开发团队。
