@@ -1,6 +1,6 @@
 import { i18n, isSupportedLanguage } from '@/lib/i18n';
 import { defineI18nUI } from 'fumadocs-ui/i18n';
-import { RootProvider } from 'fumadocs-ui/provider/next';
+import { RootProvider } from '@/components/root-provider';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
