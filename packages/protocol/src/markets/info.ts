@@ -29,7 +29,8 @@ export function isInfoType(value: string): value is InfoType {
   return (INFO_TYPES as readonly string[]).includes(value);
 }
 
-export const CONTENT_FORMATS = [
+// Legacy content formats (kept for info-market validation backward compat)
+const LEGACY_CONTENT_FORMATS = [
   'text',
   'json',
   'csv',
@@ -40,10 +41,20 @@ export const CONTENT_FORMATS = [
   'audio',
   'mixed',
 ] as const;
-export type ContentFormat = (typeof CONTENT_FORMATS)[number];
 
-export function isContentFormat(value: string): value is ContentFormat {
-  return (CONTENT_FORMATS as readonly string[]).includes(value);
+// Import from canonical deliverables module, then re-export (avoids TS2308 duplicate export)
+import {
+  CONTENT_FORMATS,
+  type ContentFormat,
+} from '../deliverables/types.js';
+
+export { CONTENT_FORMATS, type ContentFormat };
+
+export function isContentFormat(value: string): boolean {
+  return (
+    (LEGACY_CONTENT_FORMATS as readonly string[]).includes(value) ||
+    value.includes('/')  // MIME-style format from new spec
+  );
 }
 
 export const ACCESS_METHOD_TYPES = ['download', 'api', 'stream', 'query'] as const;

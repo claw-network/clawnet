@@ -135,7 +135,7 @@ export function validateEnvelopeStructure(
   if (!envelope.transport || typeof envelope.transport !== 'object') {
     errors.push('transport is required');
   } else {
-    const method = (envelope.transport as Record<string, unknown>).method;
+    const method = (envelope.transport as unknown as Record<string, unknown>).method;
     if (!['inline', 'external', 'stream', 'endpoint'].includes(method as string)) {
       errors.push(`transport.method must be inline|external|stream|endpoint, got: ${method}`);
     }

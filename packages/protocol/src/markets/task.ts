@@ -19,12 +19,15 @@ export function isTaskComplexity(value: string): value is TaskComplexity {
   return (TASK_COMPLEXITIES as readonly string[]).includes(value);
 }
 
-export const DELIVERABLE_TYPES = ['file', 'code', 'data', 'report', 'service', 'result', 'other'] as const;
-export type DeliverableType = (typeof DELIVERABLE_TYPES)[number];
+// Import from canonical deliverables module, then re-export (avoids TS2308 duplicate export)
+import {
+  DELIVERABLE_TYPES,
+  type DeliverableType,
+  isDeliverableType,
+  resolveDeliverableType,
+} from '../deliverables/types.js';
 
-export function isDeliverableType(value: string): value is DeliverableType {
-  return (DELIVERABLE_TYPES as readonly string[]).includes(value);
-}
+export { DELIVERABLE_TYPES, type DeliverableType, isDeliverableType, resolveDeliverableType };
 
 export const SKILL_LEVELS = ['beginner', 'intermediate', 'advanced', 'expert'] as const;
 export type SkillLevel = (typeof SKILL_LEVELS)[number];
@@ -160,8 +163,11 @@ function parseDeliverables(value: unknown): TaskDeliverable[] {
   return value.map((entry, index) => {
     const record = assertRecord(entry, `task.deliverables[${index}]`);
     const name = requireNonEmpty(String(record.name ?? ''), `task.deliverables[${index}].name`);
-    const typeValue = String(record.type ?? '');
-    if (!isDeliverableType(typeValue)) {
+    const rawType = String(record.type ?? '');
+    let resolvedType: DeliverableType;
+    try {
+      resolvedType = resolveDeliverableType(rawType);
+    } catch {
       throw new Error(`task.deliverables[${index}].type is invalid`);
     }
     const requiredValue = record.required;
@@ -175,7 +181,7 @@ function parseDeliverables(value: unknown): TaskDeliverable[] {
       id: typeof record.id === 'string' && record.id.trim().length > 0 ? record.id : undefined,
       name,
       description: typeof record.description === 'string' ? record.description : undefined,
-      type: typeValue,
+      type: resolvedType,
       required: requiredValue,
       acceptanceCriteria,
       format: typeof record.format === 'string' ? record.format : undefined,
