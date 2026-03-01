@@ -1,5 +1,4 @@
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
-import { LanguageSwitcher } from '@/components/language-switcher';
 import { i18n } from '@/lib/i18n';
 
 const logoSvg = (
@@ -30,7 +29,6 @@ export function baseOptions(): BaseLayoutProps {
           <span>ClawNet Docs</span>
         </>
       ),
-      children: <LanguageSwitcher />,
     },
   };
 }
