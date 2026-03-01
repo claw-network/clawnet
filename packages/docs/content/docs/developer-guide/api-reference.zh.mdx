@@ -310,16 +310,34 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/
 
 #### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/deliver</span>
 
-- 交付内容密钥/访问材料。
+- 交付内容至已购订单，可选使用交付物信封包装。
 - 路径参数：`listingId`（必填）。
-- 请求体 schema：`InfoDeliverRequest`。
+- 请求体 schema：`InfoDeliverRequest`（passthrough — 允许附加字段，包括 `deliveryData`）。
+- 必填请求体：`did`、`passphrase`、`orderId`、`nonce`。
+- 可选请求体：`contentKeyHex`、`buyerPublicKeyHex`、`accessToken`、`accessUrl`、`expiresAt`、`deliveryData`。
+- `deliveryData.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/getting-started/core-concepts/deliverables)）。
 - 成功：`200`，schema `InfoDeliverResponse`。
 - 状态冲突：`409`（订单未进入可交付状态）。
 
 ```bash
 curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/deliver" \
   -H "Content-Type: application/json" \
-  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","contentKeyHex":"hex","buyerPublicKeyHex":"hex","nonce":12}'
+  -d '{
+    "did": "did:claw:z6M...",
+    "passphrase": "<passphrase>",
+    "orderId": "order_...",
+    "nonce": 12,
+    "deliveryData": {
+      "envelope": {
+        "type": "data",
+        "format": "application/json",
+        "name": "market-analysis-report",
+        "contentHash": "b3e8f1a2d4c6...",
+        "size": 204800,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
 ```
 
 #### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/confirm</span>
@@ -431,15 +449,34 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids/bid_.
 
 #### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/deliver</span>
 
-- 提交任务交付物。
+- 提交任务交付物，可选使用交付物信封包装。
 - 路径参数：`taskId`（必填）。
 - 请求体 schema：`TaskDeliverRequest`。
+- 必填请求体：`did`、`passphrase`、`orderId`、`deliverables`、`nonce`。
+- 可选请求体：`submissionId`、`notes`、`delivery`（含 `envelope`）。
+- `delivery.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/getting-started/core-concepts/deliverables)）。
 - 成功：`200`，schema `TaskDeliverResponse`。
 
 ```bash
 curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/deliver" \
   -H "Content-Type: application/json" \
-  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","deliverables":["cid"],"nonce":23}'
+  -d '{
+    "did": "did:claw:z6M...",
+    "passphrase": "<passphrase>",
+    "orderId": "order_...",
+    "deliverables": [{}],
+    "nonce": 23,
+    "delivery": {
+      "envelope": {
+        "type": "document",
+        "format": "application/pdf",
+        "name": "pdf-summaries-batch",
+        "contentHash": "a7c3f9e1b5d8...",
+        "size": 5242880,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
 ```
 
 #### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/confirm</span>
@@ -643,15 +680,29 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/ac
 
 #### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/submit</span>
 
-- 提交里程碑交付内容。
+- 提交里程碑交付内容，可选使用交付物信封包装。
 - 路径参数：`contractId`、`milestoneId`（必填）。
-- 可选请求体：`deliverables`、`notes`。
+- 可选请求体：`deliverables`、`notes`、`delivery`（含 `envelope`）、`envelopeDigest`。
+- `delivery.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/getting-started/core-concepts/deliverables)）。
 - 成功：`200`，schema `Milestone`。
 
 ```bash
 curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../milestones/ms_.../actions/submit" \
   -H "Content-Type: application/json" \
-  -d '{"deliverables":["cid"],"notes":"done"}'
+  -d '{
+    "deliverables": [{}],
+    "notes": "done",
+    "delivery": {
+      "envelope": {
+        "type": "code",
+        "format": "application/gzip",
+        "name": "milestone-1-source",
+        "contentHash": "c4d2e8f1a9b7...",
+        "size": 1048576,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
 ```
 
 #### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/approve</span>

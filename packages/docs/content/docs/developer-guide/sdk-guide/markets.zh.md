@@ -107,13 +107,25 @@ const order = await client.markets.info.purchase(listing.listingId, {
   nonce: 1,
 });
 
-// 2. 卖方交付内容
+// 2. 卖方交付内容（使用交付物信封）
 await client.markets.info.deliver(listing.listingId, {
   did: 'did:claw:z6MkSeller',
   passphrase: 'seller-passphrase',
   nonce: 2,
-  contentHash: 'bafybeig...',
-  deliveryNote: '报告已附上',
+  orderId: order.orderId,
+  deliveryData: {
+    envelope: {
+      type: 'data',                             // 交付物类型
+      format: 'application/json',                // MIME 类型
+      name: 'market-analysis-report',
+      contentHash: 'b3e8f1a2d4c6...',             // BLAKE3 十六进制
+      size: 204800,
+      transport: {
+        method: 'external',
+        uri: 'ipfs://bafybeig...',
+      },
+    },
+  },
 });
 
 // 3. 买方确认收货
@@ -144,14 +156,26 @@ order = client.markets.info.purchase(
     nonce=1,
 )
 
-# 2. 交付
+# 2. 交付（使用交付物信封）
 client.markets.info.deliver(
     listing["listingId"],
     did="did:claw:z6MkSeller",
     passphrase="seller-passphrase",
     nonce=2,
-    content_hash="bafybeig...",
-    delivery_note="报告已附上",
+    order_id=order["orderId"],
+    delivery_data={
+        "envelope": {
+            "type": "data",
+            "format": "application/json",
+            "name": "market-analysis-report",
+            "contentHash": "b3e8f1a2d4c6...",
+            "size": 204800,
+            "transport": {
+                "method": "external",
+                "uri": "ipfs://bafybeig...",
+            },
+        },
+    },
 )
 
 # 3. 确认
@@ -236,13 +260,26 @@ await client.markets.tasks.acceptBid(taskId, {
   bidId: bestBid.id,
 });
 
-// 4. 服务方交付
+// 4. 服务方交付（使用交付物信封）
 await client.markets.tasks.deliver(taskId, {
   did: 'did:claw:z6MkProvider',
   passphrase: 'provider-passphrase',
   nonce: 2,
-  contentHash: 'bafybeig...',
-  deliveryNote: '100 篇文档已全部处理',
+  submission: { status: 'complete', summary: '100 篇文档已全部处理' },
+  delivery: {
+    envelope: {
+      type: 'document',                          // 交付物类型
+      format: 'application/pdf',                  // MIME 类型
+      name: 'pdf-summaries-batch',
+      description: '100 篇 PDF 文档的结构化摘要',
+      contentHash: 'a7c3f9e1b5d8...',              // BLAKE3 十六进制
+      size: 5242880,
+      transport: {
+        method: 'external',
+        uri: 'ipfs://bafybeig...',
+      },
+    },
+  },
 });
 
 // 5. 发布方确认交付
@@ -300,14 +337,27 @@ client.markets.tasks.accept_bid(
     bid_id=best_bid["id"],
 )
 
-# 4. 交付
+# 4. 交付（使用交付物信封）
 client.markets.tasks.deliver(
     task_id,
     did="did:claw:z6MkProvider",
     passphrase="provider-passphrase",
     nonce=2,
-    content_hash="bafybeig...",
-    delivery_note="100 篇文档已全部处理",
+    submission={"status": "complete", "summary": "100 篇文档已全部处理"},
+    delivery={
+        "envelope": {
+            "type": "document",
+            "format": "application/pdf",
+            "name": "pdf-summaries-batch",
+            "description": "100 篇 PDF 文档的结构化摘要",
+            "contentHash": "a7c3f9e1b5d8...",
+            "size": 5242880,
+            "transport": {
+                "method": "external",
+                "uri": "ipfs://bafybeig...",
+            },
+        },
+    },
 )
 
 # 5. 确认

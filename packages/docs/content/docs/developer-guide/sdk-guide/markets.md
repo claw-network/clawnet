@@ -107,13 +107,25 @@ const order = await client.markets.info.purchase(listing.listingId, {
   nonce: 1,
 });
 
-// 2. Seller delivers content
+// 2. Seller delivers content (with deliverable envelope)
 await client.markets.info.deliver(listing.listingId, {
   did: 'did:claw:z6MkSeller',
   passphrase: 'seller-passphrase',
   nonce: 2,
-  contentHash: 'bafybeig...',            // IPFS CID or content hash
-  deliveryNote: 'Report attached',
+  orderId: order.orderId,
+  deliveryData: {
+    envelope: {
+      type: 'data',                             // DeliverableType
+      format: 'application/json',                // MIME type
+      name: 'market-analysis-report',
+      contentHash: 'b3e8f1a2d4c6...',             // BLAKE3 hex
+      size: 204800,
+      transport: {
+        method: 'external',
+        uri: 'ipfs://bafybeig...',
+      },
+    },
+  },
 });
 
 // 3. Buyer confirms receipt
@@ -144,14 +156,26 @@ order = client.markets.info.purchase(
     nonce=1,
 )
 
-# 2. Deliver
+# 2. Deliver (with deliverable envelope)
 client.markets.info.deliver(
     listing["listingId"],
     did="did:claw:z6MkSeller",
     passphrase="seller-passphrase",
     nonce=2,
-    content_hash="bafybeig...",
-    delivery_note="Report attached",
+    order_id=order["orderId"],
+    delivery_data={
+        "envelope": {
+            "type": "data",
+            "format": "application/json",
+            "name": "market-analysis-report",
+            "contentHash": "b3e8f1a2d4c6...",
+            "size": 204800,
+            "transport": {
+                "method": "external",
+                "uri": "ipfs://bafybeig...",
+            },
+        },
+    },
 )
 
 # 3. Confirm
@@ -236,13 +260,26 @@ await client.markets.tasks.acceptBid(taskId, {
   bidId: bestBid.id,
 });
 
-// 4. Provider delivers
+// 4. Provider delivers (with deliverable envelope)
 await client.markets.tasks.deliver(taskId, {
   did: 'did:claw:z6MkProvider',
   passphrase: 'provider-passphrase',
   nonce: 2,
-  contentHash: 'bafybeig...',
-  deliveryNote: 'All 100 documents processed',
+  submission: { status: 'complete', summary: 'All 100 documents processed' },
+  delivery: {
+    envelope: {
+      type: 'document',                          // DeliverableType
+      format: 'application/pdf',                  // MIME type
+      name: 'pdf-summaries-batch',
+      description: 'Structured summaries for 100 PDF documents',
+      contentHash: 'a7c3f9e1b5d8...',              // BLAKE3 hex
+      size: 5242880,
+      transport: {
+        method: 'external',
+        uri: 'ipfs://bafybeig...',
+      },
+    },
+  },
 });
 
 // 5. Requester confirms delivery
@@ -300,14 +337,27 @@ client.markets.tasks.accept_bid(
     bid_id=best_bid["id"],
 )
 
-# 4. Deliver
+# 4. Deliver (with deliverable envelope)
 client.markets.tasks.deliver(
     task_id,
     did="did:claw:z6MkProvider",
     passphrase="provider-passphrase",
     nonce=2,
-    content_hash="bafybeig...",
-    delivery_note="All 100 documents processed",
+    submission={"status": "complete", "summary": "All 100 documents processed"},
+    delivery={
+        "envelope": {
+            "type": "document",
+            "format": "application/pdf",
+            "name": "pdf-summaries-batch",
+            "description": "Structured summaries for 100 PDF documents",
+            "contentHash": "a7c3f9e1b5d8...",
+            "size": 5242880,
+            "transport": {
+                "method": "external",
+                "uri": "ipfs://bafybeig...",
+            },
+        },
+    },
 )
 
 # 5. Confirm
