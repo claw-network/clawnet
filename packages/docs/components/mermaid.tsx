@@ -119,11 +119,11 @@ async function getMermaid(isDark: boolean) {
       theme: 'base',
       securityLevel: 'loose',
       fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
-      fontSize: 13,
+      fontSize: 24,
       themeVariables: isDark ? DARK_VARS : LIGHT_VARS,
-      flowchart: { curve: 'monotoneX', padding: 12, nodeSpacing: 30, rankSpacing: 40 },
-      sequence: { mirrorActors: false, messageMargin: 30, boxMargin: 8, noteMargin: 8, actorMargin: 40 },
-      state: { padding: 8, dividerMargin: 8 },
+      flowchart: { curve: 'monotoneX', padding: 16, nodeSpacing: 40, rankSpacing: 50 },
+      sequence: { mirrorActors: false, messageMargin: 40, boxMargin: 10, noteMargin: 10, actorMargin: 50 },
+      state: { padding: 10, dividerMargin: 10 },
     });
     lastIsDark = isDark;
   }
@@ -144,7 +144,7 @@ function patchSvg(raw: string): string {
     .label, .label span, .label div,
     .edgeTerminals text,
     .messageText, .labelText { color: ${labelFill}; fill: ${labelFill}; }
-    .node .label, .node .label div { color: ${textFill}; }
+    .node .label, .node .label div { color: ${textFill}; font-weight: 600; }
     .node foreignObject { overflow: visible; }
     .node foreignObject > div,
     .node foreignObject body,
@@ -154,7 +154,9 @@ function patchSvg(raw: string): string {
       justify-content: center !important;
       margin: 0 !important;
     }
-    .cluster-label text { fill: ${textFill}; }
+    .actor { font-weight: 600; }
+    text.actor-label, .actor text { font-weight: 600; }
+    .cluster-label text { fill: ${textFill}; font-weight: 600; }
     .transition { stroke: #94a3b8; }
   </style>`;
   return raw.replace(/<style>/, patchStyle + '<style>');
