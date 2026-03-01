@@ -15,3 +15,6 @@ scripts/liquidity-bot/schedule.env
 scripts/liquidity-bot/config.local.json
 scripts/liquidity-bot/state.local.json
 temp/
+packages/sdk-python/.pytest_cache/
+packages/sdk-python/tests/__pycache__/
+packages/sdk-python/src/clawnet/__pycache__/

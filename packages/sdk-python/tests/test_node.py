@@ -7,9 +7,10 @@ from clawnet.client import ClawNetClient
 
 class TestNodeApi:
     def test_get_status(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/node/status").respond_with_json({
+        httpserver.expect_request("/api/v1/node").respond_with_json({
             "did": "did:claw:z6MkNode", "synced": True, "blockHeight": 100,
             "peers": 5, "network": "testnet", "version": "0.1.0", "uptime": 3600,
+            "config": {"dataDir": "~/.clawnet"},
         })
         client = ClawNetClient(httpserver.url_for(""))
         status = client.node.get_status()
@@ -17,7 +18,7 @@ class TestNodeApi:
         assert status["blockHeight"] == 100
 
     def test_get_peers(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/node/peers").respond_with_json({
+        httpserver.expect_request("/api/v1/node/peers").respond_with_json({
             "peers": [{"peerId": "peer-1", "multiaddrs": ["/ip4/127.0.0.1/tcp/9527"]}],
             "total": 1,
         })
@@ -26,15 +27,19 @@ class TestNodeApi:
         assert peers["total"] == 1
 
     def test_get_config(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/node/config").respond_with_json({"dataDir": "~/.clawnet"})
+        httpserver.expect_request("/api/v1/node").respond_with_json({
+            "did": "did:claw:z6MkNode", "synced": True,
+            "config": {"dataDir": "~/.clawnet"},
+        })
         client = ClawNetClient(httpserver.url_for(""))
         config = client.node.get_config()
         assert config["dataDir"] == "~/.clawnet"
 
     def test_wait_for_sync_already_synced(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/node/status").respond_with_json({
+        httpserver.expect_request("/api/v1/node").respond_with_json({
             "did": "did:claw:z6MkNode", "synced": True, "blockHeight": 100,
             "peers": 5, "network": "testnet", "version": "0.1.0", "uptime": 3600,
+            "config": {},
         })
         client = ClawNetClient(httpserver.url_for(""))
         status = client.node.wait_for_sync(timeout=5.0)

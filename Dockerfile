@@ -8,8 +8,8 @@
 # --- Stage 1: Build ----------------------------------------------------------
 FROM node:20-alpine AS build
 
-# Native build tools for classic-level (node-gyp)
-RUN apk add --no-cache python3 make g++
+# Native build tools for classic-level (node-gyp) + git for pnpm prepare hooks
+RUN apk add --no-cache python3 make g++ git
 
 RUN npm install -g pnpm@10
 
@@ -33,8 +33,8 @@ COPY packages/node/tsconfig.json packages/node/
 COPY packages/cli/tsconfig.json packages/cli/
 COPY packages/sdk/tsconfig.json packages/sdk/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (git init needed for pnpm prepare hook: git config core.hooksPath)
+RUN git init && pnpm install --frozen-lockfile
 
 # Copy source code (only src dirs — .dockerignore excludes dist, node_modules, .tsbuildinfo)
 COPY packages/core/src/ packages/core/src/
@@ -64,7 +64,9 @@ COPY --from=build /app/packages/node/package.json ./packages/node/
 COPY --from=build /app/packages/cli/package.json ./packages/cli/
 COPY --from=build /app/packages/sdk/package.json ./packages/sdk/
 
-# Install production dependencies with pnpm (preserves proper symlink structure)
+# Install production dependencies with pnpm
+# Strip the prepare script first (it requires git which is only in the build stage)
+RUN node -e "const p=require('./package.json'); delete p.scripts.prepare; require('fs').writeFileSync('package.json', JSON.stringify(p,null,2))"
 RUN pnpm install --prod --frozen-lockfile
 
 # Copy built artifacts
@@ -84,14 +86,14 @@ ENV CLAW_API_HOST=0.0.0.0
 ENV CLAW_API_PORT=9528
 
 # Expose ports: API + P2P
-EXPOSE 9528 9529
+EXPOSE 9528 9527
 
 # Persistent data volume
 VOLUME /data
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -q --spider http://127.0.0.1:9528/api/node/status || exit 1
+  CMD wget -q --spider http://127.0.0.1:9528/api/v1/node || exit 1
 
 # Use tini for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]

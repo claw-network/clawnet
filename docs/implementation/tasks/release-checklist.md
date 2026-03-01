@@ -70,18 +70,19 @@
 
 ### R-3. Python SDK 发布到 PyPI
 
-- [ ] **R-3.1** 本地构建 + 测试
+- [x] **R-3.1** 本地构建 + 测试（2026-03-01）
   - 操作：`cd packages/sdk-python && hatch build && hatch run test`
-  - 验收：wheel 构建成功，测试通过
+  - 构建：`clawnet_sdk-0.2.0-py3-none-any.whl` + `.tar.gz` ✅
+  - 测试：51/51 passed ✅（修复 6 个测试文件 API 路径 + mock 签名）
 
-- [ ] **R-3.2** 确认包名和 import 路径一致
+- [x] **R-3.2** 确认包名和 import 路径一致（2026-03-01）
   - PyPI 包名：`clawnet-sdk`
   - import 路径：`from clawnet import ClawNetClient`
-  - 验收：`pip install dist/clawnet_sdk-*.whl && python -c "from clawnet import ClawNetClient; print('OK')"`
+  - 验收：wheel install + import → OK ✅
 
-- [ ] **R-3.3** 发布到 PyPI
+- [!] **R-3.3** 发布到 PyPI
   - 操作：`hatch publish`（需要 PyPI API token）
-  - 验收：`pip install clawnet-sdk` 成功
+  - 状态：阻塞 — 等待 PyPI token
 
 ### R-4. Testnet 稳定性观察（T-3.9）
 
@@ -93,7 +94,7 @@
     - clusterPeers=2（3 validators connected）
     - Scenario 01: 9 passed / 0 failed
     - Reconciliation: passed（0 discrepancies）
-  - Day 4 (03-01): ⏳
+  - Day 4 (03-01): ✅ 通过（synced=true, v0.2.0, peers=2, connections=2, blockHeight=158336, uptime=69474s, faucet mint 5 Token OK）
   - Day 5 (03-02): ⏳
   - Day 6 (03-03): ⏳
   - Day 7 (03-04): ⏳
@@ -134,14 +135,14 @@
 
 ### R-6. 文档站部署
 
-- [ ] **R-6.1** 构建文档站
-  - 目录：`packages/docs/`（Next.js + Fumadocs）
-  - 操作：`pnpm --filter docs build`
-  - 验收：本地 `pnpm --filter docs start` 可访问
+- [x] **R-6.1** 构建文档站（2026-03-01）
+  - 目录：`packages/docs/`（Next.js 15.5.12 + Fumadocs）
+  - `pnpm --filter docs build`：90 pages generated ✅
+  - Server A 部署：systemd `clawnet-docs.service` on port 3001 ✅
 
-- [ ] **R-6.2** 配置公网域名 + Caddy 反向代理
-  - 域名建议：`docs.clawnetd.com`
-  - 在 Server A 的 Caddyfile 添加反向代理规则
+- [~] **R-6.2** 配置公网域名 + Caddy 反向代理（2026-03-01）
+  - Caddy reverse proxy `docs.clawnetd.com → localhost:3001` 已添加 ✅
+  - ⚠️ 待完成：DNS A 记录 `docs.clawnetd.com → 66.94.125.242`
   - 验收：`curl https://docs.clawnetd.com` 返回文档页面
 
 ### R-7. 修复示例代码
@@ -167,22 +168,19 @@
 
 ### R-8. Docker 镜像发布
 
-- [ ] **R-8.1** 修复 Dockerfile P2P 端口
-  - 当前 `EXPOSE 9529`，应为 `EXPOSE 9527`
-  - 验收：`docker inspect` 显示 9527
+- [x] **R-8.1** 修复 Dockerfile P2P 端口（2026-03-01）
+  - `EXPOSE 9529` → `EXPOSE 9527` ✅
+  - HEALTHCHECK `/api/node/status` → `/api/v1/node` ✅
 
-- [ ] **R-8.2** 构建并推送到 GHCR
-  - 操作：
-    ```bash
-    docker build -t ghcr.io/claw-network/clawnetd:0.2.0 .
-    docker push ghcr.io/claw-network/clawnetd:0.2.0
-    docker tag ... :latest && docker push ... :latest
-    ```
-  - 验收：`docker pull ghcr.io/claw-network/clawnetd:0.2.0` 成功
+- [~] **R-8.2** 构建并推送到 GHCR（2026-03-01）
+  - Dockerfile 修复：添加 `git` 到 build stage, `git init` before pnpm install, runtime stage `--ignore-scripts`
+  - `docker build -t ghcr.io/claw-network/clawnetd:0.2.0 .` → 成功 ✅（image 411MB / 90.4MB compressed）
+  - `docker tag ... :latest` ✅
+  - ⚠️ 待完成：`docker push`（需要 GHCR auth: `echo $GHCR_TOKEN | docker login ghcr.io -u USERNAME --password-stdin`）
 
-- [ ] **R-8.3** 验证 Docker 容器可运行
-  - 操作：`docker run -e CLAW_PASSPHRASE=test ghcr.io/claw-network/clawnetd:0.2.0`
-  - 验收：容器内 `curl localhost:9528/api/v1/node` 返回 JSON
+- [x] **R-8.3** 验证 Docker 容器可运行（2026-03-01）
+  - `docker run -d -p 19528:9528 -e CLAW_PASSPHRASE=test ghcr.io/claw-network/clawnetd:0.2.0`
+  - `curl localhost:19528/api/v1/node` → v0.2.0, synced=true, network=devnet ✅
 
 ---
 
@@ -262,5 +260,5 @@ docker pull ghcr.io/claw-network/clawnetd:0.2.0
 
 ---
 
-*最后更新: 2026-02-27（R-4.1 Day 2 通过, Python SDK 0.2.0 完成待 PyPI 审核）*
+*最后更新: 2026-03-01（R-3.1/R-3.2 通过, R-4.1 Day 4 通过, R-6 文档站部署完成, R-8 Docker 镜像构建验证通过）*
 *关联文档: on-chain-tasks.md (T-3.9 ~ T-3.15), TOKEN_DISTRIBUTION.md, OPENCLAW_INTEGRATION.md*

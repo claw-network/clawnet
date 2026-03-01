@@ -7,7 +7,11 @@ from clawnet.client import ClawNetClient
 
 class TestWalletApi:
     def test_get_balance(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/balance").respond_with_json({
+        # get_balance() with no args resolves via /api/v1/identities/self first
+        httpserver.expect_request("/api/v1/identities/self").respond_with_json({
+            "did": "did:claw:z6MkSelf", "publicKey": "pk",
+        })
+        httpserver.expect_request("/api/v1/wallets/did:claw:z6MkSelf").respond_with_json({
             "balance": 1000, "available": 900, "pending": 50, "locked": 50,
         })
         client = ClawNetClient(httpserver.url_for(""))
@@ -15,7 +19,7 @@ class TestWalletApi:
         assert balance["available"] == 900
 
     def test_get_balance_with_did(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/balance", query_string="did=did%3Aclaw%3Az6MkX").respond_with_json({
+        httpserver.expect_request("/api/v1/wallets/did:claw:z6MkX").respond_with_json({
             "balance": 500, "available": 500, "pending": 0, "locked": 0,
         })
         client = ClawNetClient(httpserver.url_for(""))
@@ -23,7 +27,7 @@ class TestWalletApi:
         assert balance["balance"] == 500
 
     def test_transfer(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/transfer", method="POST").respond_with_json({
+        httpserver.expect_request("/api/v1/transfers", method="POST").respond_with_json({
             "txHash": "tx-1", "from": "did:claw:z6MkA", "to": "did:claw:z6MkB",
             "amount": 100, "status": "confirmed", "timestamp": 1700000000000,
         })
@@ -36,7 +40,11 @@ class TestWalletApi:
         assert result["amount"] == 100
 
     def test_get_history(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/history").respond_with_json({
+        # get_history() with no args resolves address first
+        httpserver.expect_request("/api/v1/identities/self").respond_with_json({
+            "did": "did:claw:z6MkSelf",
+        })
+        httpserver.expect_request("/api/v1/wallets/did:claw:z6MkSelf/transactions").respond_with_json({
             "transactions": [], "total": 0, "hasMore": False,
         })
         client = ClawNetClient(httpserver.url_for(""))
@@ -44,7 +52,7 @@ class TestWalletApi:
         assert history["total"] == 0
 
     def test_create_escrow(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/escrow", method="POST").respond_with_json({
+        httpserver.expect_request("/api/v1/escrows", method="POST").respond_with_json({
             "id": "esc-1", "depositor": "d", "beneficiary": "b",
             "amount": 100, "funded": 0, "released": 0, "status": "created",
             "releaseRules": [], "createdAt": 1700000000000,
@@ -57,7 +65,7 @@ class TestWalletApi:
         assert result["id"] == "esc-1"
 
     def test_get_escrow(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/escrow/esc-1").respond_with_json({
+        httpserver.expect_request("/api/v1/escrows/esc-1").respond_with_json({
             "id": "esc-1", "status": "funded",
         })
         client = ClawNetClient(httpserver.url_for(""))
@@ -65,7 +73,7 @@ class TestWalletApi:
         assert result["status"] == "funded"
 
     def test_release_escrow(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/escrow/esc-1/release", method="POST").respond_with_json({
+        httpserver.expect_request("/api/v1/escrows/esc-1/actions/release", method="POST").respond_with_json({
             "txHash": "tx-release",
         })
         client = ClawNetClient(httpserver.url_for(""))
@@ -73,7 +81,7 @@ class TestWalletApi:
         assert result["txHash"] == "tx-release"
 
     def test_fund_escrow(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/escrow/esc-1/fund", method="POST").respond_with_json({
+        httpserver.expect_request("/api/v1/escrows/esc-1/actions/fund", method="POST").respond_with_json({
             "txHash": "tx-fund",
         })
         client = ClawNetClient(httpserver.url_for(""))
@@ -81,7 +89,7 @@ class TestWalletApi:
         assert result["txHash"] == "tx-fund"
 
     def test_refund_escrow(self, httpserver: HTTPServer) -> None:
-        httpserver.expect_request("/api/wallet/escrow/esc-1/refund", method="POST").respond_with_json({
+        httpserver.expect_request("/api/v1/escrows/esc-1/actions/refund", method="POST").respond_with_json({
             "txHash": "tx-refund",
         })
         client = ClawNetClient(httpserver.url_for(""))
