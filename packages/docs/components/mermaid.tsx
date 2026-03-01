@@ -130,38 +130,12 @@ async function getMermaid(isDark: boolean) {
   return mermaidMod;
 }
 
-/** Patch text colours into the rendered SVG and normalize sizing. */
+/** Inject text-colour overrides into the rendered SVG. */
 function patchSvg(raw: string): string {
-  let result = raw;
-
-  // ── Normalize SVG dimensions ────────────────────────────────────────────
-  // Mermaid v11 outputs <svg style="max-width: Npx;" viewBox="..."> with no
-  // explicit width/height. Browsers compute intrinsic size from the viewBox,
-  // but in flex containers or during hydration this can produce very tall or
-  // very wide diagrams. We force responsive sizing: width fills container
-  // (capped at natural width), height scales proportionally.
-  result = result.replace(/<svg([^>]*)>/, (_match, attrs: string) => {
-    const vbMatch = attrs.match(
-      /viewBox=["'][\d.]+\s+[\d.]+\s+([\d.]+)\s+([\d.]+)["']/,
-    );
-    const maxW = vbMatch ? parseFloat(vbMatch[1]) : null;
-
-    // Strip existing width / height attributes
-    let cleaned = attrs
-      .replace(/\bwidth="[^"]*"/g, '')
-      .replace(/\bheight="[^"]*"/g, '');
-
-    // Strip max-width from Mermaid's inline style (we re-apply it below)
-    cleaned = cleaned.replace(/style="([^"]*)"/g, (_s: string, css: string) => {
-      const rest = css.replace(/max-width:\s*[^;]+;?/g, '').trim();
-      return rest ? `style="${rest}"` : '';
-    });
-
-    const mw = maxW ? `max-width:${Math.ceil(maxW)}px;` : '';
-    return `<svg${cleaned} style="width:100%;${mw}height:auto;">`;
-  });
-
-  // ── Inject text-colour overrides ────────────────────────────────────────
+  // We intentionally leave Mermaid's native SVG width/height/viewBox/style
+  // attributes untouched. Mermaid v11 outputs sensible `max-width` + `viewBox`
+  // that browsers can compute intrinsic size from. Manipulating those attributes
+  // causes height collapse in flex containers or oversized diagrams.
   const textFill = '#1e293b';
   const labelFill = '#475569';
   const patchStyle = `<style>
@@ -183,9 +157,7 @@ function patchSvg(raw: string): string {
     .cluster-label text { fill: ${textFill}; }
     .transition { stroke: #94a3b8; }
   </style>`;
-  result = result.replace(/<style>/, patchStyle + '<style>');
-
-  return result;
+  return raw.replace(/<style>/, patchStyle + '<style>');
 }
 
 export function Mermaid({ chart }: { chart: string }) {
@@ -204,14 +176,9 @@ export function Mermaid({ chart }: { chart: string }) {
         const isDark = document.documentElement.classList.contains('dark');
         const mermaid = await getMermaid(isDark);
 
-        // Pass the real, mounted container so Mermaid measures the diagram at
-        // the correct available width.  Without this, Mermaid creates an
-        // off-screen container whose width may be 0, causing dagre to stack
-        // nodes vertically → very tall SVG.
         const { svg: rendered } = await mermaid.render(
           `mermaid-${id}`,
           chart.trim(),
-          containerRef.current ?? undefined,
         );
         if (!cancelled) {
           setSvg(patchSvg(rendered));
@@ -246,7 +213,7 @@ export function Mermaid({ chart }: { chart: string }) {
     >
       {svg ? (
         <div
-          className="flex justify-center [&>svg]:max-w-full"
+          className="flex justify-center"
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (
