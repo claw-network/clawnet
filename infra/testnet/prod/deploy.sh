@@ -209,6 +209,85 @@ curl -sf http://127.0.0.1:9528/api/v1/node >/dev/null"
   echo "  [$host] clawnetd active."
 }
 
+# Deploy docs site (Next.js + Fumadocs) as a systemd service on the primary server
+install_docs_service() {
+  local host="$1"
+  local docs_domain="$2"
+
+  echo "  [$host] Building docs site..."
+  run_remote "$host" "cd /opt/clawnet && pnpm --filter docs build"
+
+  echo "  [$host] Installing clawnet-docs.service..."
+  run_remote "$host" "cat > /etc/systemd/system/clawnet-docs.service << 'SVCEOF'
+[Unit]
+Description=ClawNet Documentation Site (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/clawnet/packages/docs
+ExecStart=/usr/bin/npx next start -p 3001
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+systemctl daemon-reload
+systemctl enable clawnet-docs
+systemctl restart clawnet-docs"
+
+  echo "  [$host] Waiting for docs service..."
+  run_remote "$host" "sleep 3 && curl -sf -o /dev/null http://localhost:3001"
+  echo "  [$host] clawnet-docs active on port 3001."
+
+  # Add docs reverse proxy block to Caddyfile if not already present
+  local HAS_DOCS_BLOCK
+  HAS_DOCS_BLOCK=$(run_remote "$host" "grep -c '$docs_domain' /etc/caddy/Caddyfile 2>/dev/null || echo 0")
+  if [[ "$HAS_DOCS_BLOCK" == "0" ]]; then
+    echo "  [$host] Adding $docs_domain to Caddyfile..."
+    run_remote "$host" "cat >> /etc/caddy/Caddyfile << 'CADDYEOF'
+
+# ── Documentation Site ───────────────────────────────────────────────────────
+$docs_domain {
+    reverse_proxy localhost:3001 {
+        transport http {
+            read_timeout  30s
+            write_timeout 30s
+        }
+    }
+
+    header {
+        Strict-Transport-Security \"max-age=63072000; includeSubDomains\"
+        X-Content-Type-Options    nosniff
+        X-Frame-Options           SAMEORIGIN
+        Referrer-Policy           strict-origin-when-cross-origin
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/docs-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
+CADDYEOF"
+  else
+    echo "  [$host] Caddyfile already contains $docs_domain, skipping."
+  fi
+
+  # Ensure log file has correct ownership
+  run_remote "$host" "touch /var/log/caddy/docs-access.log && chown caddy:caddy /var/log/caddy/docs-access.log"
+
+  echo "  [$host] Reloading Caddy..."
+  run_remote "$host" "systemctl reload caddy || systemctl restart caddy"
+  echo "  [$host] Docs deployment complete ($docs_domain → localhost:3001)."
+}
+
 echo ">>> Phase 0: Preflight checks..."
 require_local_command sshpass
 require_local_command ssh
@@ -725,6 +804,15 @@ fi
 
 echo "  Server B/C clawnetd deployed and managed by systemd."
 echo ""
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 15: Deploy documentation site on Server A
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 15: Deploying documentation site on Server A..."
+install_docs_service "$SERVER_A" "docs.clawnetd.com"
+echo "  Documentation site deployed."
+echo ""
+
 echo "============================================================"
 echo "Redeployment complete!"
 echo "============================================================"
