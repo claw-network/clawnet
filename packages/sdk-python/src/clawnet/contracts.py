@@ -47,7 +47,19 @@ class ContractsApi:
     # -- Milestones ----------------------------------------------------------
 
     def submit_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
-        """Submit a milestone deliverable."""
+        """Submit a milestone deliverable.
+
+        Keyword Args:
+            deliverables (list[str] | None): Legacy deliverable URLs/hashes.
+            message (str | None): Optional message.
+            envelopeDigest (str | None): ``BLAKE3(JCS(envelope))`` hex — bypasses
+                legacy keccak256 path.
+            delivery (dict | None): ``{"envelope": {...}}`` — the
+                :class:`~clawnet.types.DeliverableEnvelope` with ``type``,
+                ``format``, ``name``, ``contentHash``, ``size``, ``transport``.
+                See :class:`~clawnet.types.MilestoneSubmitParams`.
+            did, passphrase, nonce, prev, ts: standard EventFields.
+        """
         return self._http.post(
             f"/api/v1/contracts/{quote(contract_id, safe='')}"
             f"/milestones/{quote(milestone_id, safe='')}/actions/submit",
@@ -124,6 +136,19 @@ class AsyncContractsApi:
         )
 
     async def submit_milestone(self, contract_id: str, milestone_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Submit a milestone deliverable.
+
+        Keyword Args:
+            deliverables (list[str] | None): Legacy deliverable URLs/hashes.
+            message (str | None): Optional message.
+            envelopeDigest (str | None): ``BLAKE3(JCS(envelope))`` hex — bypasses
+                legacy keccak256 path.
+            delivery (dict | None): ``{"envelope": {...}}`` — the
+                :class:`~clawnet.types.DeliverableEnvelope` with ``type``,
+                ``format``, ``name``, ``contentHash``, ``size``, ``transport``.
+                See :class:`~clawnet.types.MilestoneSubmitParams`.
+            did, passphrase, nonce, prev, ts: standard EventFields.
+        """
         return await self._http.post(
             f"/api/v1/contracts/{quote(contract_id, safe='')}"
             f"/milestones/{quote(milestone_id, safe='')}/actions/submit",

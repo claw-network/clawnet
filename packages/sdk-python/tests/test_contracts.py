@@ -70,6 +70,22 @@ class TestContractsApi:
         result = client.contracts.submit_milestone("ct-1", "ms-1", **EF, deliverables=["report.pdf"])
         assert result["txHash"] == "tx-ms-submit"
 
+    def test_submit_milestone_with_envelope(self, httpserver: HTTPServer) -> None:
+        httpserver.expect_request(
+            "/api/v1/contracts/ct-1/milestones/ms-1/actions/submit", method="POST"
+        ).respond_with_json({"txHash": "tx-ms-env"})
+        client = ClawNetClient(httpserver.url_for(""))
+        result = client.contracts.submit_milestone(
+            "ct-1", "ms-1", **EF,
+            envelopeDigest="abc123",
+            delivery={"envelope": {
+                "type": "document", "format": "application/pdf",
+                "name": "report.pdf", "contentHash": "abc123",
+                "size": 2048, "transport": {"method": "inline", "data": "..."},
+            }},
+        )
+        assert result["txHash"] == "tx-ms-env"
+
     def test_approve_milestone(self, httpserver: HTTPServer) -> None:
         httpserver.expect_request(
             "/api/v1/contracts/ct-1/milestones/ms-1/actions/approve", method="POST"

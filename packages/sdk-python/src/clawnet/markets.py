@@ -32,6 +32,15 @@ class InfoMarketApi:
         return self._http.post(f"/api/v1/markets/info/{quote(listing_id, safe='')}/actions/purchase", kwargs)
 
     def deliver(self, listing_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Deliver purchased info content.
+
+        Keyword Args:
+            orderId (str): Order to deliver against.
+            deliveryData (dict): Delivery envelope — should contain ``type``,
+                ``format``, ``name``, ``contentHash``, ``size``, ``transport``.
+                See :class:`~clawnet.types.InfoDeliverParams`.
+            did, passphrase, nonce, prev, ts: standard EventFields.
+        """
         return self._http.post(f"/api/v1/markets/info/{quote(listing_id, safe='')}/actions/deliver", kwargs)
 
     def confirm(self, listing_id: str, **kwargs: Any) -> dict[str, Any]:
@@ -94,6 +103,17 @@ class TaskMarketApi:
         )
 
     def deliver(self, task_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Submit task deliverables.
+
+        Keyword Args:
+            submission (dict): Legacy submission payload.
+            message (str | None): Optional message.
+            delivery (dict | None): ``{"envelope": {...}}`` — the
+                :class:`~clawnet.types.DeliverableEnvelope` with ``type``,
+                ``format``, ``name``, ``contentHash``, ``size``, ``transport``.
+                See :class:`~clawnet.types.TaskDeliverParams`.
+            did, passphrase, nonce, prev, ts: standard EventFields.
+        """
         return self._http.post(f"/api/v1/markets/tasks/{quote(task_id, safe='')}/actions/deliver", kwargs)
 
     def confirm(self, task_id: str, **kwargs: Any) -> dict[str, Any]:
@@ -222,6 +242,15 @@ class AsyncInfoMarketApi:
         )
 
     async def deliver(self, listing_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Deliver purchased info content.
+
+        Keyword Args:
+            orderId (str): Order to deliver against.
+            deliveryData (dict): Delivery envelope — should contain ``type``,
+                ``format``, ``name``, ``contentHash``, ``size``, ``transport``.
+                See :class:`~clawnet.types.InfoDeliverParams`.
+            did, passphrase, nonce, prev, ts: standard EventFields.
+        """
         return await self._http.post(
             f"/api/v1/markets/info/{quote(listing_id, safe='')}/actions/deliver", kwargs
         )
@@ -298,6 +327,17 @@ class AsyncTaskMarketApi:
         )
 
     async def deliver(self, task_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Submit task deliverables.
+
+        Keyword Args:
+            submission (dict): Legacy submission payload.
+            message (str | None): Optional message.
+            delivery (dict | None): ``{"envelope": {...}}`` — the
+                :class:`~clawnet.types.DeliverableEnvelope` with ``type``,
+                ``format``, ``name``, ``contentHash``, ``size``, ``transport``.
+                See :class:`~clawnet.types.TaskDeliverParams`.
+            did, passphrase, nonce, prev, ts: standard EventFields.
+        """
         return await self._http.post(
             f"/api/v1/markets/tasks/{quote(task_id, safe='')}/actions/deliver", kwargs
         )

@@ -227,6 +227,17 @@ class InfoPurchaseResponse(TypedDict):
     txHash: str
 
 
+class InfoDeliverParams(EventFields, total=False):
+    """Parameters for info-market deliver action."""
+    orderId: str
+    deliveryData: dict[str, Any] | None
+    resourcePrev: str | None
+
+
+class InfoDeliverResponse(TypedDict):
+    txHash: str
+
+
 # ---------------------------------------------------------------------------
 # Markets — Task
 # ---------------------------------------------------------------------------
@@ -238,6 +249,19 @@ class TaskPublishResponse(TypedDict):
 
 class TaskBidResponse(TypedDict):
     bidId: str
+    txHash: str
+
+
+class TaskDeliverParams(EventFields, total=False):
+    """Parameters for task-market deliver action."""
+    submission: dict[str, Any]
+    message: str | None
+    resourcePrev: str | None
+    # Phase 1+ delivery envelope
+    delivery: dict[str, Any] | None
+
+
+class TaskDeliverResponse(TypedDict):
     txHash: str
 
 
@@ -302,6 +326,8 @@ class ContractMilestone(TypedDict, total=False):
     deliverables: list[str] | None
     # BLAKE3(JCS(envelope)) hex — Phase 1+ envelope-based delivery
     envelopeDigest: str | None
+    # Phase 1+ delivery envelope
+    delivery: dict[str, Any] | None
 
 
 class Contract(TypedDict, total=False):
@@ -315,6 +341,17 @@ class Contract(TypedDict, total=False):
     escrowId: str | None
     signatures: list[dict[str, Any]]
     createdAt: int
+
+
+class MilestoneSubmitParams(EventFields, total=False):
+    """Parameters for milestone submit action."""
+    deliverables: list[str] | None
+    message: str | None
+    resourcePrev: str | None
+    # BLAKE3(JCS(envelope)) hex — bypasses legacy keccak256 path
+    envelopeDigest: str | None
+    # Phase 1+ delivery envelope
+    delivery: dict[str, Any] | None
 
 
 class CreateContractResponse(TypedDict):

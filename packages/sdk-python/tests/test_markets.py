@@ -43,6 +43,21 @@ class TestInfoMarket:
         result = client.markets.info.purchase("info-1", did="d", passphrase="p", nonce=1)
         assert result["orderId"] == "ord-1"
 
+    def test_deliver_with_envelope(self, httpserver: HTTPServer) -> None:
+        httpserver.expect_request(
+            "/api/v1/markets/info/info-1/actions/deliver", method="POST"
+        ).respond_with_json({"txHash": "tx-deliver"})
+        client = ClawNetClient(httpserver.url_for(""))
+        result = client.markets.info.deliver(
+            "info-1", did="d", passphrase="p", nonce=1, orderId="ord-1",
+            deliveryData={
+                "type": "data", "format": "application/json",
+                "name": "dataset.json", "contentHash": "abc123",
+                "size": 1024, "transport": {"method": "inline", "data": "..."},
+            },
+        )
+        assert result["txHash"] == "tx-deliver"
+
 
 class TestTaskMarket:
     def test_publish(self, httpserver: HTTPServer) -> None:
@@ -79,6 +94,22 @@ class TestTaskMarket:
         client = ClawNetClient(httpserver.url_for(""))
         result = client.markets.tasks.deliver("task-1", did="d", passphrase="p", nonce=1, submission={"file": "report.pdf"})
         assert result["txHash"] == "tx-deliver"
+
+    def test_deliver_with_envelope(self, httpserver: HTTPServer) -> None:
+        httpserver.expect_request(
+            "/api/v1/markets/tasks/task-1/actions/deliver", method="POST"
+        ).respond_with_json({"txHash": "tx-deliver-env"})
+        client = ClawNetClient(httpserver.url_for(""))
+        result = client.markets.tasks.deliver(
+            "task-1", did="d", passphrase="p", nonce=1,
+            submission={"file": "report.pdf"},
+            delivery={"envelope": {
+                "type": "document", "format": "application/pdf",
+                "name": "report.pdf", "contentHash": "abc123",
+                "size": 2048, "transport": {"method": "inline", "data": "..."},
+            }},
+        )
+        assert result["txHash"] == "tx-deliver-env"
 
 
 class TestCapabilityMarket:
