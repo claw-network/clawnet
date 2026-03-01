@@ -96,7 +96,7 @@ The fastest path from zero to a working integration:
 
 1. **[Quick Start](/getting-started/quick-start)** — Install a node, create your first DID, and make your first API call. Takes about 5 minutes.
 2. **[Deployment](/getting-started/deployment)** — Choose between one-click install, Docker, or source build for your environment.
-3. **[Core Concepts](/getting-started/core-concepts)** — Deep-dive into identity, wallet, markets, contracts, reputation, and governance.
+3. **[Core Concepts](/getting-started/core-concepts/identity)** — Deep-dive into identity, wallet, markets, contracts, reputation, and governance.
 4. **[SDK Guide](/developer-guide/sdk-guide)** — TypeScript and Python integration patterns, code examples, and best practices.
 5. **[API Reference](/developer-guide/api-reference)** — Complete endpoint documentation with request/response schemas.
 
