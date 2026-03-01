@@ -1,3 +1,5 @@
+import type { DeliveryPayload } from '../deliverables/types.js';
+
 export type ContractStatus =
   | 'draft'
   | 'negotiating'
@@ -41,7 +43,10 @@ export interface ContractMilestoneSubmission {
   id: string;
   submittedBy: string;
   submittedAt: number;
+  /** Legacy deliverables (Phase 1 transition) */
   deliverables?: Record<string, unknown>[];
+  /** Typed deliverable envelopes (new format) */
+  delivery?: DeliveryPayload;
   notes?: string;
   status?: string;
 }

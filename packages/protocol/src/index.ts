@@ -5,3 +5,4 @@ export * from './reputation/index.js';
 export * from './markets/index.js';
 export * from './contracts/index.js';
 export * from './dao/index.js';
+export * from './deliverables/index.js';

@@ -1,3 +1,5 @@
+import type { DeliverableEnvelope, DeliveryPayload } from '../deliverables/types.js';
+
 export type TokenAmount = string;
 
 export const MARKET_TYPES = ['info', 'task', 'capability'] as const;
@@ -242,6 +244,11 @@ export interface OrderDelivery {
   tracking?: OrderDeliveryTracking;
   deliveredAt?: number;
   confirmedAt?: number;
+  /** Deliverable envelope extension (Phase 1+) — see deliverable-spec §10.2 */
+  envelope?: DeliverableEnvelope;
+  /** Delivery completion fields for stream transport */
+  deliverableId?: string;
+  finalHash?: string;
 }
 
 export interface OrderDeliveryTracking {
@@ -389,7 +396,10 @@ export interface TaskSubmission {
   id: string;
   orderId: string;
   worker: string;
+  /** Legacy deliverables (Phase 1 transition — kept for backward compat) */
   deliverables: Record<string, unknown>[];
+  /** Typed deliverable envelopes (new format, preferred when present) */
+  delivery?: DeliveryPayload;
   notes?: string;
   status: SubmissionStatus;
   review?: {

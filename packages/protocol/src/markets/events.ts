@@ -126,7 +126,10 @@ export interface MarketSubmissionSubmitPayload extends Record<string, unknown> {
   orderId: string;
   submissionId: string;
   worker: string;
+  /** Legacy deliverables (Phase 1 transition — required for old parser compat) */
   deliverables: Record<string, unknown>[];
+  /** New delivery envelope (preferred when present) */
+  delivery?: { envelope: Record<string, unknown> };
   notes?: string;
   resourcePrev?: null;
 }
