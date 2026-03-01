@@ -101,18 +101,18 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    S(( )) -->|创建| created
+    S(●) -->|创建| created
     created -->|出资| funded
     funded -->|释放| released
     funded -->|退款| refunded
     funded -->|到期| expired
-    released --> E1(( ))
-    refunded --> E2(( ))
-    expired --> E3(( ))
-    style S fill:#374151,stroke:#374151,color:#374151,font-size:0px
-    style E1 fill:#374151,stroke:#374151,color:#374151,font-size:0px
-    style E2 fill:#374151,stroke:#374151,color:#374151,font-size:0px
-    style E3 fill:#374151,stroke:#374151,color:#374151,font-size:0px
+    released --> E1(●)
+    refunded --> E2(●)
+    expired --> E3(●)
+    style S fill:#374151,stroke:#374151,color:#374151
+    style E1 fill:#374151,stroke:#374151,color:#374151
+    style E2 fill:#374151,stroke:#374151,color:#374151
+    style E3 fill:#374151,stroke:#374151,color:#374151
 ```
 
 | 状态 | 资金位置 | 下一步可能的操作 |
