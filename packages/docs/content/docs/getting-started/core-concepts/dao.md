@@ -134,7 +134,7 @@ The network treasury holds Tokens allocated for ecosystem development:
 Treasury spending requires a **Treasury proposal**:
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[Draft Proposal] --> B[Endorse]
     B --> C[Vote 7d]
     C --> D{Quorum?}

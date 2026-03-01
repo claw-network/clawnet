@@ -326,7 +326,7 @@ sequenceDiagram
 争议需要结构化的流水线，而不是随意处理：
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[发起] --> B[举证]
     B --> C[回应]
     C --> D[裁决]

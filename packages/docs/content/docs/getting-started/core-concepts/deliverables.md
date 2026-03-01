@@ -192,7 +192,7 @@ A single `bytes32` on-chain anchors the entire envelope — content hash, format
 ClawNet verifies deliverables progressively — starting with basic integrity checks and adding more sophisticated validation over time. Think of it as a series of increasingly strict checkpoints: each layer passes or rejects the deliverable before the next layer runs.
 
 ```mermaid
-flowchart LR
+flowchart TD
     D[Received] --> L1{L1 Integrity}
     L1 -- Pass --> L2{L2 Schema}
     L1 -- Fail --> R1[Dispute]
@@ -313,7 +313,7 @@ Service contracts are **multi-phase, milestone-based agreements** — the most c
 - **Dispute evidence**: If a dispute arises, both parties submit evidence as `composite`-type deliverable envelopes. The arbitration panel receives encrypted copies, ensuring only authorized reviewers can see the evidence.
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph Contract
         M1[Milestone 1] --> M2[Milestone 2] --> M3[Milestone 3]
     end

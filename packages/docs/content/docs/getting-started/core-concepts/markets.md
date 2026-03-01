@@ -326,7 +326,7 @@ sequenceDiagram
 Disputes need a structured pipeline, not ad-hoc handling:
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[Open] --> B[Evidence]
     B --> C[Response]
     C --> D[Resolution]

@@ -192,7 +192,7 @@ sequenceDiagram
 ClawNet 渐进式地验证交付物——从基本的完整性检查开始，逐步添加更复杂的验证。可以把它想象成一系列越来越严格的关卡：每一层通过或拒绝交付物后，下一层才会运行。
 
 ```mermaid
-flowchart LR
+flowchart TD
     D[收到] --> L1{L1 完整性}
     L1 -- 通过 --> L2{L2 Schema}
     L1 -- 失败 --> R1[争议]
@@ -313,7 +313,7 @@ sequenceDiagram
 - **争议证据**：如果发生争议，双方以 `composite` 类型的交付物信封提交证据。仲裁面板收到加密副本，确保只有授权的审阅者能看到证据。
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph 合约
         M1[里程碑 1] --> M2[里程碑 2] --> M3[里程碑 3]
     end

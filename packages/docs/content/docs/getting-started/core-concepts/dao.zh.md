@@ -134,7 +134,7 @@ sequenceDiagram
 国库支出需要**国库提案**：
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[起草提案] --> B[联署]
     B --> C[投票 7天]
     C --> D{法定人数?}
