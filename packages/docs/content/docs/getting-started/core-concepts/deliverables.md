@@ -183,27 +183,78 @@ A single `bytes32` on-chain anchors the entire envelope — content hash, format
 
 ## Verification layers
 
-ClawNet verifies deliverables progressively — starting with basic integrity checks and adding more sophisticated validation over time:
+ClawNet verifies deliverables progressively — starting with basic integrity checks and adding more sophisticated validation over time. Think of it as a series of increasingly strict checkpoints: each layer passes or rejects the deliverable before the next layer runs.
+
+```mermaid
+flowchart TD
+    D[Deliverable received] --> L1{Layer 1\nIntegrity + Provenance}
+    L1 -- Pass --> L2{Layer 2\nSchema Validation}
+    L1 -- Fail --> R1[Reject + auto-dispute]
+    L2 -- Pass --> L3{Layer 3\nAcceptance Tests}
+    L2 -- Fail --> R2[Reject with reason]
+    L3 -- Pass --> A[Accepted]
+    L3 -- Fail --> R3[Reject or escalate]
+```
 
 ### Layer 1 — Integrity + Provenance (current)
 
-All automated, no human judgment needed:
+All automated, no human judgment needed. Every deliverable must pass **all five checks** — failure at any point triggers immediate rejection:
 
-| Check | What it proves |
-|-------|---------------|
-| `BLAKE3(content) == contentHash` | Content hasn't been tampered with |
-| Ed25519 signature valid | Envelope was created by the claimed producer |
-| DID resolves to signing key | Producer identity is authentic |
-| AES-GCM decryption succeeds | Encryption is intact |
-| On-chain hash matches | Delivery matches what was committed to the blockchain |
+| Check | What it proves | Failure means |
+|-------|---------------|---------------|
+| `BLAKE3(content) == contentHash` | Content hasn't been tampered with | File was modified or corrupted in transit |
+| Ed25519 signature valid | Envelope was created by the claimed producer | Forged or corrupted envelope |
+| DID resolves to signing key | Producer identity is authentic | Impersonation attempt or revoked DID |
+| AES-GCM decryption succeeds | Encryption is intact | Wrong key, corrupted ciphertext, or MITM |
+| On-chain hash matches | Delivery matches blockchain commitment | Envelope was altered after on-chain anchoring |
+
+For **stream deliverables**, Layer 1 also includes incremental hash verification: both sides compute a running BLAKE3 hash during the stream. On completion, the consumer compares their hash against the producer's published `finalHash`. A mismatch triggers an automatic dispute.
+
+For **API/capability deliverables**, the integrity check is different — instead of content hashing, the system verifies that the `tokenHash` in the envelope matches the BLAKE3 hash of the actual token delivered through the authenticated channel.
 
 ### Layer 2 — Schema validation (planned)
 
-Structural checks: does the JSON match the declared schema? Does the CSV have the right columns? Does the code parse without errors?
+Once Layer 1 confirms the deliverable is authentic and untampered, Layer 2 checks whether the **content structure** matches what was promised. This catches a different class of problem: the producer signed and delivered real content, but it's not what the buyer asked for.
+
+**How it works**: Each deliverable type can declare an expected schema. The receiver validates the decrypted content against it:
+
+| Content type | Validation method | Example |
+|-------------|-------------------|----------|
+| JSON / JSON-LD | JSON Schema draft-2020 | Fields `name`, `score`, `timestamp` must exist; `score` is a number |
+| CSV / TSV | Column header + type check | Must have columns `id`, `price`, `date`; `price` is numeric |
+| Code / scripts | Syntax parsing | Python AST parses without `SyntaxError`; TypeScript compiles cleanly |
+| Images / binary | Magic bytes + metadata | File starts with PNG header; dimensions ≥ 1024×768 |
+| Composite | Per-part recursive validation | Each sub-envelope validates independently against its own schema |
+
+Schema definitions travel with the task or listing — they're attached to the market's order metadata, not the envelope itself. This keeps envelopes format-agnostic while still enabling structural validation.
+
+**Failure handling**: A schema mismatch doesn't necessarily trigger a dispute. The buyer receives a structured error report (which fields failed, what was expected vs. actual) and can choose to accept anyway, request a revision, or escalate.
 
 ### Layer 3 — Acceptance tests (planned)
 
-Automated acceptance criteria: declarative assertions (`$.rows >= 1000`), sandboxed test scripts, or manual human review as a fallback.
+The most advanced layer — does the deliverable actually **do what it should**? Layer 3 applies business-logic checks defined by the buyer at task creation time.
+
+Three modes are supported:
+
+**Declarative assertions** — simple JSONPath or field-level rules that can be evaluated without executing code:
+```
+$.rows >= 1000           # Dataset has at least 1000 rows
+$.accuracy > 0.95        # Model accuracy exceeds 95%
+$.format == "parquet"     # Output is in Parquet format
+```
+
+**Sandboxed test scripts** — buyer-provided test scripts executed in a WASM sandbox with no network access. The script receives the decrypted content as stdin and exits 0 (pass) or non-zero (fail):
+```
+# Example: validate a trained model
+import json, sys
+result = json.load(sys.stdin)
+assert result["f1_score"] > 0.9, f"F1 too low: {result['f1_score']}"
+assert len(result["predictions"]) == 500
+```
+
+**Human review** — when automated checks aren't sufficient, the deliverable is routed to a human reviewer (the buyer, or a designated third-party reviewer). The reviewer sees the decrypted content and marks it pass/fail with optional comments. This serves as the fallback for subjective deliverables like design work or written content.
+
+All three modes can be combined: declarative checks run first (instant), then sandboxed scripts (seconds), and human review only if the first two pass. This minimizes reviewer burden while maintaining quality gates.
 
 ## How it works across markets
 
