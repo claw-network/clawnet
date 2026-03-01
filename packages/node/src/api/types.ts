@@ -51,6 +51,8 @@ export interface ApiServerConfig {
   dataDir?: string;
   /** Network type — controls dev route availability and auth strictness. */
   network?: NetworkType;
+  /** Allowed CORS origins. Defaults to `['*']`. Set explicitly for mainnet. */
+  corsOrigins?: string[];
 }
 
 export interface RuntimeContext {

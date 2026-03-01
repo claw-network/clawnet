@@ -59,9 +59,9 @@ describe('WalletService', () => {
     it('returns on-chain balance with zero locked when no active escrows', async () => {
       indexer.getEscrows.mockReturnValue({ items: [], total: 0, limit: 50, offset: 0 });
       const result = await service.getBalance(ALICE);
-      expect(result.balance).toBe(1000);
-      expect(result.available).toBe(1000);
-      expect(result.locked).toBe(0);
+      expect(result.balance).toBe('1000');
+      expect(result.available).toBe('1000');
+      expect(result.locked).toBe('0');
       expect(provider.token.balanceOf).toHaveBeenCalledWith(ALICE);
     });
 
@@ -73,9 +73,9 @@ describe('WalletService', () => {
         offset: 0,
       });
       const result = await service.getBalance(ALICE);
-      expect(result.balance).toBe(1000);
-      expect(result.locked).toBe(500);
-      expect(result.available).toBe(500);
+      expect(result.balance).toBe('1000');
+      expect(result.locked).toBe('500');
+      expect(result.available).toBe('500');
     });
   });
 
@@ -131,7 +131,7 @@ describe('WalletService', () => {
       expect(view).not.toBeNull();
       expect(view!.depositor).toBe(ALICE);
       expect(view!.beneficiary).toBe(BOB);
-      expect(view!.amount).toBe(100);
+      expect(view!.amount).toBe('100');
       expect(view!.status).toBe('active');
     });
 
@@ -152,7 +152,7 @@ describe('WalletService', () => {
       expect(provider.token.transfer).toHaveBeenCalledWith(BOB, 100);
       expect(result.txHash).toBe(TX_HASH);
       expect(result.status).toBe('confirmed');
-      expect(result.amount).toBe(100);
+      expect(result.amount).toBe('100');
     });
 
     it('returns failed status when receipt status is 0', async () => {
@@ -174,7 +174,7 @@ describe('WalletService', () => {
       expect(provider.token.approve).toHaveBeenCalled();
       expect(provider.escrow.createEscrow).toHaveBeenCalled();
       expect(result.id).toBe('esc-1');
-      expect(result.amount).toBe(100);
+      expect(result.amount).toBe('100');
       expect(result.status).toBe('active');
     });
 
@@ -201,7 +201,7 @@ describe('WalletService', () => {
     it('releases escrow and reads amount', async () => {
       const result = await service.releaseEscrow('esc-1');
       expect(provider.escrow.release).toHaveBeenCalled();
-      expect(result.amount).toBe(100); // from getEscrow mock
+      expect(result.amount).toBe('100'); // from getEscrow mock
       expect(result.status).toBe('released');
     });
   });

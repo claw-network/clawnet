@@ -290,12 +290,23 @@ export class EventIndexer {
 
   // ── Escrow ──────────────────────────────────────────────────────────────
 
+  // Status codes aligned with ClawEscrow.sol EscrowStatus enum:
+  //   Active = 0, Released = 1, Refunded = 2, Expired = 3, Disputed = 4
+  private static readonly ESCROW_STATUS = {
+    Active: 0,
+    Released: 1,
+    Refunded: 2,
+    Expired: 3,
+    Disputed: 4,
+  } as const;
+
   private materializeEscrow(
     eventName: string,
     args: Record<string, string>,
     log: Log,
     timestamp: number,
   ): void {
+    const S = EventIndexer.ESCROW_STATUS;
     switch (eventName) {
       case 'EscrowCreated':
         this.store.upsertEscrow({
@@ -304,26 +315,42 @@ export class EventIndexer {
           beneficiary: args['beneficiary'] ?? '',
           arbiter: args['arbiter'] ?? '',
           amount: args['amount'] ?? '0',
-          status: 0, // Created
+          status: S.Active,
           createdAt: timestamp,
           updatedAt: timestamp,
         });
         break;
       case 'EscrowFunded':
-        this.store.updateEscrowStatus(args['escrowId'] ?? '', 1, timestamp);
+        // Funding does not change escrow status — it remains Active.
+        // Only update the amount and timestamp.
+        this.store.updateEscrowAmount(
+          args['escrowId'] ?? '',
+          args['amount'] ?? '0',
+          timestamp,
+        );
         break;
       case 'EscrowReleased':
-        this.store.updateEscrowStatus(args['escrowId'] ?? '', 2, timestamp);
+        this.store.updateEscrowStatus(args['escrowId'] ?? '', S.Released, timestamp);
         break;
       case 'EscrowRefunded':
-        this.store.updateEscrowStatus(args['escrowId'] ?? '', 3, timestamp);
+        this.store.updateEscrowStatus(args['escrowId'] ?? '', S.Refunded, timestamp);
         break;
-      case 'DisputeOpened':
-        this.store.updateEscrowStatus(args['escrowId'] ?? '', 4, timestamp);
+      case 'EscrowExpired':
+        this.store.updateEscrowStatus(args['escrowId'] ?? '', S.Expired, timestamp);
         break;
-      case 'DisputeResolved':
-        this.store.updateEscrowStatus(args['escrowId'] ?? '', 5, timestamp);
+      case 'EscrowDisputed':
+        this.store.updateEscrowStatus(args['escrowId'] ?? '', S.Disputed, timestamp);
         break;
+      case 'EscrowResolved': {
+        // Arbiter resolution: releasedToBeneficiary → Released, otherwise → Refunded
+        const released = args['releasedToBeneficiary'] === 'true';
+        this.store.updateEscrowStatus(
+          args['escrowId'] ?? '',
+          released ? S.Released : S.Refunded,
+          timestamp,
+        );
+        break;
+      }
       default:
         break;
     }

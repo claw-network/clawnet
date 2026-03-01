@@ -432,7 +432,15 @@ export class P2PSync {
       if (!this.validateSnapshotState) {
         return;
       }
-      const events = await this.collectEventsForSnapshot(latest?.at ?? null, snapshot.at);
+      // collectEventsForSnapshot uses event hashes as cursors (matching
+      // getEventLogRange semantics).  `snapshot.at` is the hash of the
+      // last event the snapshot covers; `latest?.at` is the same for the
+      // previous snapshot (i.e. the point from which new events start).
+      // When there is no previous snapshot we pass null to start from the
+      // beginning of the event log.
+      const fromHash = latest?.at ?? null;
+      const toHash = snapshot.at;
+      const events = await this.collectEventsForSnapshot(fromHash, toHash);
       if (!events) {
         return;
       }
@@ -824,15 +832,23 @@ export class P2PSync {
     return concatBytes(...parts);
   }
 
+  /**
+   * Collect all events between two event-hash cursors.
+   *
+   * @param fromHash  Event hash to start after (exclusive). null = start of log.
+   * @param toHash    Event hash to stop at (inclusive). Must be an event hash
+   *                  present in the event store so the cursor comparison works.
+   * @returns Array of raw event bytes, or null if collection failed.
+   */
   private async collectEventsForSnapshot(
-    prevAt: string | null,
-    targetAt: string,
+    fromHash: string | null,
+    toHash: string,
   ): Promise<Uint8Array[] | null> {
-    if (!targetAt) {
+    if (!toHash) {
       return null;
     }
     const events: Uint8Array[] = [];
-    let cursor = prevAt ?? '';
+    let cursor = fromHash ?? '';
     let totalBytes = 0;
     const maxTotalBytes = this.config.maxSnapshotTotalBytes;
     let guard = 0;
@@ -858,7 +874,7 @@ export class P2PSync {
         return null;
       }
       cursor = range.cursor;
-      if (cursor === targetAt) {
+      if (cursor === toHash) {
         return events;
       }
     }

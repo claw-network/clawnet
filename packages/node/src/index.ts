@@ -660,7 +660,7 @@ export class ClawNetNode {
   }
 
   private resolveNetwork(): string {
-    return this.persistedConfig?.network ?? 'devnet';
+    return this.config.network ?? this.persistedConfig?.network ?? 'devnet';
   }
 
   private resolveP2PPort(): number {

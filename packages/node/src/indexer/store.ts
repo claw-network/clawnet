@@ -288,6 +288,12 @@ export class IndexerStore {
       .run(status, updatedAt, escrowId);
   }
 
+  updateEscrowAmount(escrowId: string, amount: string, updatedAt: number): void {
+    this._db
+      .prepare('UPDATE escrows SET amount = ?, updated_at = ? WHERE escrow_id = ?')
+      .run(amount, updatedAt, escrowId);
+  }
+
   // ── Service contracts ───────────────────────────────────────────────────
 
   upsertServiceContract(c: IndexedServiceContract): void {
@@ -377,13 +383,15 @@ export class IndexerStore {
     isActive: boolean,
     updatedAt: number,
   ): void {
+    // When controller or activeKey is empty, preserve the existing value
+    // (e.g. KeyRotated only updates the key, DIDRevoked only updates is_active).
     this._db
       .prepare(
         `INSERT INTO did_cache (did_hash, controller, active_key, is_active, updated_at)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(did_hash) DO UPDATE SET
-           controller = excluded.controller,
-           active_key = excluded.active_key,
+           controller = CASE WHEN excluded.controller = '' THEN did_cache.controller ELSE excluded.controller END,
+           active_key = CASE WHEN excluded.active_key = '' THEN did_cache.active_key ELSE excluded.active_key END,
            is_active  = excluded.is_active,
            updated_at = excluded.updated_at`,
       )

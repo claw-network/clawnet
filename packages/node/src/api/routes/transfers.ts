@@ -32,7 +32,7 @@ export function transferRoutes(ctx: RuntimeContext): Router {
     // On-chain path
     if (ctx.walletService) {
       try {
-        const result = await ctx.walletService.transfer(from, to, Number(body.amount), body.memo);
+        const result = await ctx.walletService.transfer(from, to, BigInt(body.amount), body.memo);
         created(res, result, { self: `/api/v1/wallets/${from}` });
         return;
       } catch (err) {
@@ -68,7 +68,7 @@ export function transferRoutes(ctx: RuntimeContext): Router {
           txHash: hash,
           from,
           to,
-          amount: Number(body.amount),
+          amount: String(body.amount),
           status: 'broadcast',
           timestamp: body.ts ?? Date.now(),
         },

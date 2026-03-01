@@ -46,7 +46,13 @@ function parseArgs(argv: string[]): DaemonArgs {
       continue;
     }
     if (arg === '--api-port') {
-      apiPort = Number.parseInt(argv[++i] ?? '', 10);
+      const raw = argv[++i] ?? '';
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
+        console.error(`Invalid --api-port value: '${raw}'. Must be 1–65535.`);
+        process.exit(1);
+      }
+      apiPort = parsed;
       continue;
     }
     if (arg === '--listen') {

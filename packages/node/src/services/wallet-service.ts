@@ -35,17 +35,17 @@ export interface TransferResult {
   txHash: string;
   from: string;
   to: string;
-  amount: number;
-  fee?: number;
+  amount: string;
+  fee?: string;
   status: string;
   timestamp: number;
 }
 
 export interface BalanceResult {
-  balance: number;
-  available: number;
-  pending: number;
-  locked: number;
+  balance: string;
+  available: string;
+  pending: string;
+  locked: string;
 }
 
 export interface EscrowView {
@@ -53,7 +53,7 @@ export interface EscrowView {
   depositor: string;
   beneficiary: string;
   arbiter: string;
-  amount: number;
+  amount: string;
   status: string;
   createdAt: number;
   expiresAt: number;
@@ -62,16 +62,16 @@ export interface EscrowView {
 
 export interface EscrowActionResult {
   txHash: string;
-  amount: number;
+  amount: string;
   status: string;
   timestamp: number;
 }
 
 export interface EscrowCreateResult {
   id: string;
-  amount: number;
-  released: number;
-  remaining: number;
+  amount: string;
+  released: string;
+  remaining: string;
   status: string;
   createdAt: number;
   expiresAt?: number;
@@ -89,7 +89,7 @@ interface TransferRow {
   txHash: string;
   from: string;
   to: string;
-  amount: number;
+  amount: string;
   type: string;
   status: string;
   timestamp: number;
@@ -131,12 +131,12 @@ export class WalletService {
    */
   async getBalance(address: string): Promise<BalanceResult> {
     const raw: bigint = await this.contracts.token.balanceOf(address);
-    const balance = Number(raw);
+    const balance = raw;
 
     // Locked / pending breakdown requires indexer data (escrow balances).
     // For now, the "locked" amount is the sum of all active escrows where
     // the address is the depositor.
-    let locked = 0;
+    let locked = 0n;
     if (this.indexer) {
       const escrows = this.indexer.getEscrows({
         address,
@@ -144,15 +144,15 @@ export class WalletService {
         limit: 200,
       });
       for (const e of escrows.items) {
-        locked += Number(e.amount);
+        locked += BigInt(e.amount);
       }
     }
 
     return {
-      balance,
-      available: balance - locked,
-      pending: 0,
-      locked,
+      balance: String(balance),
+      available: String(balance - locked),
+      pending: '0',
+      locked: String(locked),
     };
   }
 
@@ -189,14 +189,14 @@ export class WalletService {
   async transfer(
     from: string,
     to: string,
-    amount: number,
+    amount: bigint | number,
     memo?: string,
   ): Promise<TransferResult> {
     this.log.info(
-      'Wallet transfer: %s → %s, %d Token(s)%s',
+      'Wallet transfer: %s → %s, %s Token(s)%s',
       from,
       to,
-      amount,
+      String(amount),
       memo ? ` (${memo})` : '',
     );
 
@@ -208,7 +208,7 @@ export class WalletService {
       txHash: receipt.hash,
       from,
       to,
-      amount,
+      amount: String(amount),
       status: receipt.status === 1 ? 'confirmed' : 'failed',
       timestamp,
     };
@@ -227,13 +227,13 @@ export class WalletService {
    */
   async mint(
     to: string,
-    amount: number,
+    amount: bigint | number,
     memo?: string,
   ): Promise<TransferResult> {
     this.log.info(
-      'Wallet mint: → %s, %d Token(s)%s',
+      'Wallet mint: → %s, %s Token(s)%s',
       to,
-      amount,
+      String(amount),
       memo ? ` (${memo})` : '',
     );
 
@@ -245,7 +245,7 @@ export class WalletService {
       txHash: receipt.hash,
       from: '0x0000000000000000000000000000000000000000',
       to,
-      amount,
+      amount: String(amount),
       status: receipt.status === 1 ? 'confirmed' : 'failed',
       timestamp,
     };
@@ -267,7 +267,7 @@ export class WalletService {
     escrowId: string;
     beneficiary: string;
     arbiter?: string;
-    amount: number;
+    amount: bigint | number;
     expiresAt?: number;
   }): Promise<EscrowCreateResult> {
     const {
@@ -280,9 +280,9 @@ export class WalletService {
     const id32 = keccak256(toUtf8Bytes(escrowId));
 
     this.log.info(
-      'Creating escrow %s: %d Token(s), beneficiary=%s',
+      'Creating escrow %s: %s Token(s), beneficiary=%s',
       escrowId,
-      amount,
+      String(amount),
       beneficiary,
     );
 
@@ -308,9 +308,9 @@ export class WalletService {
 
     return {
       id: escrowId,
-      amount,
-      released: 0,
-      remaining: amount,
+      amount: String(amount),
+      released: '0',
+      remaining: String(amount),
       status: 'active',
       createdAt: ts,
       expiresAt: expiresAt || undefined,
@@ -321,10 +321,10 @@ export class WalletService {
   /**
    * Fund (top up) an existing escrow.
    */
-  async fundEscrow(escrowId: string, amount: number): Promise<EscrowActionResult> {
+  async fundEscrow(escrowId: string, amount: bigint | number): Promise<EscrowActionResult> {
     const id32 = keccak256(toUtf8Bytes(escrowId));
 
-    this.log.info('Funding escrow %s: %d Token(s)', escrowId, amount);
+    this.log.info('Funding escrow %s: %s Token(s)', escrowId, String(amount));
 
     // Approve and fund.
     const escrowAddr = await this.contracts.escrow.getAddress();
@@ -336,7 +336,7 @@ export class WalletService {
 
     return {
       txHash: receipt.hash,
-      amount,
+      amount: String(amount),
       status: receipt.status === 1 ? 'funded' : 'failed',
       timestamp: Date.now(),
     };
@@ -467,7 +467,11 @@ export class WalletService {
    * Fetch on-chain escrow state.
    */
   async getEscrow(escrowId: string): Promise<EscrowView | null> {
-    const id32 = keccak256(toUtf8Bytes(escrowId));
+    // If the input already looks like a bytes32 hex (from indexer list),
+    // use it directly; otherwise hash the human-readable ID.
+    const id32 = escrowId.startsWith('0x') && escrowId.length === 66
+      ? escrowId
+      : keccak256(toUtf8Bytes(escrowId));
 
     try {
       const [depositor, beneficiary, arbiter, amount, createdAt, expiresAt, status] =
@@ -485,7 +489,7 @@ export class WalletService {
         depositor: depositor as string,
         beneficiary: beneficiary as string,
         arbiter: arbiter as string,
-        amount: Number(amount as bigint),
+        amount: String(amount as bigint),
         status: ESCROW_STATUS_MAP[Number(status)] ?? 'unknown',
         createdAt: Number(createdAt as bigint),
         expiresAt: Number(expiresAt as bigint),
@@ -520,7 +524,7 @@ export class WalletService {
       txHash: row.txHash,
       from: row.fromAddr,
       to: row.toAddr,
-      amount: Number(row.amount),
+      amount: String(row.amount),
       type: row.fromAddr.toLowerCase() === address.toLowerCase() ? 'sent' : 'received',
       status: 'confirmed',
       timestamp: row.timestamp,
@@ -552,12 +556,12 @@ export class WalletService {
    * Read the stored amount for an escrow (post-tx).
    * Returns 0 if the escrow can't be read.
    */
-  private async getEscrowAmount(id32: string): Promise<number> {
+  private async getEscrowAmount(id32: string): Promise<string> {
     try {
       const [, , , amount] = await this.contracts.escrow.getEscrow(id32);
-      return Number(amount as bigint);
+      return String(amount as bigint);
     } catch {
-      return 0;
+      return '0';
     }
   }
 }

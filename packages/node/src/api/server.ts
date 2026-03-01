@@ -7,7 +7,7 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { Router } from './router.js';
-import { cors, errorBoundary, requestLogger } from './middleware.js';
+import { createCors, createErrorBoundary, requestLogger } from './middleware.js';
 import { apiKeyAuth } from './auth.js';
 import type { RuntimeContext, ApiServerConfig } from './types.js';
 import type { ApiKeyStore } from './api-key-store.js';
@@ -126,12 +126,17 @@ export class ApiServer {
     // Set up middleware + router as request handler
     const router = this.router;
     const authMiddleware = apiKeyAuth(this.runtime.apiKeyStore, this.config.network);
+    const isMainnet = this.config.network === 'mainnet';
+    const corsMiddleware = createCors({
+      origins: this.config.corsOrigins ?? (isMainnet ? [] : ['*']),
+    });
+    const errorMiddleware = createErrorBoundary({ hideDetails: isMainnet });
 
     this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
       // Middleware chain: CORS → auth → error boundary → logger → router
-      void cors(req, res, async () => {
+      void corsMiddleware(req, res, async () => {
         await authMiddleware(req, res, async () => {
-          await errorBoundary(req, res, async () => {
+          await errorMiddleware(req, res, async () => {
             await requestLogger(() => {})(req, res, async () => {
               const matched = await router.handle(req, res);
               if (!matched && !res.headersSent) {

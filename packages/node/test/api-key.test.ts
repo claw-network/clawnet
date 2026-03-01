@@ -31,6 +31,16 @@ describe('ApiKeyStore', () => {
     expect(record.createdAt).toBeTruthy();
   });
 
+  it('stores keys as SHA-256 hashes, not plaintext', () => {
+    const record = store.create('hashed');
+    // The plaintext key returned by create() must NOT appear in the DB
+    const row = store['db']
+      .prepare('SELECT key FROM api_keys WHERE id = ?')
+      .get(record.id) as { key: string };
+    expect(row.key).not.toBe(record.key);
+    expect(row.key).toMatch(/^[a-f0-9]{64}$/); // SHA-256 hex
+  });
+
   it('validates an active key', () => {
     const created = store.create('agent-1');
     const validated = store.validate(created.key);
