@@ -72,6 +72,19 @@ type PeerStoreLike = {
   get: (peerId: string) => Promise<PeerRecordLike | undefined>;
 };
 
+/** Minimal duplex stream returned by dialProtocol / passed to handle callback. */
+export interface StreamDuplex {
+  source: AsyncIterable<{ subarray: () => Uint8Array } | Uint8Array>;
+  sink: (source: AsyncIterable<Uint8Array>) => Promise<void>;
+  close: () => void | Promise<void>;
+}
+
+/** Callback invoked when a remote peer opens a stream for a registered protocol. */
+export type StreamHandler = (data: {
+  stream: StreamDuplex;
+  connection: { remotePeer?: { toString: () => string } };
+}) => void;
+
 type Libp2pNodeServices = {
   pubsub?: PubsubService;
 } & Record<string, unknown>;
@@ -85,6 +98,9 @@ type Libp2pNode = {
   addEventListener?: (type: string, listener: (event: unknown) => void) => void;
   services?: Libp2pNodeServices;
   peerStore?: PeerStoreLike;
+  handle?: (protocol: string, handler: StreamHandler) => Promise<void>;
+  unhandle?: (protocol: string) => Promise<void>;
+  dialProtocol?: (peerId: unknown, protocol: string) => Promise<StreamDuplex>;
 };
 
 export class P2PNode {
@@ -382,6 +398,42 @@ export class P2PNode {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Register a stream protocol handler.
+   * When a remote peer opens a stream for the given protocol ID, `handler` is called.
+   */
+  async handleProtocol(protocol: string, handler: StreamHandler): Promise<void> {
+    if (!this.node?.handle) {
+      throw new Error('node not started or does not support handle()');
+    }
+    await this.node.handle(protocol, handler);
+  }
+
+  /**
+   * Remove a previously registered stream protocol handler.
+   */
+  async unhandleProtocol(protocol: string): Promise<void> {
+    if (!this.node?.unhandle) {
+      throw new Error('node not started or does not support unhandle()');
+    }
+    await this.node.unhandle(protocol);
+  }
+
+  /**
+   * Open a new stream to a remote peer for the given protocol.
+   * The caller must have a connection to the peer (via `connect()`).
+   *
+   * @param peerId  The remote peer's ID (string).
+   * @param protocol  The protocol ID (e.g. '/clawnet/1.0.0/delivery-auth').
+   * @returns A duplex stream for reading/writing.
+   */
+  async newStream(peerId: string, protocol: string): Promise<StreamDuplex> {
+    if (!this.node?.dialProtocol) {
+      throw new Error('node not started or does not support dialProtocol()');
+    }
+    return this.node.dialProtocol(peerId, protocol);
   }
 
   private getPubsub(): PubsubService {

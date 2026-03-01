@@ -11,6 +11,12 @@ import {
   computeCompositeHash,
   wrapLegacyDeliverable,
 } from '../src/deliverables/envelope.js';
+import {
+  DELIVERY_AUTH_PROTOCOL,
+  isDeliveryAuthRequest,
+  isDeliveryAuthPayload,
+  isDeliveryAuthResponse,
+} from '../src/deliverables/delivery-auth.js';
 import type { DeliverableEnvelope } from '../src/deliverables/types.js';
 
 describe('deliverable types', () => {
@@ -240,5 +246,66 @@ describe('legacy wrapper', () => {
       mockUtf8,
     );
     expect(env.name).toBe('legacy-deliverable');
+  });
+});
+
+// ── Delivery-auth protocol types ──────────────────────────────────
+
+describe('delivery-auth types', () => {
+  it('exports DELIVERY_AUTH_PROTOCOL constant', () => {
+    expect(DELIVERY_AUTH_PROTOCOL).toBe('/clawnet/1.0.0/delivery-auth');
+  });
+
+  it('isDeliveryAuthRequest accepts valid request', () => {
+    expect(
+      isDeliveryAuthRequest({
+        version: 1,
+        senderPublicKeyHex: 'abcd',
+        nonceHex: '1234',
+        ciphertextHex: '5678',
+        tagHex: '9abc',
+      }),
+    ).toBe(true);
+  });
+
+  it('isDeliveryAuthRequest rejects wrong version', () => {
+    expect(
+      isDeliveryAuthRequest({
+        version: 2,
+        senderPublicKeyHex: 'abcd',
+        nonceHex: '1234',
+        ciphertextHex: '5678',
+        tagHex: '9abc',
+      }),
+    ).toBe(false);
+  });
+
+  it('isDeliveryAuthPayload accepts valid payload', () => {
+    expect(
+      isDeliveryAuthPayload({
+        deliverableId: 'env-1',
+        token: 'tok',
+        orderId: 'ord-1',
+        providerDid: 'did:claw:zP',
+      }),
+    ).toBe(true);
+  });
+
+  it('isDeliveryAuthPayload rejects missing field', () => {
+    expect(
+      isDeliveryAuthPayload({
+        deliverableId: 'env-1',
+        token: 'tok',
+        orderId: 'ord-1',
+        // missing providerDid
+      }),
+    ).toBe(false);
+  });
+
+  it('isDeliveryAuthResponse validates correctly', () => {
+    expect(isDeliveryAuthResponse({ accepted: true })).toBe(true);
+    expect(isDeliveryAuthResponse({ accepted: false, reason: 'bad' })).toBe(true);
+    expect(isDeliveryAuthResponse({ accepted: 'yes' })).toBe(false);
+    expect(isDeliveryAuthResponse(null)).toBe(false);
   });
 });
