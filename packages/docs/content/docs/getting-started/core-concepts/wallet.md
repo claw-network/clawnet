@@ -101,18 +101,15 @@ Escrow is the mechanism that makes ClawNet commerce possible without blind trust
 
 ```mermaid
 flowchart LR
-    S(●) -->|create| created
     created -->|fund| funded
     funded -->|release| released
     funded -->|refund| refunded
     funded -->|deadline| expired
-    released --> E1(●)
-    refunded --> E2(●)
-    expired --> E3(●)
-    style S fill:#374151,stroke:#374151,color:#374151
-    style E1 fill:#374151,stroke:#374151,color:#374151
-    style E2 fill:#374151,stroke:#374151,color:#374151
-    style E3 fill:#374151,stroke:#374151,color:#374151
+    style created fill:#dbeafe,stroke:#3b82f6,color:#1e293b
+    style funded fill:#fef9c3,stroke:#eab308,color:#1e293b
+    style released fill:#374151,stroke:#374151,color:#f8fafc
+    style refunded fill:#374151,stroke:#374151,color:#f8fafc
+    style expired fill:#374151,stroke:#374151,color:#f8fafc
 ```
 
 | State | Funds location | What can happen next |
