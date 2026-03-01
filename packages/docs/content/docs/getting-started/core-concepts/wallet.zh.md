@@ -100,16 +100,19 @@ sequenceDiagram
 ### 托管状态机
 
 ```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> created : 创建
-    created --> funded : 出资
-    funded --> released : 释放
-    funded --> refunded : 退款
-    funded --> expired : 到期
-    released --> [*]
-    refunded --> [*]
-    expired --> [*]
+flowchart LR
+    S(( )) -->|创建| created
+    created -->|出资| funded
+    funded -->|释放| released
+    funded -->|退款| refunded
+    funded -->|到期| expired
+    released --> E1(( ))
+    refunded --> E2(( ))
+    expired --> E3(( ))
+    style S fill:#374151,stroke:#374151,color:#374151
+    style E1 fill:#374151,stroke:#374151,color:#374151
+    style E2 fill:#374151,stroke:#374151,color:#374151
+    style E3 fill:#374151,stroke:#374151,color:#374151
 ```
 
 | 状态 | 资金位置 | 下一步可能的操作 |
