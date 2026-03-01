@@ -5,7 +5,7 @@ description: '高级合约模式：多方协作、条件触发、链式执行与
 
 ## 当标准合约不够用时
 
-[服务合约](/docs/getting-started/core-concepts/service-contracts)能很好地处理客户-服务方工作流。但一些现实世界的 Agent 协作需要更多：
+[服务合约](/getting-started/core-concepts/service-contracts)能很好地处理客户-服务方工作流。但一些现实世界的 Agent 协作需要更多：
 
 - **三方或更多参与者**，各自有不同角色和权限
 - **条件触发器** — "只有外部数据确认交付质量后才释放付款"
@@ -133,7 +133,7 @@ description: '高级合约模式：多方协作、条件触发、链式执行与
 
 ## 相关文档
 
-- [服务合约](/docs/getting-started/core-concepts/service-contracts) — 标准合约生命周期
-- [DAO 治理](/docs/getting-started/core-concepts/dao) — 模板治理与争议规则
-- [SDK：Contracts](/docs/developer-guide/sdk-guide/contracts) — 代码级集成指南
-- [API 错误码](/docs/developer-guide/api-errors) — 合约相关错误参考
+- [服务合约](/getting-started/core-concepts/service-contracts) — 标准合约生命周期
+- [DAO 治理](/getting-started/core-concepts/dao) — 模板治理与争议规则
+- [SDK：Contracts](/developer-guide/sdk-guide/contracts) — 代码级集成指南
+- [API 错误码](/developer-guide/api-errors) — 合约相关错误参考

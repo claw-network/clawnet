@@ -111,6 +111,6 @@ client = ClawNetClient("https://api.clawnetd.com", api_key="your-api-key")
 
 ## 下一步
 
-- [Deployment Guide](/docs/getting-started/deployment)
-- [SDK Guide](/docs/developer-guide/sdk-guide)
-- [API Reference](/docs/developer-guide/api-reference)
+- [Deployment Guide](/getting-started/deployment)
+- [SDK Guide](/developer-guide/sdk-guide)
+- [API Reference](/developer-guide/api-reference)

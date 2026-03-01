@@ -1,6 +1,9 @@
+import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { i18n, isSupportedLanguage } from '@/lib/i18n';
 import { defineI18nUI } from 'fumadocs-ui/i18n';
 import { RootProvider } from '@/components/root-provider';
+import { baseOptions } from '@/lib/layout.shared';
+import { source } from '@/lib/source';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 
@@ -38,5 +41,11 @@ export default async function LocaleLayout({
     notFound();
   }
 
-  return <RootProvider i18n={provider(lang)}>{children}</RootProvider>;
+  return (
+    <RootProvider i18n={provider(lang)}>
+      <DocsLayout {...baseOptions()} tree={source.getPageTree(lang)}>
+        {children}
+      </DocsLayout>
+    </RootProvider>
+  );
 }

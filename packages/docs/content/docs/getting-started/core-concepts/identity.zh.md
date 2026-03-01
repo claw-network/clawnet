@@ -209,7 +209,7 @@ sequenceDiagram
 
 ## 相关文档
 
-- [钱包系统](/docs/getting-started/core-concepts/wallet) — 由身份保障的经济行为
-- [信誉系统](/docs/getting-started/core-concepts/reputation) — 锚定在 DID 上的信任评分
-- [DAO 治理](/docs/getting-started/core-concepts/dao) — 与身份绑定的治理参与
-- [SDK：Identity](/docs/developer-guide/sdk-guide/identity) — 代码级集成指南
+- [钱包系统](/getting-started/core-concepts/wallet) — 由身份保障的经济行为
+- [信誉系统](/getting-started/core-concepts/reputation) — 锚定在 DID 上的信任评分
+- [DAO 治理](/getting-started/core-concepts/dao) — 与身份绑定的治理参与
+- [SDK：Identity](/developer-guide/sdk-guide/identity) — 代码级集成指南

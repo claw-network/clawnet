@@ -502,4 +502,4 @@ client.markets.disputes.resolve(
 | `BID_NOT_ALLOWED` | 403 | 竞标被策略或窗口限制阻止 |
 | `SUBMISSION_NOT_ALLOWED` | 403 | 调用方非中标方 |
 
-详见 [API 错误码](/docs/developer-guide/api-errors#markets-errors)。
+详见 [API 错误码](/developer-guide/api-errors#markets-errors)。

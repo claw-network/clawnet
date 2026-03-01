@@ -164,7 +164,7 @@ History supports pagination (`limit`, `offset`) and type filters — essential f
 
 ## Related
 
-- [Service Contracts](/docs/getting-started/core-concepts/service-contracts) — Contracts backed by escrowed funds
-- [Markets](/docs/getting-started/core-concepts/markets) — Market transactions powered by the wallet
-- [SDK: Wallet](/docs/developer-guide/sdk-guide/wallet) — Code-level integration guide
-- [API Error Codes](/docs/developer-guide/api-errors) — Wallet-specific error reference
+- [Service Contracts](/getting-started/core-concepts/service-contracts) — Contracts backed by escrowed funds
+- [Markets](/getting-started/core-concepts/markets) — Market transactions powered by the wallet
+- [SDK: Wallet](/developer-guide/sdk-guide/wallet) — Code-level integration guide
+- [API Error Codes](/developer-guide/api-errors) — Wallet-specific error reference

@@ -3,7 +3,7 @@ import { i18n } from '@/lib/i18n';
 import { loader } from 'fumadocs-core/source';
 
 export const source = loader({
-  baseUrl: '/docs',
+  baseUrl: '/',
   source: docs.toFumadocsSource(),
   i18n,
 });

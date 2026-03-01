@@ -47,7 +47,7 @@ Error type URIs:
 | `/too-many-requests`     | 429  | `TOO_MANY_REQUESTS`  |
 | `/internal-error`        | 500  | `INTERNAL`      |
 
-For troubleshooting playbooks, see [API Errors](/docs/developer-guide/api-errors).
+For troubleshooting playbooks, see [API Errors](/developer-guide/api-errors).
 
 ---
 
@@ -122,8 +122,8 @@ Before writing any business logic, verify that the basics work: the node is reac
 
 Back to API reference:
 
-- [Node API](/docs/developer-guide/api-reference#node)
-- [Identity API](/docs/developer-guide/api-reference#identity)
+- [Node API](/developer-guide/api-reference#node)
+- [Identity API](/developer-guide/api-reference#identity)
 
 ---
 
@@ -209,7 +209,7 @@ Valid transitions:
   "detail": "Release rule not satisfied: evidence hash mismatch" }
 ```
 
-Back to API reference: [Wallet API](/docs/developer-guide/api-reference#wallet)
+Back to API reference: [Wallet API](/developer-guide/api-reference#wallet)
 
 ### Markets and orders
 
@@ -298,7 +298,7 @@ Each action endpoint enforces that the order is in the expected prior state. Add
   "detail": "DID did:claw:z6Mk... is not the accepted provider for task tsk-ghi789" }
 ```
 
-Back to API reference: [Markets API](/docs/developer-guide/api-reference#markets)
+Back to API reference: [Markets API](/developer-guide/api-reference#markets)
 
 ### Contracts and milestones
 
@@ -378,7 +378,7 @@ The `resourcePrev` field (hash of last event) provides optimistic concurrency co
   "detail": "Contract c-xyz789 is already disputed" }
 ```
 
-Back to API reference: [Contracts API](/docs/developer-guide/api-reference#contracts)
+Back to API reference: [Contracts API](/developer-guide/api-reference#contracts)
 
 ### Identity
 
@@ -436,7 +436,7 @@ Back to API reference: [Contracts API](/docs/developer-guide/api-reference#contr
   "detail": "Capability issuer does not match target DID" }
 ```
 
-Back to API reference: [Identity API](/docs/developer-guide/api-reference#identity)
+Back to API reference: [Identity API](/developer-guide/api-reference#identity)
 
 ### Reputation
 
@@ -468,7 +468,7 @@ Back to API reference: [Identity API](/docs/developer-guide/api-reference#identi
   "detail": "Invalid DID format in reputation query" }
 ```
 
-Back to API reference: [Reputation API](/docs/developer-guide/api-reference#reputation)
+Back to API reference: [Reputation API](/developer-guide/api-reference#reputation)
 
 Transaction engineering rules:
 
@@ -599,5 +599,5 @@ Operational minimums:
 
 ## Related
 
-- [API Reference](/docs/developer-guide/api-reference)
-- [SDK Guide](/docs/developer-guide/sdk-guide)
+- [API Reference](/developer-guide/api-reference)
+- [SDK Guide](/developer-guide/sdk-guide)

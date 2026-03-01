@@ -283,4 +283,4 @@ print(state["status"], state["amount"], state["beneficiary"])
 | `ESCROW_INVALID_STATE` | 409 | Action incompatible with current escrow state |
 | `ESCROW_RULE_NOT_MET` | 409 | Release rule preconditions not satisfied |
 
-See [API Error Codes](/docs/developer-guide/api-errors#wallet-errors) for full details.
+See [API Error Codes](/developer-guide/api-errors#wallet-errors) for full details.

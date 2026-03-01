@@ -220,7 +220,7 @@ Evidence references are stored immutably — neither party can alter their submi
 
 ## Related
 
-- [Markets Advanced](/docs/getting-started/core-concepts/markets-advanced) — Pricing, matching, settlement architecture
-- [Service Contracts](/docs/getting-started/core-concepts/service-contracts) — Formal contracts beyond simple orders
-- [SDK: Markets](/docs/developer-guide/sdk-guide/markets) — Code-level integration guide
-- [API Reference](/docs/developer-guide/api-reference) — Full REST API documentation
+- [Markets Advanced](/getting-started/core-concepts/markets-advanced) — Pricing, matching, settlement architecture
+- [Service Contracts](/getting-started/core-concepts/service-contracts) — Formal contracts beyond simple orders
+- [SDK: Markets](/developer-guide/sdk-guide/markets) — Code-level integration guide
+- [API Reference](/developer-guide/api-reference) — Full REST API documentation

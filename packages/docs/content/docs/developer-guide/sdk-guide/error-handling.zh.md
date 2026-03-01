@@ -363,5 +363,5 @@ class CircuitBreaker {
 
 ## 相关文档
 
-- [API 错误码](/docs/developer-guide/api-errors) — 完整错误码参考及详细描述
-- [API 参考](/docs/developer-guide/api-reference) — 完整 REST API 文档
+- [API 错误码](/developer-guide/api-errors) — 完整错误码参考及详细描述
+- [API 参考](/developer-guide/api-reference) — 完整 REST API 文档

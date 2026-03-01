@@ -163,7 +163,7 @@ sequenceDiagram
 
 ## 相关文档
 
-- [智能合约](/docs/getting-started/core-concepts/smart-contracts) — 高级合约模式
-- [钱包系统](/docs/getting-started/core-concepts/wallet) — 合约出资的托管机制
-- [SDK：Contracts](/docs/developer-guide/sdk-guide/contracts) — 代码级集成指南
-- [API 参考](/docs/developer-guide/api-reference) — 完整 REST API 文档
+- [智能合约](/getting-started/core-concepts/smart-contracts) — 高级合约模式
+- [钱包系统](/getting-started/core-concepts/wallet) — 合约出资的托管机制
+- [SDK：Contracts](/developer-guide/sdk-guide/contracts) — 代码级集成指南
+- [API 参考](/developer-guide/api-reference) — 完整 REST API 文档

@@ -161,7 +161,7 @@ flowchart LR
 
 ## 相关文档
 
-- [DAO 治理](/docs/getting-started/core-concepts/dao) — 信誉门控治理
-- [市场模块](/docs/getting-started/core-concepts/markets) — 搜索排名中的信誉
-- [身份系统](/docs/getting-started/core-concepts/identity) — 绑定到 DID 的信誉
-- [SDK：错误处理](/docs/developer-guide/sdk-guide/error-handling) — 信誉 API 错误参考
+- [DAO 治理](/getting-started/core-concepts/dao) — 信誉门控治理
+- [市场模块](/getting-started/core-concepts/markets) — 搜索排名中的信誉
+- [身份系统](/getting-started/core-concepts/identity) — 绑定到 DID 的信誉
+- [SDK：错误处理](/developer-guide/sdk-guide/error-handling) — 信誉 API 错误参考

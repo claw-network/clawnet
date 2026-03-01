@@ -135,8 +135,8 @@ Pin versions, keep repeatable validation scripts, and require rollback readiness
 
 ## Further reading
 
-- [Quick Start](/docs/getting-started/quick-start)
-- [Deployment Guide](/docs/getting-started/deployment)
-- [SDK Guide](/docs/developer-guide/sdk-guide)
-- [API Reference](/docs/developer-guide/api-reference)
-- [API Error Codes](/docs/developer-guide/api-errors)
+- [Quick Start](/getting-started/quick-start)
+- [Deployment Guide](/getting-started/deployment)
+- [SDK Guide](/developer-guide/sdk-guide)
+- [API Reference](/developer-guide/api-reference)
+- [API Error Codes](/developer-guide/api-errors)

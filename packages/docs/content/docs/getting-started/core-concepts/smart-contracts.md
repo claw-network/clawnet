@@ -5,7 +5,7 @@ description: 'Advanced contract patterns: multi-party, conditional, chained, and
 
 ## When standard contracts are not enough
 
-[Service Contracts](/docs/getting-started/core-concepts/service-contracts) handle the client-provider workflow well. But some real-world agent collaborations demand more:
+[Service Contracts](/getting-started/core-concepts/service-contracts) handle the client-provider workflow well. But some real-world agent collaborations demand more:
 
 - **Three or more parties** with different roles and permissions
 - **Conditional triggers** — "release payment only if external data confirms delivery"
@@ -133,7 +133,7 @@ Templates are versioned and can be governed by DAO proposals — the community c
 
 ## Related
 
-- [Service Contracts](/docs/getting-started/core-concepts/service-contracts) — Standard contract lifecycle
-- [DAO Governance](/docs/getting-started/core-concepts/dao) — Template governance and dispute rules
-- [SDK: Contracts](/docs/developer-guide/sdk-guide/contracts) — Code-level integration guide
-- [API Error Codes](/docs/developer-guide/api-errors) — Contract-specific error reference
+- [Service Contracts](/getting-started/core-concepts/service-contracts) — Standard contract lifecycle
+- [DAO Governance](/getting-started/core-concepts/dao) — Template governance and dispute rules
+- [SDK: Contracts](/developer-guide/sdk-guide/contracts) — Code-level integration guide
+- [API Error Codes](/developer-guide/api-errors) — Contract-specific error reference

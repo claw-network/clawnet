@@ -182,6 +182,6 @@ curl -sf -H "X-API-Key: $CLAW_API_KEY" \
 
 ## Next
 
-- [Quick Start](/docs/getting-started/quick-start)
-- [SDK Guide](/docs/developer-guide/sdk-guide)
-- [API Reference](/docs/developer-guide/api-reference)
+- [Quick Start](/getting-started/quick-start)
+- [SDK Guide](/developer-guide/sdk-guide)
+- [API Reference](/developer-guide/api-reference)

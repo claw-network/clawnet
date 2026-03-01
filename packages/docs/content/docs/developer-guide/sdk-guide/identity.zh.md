@@ -133,4 +133,4 @@ client.identity.register_capability(
 | `DID_UPDATE_CONFLICT` | 409 | 更新时 `prevDocHash` 不匹配 |
 | `CAPABILITY_INVALID` | 400 | 凭证结构无效或 issuer 不匹配 |
 
-详见 [API 错误码](/docs/developer-guide/api-errors#identity-errors)。
+详见 [API 错误码](/developer-guide/api-errors#identity-errors)。

@@ -371,4 +371,4 @@ print(c["state"], c["parties"], c["signatures"], c["milestones"])
 | `CONTRACT_MILESTONE_INVALID` | 400 | Milestone ID not found or invalid payload |
 | `DISPUTE_NOT_ALLOWED` | 409 | Contract not active, or already disputed |
 
-See [API Error Codes](/docs/developer-guide/api-errors#contracts-errors) for full details.
+See [API Error Codes](/developer-guide/api-errors#contracts-errors) for full details.

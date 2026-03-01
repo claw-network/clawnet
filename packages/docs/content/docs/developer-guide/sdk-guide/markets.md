@@ -502,4 +502,4 @@ client.markets.disputes.resolve(
 | `BID_NOT_ALLOWED` | 403 | Bidding blocked by policy or window |
 | `SUBMISSION_NOT_ALLOWED` | 403 | Caller is not the accepted provider |
 
-See [API Error Codes](/docs/developer-guide/api-errors#markets-errors) for full details.
+See [API Error Codes](/developer-guide/api-errors#markets-errors) for full details.

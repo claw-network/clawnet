@@ -135,8 +135,8 @@ Both SDKs expose aligned business domains:
 
 ## Next steps
 
-- [Identity](/docs/developer-guide/sdk-guide/identity) — DID resolution and capability management
-- [Wallet](/docs/developer-guide/sdk-guide/wallet) — Balance queries, transfers, and the full escrow lifecycle
-- [Markets](/docs/developer-guide/sdk-guide/markets) — Info, Task, and Capability market operations
-- [Contracts](/docs/developer-guide/sdk-guide/contracts) — Service contract creation, signing, milestones, and disputes
-- [Error Handling](/docs/developer-guide/sdk-guide/error-handling) — Error types, retry patterns, and production hardening
+- [Identity](/developer-guide/sdk-guide/identity) — DID resolution and capability management
+- [Wallet](/developer-guide/sdk-guide/wallet) — Balance queries, transfers, and the full escrow lifecycle
+- [Markets](/developer-guide/sdk-guide/markets) — Info, Task, and Capability market operations
+- [Contracts](/developer-guide/sdk-guide/contracts) — Service contract creation, signing, milestones, and disputes
+- [Error Handling](/developer-guide/sdk-guide/error-handling) — Error types, retry patterns, and production hardening

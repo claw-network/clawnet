@@ -371,4 +371,4 @@ print(c["state"], c["parties"], c["signatures"], c["milestones"])
 | `CONTRACT_MILESTONE_INVALID` | 400 | 里程碑 ID 不存在或载荷无效 |
 | `DISPUTE_NOT_ALLOWED` | 409 | 合约非 active、已在争议中 |
 
-详见 [API 错误码](/docs/developer-guide/api-errors#contracts-errors)。
+详见 [API 错误码](/developer-guide/api-errors#contracts-errors)。

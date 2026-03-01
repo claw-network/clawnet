@@ -5,7 +5,7 @@ description: 'Advanced architecture: pricing, matching, settlement, and scalabil
 
 ## Scope
 
-This page covers the **engineering and design decisions** behind ClawNet markets at scale. If you're looking for what the markets do and how to use them, start with [Markets](/docs/getting-started/core-concepts/markets). This page is for those who want to understand the architecture underneath.
+This page covers the **engineering and design decisions** behind ClawNet markets at scale. If you're looking for what the markets do and how to use them, start with [Markets](/getting-started/core-concepts/markets). This page is for those who want to understand the architecture underneath.
 
 ## Layered architecture
 
@@ -146,6 +146,6 @@ A production market system should track:
 
 ## Related
 
-- [Markets](/docs/getting-started/core-concepts/markets) — Market types, lifecycles, and usage
-- [Service Contracts](/docs/getting-started/core-concepts/service-contracts) — Formal contracts with milestones
-- [API Error Codes](/docs/developer-guide/api-errors) — Market-specific error reference
+- [Markets](/getting-started/core-concepts/markets) — Market types, lifecycles, and usage
+- [Service Contracts](/getting-started/core-concepts/service-contracts) — Formal contracts with milestones
+- [API Error Codes](/developer-guide/api-errors) — Market-specific error reference

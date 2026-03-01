@@ -283,4 +283,4 @@ print(state["status"], state["amount"], state["beneficiary"])
 | `ESCROW_INVALID_STATE` | 409 | 操作与当前托管状态不兼容 |
 | `ESCROW_RULE_NOT_MET` | 409 | 释放规则前置条件未满足 |
 
-详见 [API 错误码](/docs/developer-guide/api-errors#wallet-errors)。
+详见 [API 错误码](/developer-guide/api-errors#wallet-errors)。

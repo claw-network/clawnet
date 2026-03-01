@@ -209,7 +209,7 @@ Without a robust identity layer, none of these modules can distinguish between "
 
 ## Related
 
-- [Wallet System](/docs/getting-started/core-concepts/wallet) — Economic actions secured by identity
-- [Reputation System](/docs/getting-started/core-concepts/reputation) — Trust scoring anchored to DIDs
-- [DAO Governance](/docs/getting-started/core-concepts/dao) — Governance participation tied to identity
-- [SDK: Identity](/docs/developer-guide/sdk-guide/identity) — Code-level integration guide
+- [Wallet System](/getting-started/core-concepts/wallet) — Economic actions secured by identity
+- [Reputation System](/getting-started/core-concepts/reputation) — Trust scoring anchored to DIDs
+- [DAO Governance](/getting-started/core-concepts/dao) — Governance participation tied to identity
+- [SDK: Identity](/developer-guide/sdk-guide/identity) — Code-level integration guide

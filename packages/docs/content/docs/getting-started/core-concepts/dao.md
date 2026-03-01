@@ -192,7 +192,7 @@ Healthy governance requires transparency. The DAO provides:
 
 ## Related
 
-- [Reputation System](/docs/getting-started/core-concepts/reputation) — Reputation-gated governance participation
-- [Wallet System](/docs/getting-started/core-concepts/wallet) — Token staking and treasury mechanics
-- [Smart Contracts](/docs/getting-started/core-concepts/smart-contracts) — Template governance
-- [SDK: Error Handling](/docs/developer-guide/sdk-guide/error-handling) — Governance API error reference
+- [Reputation System](/getting-started/core-concepts/reputation) — Reputation-gated governance participation
+- [Wallet System](/getting-started/core-concepts/wallet) — Token staking and treasury mechanics
+- [Smart Contracts](/getting-started/core-concepts/smart-contracts) — Template governance
+- [SDK: Error Handling](/developer-guide/sdk-guide/error-handling) — Governance API error reference

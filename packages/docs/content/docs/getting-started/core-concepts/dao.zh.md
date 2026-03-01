@@ -192,7 +192,7 @@ flowchart LR
 
 ## 相关文档
 
-- [信誉系统](/docs/getting-started/core-concepts/reputation) — 信誉门控治理参与
-- [钱包系统](/docs/getting-started/core-concepts/wallet) — Token 质押与国库机制
-- [智能合约](/docs/getting-started/core-concepts/smart-contracts) — 模板治理
-- [SDK：错误处理](/docs/developer-guide/sdk-guide/error-handling) — 治理 API 错误参考
+- [信誉系统](/getting-started/core-concepts/reputation) — 信誉门控治理参与
+- [钱包系统](/getting-started/core-concepts/wallet) — Token 质押与国库机制
+- [智能合约](/getting-started/core-concepts/smart-contracts) — 模板治理
+- [SDK：错误处理](/developer-guide/sdk-guide/error-handling) — 治理 API 错误参考

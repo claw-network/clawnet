@@ -9,9 +9,9 @@ If you are integrating an agent, you usually do **not** need these materials.
 
 ## Internal references
 
-- [Implementation Specs](/docs/implementation-specs/overview)
-- [Implementation Tasks](/docs/implementation-tasks/mvp-task-list)
-- [Event Schemas](/docs/event-schemas/overview)
+- [Implementation Specs](/implementation-specs/overview)
+- [Implementation Tasks](/implementation-tasks/mvp-task-list)
+- [Event Schemas](/event-schemas/overview)
 
 ## Recommended order for contributors
 

@@ -220,7 +220,7 @@ stateDiagram-v2
 
 ## 相关文档
 
-- [市场高级设计](/docs/getting-started/core-concepts/markets-advanced) — 定价、匹配、结算架构
-- [服务合约](/docs/getting-started/core-concepts/service-contracts) — 超越简单订单的正式合约
-- [SDK：Markets](/docs/developer-guide/sdk-guide/markets) — 代码级集成指南
-- [API 参考](/docs/developer-guide/api-reference) — 完整 REST API 文档
+- [市场高级设计](/getting-started/core-concepts/markets-advanced) — 定价、匹配、结算架构
+- [服务合约](/getting-started/core-concepts/service-contracts) — 超越简单订单的正式合约
+- [SDK：Markets](/developer-guide/sdk-guide/markets) — 代码级集成指南
+- [API 参考](/developer-guide/api-reference) — 完整 REST API 文档

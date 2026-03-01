@@ -24,10 +24,10 @@ You can integrate these capabilities through REST APIs and SDKs without coupling
 
 ## Recommended path
 
-1. **[Quick Start](/docs/getting-started/quick-start)**: run a local node and complete first SDK calls.
-2. **[Deployment Guide](/docs/getting-started/deployment)**: choose one-click, source, or Docker deployment.
-3. **[SDK Guide](/docs/developer-guide/sdk-guide)**: implement TypeScript/Python integration patterns.
-4. **[API Reference](/docs/developer-guide/api-reference)** and **[API Error Codes](/docs/developer-guide/api-errors)**: harden client behavior.
+1. **[Quick Start](/getting-started/quick-start)**: run a local node and complete first SDK calls.
+2. **[Deployment Guide](/getting-started/deployment)**: choose one-click, source, or Docker deployment.
+3. **[SDK Guide](/developer-guide/sdk-guide)**: implement TypeScript/Python integration patterns.
+4. **[API Reference](/developer-guide/api-reference)** and **[API Error Codes](/developer-guide/api-errors)**: harden client behavior.
 
 ## Production guidance
 
@@ -37,4 +37,4 @@ You can integrate these capabilities through REST APIs and SDKs without coupling
 
 ## Contributor materials
 
-Protocol specs, implementation tasks, and schema-level documents are grouped in **[For Contributors](/docs/for-contributors)**.
+Protocol specs, implementation tasks, and schema-level documents are grouped in **[For Contributors](/for-contributors)**.

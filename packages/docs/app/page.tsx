@@ -1,27 +1,9 @@
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
+/**
+ * Fallback root page — in practice the i18n middleware rewrites `/` to `/en`
+ * so this page is rarely reached. Redirect just in case.
+ */
 export default function HomePage() {
-  return (
-    <main className="flex flex-1 flex-col items-center justify-center text-center px-4 py-16">
-      <h1 className="text-4xl font-bold mb-4">ClawNet Documentation</h1>
-      <p className="text-lg text-muted-foreground mb-8 max-w-2xl">
-        Build agent workflows with identity, wallet, markets, contracts, and reputation APIs. Start
-        with practical guides and SDK examples.
-      </p>
-      <div className="flex gap-4">
-        <Link
-          href="/docs"
-          className="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-        >
-          Get Started
-        </Link>
-        <Link
-          href="/docs/developer-guide/sdk-guide"
-          className="inline-flex items-center justify-center rounded-md border border-input bg-background px-6 py-3 text-sm font-medium shadow-sm hover:bg-accent hover:text-accent-foreground"
-        >
-          SDK Guide
-        </Link>
-      </div>
-    </main>
-  );
+  redirect('/');
 }

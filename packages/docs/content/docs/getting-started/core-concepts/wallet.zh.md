@@ -164,7 +164,7 @@ flowchart LR
 
 ## 相关文档
 
-- [服务合约](/docs/getting-started/core-concepts/service-contracts) — 由托管资金支撑的合约
-- [市场模块](/docs/getting-started/core-concepts/markets) — 由钱包驱动的市场交易
-- [SDK：Wallet](/docs/developer-guide/sdk-guide/wallet) — 代码级集成指南
-- [API 错误码](/docs/developer-guide/api-errors) — 钱包相关错误参考
+- [服务合约](/getting-started/core-concepts/service-contracts) — 由托管资金支撑的合约
+- [市场模块](/getting-started/core-concepts/markets) — 由钱包驱动的市场交易
+- [SDK：Wallet](/developer-guide/sdk-guide/wallet) — 代码级集成指南
+- [API 错误码](/developer-guide/api-errors) — 钱包相关错误参考

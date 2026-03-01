@@ -135,8 +135,8 @@ print(result["txHash"])
 
 ## 后续阅读
 
-- [Identity](/docs/developer-guide/sdk-guide/identity) — DID 解析与 Capability 管理
-- [Wallet](/docs/developer-guide/sdk-guide/wallet) — 余额查询、转账与完整托管生命周期
-- [Markets](/docs/developer-guide/sdk-guide/markets) — 信息、任务、能力市场操作
-- [Contracts](/docs/developer-guide/sdk-guide/contracts) — 服务合约创建、签署、里程碑与争议
-- [错误处理](/docs/developer-guide/sdk-guide/error-handling) — 错误类型、重试策略与生产加固
+- [Identity](/developer-guide/sdk-guide/identity) — DID 解析与 Capability 管理
+- [Wallet](/developer-guide/sdk-guide/wallet) — 余额查询、转账与完整托管生命周期
+- [Markets](/developer-guide/sdk-guide/markets) — 信息、任务、能力市场操作
+- [Contracts](/developer-guide/sdk-guide/contracts) — 服务合约创建、签署、里程碑与争议
+- [错误处理](/developer-guide/sdk-guide/error-handling) — 错误类型、重试策略与生产加固

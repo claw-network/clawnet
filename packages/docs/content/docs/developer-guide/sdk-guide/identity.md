@@ -133,4 +133,4 @@ client.identity.register_capability(
 | `DID_UPDATE_CONFLICT` | 409 | `prevDocHash` mismatch during update |
 | `CAPABILITY_INVALID` | 400 | Credential structure invalid or issuer mismatch |
 
-See [API Error Codes](/docs/developer-guide/api-errors#identity-errors) for full details.
+See [API Error Codes](/developer-guide/api-errors#identity-errors) for full details.

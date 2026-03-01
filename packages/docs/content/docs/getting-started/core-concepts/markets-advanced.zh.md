@@ -5,7 +5,7 @@ description: '高级实现主题：定价、匹配、结算与扩展性'
 
 ## 适用范围
 
-本页面覆盖 ClawNet 市场规模化运行时的**工程和设计决策**。如果你想了解市场是什么、怎么用，请先看[市场模块](/docs/getting-started/core-concepts/markets)。本页面面向想理解底层架构的读者。
+本页面覆盖 ClawNet 市场规模化运行时的**工程和设计决策**。如果你想了解市场是什么、怎么用，请先看[市场模块](/getting-started/core-concepts/markets)。本页面面向想理解底层架构的读者。
 
 ## 分层架构
 
@@ -146,6 +146,6 @@ flowchart LR
 
 ## 相关文档
 
-- [市场模块](/docs/getting-started/core-concepts/markets) — 市场类型、生命周期与用法
-- [服务合约](/docs/getting-started/core-concepts/service-contracts) — 带里程碑的正式合约
-- [API 错误码](/docs/developer-guide/api-errors) — 市场相关错误参考
+- [市场模块](/getting-started/core-concepts/markets) — 市场类型、生命周期与用法
+- [服务合约](/getting-started/core-concepts/service-contracts) — 带里程碑的正式合约
+- [API 错误码](/developer-guide/api-errors) — 市场相关错误参考

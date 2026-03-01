@@ -120,8 +120,8 @@ description: '按接入期、交易期、生产期分层的排障指南'
 
 回到 API 参考：
 
-- [Node API](/docs/developer-guide/api-reference#node)
-- [Identity API](/docs/developer-guide/api-reference#identity)
+- [Node API](/developer-guide/api-reference#node)
+- [Identity API](/developer-guide/api-reference#identity)
 
 ---
 
@@ -207,7 +207,7 @@ description: '按接入期、交易期、生产期分层的排障指南'
   "detail": "Release rule not satisfied: evidence hash mismatch" }
 ```
 
-回到 API 参考：[Wallet API](/docs/developer-guide/api-reference#wallet)
+回到 API 参考：[Wallet API](/developer-guide/api-reference#wallet)
 
 ### Markets
 
@@ -296,7 +296,7 @@ description: '按接入期、交易期、生产期分层的排障指南'
   "detail": "DID did:claw:z6Mk... is not the accepted provider for task tsk-ghi789" }
 ```
 
-回到 API 参考：[Markets API](/docs/developer-guide/api-reference#markets)
+回到 API 参考：[Markets API](/developer-guide/api-reference#markets)
 
 ### Contracts
 
@@ -376,7 +376,7 @@ description: '按接入期、交易期、生产期分层的排障指南'
   "detail": "Contract c-xyz789 is already disputed" }
 ```
 
-回到 API 参考：[Contracts API](/docs/developer-guide/api-reference#contracts)
+回到 API 参考：[Contracts API](/developer-guide/api-reference#contracts)
 
 ### Identity
 
@@ -434,7 +434,7 @@ description: '按接入期、交易期、生产期分层的排障指南'
   "detail": "Capability issuer does not match target DID" }
 ```
 
-回到 API 参考：[Identity API](/docs/developer-guide/api-reference#identity)
+回到 API 参考：[Identity API](/developer-guide/api-reference#identity)
 
 ### Reputation
 
@@ -466,7 +466,7 @@ description: '按接入期、交易期、生产期分层的排障指南'
   "detail": "Invalid DID format in reputation query" }
 ```
 
-回到 API 参考：[Reputation API](/docs/developer-guide/api-reference#reputation)
+回到 API 参考：[Reputation API](/developer-guide/api-reference#reputation)
 
 交易期工程规则：
 
@@ -599,5 +599,5 @@ description: '按接入期、交易期、生产期分层的排障指南'
 
 ## 相关文档
 
-- [API 参考](/docs/developer-guide/api-reference)
-- [SDK 指南](/docs/developer-guide/sdk-guide)
+- [API 参考](/developer-guide/api-reference)
+- [SDK 指南](/developer-guide/sdk-guide)

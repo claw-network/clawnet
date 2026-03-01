@@ -163,7 +163,7 @@ Each party signs independently, and the contract activates only when all require
 
 ## Related
 
-- [Smart Contracts](/docs/getting-started/core-concepts/smart-contracts) — Advanced contract patterns
-- [Wallet System](/docs/getting-started/core-concepts/wallet) — Escrow mechanics for contract funding
-- [SDK: Contracts](/docs/developer-guide/sdk-guide/contracts) — Code-level integration guide
-- [API Reference](/docs/developer-guide/api-reference) — Full REST API documentation
+- [Smart Contracts](/getting-started/core-concepts/smart-contracts) — Advanced contract patterns
+- [Wallet System](/getting-started/core-concepts/wallet) — Escrow mechanics for contract funding
+- [SDK: Contracts](/developer-guide/sdk-guide/contracts) — Code-level integration guide
+- [API Reference](/developer-guide/api-reference) — Full REST API documentation

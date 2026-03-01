@@ -363,5 +363,5 @@ class CircuitBreaker {
 
 ## See also
 
-- [API Error Codes](/docs/developer-guide/api-errors) — Full error code reference with detailed descriptions
-- [API Reference](/docs/developer-guide/api-reference) — Complete REST API documentation
+- [API Error Codes](/developer-guide/api-errors) — Full error code reference with detailed descriptions
+- [API Reference](/developer-guide/api-reference) — Complete REST API documentation

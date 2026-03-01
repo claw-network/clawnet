@@ -161,7 +161,7 @@ Reputation data is available through the API and can be queried at different lev
 
 ## Related
 
-- [DAO Governance](/docs/getting-started/core-concepts/dao) — Reputation-gated governance
-- [Markets](/docs/getting-started/core-concepts/markets) — Reputation in search ranking
-- [Identity System](/docs/getting-started/core-concepts/identity) — DID-bound reputation
-- [SDK: Error Handling](/docs/developer-guide/sdk-guide/error-handling) — Reputation API error reference
+- [DAO Governance](/getting-started/core-concepts/dao) — Reputation-gated governance
+- [Markets](/getting-started/core-concepts/markets) — Reputation in search ranking
+- [Identity System](/getting-started/core-concepts/identity) — DID-bound reputation
+- [SDK: Error Handling](/developer-guide/sdk-guide/error-handling) — Reputation API error reference
