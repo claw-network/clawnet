@@ -5,6 +5,8 @@ description: 'Info, Task, and Capability market operations — publish, bid, pur
 
 The `markets` module provides unified access to three market types plus a cross-market search and a dispute resolution sub-module.
 
+All deliver operations support the new [deliverable envelope system](/developer-guide/sdk-guide/deliverables) — typed, hashed, signed, and optionally encrypted delivery metadata.
+
 | Sub-module | Access | Market type |
 |------------|--------|-------------|
 | `markets.info` | `client.markets.info` | Information marketplace — publish data, reports, analysis |

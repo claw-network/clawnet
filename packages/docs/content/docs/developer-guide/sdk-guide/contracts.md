@@ -178,7 +178,7 @@ client.contracts.fund(
 
 ## Milestone workflow
 
-Milestones allow incremental delivery and payout within a contract.
+Milestones allow incremental delivery and payout within a contract. Milestone submissions support the [deliverable envelope](/developer-guide/sdk-guide/deliverables) for cryptographic proof of delivery.
 
 ### TypeScript
 

@@ -1,5 +1,5 @@
 {
   "title": "开发者指南",
   "defaultOpen": true,
-  "pages": ["deliverables", "sdk-guide", "api-reference", "api-errors"]
+  "pages": ["sdk-guide", "api-reference", "api-errors"]
 }

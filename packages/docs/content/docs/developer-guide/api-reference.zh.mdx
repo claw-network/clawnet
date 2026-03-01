@@ -315,7 +315,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/
 - 请求体 schema：`InfoDeliverRequest`（passthrough — 允许附加字段，包括 `deliveryData`）。
 - 必填请求体：`did`、`passphrase`、`orderId`、`nonce`。
 - 可选请求体：`contentKeyHex`、`buyerPublicKeyHex`、`accessToken`、`accessUrl`、`expiresAt`、`deliveryData`。
-- `deliveryData.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/getting-started/core-concepts/deliverables)）。
+- `deliveryData.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/developer-guide/sdk-guide/deliverables)）。
 - 成功：`200`，schema `InfoDeliverResponse`。
 - 状态冲突：`409`（订单未进入可交付状态）。
 
@@ -454,7 +454,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids/bid_.
 - 请求体 schema：`TaskDeliverRequest`。
 - 必填请求体：`did`、`passphrase`、`orderId`、`deliverables`、`nonce`。
 - 可选请求体：`submissionId`、`notes`、`delivery`（含 `envelope`）。
-- `delivery.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/getting-started/core-concepts/deliverables)）。
+- `delivery.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/developer-guide/sdk-guide/deliverables)）。
 - 成功：`200`，schema `TaskDeliverResponse`。
 
 ```bash
@@ -683,7 +683,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/ac
 - 提交里程碑交付内容，可选使用交付物信封包装。
 - 路径参数：`contractId`、`milestoneId`（必填）。
 - 可选请求体：`deliverables`、`notes`、`delivery`（含 `envelope`）、`envelopeDigest`。
-- `delivery.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/getting-started/core-concepts/deliverables)）。
+- `delivery.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/developer-guide/sdk-guide/deliverables)）。
 - 成功：`200`，schema `Milestone`。
 
 ```bash

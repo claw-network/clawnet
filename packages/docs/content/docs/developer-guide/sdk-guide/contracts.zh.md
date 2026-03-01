@@ -178,7 +178,7 @@ client.contracts.fund(
 
 ## 里程碑工作流
 
-里程碑支持合约内的增量交付和分期付款。
+里程碑支持合约内的增量交付和分期付款。里程碑提交支持[交付物信封](/developer-guide/sdk-guide/deliverables)，提供交付的密码学证明。
 
 ### TypeScript
 

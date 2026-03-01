@@ -1,5 +1,5 @@
 {
   "title": "SDK Guide",
   "defaultOpen": true,
-  "pages": ["index", "identity", "wallet", "markets", "contracts", "error-handling"]
+  "pages": ["index", "identity", "wallet", "markets", "deliverables", "contracts", "error-handling"]
 }

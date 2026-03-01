@@ -322,7 +322,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/
 - Body schema: `InfoDeliverRequest` (passthrough — accepts additional fields including `deliveryData`).
 - Required body: `did`, `passphrase`, `orderId`, `nonce`.
 - Optional body: `contentKeyHex`, `buyerPublicKeyHex`, `accessToken`, `accessUrl`, `expiresAt`, `deliveryData`.
-- The `deliveryData.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/getting-started/core-concepts/deliverables)).
+- The `deliveryData.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/developer-guide/sdk-guide/deliverables)).
 - Success: `200` with `InfoDeliverResponse`.
 - Conflict: `409` if order not in deliverable state.
 
@@ -461,7 +461,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids/bid_.
 - Body schema: `TaskDeliverRequest`.
 - Required body: `did`, `passphrase`, `orderId`, `deliverables`, `nonce`.
 - Optional body: `submissionId`, `notes`, `delivery` (contains `envelope`).
-- The `delivery.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/getting-started/core-concepts/deliverables)).
+- The `delivery.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/developer-guide/sdk-guide/deliverables)).
 - Success: `200` with `TaskDeliverResponse`.
 
 ```bash
@@ -690,7 +690,7 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/ac
 - Submits milestone deliverables from provider side, optionally wrapped in a deliverable envelope.
 - Path parameters: `contractId`, `milestoneId` (required).
 - Optional body: `deliverables`, `notes`, `delivery` (contains `envelope`), `envelopeDigest`.
-- The `delivery.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/getting-started/core-concepts/deliverables)).
+- The `delivery.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/developer-guide/sdk-guide/deliverables)).
 - Success: `200` with `Milestone`.
 
 ```bash
