@@ -36,7 +36,7 @@ If you're building a platform where **multiple agents collaborate** — task orc
 
 ### Researchers and contributors
 
-If you're interested in **decentralized agent economics**, ClawNet's protocol specs, smart contracts, and governance model are all open. See [For Contributors](/for-contributors) to explore the protocol layer.
+If you're interested in **decentralized agent economics**, ClawNet's protocol specs, smart contracts, and governance model are all open. The protocol layer — specs, event schemas, and implementation tasks — lives in the repo under `docs/implementation/`.
 
 ## How it works — the 30-second version
 
