@@ -144,10 +144,17 @@ rpc_peer_count() {
 
 install_peer_clawnetd_service() {
   local host="$1"
-  local bootstrap_multiaddr="$2"
+  shift  # remaining args are bootstrap multiaddrs
 
   echo "  [$host] Writing /opt/clawnet/node-data/config.yaml..."
   run_remote "$host" "mkdir -p /opt/clawnet/node-data"
+
+  # Build bootstrap list from all supplied multiaddrs
+  local bootstrap_yaml=""
+  for addr in "$@"; do
+    bootstrap_yaml="${bootstrap_yaml}    - ${addr}\n"
+  done
+
   run_remote "$host" "cat > /opt/clawnet/node-data/config.yaml << CFGEOF
 v: 1
 network: testnet
@@ -156,8 +163,7 @@ p2p:
   listen:
     - /ip4/0.0.0.0/tcp/9527
   bootstrap:
-    - $bootstrap_multiaddr
-
+$(echo -e "$bootstrap_yaml")
 logging:
   level: info
 
@@ -565,8 +571,28 @@ fi
 A_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_A/tcp/9527/p2p/$SERVER_A_CLAWNET_PEER_ID"
 echo "  Server A bootstrap addr: $A_BOOTSTRAP_MULTIADDR"
 
+# Install clawnetd on B first (bootstrap: A only, C not yet running)
 install_peer_clawnetd_service "$SERVER_B" "$A_BOOTSTRAP_MULTIADDR"
-install_peer_clawnetd_service "$SERVER_C" "$A_BOOTSTRAP_MULTIADDR"
+
+# Wait for B to start and discover its peerId
+echo "  Waiting 6s for Server B clawnetd to start..."
+sleep 6
+SERVER_B_CLAWNET_PEER_ID=$(run_remote "$SERVER_B" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
+B_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_B/tcp/9527/p2p/$SERVER_B_CLAWNET_PEER_ID"
+echo "  Server B bootstrap addr: $B_BOOTSTRAP_MULTIADDR"
+
+# Install clawnetd on C with full-mesh bootstrap (A + B)
+install_peer_clawnetd_service "$SERVER_C" "$A_BOOTSTRAP_MULTIADDR" "$B_BOOTSTRAP_MULTIADDR"
+
+# Update B's config to also include C once C is up
+echo "  Waiting 6s for Server C clawnetd to start..."
+sleep 6
+SERVER_C_CLAWNET_PEER_ID=$(run_remote "$SERVER_C" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
+C_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_C/tcp/9527/p2p/$SERVER_C_CLAWNET_PEER_ID"
+echo "  Server C bootstrap addr: $C_BOOTSTRAP_MULTIADDR"
+
+# Re-install B with full-mesh bootstrap (A + C)
+install_peer_clawnetd_service "$SERVER_B" "$A_BOOTSTRAP_MULTIADDR" "$C_BOOTSTRAP_MULTIADDR"
 
 echo "  Waiting 8s for mesh convergence..."
 sleep 8
