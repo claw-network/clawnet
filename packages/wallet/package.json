@@ -1,0 +1,14 @@
+{
+  "name": "@claw-network/wallet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ClawNet Wallet Web App — manage tokens, transfers, escrow, and transaction history",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

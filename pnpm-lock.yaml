@@ -277,6 +277,12 @@ importers:
 
   packages/sdk: {}
 
+  packages/wallet:
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@22.19.8)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)
+
 packages:
 
   '@adraffy/ens-normalize@1.10.1':
