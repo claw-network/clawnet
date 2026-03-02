@@ -227,29 +227,40 @@ export function devRoutes(ctx: RuntimeContext): Router {
     // On-chain faucet — prefer mint (no pre-funded balance needed),
     // fall back to transfer if the node signer lacks MINTER_ROLE.
     if (ctx.walletService) {
-      try {
-        const walletService = ctx.walletService as unknown as {
-          mint?: (...args: unknown[]) => Promise<unknown>;
-          transfer?: (...args: unknown[]) => Promise<unknown>;
-        };
+      // Resolve DID → EVM address for on-chain calls
+      let evmTo = to;
+      if (body.did && body.did.startsWith('did:claw:')) {
+        const resolved = await ctx.walletService.resolveDidToAddress(body.did);
+        if (resolved) {
+          evmTo = resolved;
+        }
+      }
+      // If `to` is not a valid EVM hex address, fall through to legacy path
+      const isEvmAddress = /^0x[0-9a-fA-F]{40}$/.test(evmTo);
+      if (isEvmAddress) {
+        try {
+          const walletService = ctx.walletService as unknown as {
+            mint?: (...args: unknown[]) => Promise<unknown>;
+            transfer?: (...args: unknown[]) => Promise<unknown>;
+          };
 
-        // Try minting fresh Tokens first (requires MINTER_ROLE).
-        if (walletService.mint) {
-          try {
-            const result = await walletService.mint(to, amount, 'dev-faucet-mint');
-            if (result) {
-              recordClaim(claimMeta);
-              ok(res, result, { self: '/api/v1/dev/faucet' });
-              return;
-            }
-          } catch {
+          // Try minting fresh Tokens first (requires MINTER_ROLE).
+          if (walletService.mint) {
+            try {
+              const result = await walletService.mint(evmTo, amount, 'dev-faucet-mint');
+              if (result) {
+                recordClaim(claimMeta);
+                ok(res, result, { self: '/api/v1/dev/faucet' });
+                return;
+              }
+            } catch {
             // Mint failed (likely no MINTER_ROLE) — fall through to transfer.
           }
         }
 
         // Fallback: transfer from the node signer's own balance.
         if (walletService.transfer) {
-          const result = await walletService.transfer('faucet', to, amount, 'dev-faucet-transfer');
+          const result = await walletService.transfer('faucet', evmTo, amount, 'dev-faucet-transfer');
           if (result) {
             recordClaim(claimMeta);
             ok(res, result, { self: '/api/v1/dev/faucet' });
@@ -260,6 +271,7 @@ export function devRoutes(ctx: RuntimeContext): Router {
         internalError(res, (err as Error).message);
         return;
       }
+      } // isEvmAddress
     }
 
     // Legacy: create mint envelope using node's own identity
