@@ -95,16 +95,14 @@
     - Scenario 01: 9 passed / 0 failed
     - Reconciliation: passed（0 discrepancies）
   - Day 4 (03-01): ✅ 通过（synced=true, v0.2.0, peers=2, connections=2, blockHeight=158336, uptime=69474s, faucet mint 5 Token OK）
-  - Day 5 (03-02): ⚠️ 部分通过（Geth ✅ / libp2p ⚠️）
+  - Day 5 (03-02): ✅ 通过（修复后）
     - 早间 08:01 UTC（Server 端 cron）：clusterPeers=2, blockHeight=167729, Scenario 9/9, Reconciliation 0 discrepancies
     - ⚠️ Server B/C Geth crash loop 修复（`/config/password.txt` 丢失 → 恢复 config + 重导入 keystore + 链同步）
-    - **Re-verify 12:52 UTC**: Geth clusterPeers=2 ✅, blockHeight=176486, Node-A synced=true v0.2.0, uptime=185999s
-    - ⚠️ **libp2p 层异常**: peers=1, connections=1（期望 peers=2, connections≥2）
-      - Day 4 正常：peers=2, connections=2
-      - Geth 层 peerCount=2 → B/C Geth 均在线，链层无问题
-      - 原因：Server B 或 C 的 `clawnetd`（libp2p）未随 Geth crash 修复一同恢复
-      - 待修复：SSH → `systemctl restart clawnetd` on B & C → 确认 peers 恢复到 2
-    - 🔧 **daily-monitor.sh 改进**：新增 libp2p peers vs Geth clusterPeers 一致性检查（原脚本不检测 libp2p 降级）
+    - **Re-verify 12:52 UTC**: Geth clusterPeers=2 ✅, blockHeight=176486, libp2p peers=1 ⚠️
+    - **libp2p 修复 13:10 UTC**: `systemctl restart clawnetd` on bob + geth-c
+      - 根因：Server C 在 03-01 14:03 断开后未自动重连（libp2p 无持久重连机制）
+      - 修复后：Server A peers=3 connections=3 ✅, Server B peers=2 ✅, Server C peers=1 ✅
+    - 🔧 **daily-monitor.sh 改进**：新增 libp2p peers vs Geth clusterPeers 一致性检查（testnet + mainnet）
   - Day 6 (03-03): ⏳
   - Day 7 (03-04): ⏳
   - 验收：连续 5 天无异常（健康检查 + 对账 0 差异 + 场景回归通过）
@@ -269,5 +267,5 @@ docker pull ghcr.io/claw-network/clawnetd:0.2.0
 
 ---
 
-*最后更新: 2026-03-02（R-4.1 Day 5 re-verify — Geth ✅ clusterPeers=2 / libp2p ⚠️ peers=1 < expected 2, daily-monitor.sh 已增加 libp2p 一致性检查）*
+*最后更新: 2026-03-02（R-4.1 Day 5 — libp2p 修复完成, Server A peers=3/conn=3, daily-monitor.sh 增加 libp2p 检查）*
 *关联文档: on-chain-tasks.md (T-3.9 ~ T-3.15), TOKEN_DISTRIBUTION.md, OPENCLAW_INTEGRATION.md*
