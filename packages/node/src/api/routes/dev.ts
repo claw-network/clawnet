@@ -9,10 +9,23 @@ import { ok, badRequest, internalError, tooManyRequests, unauthorized } from '..
 import { validate } from '../schemas/common.js';
 import { z } from 'zod';
 import type { RuntimeContext } from '../types.js';
-import { resolveAddress, resolvePrivateKey } from '../types.js';
+import { resolveAddress, resolvePrivateKey, publicKeyFromDid, bytesToHex } from '../types.js';
 import { getApiKeyAuth } from '../auth.js';
 import { createWalletMintEnvelope } from '@claw-network/protocol';
 import type { IncomingMessage } from 'node:http';
+
+/**
+ * Extract the Ed25519 public key from a `did:claw:` DID and return it as
+ * a `0x`-prefixed hex string suitable for on-chain calls.
+ */
+function publicKeyHexFromDid(did: string): string | null {
+  try {
+    const pk = publicKeyFromDid(did);
+    return '0x' + bytesToHex(pk);
+  } catch {
+    return null;
+  }
+}
 
 const FaucetSchema = z
   .object({
@@ -227,10 +240,19 @@ export function devRoutes(ctx: RuntimeContext): Router {
     // On-chain faucet — prefer mint (no pre-funded balance needed),
     // fall back to transfer if the node signer lacks MINTER_ROLE.
     if (ctx.walletService) {
-      // Resolve DID → EVM address for on-chain calls
+      // Resolve DID → EVM address for on-chain calls.
+      // If the DID is not registered on-chain, auto-register it first.
       let evmTo = to;
       if (body.did && body.did.startsWith('did:claw:')) {
-        const resolved = await ctx.walletService.resolveDidToAddress(body.did);
+        let resolved = await ctx.walletService.resolveDidToAddress(body.did);
+        if (!resolved && ctx.identityService) {
+          try {
+            const pubKeyHex = publicKeyHexFromDid(body.did);
+            if (pubKeyHex) {
+              resolved = await ctx.identityService.ensureRegistered(body.did, pubKeyHex);
+            }
+          } catch { /* auto-register failed — fall through to legacy */ }
+        }
         if (resolved) {
           evmTo = resolved;
         }

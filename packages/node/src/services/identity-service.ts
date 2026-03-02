@@ -347,6 +347,40 @@ export class IdentityService {
   // ========================================================================
 
   /**
+   * Ensure a DID is registered on-chain.  If already registered, returns
+   * the existing controller.  If not, auto-registers via `batchRegisterDID`
+   * (REGISTRAR_ROLE — no ECDSA signature needed) with the node signer as
+   * controller.
+   *
+   * @param did       Full DID string (`did:claw:z...`)
+   * @param publicKey Ed25519 public key (32 bytes, hex 0x-prefixed)
+   * @returns The controller (EVM) address.
+   */
+  async ensureRegistered(
+    did: string,
+    publicKey: string,
+  ): Promise<string> {
+    // Check if already registered
+    const existing = await this.getController(did);
+    if (existing) return existing;
+
+    const didHash = this.hashDid(did);
+    const controller = this.contracts.signerAddress;
+
+    this.log.info('Identity auto-register (batchRegisterDID): %s → %s', did, controller);
+
+    const tx = await this.contracts.identity.batchRegisterDID(
+      [didHash],
+      [publicKey],
+      [KEY_PURPOSE_MAP.authentication],
+      [controller],
+    );
+    await tx.wait();
+
+    return controller;
+  }
+
+  /**
    * Hash a DID string to bytes32 for on-chain use.
    *
    * Uses keccak256(toUtf8Bytes(did)) — consistent with WalletService.
