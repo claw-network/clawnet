@@ -67,6 +67,36 @@ export class ApiClient {
         );
       }
 
+      const json = await res.json();
+
+      // Unwrap API envelope { data: T, links?, meta? }
+      if (json && typeof json === 'object' && 'data' in json && !('_raw' in json)) {
+        return json.data as T;
+      }
+      return json as T;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  /** Like request() but returns the full envelope (for paginated endpoints). */
+  private async requestFull<T>(method: string, path: string): Promise<T> {
+    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    if (this.apiKey) headers['X-API-Key'] = this.apiKey;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers,
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        let errBody: { code?: string; message?: string } = {};
+        try { errBody = await res.json(); } catch { /* ignore */ }
+        throw new ApiError(res.status, errBody.code ?? 'UNKNOWN', errBody.message ?? `HTTP ${res.status}`);
+      }
       return await res.json() as T;
     } finally {
       clearTimeout(timeout);
@@ -104,7 +134,14 @@ export class ApiClient {
     pending: number;
     locked: number;
   }> {
-    return this.get(`/api/v1/wallets/${encodeURIComponent(address)}`);
+    const raw = await this.get<Record<string, unknown>>(`/api/v1/wallets/${encodeURIComponent(address)}`);
+    // On-chain service returns string values (from BigInt); convert to numbers
+    return {
+      balance: Number(raw.balance ?? 0),
+      available: Number(raw.available ?? 0),
+      pending: Number(raw.pending ?? 0),
+      locked: Number(raw.locked ?? 0),
+    };
   }
 
   /** POST /api/v1/transfers */
@@ -147,10 +184,28 @@ export class ApiClient {
     total: number;
     hasMore: boolean;
   }> {
-    return this.get(
-      `/api/v1/wallets/${encodeURIComponent(address)}/transactions`,
-      opts as Record<string, string | number> | undefined,
-    );
+    let url = `/api/v1/wallets/${encodeURIComponent(address)}/transactions`;
+    if (opts) {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(opts)) {
+        if (v !== undefined && v !== null) qs.set(k, String(v));
+      }
+      const s = qs.toString();
+      if (s) url += `?${s}`;
+    }
+    // Paginated response: { data: [...], meta: { pagination: {...} }, links: {...} }
+    const envelope = await this.requestFull<{
+      data: Array<Record<string, unknown>>;
+      meta?: { pagination?: { total?: number; page?: number; totalPages?: number } };
+      links?: { next?: string | null };
+    }>('GET', url);
+    const page = opts?.page ?? 1;
+    const pagination = envelope.meta?.pagination;
+    return {
+      transactions: (envelope.data ?? []) as any,
+      total: pagination?.total ?? 0,
+      hasMore: !!envelope.links?.next,
+    };
   }
 
   /** GET /api/v1/node */

@@ -3,11 +3,33 @@
  */
 
 import { Router } from '../router.js';
-import { ok, badRequest, internalError, paginated, parsePagination } from '../response.js';
+import { ok, badRequest, notFound, internalError, paginated, parsePagination } from '../response.js';
 import type { RuntimeContext } from '../types.js';
 import { resolveAddress } from '../types.js';
 import { buildWalletState } from '../legacy.js';
 import { getWalletBalance } from '@claw-network/protocol';
+
+/**
+ * For the on-chain path, resolve the user-supplied address/DID to an
+ * EVM address that contract calls understand.
+ * - DID → look up on-chain identity registry → controller (0x…)
+ * - 0x… → pass through
+ * - claw1… → not valid for on-chain path (needs DID or 0x)
+ */
+async function resolveEvmAddress(
+  ctx: RuntimeContext,
+  input: string,
+): Promise<string | null> {
+  // Already an EVM hex address
+  if (/^0x[0-9a-fA-F]{40}$/.test(input)) return input;
+
+  // DID → resolve via on-chain identity registry
+  if (input.startsWith('did:claw:') && ctx.walletService) {
+    return ctx.walletService.resolveDidToAddress(input);
+  }
+
+  return null;
+}
 
 export function walletRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -24,7 +46,12 @@ export function walletRoutes(ctx: RuntimeContext): Router {
     // On-chain path
     if (ctx.walletService) {
       try {
-        const balance = await ctx.walletService.getBalance(resolved);
+        const evmAddr = await resolveEvmAddress(ctx, address);
+        if (!evmAddr) {
+          notFound(res, `Could not resolve address to EVM account: ${address}`);
+          return;
+        }
+        const balance = await ctx.walletService.getBalance(evmAddr);
         ok(res, balance, { self: `/api/v1/wallets/${address}` });
         return;
       } catch (err) {
@@ -73,7 +100,8 @@ export function walletRoutes(ctx: RuntimeContext): Router {
     // On-chain path
     if (ctx.walletService) {
       try {
-        const result = await ctx.walletService.getHistory(resolved, {
+        const evmAddr = await resolveEvmAddress(ctx, address) ?? resolved;
+        const result = await ctx.walletService.getHistory(evmAddr, {
           limit: perPage,
           offset,
           type: typeFilter,
