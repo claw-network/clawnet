@@ -170,10 +170,4 @@ export function bindDashboard(): void {
       showToast('Refresh failed', 'error');
     }
   });
-
-  // Load data (deferred to avoid synchronous re-render loop)
-  queueMicrotask(() => {
-    store.fetchBalance().catch(() => showToast('Failed to load balance', 'error'));
-    store.fetchHistory().catch(() => {});
-  });
 }

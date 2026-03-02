@@ -154,14 +154,13 @@ export function bindHistory(): void {
     }
   });
 
-  // Load data
-  store.fetchHistory(1).then(() => {
-    const listEl = document.getElementById('history-list');
-    const pagEl = document.getElementById('history-pagination');
-    if (listEl) listEl.innerHTML = renderHistoryList();
-    if (pagEl) pagEl.innerHTML = renderPagination();
-    bindHistoryPagination();
-  });
+  // Initial data is loaded by main.ts on route entry.
+  // Just update DOM when store already has data.
+  const listEl = document.getElementById('history-list');
+  const pagEl = document.getElementById('history-pagination');
+  if (listEl) listEl.innerHTML = renderHistoryList();
+  if (pagEl) pagEl.innerHTML = renderPagination();
+  bindHistoryPagination();
 }
 
 function bindHistoryPagination(): void {

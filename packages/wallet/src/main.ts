@@ -16,6 +16,7 @@ import { showToast } from './components/toast.js';
 const root = document.querySelector<HTMLElement>('#app')!;
 
 let rendering = false;
+let lastRoute = '';
 
 /** Render current route. */
 function render(): void {
@@ -23,6 +24,8 @@ function render(): void {
   rendering = true;
 
   const s = store.getState();
+  const routeChanged = lastRoute !== s.route;
+  lastRoute = s.route;
 
   let pageHtml = '';
   let bindFn: (() => void) | null = null;
@@ -61,6 +64,16 @@ function render(): void {
   if (bindFn) bindFn();
 
   rendering = false;
+
+  // Load data only on route entry (not on every re-render)
+  if (routeChanged && s.connection.connected) {
+    if (s.route === 'dashboard') {
+      store.fetchBalance().catch(() => showToast('Failed to load balance', 'error'));
+      store.fetchHistory().catch(() => {});
+    } else if (s.route === 'history') {
+      store.fetchHistory().catch(() => {});
+    }
+  }
 }
 
 // Subscribe to store changes and re-render
