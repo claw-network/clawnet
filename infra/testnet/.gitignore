@@ -7,5 +7,11 @@ scenarios/init/RUN_REPORT.md
 *.key
 *.pem
 
-# Runtime data
+# Runtime data (on production servers — NEVER wipe with git clean)
 data/
+chain-data/
+config/
+clawnetd-data/
+node-data/
+docker-compose.chain.yml
+docker-compose.sync.yml

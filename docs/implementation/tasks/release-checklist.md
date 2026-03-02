@@ -95,7 +95,11 @@
     - Scenario 01: 9 passed / 0 failed
     - Reconciliation: passed（0 discrepancies）
   - Day 4 (03-01): ✅ 通过（synced=true, v0.2.0, peers=2, connections=2, blockHeight=158336, uptime=69474s, faucet mint 5 Token OK）
-  - Day 5 (03-02): ⏳
+  - Day 5 (03-02): ✅ 通过（2026-03-02T08:01:10Z, report: `/opt/clawnet/infra/testnet/reports/2026-03-02.json`）
+    - ⚠️ Server B/C Geth crash loop 修复（`/config/password.txt` 丢失 → 恢复 config + 重导入 keystore + 链同步）
+    - clusterPeers=2（3 validators connected, blockHeight=167729）
+    - Scenario 01: 9 passed / 0 failed
+    - Reconciliation: passed（0 discrepancies）
   - Day 6 (03-03): ⏳
   - Day 7 (03-04): ⏳
   - 验收：连续 5 天无异常（健康检查 + 对账 0 差异 + 场景回归通过）
@@ -260,5 +264,5 @@ docker pull ghcr.io/claw-network/clawnetd:0.2.0
 
 ---
 
-*最后更新: 2026-03-01（R-3.1/R-3.2 通过, R-4.1 Day 4 通过, R-6 文档站部署完成, R-8 Docker 镜像构建验证通过）*
+*最后更新: 2026-03-02（R-4.1 Day 5 通过 — Server B/C Geth 修复 + 链同步恢复, 4/4 checks PASS）*
 *关联文档: on-chain-tasks.md (T-3.9 ~ T-3.15), TOKEN_DISTRIBUTION.md, OPENCLAW_INTEGRATION.md*

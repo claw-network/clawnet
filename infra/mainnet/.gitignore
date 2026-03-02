@@ -5,3 +5,8 @@ secrets.env
 *.key
 *.pem
 chain-data/
+config/
+clawnetd-data/
+node-data/
+docker-compose.chain.yml
+docker-compose.sync.yml

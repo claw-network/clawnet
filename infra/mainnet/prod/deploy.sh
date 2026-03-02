@@ -7,10 +7,11 @@
 #   2. Wipe chain data
 #   3. Upload genesis.json and re-initialize
 #   4. Import validator keys
-#   5. Start Node 1 (mining), wait for blocks
-#   6. Start Node 2-5 (sync then mine)
-#   7. Deploy contracts
-#   8. Run bootstrap mint
+#   5. Create .env files + security hardening
+#   6. Start Node 1 (mining), wait for blocks
+#   7. Start Node 2-5 (sync then mine)
+#   8. Deploy contracts
+#   9. Run bootstrap mint
 #
 # Prerequisites:
 #   - SSH key auth (recommended), default key: ~/.ssh/id_ed25519_clawnet
@@ -480,6 +481,42 @@ ENVEOF"
 done
 
 echo "  .env files created."
+echo ""
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 5b: Security hardening on all servers
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 5b: Applying security hardening..."
+
+SECURITY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+HARDEN_SCRIPT="$SECURITY_DIR/harden-server.sh"
+AUDIT_SCRIPT="$SECURITY_DIR/security-audit.sh"
+SYSCTL_CONF="$SECURITY_DIR/configs/sysctl-hardening.conf"
+
+for f in "$HARDEN_SCRIPT" "$AUDIT_SCRIPT" "$SYSCTL_CONF"; do
+  if [[ ! -f "$f" ]]; then
+    echo "ERROR: security file not found: $f"
+    exit 1
+  fi
+done
+
+for HOST in $ALL_SERVERS; do
+  echo "  [$HOST] Uploading security files..."
+  scp_to "$HARDEN_SCRIPT" "$HOST" "/tmp/harden-server.sh"
+  scp_to "$AUDIT_SCRIPT"  "$HOST" "/opt/clawnet/security-audit.sh"
+  scp_to "$SYSCTL_CONF"   "$HOST" "/etc/sysctl.d/99-clawnet-hardening.conf"
+  run_remote "$HOST" "chmod +x /opt/clawnet/security-audit.sh && bash /tmp/harden-server.sh && rm /tmp/harden-server.sh"
+
+  # Inject SMTP credentials for security-audit email reports
+  run_remote "$HOST" "cat > /opt/clawnet/.smtp-env << 'SMTPEOF'
+CLAWNET_SMTP_USER=${CLAWNET_SMTP_USER:-security-audit@clawnetd.com}
+CLAWNET_SMTP_PASS=${CLAWNET_SMTP_PASS}
+SMTPEOF
+chmod 600 /opt/clawnet/.smtp-env"
+  echo "  [$HOST] Hardened."
+done
+
+echo "  Security hardening applied to all servers."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
