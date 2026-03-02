@@ -15,8 +15,13 @@ import { showToast } from './components/toast.js';
 
 const root = document.querySelector<HTMLElement>('#app')!;
 
+let rendering = false;
+
 /** Render current route. */
 function render(): void {
+  if (rendering) return;
+  rendering = true;
+
   const s = store.getState();
 
   let pageHtml = '';
@@ -54,6 +59,8 @@ function render(): void {
 
   // Bind page-specific events
   if (bindFn) bindFn();
+
+  rendering = false;
 }
 
 // Subscribe to store changes and re-render
