@@ -297,6 +297,55 @@ CADDYEOF"
   echo "  [$host] Docs deployment complete ($docs_domain → localhost:3001)."
 }
 
+# Build and deploy the wallet webapp (static SPA via Vite)
+install_wallet_site() {
+  local host="$1"
+  local wallet_domain="$2"
+
+  echo "  [$host] Building wallet web app..."
+  run_remote "$host" "cd /opt/clawnet && pnpm install --filter @claw-network/wallet && cd packages/wallet && pnpm exec vite build"
+
+  # Add wallet static site block to Caddyfile if not already present
+  local HAS_WALLET_BLOCK
+  HAS_WALLET_BLOCK=$(run_remote "$host" "grep -c '$wallet_domain' /etc/caddy/Caddyfile 2>/dev/null || echo 0")
+  if [[ "$HAS_WALLET_BLOCK" == "0" ]]; then
+    echo "  [$host] Adding $wallet_domain to Caddyfile..."
+    run_remote "$host" "cat >> /etc/caddy/Caddyfile << 'CADDYEOF'
+
+# ── Wallet Web App ───────────────────────────────────────────────────────
+$wallet_domain {
+    root * /opt/clawnet/packages/wallet/dist
+    try_files {path} /index.html
+    file_server
+
+    header {
+        Strict-Transport-Security \"max-age=63072000; includeSubDomains\"
+        X-Content-Type-Options    nosniff
+        X-Frame-Options           SAMEORIGIN
+        Referrer-Policy           strict-origin-when-cross-origin
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/wallet-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
+CADDYEOF"
+  else
+    echo "  [$host] Caddyfile already contains $wallet_domain, skipping."
+  fi
+
+  # Ensure log file has correct ownership
+  run_remote "$host" "touch /var/log/caddy/wallet-access.log && chown caddy:caddy /var/log/caddy/wallet-access.log"
+
+  echo "  [$host] Reloading Caddy..."
+  run_remote "$host" "systemctl reload caddy || systemctl restart caddy"
+  echo "  [$host] Wallet deployment complete ($wallet_domain → static SPA)."
+}
+
 echo ">>> Phase 0: Preflight checks..."
 require_local_command sshpass
 require_local_command ssh
@@ -942,6 +991,14 @@ echo ""
 echo ">>> Phase 15: Deploying documentation site on Server A..."
 install_docs_service "$SERVER_A" "docs.clawnetd.com"
 echo "  Documentation site deployed."
+echo ""
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 16: Deploy wallet web app on Server A
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 16: Deploying wallet web app on Server A..."
+install_wallet_site "$SERVER_A" "wallet.clawnetd.com"
+echo "  Wallet web app deployed."
 echo ""
 
 echo "============================================================"

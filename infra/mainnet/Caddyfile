@@ -134,3 +134,25 @@ docs.clawnet.io {
         }
     }
 }
+
+# ── Wallet Web App ───────────────────────────────────────────────────────────
+wallet.clawnet.io {
+    root * /opt/clawnet/packages/wallet/dist
+    try_files {path} /index.html
+    file_server
+
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains"
+        X-Content-Type-Options    nosniff
+        X-Frame-Options           SAMEORIGIN
+        Referrer-Policy           strict-origin-when-cross-origin
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/wallet-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
