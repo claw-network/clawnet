@@ -147,16 +147,33 @@ describe('WalletService', () => {
   // ── WRITE ──────────────────────────────────────────────────────────
 
   describe('transfer', () => {
-    it('calls token.transfer and returns receipt', async () => {
+    it('uses burn+mint for non-signer from address', async () => {
+      provider.token.burn = vi.fn().mockResolvedValue(mockTxResponse());
+      provider.token.mint = vi.fn().mockResolvedValue(mockTxResponse());
       const result = await service.transfer(ALICE, BOB, 100);
-      expect(provider.token.transfer).toHaveBeenCalledWith(BOB, 100);
+      expect(provider.token.burn).toHaveBeenCalledWith(ALICE, 100);
+      expect(provider.token.mint).toHaveBeenCalledWith(BOB, 100);
       expect(result.txHash).toBe(TX_HASH);
       expect(result.status).toBe('confirmed');
       expect(result.amount).toBe('100');
     });
 
+    it('uses direct transfer for signer address', async () => {
+      const result = await service.transfer(SIGNER_ADDRESS, BOB, 100);
+      expect(provider.token.transfer).toHaveBeenCalledWith(BOB, 100);
+      expect(result.txHash).toBe(TX_HASH);
+      expect(result.status).toBe('confirmed');
+    });
+
+    it('uses direct transfer for faucet special from', async () => {
+      const result = await service.transfer('faucet', BOB, 100);
+      expect(provider.token.transfer).toHaveBeenCalledWith(BOB, 100);
+      expect(result.status).toBe('confirmed');
+    });
+
     it('returns failed status when receipt status is 0', async () => {
-      provider.token.transfer.mockResolvedValue(
+      provider.token.burn = vi.fn().mockResolvedValue(mockTxResponse());
+      provider.token.mint = vi.fn().mockResolvedValue(
         mockTxResponse({ status: 0 }),
       );
       const result = await service.transfer(ALICE, BOB, 50);

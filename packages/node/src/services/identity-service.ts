@@ -23,6 +23,26 @@ import type { ContractProvider } from './contract-provider.js';
 import type { IndexerQuery } from '../indexer/query.js';
 
 // ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive a unique, deterministic EVM address for a DID.
+ *
+ * The address is a pseudo-address (no one holds its private key) used
+ * solely as a balance-holding account on the ERC-20 token contract.
+ * Token operations (mint / burn) are executed by the node signer which
+ * holds MINTER_ROLE and BURNER_ROLE.
+ *
+ * Formula: `'0x' + keccak256("clawnet:did-address:" + did)[last 20 bytes]`
+ */
+export function deriveAddressForDid(did: string): string {
+  const hash = keccak256(toUtf8Bytes('clawnet:did-address:' + did));
+  // Take last 20 bytes (40 hex chars) of the 32-byte hash
+  return '0x' + hash.slice(26);
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -349,12 +369,12 @@ export class IdentityService {
   /**
    * Ensure a DID is registered on-chain.  If already registered, returns
    * the existing controller.  If not, auto-registers via `batchRegisterDID`
-   * (REGISTRAR_ROLE — no ECDSA signature needed) with the node signer as
-   * controller.
+   * (REGISTRAR_ROLE — no ECDSA signature needed) with a **unique derived
+   * address** as controller so each DID has its own balance slot.
    *
    * @param did       Full DID string (`did:claw:z...`)
    * @param publicKey Ed25519 public key (32 bytes, hex 0x-prefixed)
-   * @returns The controller (EVM) address.
+   * @returns The controller (EVM) address (unique per DID).
    */
   async ensureRegistered(
     did: string,
@@ -365,7 +385,7 @@ export class IdentityService {
     if (existing) return existing;
 
     const didHash = this.hashDid(did);
-    const controller = this.contracts.signerAddress;
+    const controller = deriveAddressForDid(did);
 
     this.log.info('Identity auto-register (batchRegisterDID): %s → %s', did, controller);
 

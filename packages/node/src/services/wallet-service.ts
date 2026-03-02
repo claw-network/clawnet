@@ -183,8 +183,14 @@ export class WalletService {
   /**
    * Execute an on-chain Token transfer.
    *
-   * `from` is implicit — the node's signer sends the tx.  The `from` param
-   * is only used for response metadata.
+   * Uses the burn+mint pattern: tokens are burned from the sender's
+   * per-DID address and minted to the receiver's address.  This avoids
+   * the need for per-DID private keys or ETH gas funding — the node
+   * signer holds MINTER_ROLE and BURNER_ROLE.
+   *
+   * For the special case where `from` is `'faucet'` or the node signer,
+   * a direct `transfer()` is used instead (since the signer actually
+   * holds those tokens).
    */
   async transfer(
     from: string,
@@ -200,8 +206,22 @@ export class WalletService {
       memo ? ` (${memo})` : '',
     );
 
-    const tx = await this.contracts.token.transfer(to, amount);
-    const receipt = await tx.wait();
+    const isSigner = from === 'faucet' ||
+      from.toLowerCase() === this.contracts.signerAddress.toLowerCase();
+
+    let receipt;
+    if (isSigner) {
+      // Direct transfer from node signer's own balance
+      const tx = await this.contracts.token.transfer(to, amount);
+      receipt = await tx.wait();
+    } else {
+      // Burn from sender and mint to receiver (per-DID isolation)
+      const burnTx = await this.contracts.token.burn(from, amount);
+      await burnTx.wait();
+      const mintTx = await this.contracts.token.mint(to, amount);
+      receipt = await mintTx.wait();
+    }
+
     const timestamp = Date.now();
 
     return {

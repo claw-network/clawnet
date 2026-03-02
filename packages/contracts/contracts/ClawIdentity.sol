@@ -73,6 +73,7 @@ contract ClawIdentity is
     event KeyRotated(bytes32 indexed didHash, bytes32 indexed oldKeyHash, bytes32 indexed newKeyHash);
     event DIDRevoked(bytes32 indexed didHash);
     event PlatformLinked(bytes32 indexed didHash, bytes32 linkHash);
+    event DIDControllerUpdated(bytes32 indexed didHash, address indexed oldController, address indexed newController);
 
     // ─── Errors ──────────────────────────────────────────────────────
 
@@ -267,6 +268,25 @@ contract ClawIdentity is
         d.updatedAt = uint64(block.timestamp);
 
         emit KeyRotated(didHash, oldKeyHash, newKeyHash);
+    }
+
+    /**
+     * @notice Admin-only: update the controller of an existing DID.
+     *         Used for migration from legacy registrations where all
+     *         DIDs shared the node signer as controller.
+     */
+    function adminSetController(
+        bytes32 didHash,
+        address newController
+    ) external whenNotPaused onlyRole(REGISTRAR_ROLE) {
+        if (dids[didHash].controller == address(0)) revert DIDNotFound(didHash);
+        if (newController == address(0)) revert InvalidAddress();
+
+        address old = dids[didHash].controller;
+        dids[didHash].controller = newController;
+        dids[didHash].updatedAt = uint64(block.timestamp);
+
+        emit DIDControllerUpdated(didHash, old, newController);
     }
 
     /**

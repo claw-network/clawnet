@@ -18,7 +18,7 @@
     },
     "ClawIdentity": {
       "proxy": "0xee9B2D7eb0CD51e1d0a14278bCA32b02548D1149",
-      "impl": "0x70cb634D6EAC954A2E5Ecf5992bD4AA36D1c419B"
+      "impl": "0xB3fFe0876349C60763F4dE6B4c337E2E0f2FCC85"
     },
     "ClawStaking": {
       "proxy": "0x6269D9358a8C4502fC8b629E8998Eb9C98961995",

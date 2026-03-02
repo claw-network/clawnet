@@ -32,7 +32,24 @@ export function transferRoutes(ctx: RuntimeContext): Router {
     // On-chain path
     if (ctx.walletService) {
       try {
-        const result = await ctx.walletService.transfer(from, to, BigInt(body.amount), body.memo);
+        // Resolve sender & receiver DIDs → EVM addresses via identity registry
+        const evmFrom = body.did
+          ? await ctx.walletService.resolveDidToAddress(body.did)
+          : null;
+        const evmTo = body.to.startsWith('did:claw:')
+          ? await ctx.walletService.resolveDidToAddress(body.to)
+          : /^0x[0-9a-fA-F]{40}$/.test(to) ? to : null;
+
+        if (!evmFrom) {
+          badRequest(res, 'Sender DID not registered on-chain', route.url.pathname);
+          return;
+        }
+        if (!evmTo) {
+          badRequest(res, 'Recipient address not resolved on-chain', route.url.pathname);
+          return;
+        }
+
+        const result = await ctx.walletService.transfer(evmFrom, evmTo, BigInt(body.amount), body.memo);
         created(res, result, { self: `/api/v1/wallets/${from}` });
         return;
       } catch (err) {

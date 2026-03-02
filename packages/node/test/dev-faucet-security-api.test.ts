@@ -53,6 +53,7 @@ describe('dev faucet security api', () => {
 
     const walletService = {
       mint: async (_to: string, amount: number) => ({ txHash: '0xtest', amount }),
+      resolveDidToAddress: async () => null,
     };
 
     api = new ApiServer(
@@ -74,21 +75,21 @@ describe('dev faucet security api', () => {
     const missingKeyRes = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ address: '0xabc', amount: 1 }),
+      body: JSON.stringify({ address: '0x' + 'ab'.repeat(20), amount: 1 }),
     });
     expect(missingKeyRes.status).toBe(401);
 
     const badKeyRes = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': 'wrong-key' },
-      body: JSON.stringify({ address: '0xabc', amount: 1 }),
+      body: JSON.stringify({ address: '0x' + 'ab'.repeat(20), amount: 1 }),
     });
     expect(badKeyRes.status).toBe(401);
 
     const okRes = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': 'test-dev-key' },
-      body: JSON.stringify({ address: '0xabc', amount: 1 }),
+      body: JSON.stringify({ address: '0x' + 'ab'.repeat(20), amount: 1 }),
     });
     expect(okRes.status).toBe(200);
   });
@@ -99,7 +100,7 @@ describe('dev faucet security api', () => {
     const overAmountRes = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': 'test-dev-key' },
-      body: JSON.stringify({ address: '0xover', amount: 51 }),
+      body: JSON.stringify({ address: '0x' + 'ff'.repeat(20), amount: 51 }),
     });
     expect(overAmountRes.status).toBe(400);
 
@@ -107,7 +108,7 @@ describe('dev faucet security api', () => {
       const res = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-api-key': 'test-dev-key' },
-        body: JSON.stringify({ address: `0xip-limit-${i}`, amount: 1 }),
+        body: JSON.stringify({ address: '0x' + (i + 1).toString(16).padStart(40, '0'), amount: 1 }),
       });
       expect(res.status).toBe(200);
     }
@@ -115,7 +116,7 @@ describe('dev faucet security api', () => {
     const limitedRes = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': 'test-dev-key' },
-      body: JSON.stringify({ address: '0xip-limit-4', amount: 1 }),
+      body: JSON.stringify({ address: '0x' + '00'.repeat(19) + '04', amount: 1 }),
     });
     expect(limitedRes.status).toBe(429);
     expect(limitedRes.headers.get('retry-after')).toBeTruthy();
@@ -131,7 +132,7 @@ describe('dev faucet security api', () => {
       const res = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-api-key': 'test-dev-key' },
-        body: JSON.stringify({ did: 'did:claw:monthly-cap', address: `0xmonthly-${i}`, amount: 1 }),
+        body: JSON.stringify({ did: 'did:claw:monthly-cap', address: '0x' + (i + 10).toString(16).padStart(40, '0'), amount: 1 }),
       });
       expect(res.status).toBe(200);
     }
@@ -139,7 +140,7 @@ describe('dev faucet security api', () => {
     const didLimitedRes = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': 'test-dev-key' },
-      body: JSON.stringify({ did: 'did:claw:monthly-cap', address: '0xmonthly-5', amount: 1 }),
+      body: JSON.stringify({ did: 'did:claw:monthly-cap', address: '0x' + '00'.repeat(19) + '15', amount: 1 }),
     });
     expect(didLimitedRes.status).toBe(429);
 
@@ -154,14 +155,14 @@ describe('dev faucet security api', () => {
     const firstRes = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': 'test-dev-key' },
-      body: JSON.stringify({ address: '0xcooldown', amount: 1 }),
+      body: JSON.stringify({ address: '0x' + 'cc'.repeat(20), amount: 1 }),
     });
     expect(firstRes.status).toBe(200);
 
     const cooldownRes = await fetch(`${baseUrl}/api/v1/dev/faucet`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': 'test-dev-key' },
-      body: JSON.stringify({ address: '0xcooldown', amount: 1 }),
+      body: JSON.stringify({ address: '0x' + 'cc'.repeat(20), amount: 1 }),
     });
     expect(cooldownRes.status).toBe(429);
   });
