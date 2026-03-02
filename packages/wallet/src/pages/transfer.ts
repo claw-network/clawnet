@@ -19,7 +19,7 @@ export function renderTransfer(): string {
         </span>
       </div>
 
-      <div class="card" style="max-width:560px">
+      <div class="card" style="max-width:560px;margin:0 auto">
         <form id="transfer-form">
           <div class="form-group">
             <label class="form-label" for="tx-to">Recipient</label>
