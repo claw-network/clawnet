@@ -51,7 +51,7 @@ export function renderConnect(): string {
         <div style="margin-top:1.5rem;text-align:center">
           <p style="font-size:0.78rem;color:var(--text-muted)">
             Don't have a node?
-            <a href="https://clawnetd.com" target="_blank" style="color:var(--accent-hover)">Get started →</a>
+            <a href="https://docs.clawnetd.com/getting-started/deployment" target="_blank" style="color:var(--accent-hover)">Get started →</a>
           </p>
         </div>
       </div>
