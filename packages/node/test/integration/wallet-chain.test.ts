@@ -81,8 +81,8 @@ describe('Chain Integration: Wallet', () => {
   it('should read deployer balance (minted supply)', async () => {
     const signerAddr = contractProvider.signerAddress;
     const result = await walletService.getBalance(signerAddr);
-    expect(result.balance).toBeGreaterThan(0);
-    expect(typeof result.balance).toBe('number');
+    expect(Number(result.balance)).toBeGreaterThan(0);
+    expect(typeof result.balance).toBe('string');
   });
 
   it('should transfer tokens and get confirmed receipt', async () => {
@@ -93,11 +93,11 @@ describe('Chain Integration: Wallet', () => {
     const result = await walletService.transfer(signerAddr, recipient, 100, 'integration-test');
     expect(result.txHash).toMatch(/^0x[0-9a-f]{64}$/);
     expect(result.status).toBe('confirmed');
-    expect(result.amount).toBe(100);
+    expect(result.amount).toBe('100');
 
     // Verify recipient balance
     const recipientBalance = await walletService.getBalance(recipient);
-    expect(recipientBalance.balance).toBeGreaterThanOrEqual(100);
+    expect(Number(recipientBalance.balance)).toBeGreaterThanOrEqual(100);
   });
 
   it('should create, fund, and release an escrow', async () => {
@@ -111,14 +111,14 @@ describe('Chain Integration: Wallet', () => {
       expiresAt: Math.floor(Date.now() / 1000) + 86400, // +1 day
     });
     expect(createResult.id).toBe('integration-test-escrow-1');
-    expect(createResult.amount).toBe(50);
+    expect(createResult.amount).toBe('50');
     expect(createResult.status).toBe('active');
 
     // Read on-chain
     const view = await walletService.getEscrow('integration-test-escrow-1');
     expect(view).not.toBeNull();
-    expect(view!.amount).toBeGreaterThan(0);
-    expect(view!.amount).toBeLessThanOrEqual(50);
+    expect(Number(view!.amount)).toBeGreaterThan(0);
+    expect(Number(view!.amount)).toBeLessThanOrEqual(50);
     expect(view!.status).toBe('active');
 
     // Release
