@@ -138,7 +138,11 @@ export class ContractProvider {
 
   /** Tear down provider connection. */
   async destroy(): Promise<void> {
-    this.provider.destroy();
+    try {
+      this.provider.destroy();
+    } catch {
+      // Ignore errors from pending requests being cancelled
+    }
   }
 
   // ── Internal helpers ────────────────────────────────────────────────────

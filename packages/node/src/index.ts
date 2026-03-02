@@ -304,6 +304,7 @@ export class ClawNetNode {
         await this.apiServer.start();
       }
     } catch (error) {
+      console.error('[clawnetd] Startup failed:', (error as Error)?.message ?? error);
       await this.stop();
       throw error;
     } finally {
