@@ -45,19 +45,18 @@ export function walletRoutes(ctx: RuntimeContext): Router {
 
     // On-chain path
     if (ctx.walletService) {
-      try {
-        const evmAddr = await resolveEvmAddress(ctx, address);
-        if (!evmAddr) {
-          notFound(res, `Could not resolve address to EVM account: ${address}`);
+      const evmAddr = await resolveEvmAddress(ctx, address);
+      if (evmAddr) {
+        try {
+          const balance = await ctx.walletService.getBalance(evmAddr);
+          ok(res, balance, { self: `/api/v1/wallets/${address}` });
+          return;
+        } catch (err) {
+          internalError(res, (err as Error).message);
           return;
         }
-        const balance = await ctx.walletService.getBalance(evmAddr);
-        ok(res, balance, { self: `/api/v1/wallets/${address}` });
-        return;
-      } catch (err) {
-        internalError(res, (err as Error).message);
-        return;
       }
+      // DID not registered on-chain — fall through to legacy path
     }
 
     // Legacy fallback
@@ -99,26 +98,29 @@ export function walletRoutes(ctx: RuntimeContext): Router {
 
     // On-chain path
     if (ctx.walletService) {
-      try {
-        const evmAddr = await resolveEvmAddress(ctx, address) ?? resolved;
-        const result = await ctx.walletService.getHistory(evmAddr, {
-          limit: perPage,
-          offset,
-          type: typeFilter,
-        });
-        const items = Array.isArray(result.transactions) ? result.transactions : [];
-        paginated(res, items, {
-          page,
-          perPage,
-          total: result.total ?? items.length,
-          basePath: `/api/v1/wallets/${address}/transactions`,
-          query: typeFilter ? { type: typeFilter } : {},
-        });
-        return;
-      } catch (err) {
-        internalError(res, (err as Error).message);
-        return;
+      const evmAddr = await resolveEvmAddress(ctx, address);
+      if (evmAddr) {
+        try {
+          const result = await ctx.walletService.getHistory(evmAddr, {
+            limit: perPage,
+            offset,
+            type: typeFilter,
+          });
+          const items = Array.isArray(result.transactions) ? result.transactions : [];
+          paginated(res, items, {
+            page,
+            perPage,
+            total: result.total ?? items.length,
+            basePath: `/api/v1/wallets/${address}/transactions`,
+            query: typeFilter ? { type: typeFilter } : {},
+          });
+          return;
+        } catch (err) {
+          internalError(res, (err as Error).message);
+          return;
+        }
       }
+      // DID not registered on-chain — fall through to legacy path
     }
 
     // Legacy fallback
