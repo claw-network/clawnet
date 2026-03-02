@@ -89,8 +89,21 @@ export class ApiKeyStore {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA_SQL);
+    this.migrateAddKeyPrefix();
     this.migrateHashKeys();
     this.prepareStatements();
+  }
+
+  /**
+   * Add the `key_prefix` column if it doesn't exist yet (schema upgrade).
+   * SQLite has no `ADD COLUMN IF NOT EXISTS`, so check PRAGMA table_info.
+   */
+  private migrateAddKeyPrefix(): void {
+    const columns = this.db.pragma('table_info(api_keys)') as Array<{ name: string }>;
+    const hasColumn = columns.some((c) => c.name === 'key_prefix');
+    if (!hasColumn) {
+      this.db.exec("ALTER TABLE api_keys ADD COLUMN key_prefix TEXT NOT NULL DEFAULT ''");
+    }
   }
 
   /**
