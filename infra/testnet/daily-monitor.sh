@@ -264,6 +264,9 @@ echo ""
 # ==============================================================================
 echo -e "${BOLD}=== 2. ClawNet Node REST API ===${NC}"
 
+NODE_A_LIBP2P_PEERS=0
+NODE_A_LIBP2P_CONNECTIONS=0
+
 check_node() {
   local label=$1
   local url=$2
@@ -288,12 +291,26 @@ check_node() {
   local did
   did=$(echo "$resp" | jq -r '.did // .data.did // empty' 2>/dev/null || true)
   local peers
-  peers=$(echo "$resp" | jq -r '.peers // .data.peers // .peerCount // 0' 2>/dev/null || echo "?")
+  peers=$(echo "$resp" | jq -r '.peers // .data.peers // .peerCount // 0' 2>/dev/null || echo "0")
+  local connections
+  connections=$(echo "$resp" | jq -r '.connections // .data.connections // 0' 2>/dev/null || echo "0")
   local version
   version=$(echo "$resp" | jq -r '.version // .data.version // "?"' 2>/dev/null || echo "?")
 
-  ok "$label: DID=${did:0:20}... peers=$peers version=$version"
+  # Export to outer scope for JSON report
+  NODE_A_LIBP2P_PEERS=$peers
+  NODE_A_LIBP2P_CONNECTIONS=$connections
+
+  ok "$label: DID=${did:0:20}... peers=$peers connections=$connections version=$version"
   record_pass
+
+  # Validate libp2p peers against Geth cluster peers.
+  # Geth clusterPeers tells us how many validators are connected at L1.
+  # The ClawNet Node (libp2p) should see at least the same number of peers.
+  if [ "$CLUSTER_PEERS" -gt 0 ] && [ "$peers" -lt "$CLUSTER_PEERS" ]; then
+    warn "$label: libp2p peers ($peers) < Geth clusterPeers ($CLUSTER_PEERS) — a ClawNet Node on B/C may be down"
+    record_warn "$label: libp2p peers degraded ($peers < $CLUSTER_PEERS)"
+  fi
 }
 
 check_node "Node-A" "$NODE_A_URL"
@@ -500,7 +517,9 @@ cat > "$REPORT_FILE" <<EOF
       "expectedPeers": 2
     },
     "nodeApi": {
-      "A": "$(curl -sf --connect-timeout 5 "$NODE_A_URL/api/v1/node" > /dev/null 2>&1 && echo "ok" || echo "unreachable")"
+      "A": "$(curl -sf --connect-timeout 5 "$NODE_A_URL/api/v1/node" > /dev/null 2>&1 && echo "ok" || echo "unreachable")",
+      "libp2pPeers": $NODE_A_LIBP2P_PEERS,
+      "libp2pConnections": $NODE_A_LIBP2P_CONNECTIONS
     },
     "reconciliation": {
       "status": "$RECONCILE_STATUS",
