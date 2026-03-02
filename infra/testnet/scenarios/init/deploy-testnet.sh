@@ -102,9 +102,10 @@ if [[ "$LIQUIDITY_ADDRESS" == "$RESERVE_ADDRESS" ]]; then
 fi
 
 # Server config
-SERVER_A="${SERVER_A:-173.249.46.252}"
-SERVER_B="${SERVER_B:-167.86.93.216}"
-SERVER_C="${SERVER_C:-167.86.93.223}"
+SERVER_A="${SERVER_A:-173.249.46.252}"    # alice   — primary in this init script
+SERVER_B="${SERVER_B:-167.86.93.216}"     # bob     — Validator 2
+SERVER_C="${SERVER_C:-85.239.235.67}"     # geth-c  — Validator 3
+SERVER_GETH_A="${SERVER_GETH_A:-66.94.125.242}"  # geth-a — Validator 1, api.clawnetd.com
 SSH_PASS="${SSH_PASSWORD:-G66tdTcmvBz*k1sf}"
 SSH_CMD="sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no"
 SERVER_A_CLAWNET_PEER_ID="${SERVER_A_CLAWNET_PEER_ID:-12D3KooWQnQQNGBG5yhuhiaxwcHmksDYy9ZbMiC8uoJp4D6oB5QM}"

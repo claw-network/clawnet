@@ -2,14 +2,15 @@
 # ==============================================================================
 # ClawNet Testnet — Full Redeployment Script
 # ==============================================================================
-# This script performs a complete testnet redeployment on all 3 servers:
+# This script performs a complete testnet redeployment on all 4 servers:
 #   1. Stop existing Geth on all servers
 #   2. Wipe chain data
 #   3. Upload genesis.json and re-initialize
-#   4. Import validator keys
+#   4. Import validator keys (A/B/C only — D is non-validator)
 #   5. Create .env files + security hardening
 #   6. Start Server A (mining), wait for blocks
 #   7. Start Server B & C (sync then mine)
+#   7b. Start Server D (sync-only, non-validator full node)
 #   8. Deploy contracts
 #   9. Run bootstrap mint
 #
@@ -101,9 +102,10 @@ if [[ "$LIQUIDITY_ADDRESS" == "$RESERVE_ADDRESS" ]]; then
 fi
 
 # Server config
-SERVER_A="${SERVER_A:-66.94.125.242}"
-SERVER_B="${SERVER_B:-85.239.236.49}"
-SERVER_C="${SERVER_C:-85.239.235.67}"
+SERVER_A="${SERVER_A:-66.94.125.242}"      # geth-a  — Validator 1, primary, api.clawnetd.com
+SERVER_B="${SERVER_B:-167.86.93.216}"     # bob     — Validator 2
+SERVER_C="${SERVER_C:-85.239.235.67}"     # geth-c  — Validator 3
+SERVER_D="${SERVER_D:-173.249.46.252}"    # alice   — Non-validator full node
 SSH_PASS="${SSH_PASSWORD:-G66tdTcmvBz*k1sf}"
 SSH_CMD="sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no"
 CLAW_PASSPHRASE="${CLAW_PASSPHRASE:-$(openssl rand -hex 32)}"
@@ -144,10 +146,17 @@ rpc_peer_count() {
 
 install_peer_clawnetd_service() {
   local host="$1"
-  local bootstrap_multiaddr="$2"
+  shift  # remaining args are bootstrap multiaddrs
 
   echo "  [$host] Writing /opt/clawnet/node-data/config.yaml..."
   run_remote "$host" "mkdir -p /opt/clawnet/node-data"
+
+  # Build bootstrap list from all supplied multiaddrs
+  local bootstrap_yaml=""
+  for addr in "$@"; do
+    bootstrap_yaml="${bootstrap_yaml}    - ${addr}\n"
+  done
+
   run_remote "$host" "cat > /opt/clawnet/node-data/config.yaml << CFGEOF
 v: 1
 network: testnet
@@ -156,8 +165,7 @@ p2p:
   listen:
     - /ip4/0.0.0.0/tcp/9527
   bootstrap:
-    - $bootstrap_multiaddr
-
+$(echo -e "$bootstrap_yaml")
 logging:
   level: info
 
@@ -308,7 +316,7 @@ if [[ "$(uname)" != "Darwin" ]]; then
   chmod 600 "$SECRETS_FILE" 2>/dev/null || true
 fi
 
-for HOST in $SERVER_A $SERVER_B $SERVER_C; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
   echo "  [preflight] SSH check: $HOST"
   run_remote "$HOST" 'echo ok >/dev/null'
   echo "  [preflight] Runtime check on $HOST"
@@ -327,6 +335,7 @@ echo "Timestamp : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "Server A  : $SERVER_A (Validator 1 — $VALIDATOR_1_ADDRESS)"
 echo "Server B  : $SERVER_B (Validator 2 — $VALIDATOR_2_ADDRESS)"
 echo "Server C  : $SERVER_C (Validator 3 — $VALIDATOR_3_ADDRESS)"
+echo "Server D  : $SERVER_D (Full node — non-validator peer)"
 echo "Deployer  : $DEPLOYER_ADDRESS"
 echo "Treasury  : $TREASURY_ADDRESS"
 echo "Liquidity : $LIQUIDITY_ADDRESS"
@@ -338,7 +347,7 @@ echo ""
 # Phase 1: Stop all Geth instances
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 1: Stopping Geth on all servers..."
-for HOST in $SERVER_A $SERVER_B $SERVER_C; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
   echo "  Stopping Geth on $HOST..."
   run_remote "$HOST" 'cd /opt/clawnet && docker compose -f docker-compose.chain.yml down 2>/dev/null; docker stop clawnet-geth 2>/dev/null; docker rm clawnet-geth 2>/dev/null; echo "done"' || true
 done
@@ -350,7 +359,7 @@ echo ""
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 2: Wiping chain data and re-initializing..."
 
-for HOST in $SERVER_A $SERVER_B $SERVER_C; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
   echo "  [$HOST] Wiping chain data..."
   run_remote "$HOST" 'rm -rf /opt/clawnet/chain-data/*'
 
@@ -406,7 +415,7 @@ echo ""
 # Phase 4: Update code on all servers
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 4: Updating code on all servers..."
-for HOST in $SERVER_A $SERVER_B $SERVER_C; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
   echo "  [$HOST] git pull..."
   run_remote "$HOST" 'cd /opt/clawnet && git pull' || true
 done
@@ -429,6 +438,11 @@ run_remote "$SERVER_C" "cat > /opt/clawnet/.env << 'ENVEOF'
 VALIDATOR_ADDRESS=$VALIDATOR_3_ADDRESS
 ENVEOF"
 
+# Server D is a non-validator full node — no VALIDATOR_ADDRESS needed
+run_remote "$SERVER_D" "cat > /opt/clawnet/.env << 'ENVEOF'
+# Non-validator full node (sync only, no mining)
+ENVEOF"
+
 echo "  .env files created."
 echo ""
 
@@ -449,7 +463,7 @@ for f in "$HARDEN_SCRIPT" "$AUDIT_SCRIPT" "$SYSCTL_CONF"; do
   fi
 done
 
-for HOST in $SERVER_A $SERVER_B $SERVER_C; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
   echo "  [$HOST] Uploading security files..."
   scp_to "$HARDEN_SCRIPT" "$HOST" "/tmp/harden-server.sh"
   scp_to "$AUDIT_SCRIPT"  "$HOST" "/opt/clawnet/security-audit.sh"
@@ -556,6 +570,31 @@ echo "  Server C enode: $ENODE_C"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
+# Phase 8b: Start Server D (sync-only, non-validator full node)
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 8b: Starting Geth on Server D (sync-only, non-validator)..."
+
+BOOTNODES_D="${ENODE_A},${ENODE_B},${ENODE_C}"
+
+run_remote "$SERVER_D" "cd /opt/clawnet && cp infra/testnet/docker-compose.sync.yml docker-compose.chain.yml && \
+  sed -i 's|enode://.*@66.94.125.242:30303|${BOOTNODES_D}|g' docker-compose.chain.yml && \
+  sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${BOOTNODES_D#enode://}|g' docker-compose.chain.yml && \
+  docker compose -f docker-compose.chain.yml up -d"
+
+echo "  Waiting 15s for Server D to sync..."
+sleep 15
+
+D_BLOCK=$(run_remote "$SERVER_D" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"')
+echo "  Server D block number: $D_BLOCK"
+
+# Get enode for Server D
+ENODE_D_RAW=$(run_remote "$SERVER_D" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"admin_nodeInfo\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"result\"][\"enode\"])"')
+ENODE_D=$(echo "$ENODE_D_RAW" | sed "s/127.0.0.1/$SERVER_D/")
+echo "  Server D enode: $ENODE_D"
+echo "  Server D syncing (non-validator, no mining)."
+echo ""
+
+# ══════════════════════════════════════════════════════════════════
 # Phase 9: Deploy contracts
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 9: Deploying smart contracts..."
@@ -628,6 +667,7 @@ cat > "$SCRIPT_DIR/enodes.env" << EOF
 ENODE_A=$ENODE_A
 ENODE_B=$ENODE_B
 ENODE_C=$ENODE_C
+ENODE_D=$ENODE_D
 EOF
 
 echo "  Saved: contracts.json, enodes.env"
@@ -644,16 +684,19 @@ B_BLOCK_FINAL=$(rpc_block_number "$SERVER_B")
 B_PEERS_FINAL=$(rpc_peer_count "$SERVER_B")
 C_BLOCK_FINAL=$(rpc_block_number "$SERVER_C")
 C_PEERS_FINAL=$(rpc_peer_count "$SERVER_C")
+D_BLOCK_FINAL=$(rpc_block_number "$SERVER_D")
+D_PEERS_FINAL=$(rpc_peer_count "$SERVER_D")
 
 echo "  Server A: block=$A_BLOCK_FINAL peers=$A_PEERS_FINAL"
 echo "  Server B: block=$B_BLOCK_FINAL peers=$B_PEERS_FINAL"
 echo "  Server C: block=$C_BLOCK_FINAL peers=$C_PEERS_FINAL"
+echo "  Server D: block=$D_BLOCK_FINAL peers=$D_PEERS_FINAL"
 
-if [[ "$A_BLOCK_FINAL" -le 0 || "$B_BLOCK_FINAL" -le 0 || "$C_BLOCK_FINAL" -le 0 ]]; then
+if [[ "$A_BLOCK_FINAL" -le 0 || "$B_BLOCK_FINAL" -le 0 || "$C_BLOCK_FINAL" -le 0 || "$D_BLOCK_FINAL" -le 0 ]]; then
   echo "ERROR: one or more nodes report block number <= 0"
   exit 1
 fi
-if [[ "$A_PEERS_FINAL" -lt 1 || "$B_PEERS_FINAL" -lt 1 || "$C_PEERS_FINAL" -lt 1 ]]; then
+if [[ "$A_PEERS_FINAL" -lt 1 || "$B_PEERS_FINAL" -lt 1 || "$C_PEERS_FINAL" -lt 1 || "$D_PEERS_FINAL" -lt 1 ]]; then
   echo "ERROR: one or more nodes have peerCount < 1"
   exit 1
 fi
@@ -807,9 +850,9 @@ echo "  clawnetd deployed on Server A."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 14: Deploy clawnetd on Server B/C via systemd + node.env
+# Phase 14: Deploy clawnetd on Server B/C/D via systemd + node.env
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 14: Setting up clawnetd on Server B/C..."
+echo ">>> Phase 14: Setting up clawnetd on Server B/C/D (full-mesh bootstrap)..."
 
 A_NODE_PEER_ID=$(run_remote "$SERVER_A" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'")
 if [[ -z "$A_NODE_PEER_ID" ]]; then
@@ -820,8 +863,29 @@ fi
 A_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_A/tcp/9527/p2p/$A_NODE_PEER_ID"
 echo "  Server A bootstrap addr: $A_BOOTSTRAP_MULTIADDR"
 
+# Phase 14a: Start B first (bootstrap: A only, B/C/D not yet running)
 install_peer_clawnetd_service "$SERVER_B" "$A_BOOTSTRAP_MULTIADDR"
-install_peer_clawnetd_service "$SERVER_C" "$A_BOOTSTRAP_MULTIADDR"
+
+echo "  Waiting 6s for Server B clawnetd to start..."
+sleep 6
+B_NODE_PEER_ID=$(run_remote "$SERVER_B" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
+B_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_B/tcp/9527/p2p/$B_NODE_PEER_ID"
+echo "  Server B bootstrap addr: $B_BOOTSTRAP_MULTIADDR"
+
+# Phase 14b: Start C with bootstrap: A + B
+install_peer_clawnetd_service "$SERVER_C" "$A_BOOTSTRAP_MULTIADDR" "$B_BOOTSTRAP_MULTIADDR"
+
+echo "  Waiting 6s for Server C clawnetd to start..."
+sleep 6
+C_NODE_PEER_ID=$(run_remote "$SERVER_C" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
+C_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_C/tcp/9527/p2p/$C_NODE_PEER_ID"
+echo "  Server C bootstrap addr: $C_BOOTSTRAP_MULTIADDR"
+
+# Phase 14c: Start D with bootstrap: A + B (full-mesh via KadDHT discovery)
+install_peer_clawnetd_service "$SERVER_D" "$A_BOOTSTRAP_MULTIADDR" "$B_BOOTSTRAP_MULTIADDR"
+
+# Phase 14d: Re-install B with full-mesh bootstrap (A + C) so B can recover if A goes down
+install_peer_clawnetd_service "$SERVER_B" "$A_BOOTSTRAP_MULTIADDR" "$C_BOOTSTRAP_MULTIADDR"
 
 echo "  Waiting 8s for mesh convergence..."
 sleep 8
@@ -830,16 +894,17 @@ A_NODE_PEERS=$(run_remote "$SERVER_A" "curl -sf http://127.0.0.1:9528/api/v1/nod
 A_NODE_CONNECTIONS=$(run_remote "$SERVER_A" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"connections\", 0)))'")
 echo "  Server A clawnetd mesh: peers=$A_NODE_PEERS connections=$A_NODE_CONNECTIONS"
 
-if [[ "$A_NODE_PEERS" -lt 2 || "$A_NODE_CONNECTIONS" -lt 2 ]]; then
-  echo "ERROR: clawnetd mesh not converged on Server A (expected peers/connections >= 2)"
-  echo "Debug: Server A/B/C clawnetd status"
+if [[ "$A_NODE_PEERS" -lt 3 || "$A_NODE_CONNECTIONS" -lt 3 ]]; then
+  echo "ERROR: clawnetd mesh not converged on Server A (expected peers/connections >= 3)"
+  echo "Debug: Server A/B/C/D clawnetd status"
   run_remote "$SERVER_A" "systemctl status clawnetd --no-pager -n 80 || true"
   run_remote "$SERVER_B" "systemctl status clawnetd --no-pager -n 80 || true"
   run_remote "$SERVER_C" "systemctl status clawnetd --no-pager -n 80 || true"
+  run_remote "$SERVER_D" "systemctl status clawnetd --no-pager -n 80 || true"
   exit 1
 fi
 
-echo "  Server B/C clawnetd deployed and managed by systemd."
+echo "  Server B/C/D clawnetd deployed and managed by systemd."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
