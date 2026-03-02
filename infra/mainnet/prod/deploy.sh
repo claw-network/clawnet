@@ -262,10 +262,17 @@ CADDYEOF"
 
 install_peer_clawnetd_service() {
   local host="$1"
-  local bootstrap_multiaddr="$2"
+  shift  # remaining args are bootstrap multiaddrs
 
   echo "  [$host] Writing /opt/clawnet/node-data/config.yaml..."
   run_remote "$host" "mkdir -p /opt/clawnet/node-data"
+
+  # Build bootstrap list from all supplied multiaddrs
+  local bootstrap_yaml=""
+  for addr in "$@"; do
+    bootstrap_yaml="${bootstrap_yaml}    - ${addr}\n"
+  done
+
   run_remote "$host" "cat > /opt/clawnet/node-data/config.yaml << CFGEOF
 v: 1
 network: mainnet
@@ -274,8 +281,7 @@ p2p:
   listen:
     - /ip4/0.0.0.0/tcp/9527
   bootstrap:
-    - $bootstrap_multiaddr
-
+$(echo -e "$bootstrap_yaml")
 logging:
   level: info
 
@@ -847,8 +853,43 @@ fi
 NODE_1_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_1/tcp/9527/p2p/$NODE_1_PEER_ID"
 echo "  Node 1 bootstrap addr: $NODE_1_BOOTSTRAP_MULTIADDR"
 
-for HOST in $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5; do
-  install_peer_clawnetd_service "$HOST" "$NODE_1_BOOTSTRAP_MULTIADDR"
+# ── Full-mesh bootstrap: deploy peers sequentially, collecting peerIds ────────
+# Each peer gets Node 1 + all previously deployed peers as bootstrap targets.
+# After all are up, re-deploy earlier peers with the full set.
+declare -A PEER_IDS
+declare -a PEER_HOSTS=($SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5)
+declare -a PEER_MULTIADDRS=()
+
+# Pass 1: Deploy each peer with Node 1 + previously deployed peers
+for HOST in "${PEER_HOSTS[@]}"; do
+  # Build bootstrap list: Node 1 + all peers deployed so far
+  local_bootstrap_args=("$NODE_1_BOOTSTRAP_MULTIADDR")
+  for ma in "${PEER_MULTIADDRS[@]}"; do
+    local_bootstrap_args+=("$ma")
+  done
+
+  install_peer_clawnetd_service "$HOST" "${local_bootstrap_args[@]}"
+
+  echo "  Waiting 6s for $HOST clawnetd to start..."
+  sleep 6
+  _PEER_ID=$(run_remote "$HOST" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
+  _MULTIADDR="/ip4/$HOST/tcp/9527/p2p/$_PEER_ID"
+  echo "  $HOST bootstrap addr: $_MULTIADDR"
+  PEER_IDS[$HOST]="$_PEER_ID"
+  PEER_MULTIADDRS+=("$_MULTIADDR")
+done
+
+# Pass 2: Re-deploy earlier peers with full bootstrap set (Node 1 + all other peers)
+echo "  Updating earlier peers with full-mesh bootstrap..."
+for i in "${!PEER_HOSTS[@]}"; do
+  HOST="${PEER_HOSTS[$i]}"
+  full_bootstrap_args=("$NODE_1_BOOTSTRAP_MULTIADDR")
+  for j in "${!PEER_HOSTS[@]}"; do
+    if [[ "$j" != "$i" ]]; then
+      full_bootstrap_args+=("${PEER_MULTIADDRS[$j]}")
+    fi
+  done
+  install_peer_clawnetd_service "$HOST" "${full_bootstrap_args[@]}"
 done
 
 echo "  Waiting 10s for mesh convergence..."
