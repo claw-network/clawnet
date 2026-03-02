@@ -83,10 +83,11 @@ CRITICAL=0
 
 for arg in "$@"; do
   case "$arg" in
-    --check-only) CHECK_ONLY=true ;;
-    --verbose)    VERBOSE=true ;;
-    --cron)       CRON_MODE=true ;;
-    --server)     shift_next=true ;;
+    --check-only)  CHECK_ONLY=true ;;
+    --verbose)     VERBOSE=true ;;
+    --cron)        CRON_MODE=true ;;
+    --test-email)  TEST_EMAIL=true ;;
+    --server)      shift_next=true ;;
     1|2|3|4|5)
       if [[ "${shift_next:-}" == true ]]; then
         TARGET_SERVER="$arg"
@@ -152,6 +153,56 @@ section() {
 
 # ─────────────────────────── Email Reporting ─────────────────────────────────
 
+test_email() {
+  echo "Sending SMTP test email to ${REPORT_EMAIL} via smtps://${SMTP_HOST}:${SMTP_PORT} ..."
+  local test_body
+  test_body=$(cat <<MAILEOF
+From: ClawNet Security Audit <${SMTP_FROM}>
+To: ${REPORT_EMAIL}
+Subject: [ClawNet Mainnet] SMTP Test — $(hostname) — ${TIMESTAMP}
+Date: $(date -R 2>/dev/null || date -u)
+Content-Type: text/plain; charset=utf-8
+MIME-Version: 1.0
+X-Mailer: clawnet-security-audit
+
+This is a test email from ClawNet Mainnet security-audit.sh
+
+Host:      $(hostname 2>/dev/null || echo unknown)
+Timestamp: ${TIMESTAMP}
+SMTP Host: ${SMTP_HOST}:${SMTP_PORT}
+SMTP User: ${SMTP_USER}
+Recipient: ${REPORT_EMAIL}
+
+If you received this, SMTP is configured correctly.
+MAILEOF
+)
+
+  local curl_args=(
+    --verbose --max-time 30
+    --url "smtps://${SMTP_HOST}:${SMTP_PORT}"
+    --ssl-reqd
+    --mail-from "${SMTP_FROM}"
+    --mail-rcpt "${REPORT_EMAIL}"
+    -T -
+  )
+  if [[ -n "${SMTP_PASS}" ]]; then
+    curl_args+=(--user "${SMTP_USER}:${SMTP_PASS}")
+  fi
+
+  if curl "${curl_args[@]}" <<< "$test_body" 2>&1; then
+    echo "✓ Test email sent successfully to ${REPORT_EMAIL}"
+  else
+    echo "✗ Failed to send test email (exit code: $?)"
+    exit 1
+  fi
+  exit 0
+}
+
+# Handle --test-email before main()
+if [[ "${TEST_EMAIL:-}" == true ]]; then
+  test_email
+fi
+
 send_report_email() {
   local subject="$1"
   local body="$2"
@@ -171,6 +222,7 @@ To: ${REPORT_EMAIL}
 Subject: ${subject}
 Date: $(date -R 2>/dev/null || date -u)
 Content-Type: text/plain; charset=utf-8
+MIME-Version: 1.0
 X-Mailer: clawnet-security-audit
 
 ${body}

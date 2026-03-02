@@ -509,8 +509,8 @@ for HOST in $ALL_SERVERS; do
 
   # Inject SMTP credentials for security-audit email reports
   run_remote "$HOST" "cat > /opt/clawnet/.smtp-env << 'SMTPEOF'
-CLAWNET_SMTP_USER=${CLAWNET_SMTP_USER:-security-audit@clawnetd.com}
-CLAWNET_SMTP_PASS=${CLAWNET_SMTP_PASS}
+export CLAWNET_SMTP_USER=${CLAWNET_SMTP_USER:-security-audit@clawnetd.com}
+export CLAWNET_SMTP_PASS=${CLAWNET_SMTP_PASS}
 SMTPEOF
 chmod 600 /opt/clawnet/.smtp-env"
   echo "  [$HOST] Hardened."
