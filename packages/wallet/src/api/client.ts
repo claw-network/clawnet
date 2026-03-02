@@ -153,7 +153,7 @@ export class ApiClient {
     );
   }
 
-  /** GET /api/v1/node/status */
+  /** GET /api/v1/node */
   async getNodeStatus(): Promise<{
     did: string;
     synced: boolean;
@@ -163,7 +163,7 @@ export class ApiClient {
     version: string;
     uptime: number;
   }> {
-    return this.get('/api/v1/node/status');
+    return this.get('/api/v1/node');
   }
 
   /** POST /api/v1/escrows */
