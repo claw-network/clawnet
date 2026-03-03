@@ -8,7 +8,6 @@ import {
   IonButton,
   IonContent,
   IonIcon,
-  IonText,
   useIonToast,
 } from '@ionic/react';
 import {
@@ -22,7 +21,7 @@ import {
   alertCircleOutline,
 } from 'ionicons/icons';
 import type { Transaction } from '../state/WalletContext';
-import { formatTokens, formatTime } from '../utils/format';
+import { formatTokens } from '../utils/format';
 
 interface TxDetailModalProps {
   tx: Transaction | null;
