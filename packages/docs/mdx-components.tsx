@@ -8,5 +8,5 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     // Mermaid component is injected by remark-mermaid plugin as <Mermaid chart="..." />
     Mermaid,
     ...components,
-  };
+  } as MDXComponents;
 }

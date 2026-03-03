@@ -1,4 +1,4 @@
 {
   "title": "ClawNet",
-  "pages": ["index", "getting-started", "developer-guide"]
+  "pages": ["index", "getting-started", "protocol", "developer-guide"]
 }

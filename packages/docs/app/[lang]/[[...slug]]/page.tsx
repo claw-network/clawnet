@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Mermaid } from '@/components/mermaid';
 import { DEFAULT_LOCALE } from '@/lib/i18n';
 import type { AnchorHTMLAttributes } from 'react';
+import type { MDXComponents } from 'mdx/types';
 
 function getMdxComponents(lang: string) {
   const DefaultA = (defaultMdxComponents as Record<string, unknown>).a as
@@ -23,7 +24,7 @@ function getMdxComponents(lang: string) {
       }
       return <AnchorTag {...rest} href={href} />;
     },
-  };
+  } as MDXComponents;
 }
 
 export default async function Page(props: { params: Promise<{ lang: string; slug?: string[] }> }) {
