@@ -425,11 +425,7 @@ else
     _node_b=$(grep -E '^NODE_B_URL=' "$_env_file" 2>/dev/null | head -1 | cut -d= -f2-)
     _node_c=$(grep -E '^NODE_C_URL=' "$_env_file" 2>/dev/null | head -1 | cut -d= -f2-)
 
-    if [ -n "$_node_a" ] && [ "$_node_a" = "$_node_b" ] && [ "$_node_b" = "$_node_c" ]; then
-      info "Scenarios skipped — single-node testnet (all 3 URLs point to $_node_a)"
-      info "Scenario regression requires 3 distinct nodes; will auto-enable when multi-node is deployed"
-      SCENARIO_STATUS="skipped-single-node"
-    elif [ -z "$_node_a" ] || [ -z "$_node_b" ] || [ -z "$_node_c" ]; then
+    if [ -z "$_node_a" ] || [ -z "$_node_b" ] || [ -z "$_node_c" ]; then
       info "Scenarios skipped — NODE_A/B/C_URL not all configured in .env"
       SCENARIO_STATUS="skipped-no-urls"
     else

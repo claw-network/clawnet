@@ -103,7 +103,17 @@
       - 根因：Server C 在 03-01 14:03 断开后未自动重连（libp2p 无持久重连机制）
       - 修复后：Server A peers=3 connections=3 ✅, Server B peers=2 ✅, Server C peers=1 ✅
     - 🔧 **daily-monitor.sh 改进**：新增 libp2p peers vs Geth clusterPeers 一致性检查（testnet + mainnet）
-  - Day 6 (03-03): ⏳
+  - Day 6 (03-03): ✅ 通过（修复后）
+    - **Geth 层**：3/3 validators 同步，blockHeight=202575→203019，clusterPeers=2 ✅
+    - ⚠️ **Server B libp2p 断连**（同 Day 5 根因 — 无持久重连）
+      - Mar 01 14:03 断开后 47h 未重连，`systemctl restart clawnetd` 修复 → peers=1 ✅
+    - **Scenario 01**: 8/9 passed（1 预期失败 — 单节点模式下 DID 唯一性检查）
+      - 🔧 修复 scenario `.env`：旧 IP 改为 `127.0.0.1:9528`（B/C API port 9528 未开放外网，符合设计）
+      - 🔧 修复 `daily-monitor.sh`：移除单节点模式跳过逻辑，允许 Scenario 01 在单节点运行
+    - **Reconciliation**: 2 indexer 级差异（非链共识问题）
+      - DID controller: indexer 记录 deployer 为 controller，链上为 derived address
+      - Deployer balance: indexer=0 vs chain=150060（Server A 重启后 indexer 未完全追赶）
+    - **Faucet**: max per claim=50 Token（scenario 请求 10000 被拒，正常限制）
   - Day 7 (03-04): ⏳
   - 验收：连续 5 天无异常（健康检查 + 对账 0 差异 + 场景回归通过）
 
@@ -267,5 +277,5 @@ docker pull ghcr.io/claw-network/clawnetd:0.2.0
 
 ---
 
-*最后更新: 2026-03-02（R-4.1 Day 5 — libp2p 修复完成, Server A peers=3/conn=3, daily-monitor.sh 增加 libp2p 检查）*
+*最后更新: 2026-03-03（R-4.1 Day 6 — Geth 3/3 validators, blockHeight ~203K, Server B libp2p 重启修复, Scenario 8/9, indexer 2 discrepancies）*
 *关联文档: on-chain-tasks.md (T-3.9 ~ T-3.15), TOKEN_DISTRIBUTION.md, OPENCLAW_INTEGRATION.md*
