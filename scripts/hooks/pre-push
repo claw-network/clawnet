@@ -178,13 +178,15 @@ fi
 echo ""
 
 # ── phase 4: integration test ───────────────────────────────────
+TESTNET_URL="${CLAWNET_TESTNET_URL:-https://clawnetd.com}"
 echo -e "${BOLD}🌐 Phase 4/4 — Integration Test${RESET}"
+echo -e "  ${DIM}target: ${TESTNET_URL}${RESET}"
 INT_START=$(date +%s)
 INT_LOG=$(mktemp)
 
 printf "  %-28s " "integration-test.mjs"
 
-node scripts/integration-test.mjs > "$INT_LOG" 2>&1
+node scripts/integration-test.mjs --nodes="${TESTNET_URL}" > "$INT_LOG" 2>&1
 INT_EC=$?
 INT_END=$(date +%s)
 INT_SECS=$((INT_END - INT_START))
@@ -192,11 +194,16 @@ INT_SECS=$((INT_END - INT_START))
 if [ $INT_EC -eq 0 ]; then
   echo -e "${GREEN}✅ passed${RESET} ${DIM}(${INT_SECS}s)${RESET}"
 else
-  echo -e "${YELLOW}⚠️  FAILED (non-blocking)${RESET} ${DIM}(${INT_SECS}s)${RESET}"
+  echo -e "${RED}❌ FAILED${RESET} ${DIM}(${INT_SECS}s)${RESET}"
   echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
-  tail -20 "$INT_LOG" | sed 's/^/    /'
+  tail -30 "$INT_LOG" | sed 's/^/    /'
   echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
-  echo -e "${YELLOW}   Integration tests failed but push continues (testnet may not be running).${RESET}"
+  rm -f "$INT_LOG"
+  echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${RED}${BOLD}❌ Integration tests failed${RESET} ${DIM}(${INT_SECS}s)${RESET}"
+  echo -e "   Push aborted. Fix the integration test failures and try again."
+  echo ""
+  exit 1
 fi
 rm -f "$INT_LOG"
 
@@ -204,7 +211,7 @@ rm -f "$INT_LOG"
 TOTAL_END=$(date +%s)
 TOTAL_SECS=$((TOTAL_END - TOTAL_START))
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "${GREEN}${BOLD}✅ Lint + build + test: all ${PASSED} packages passed${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+echo -e "${GREEN}${BOLD}✅ All 4 phases passed (lint + build + test + integration)${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
 echo -e "   Pushing..."
 echo ""
 exit 0
