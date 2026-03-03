@@ -10,15 +10,17 @@
   --ion-font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --claw-font-mono: 'IBM Plex Mono', 'Courier New', monospace;
 
-  /* Brand tokens */
-  --claw-accent-soft: rgba(96, 165, 250, 0.10);
-  --claw-accent-glow: rgba(96, 165, 250, 0.20);
-  --claw-green-soft: rgba(34, 197, 94, 0.10);
-  --claw-red-soft: rgba(239, 68, 68, 0.10);
-  --claw-yellow-soft: rgba(234, 179, 8, 0.10);
-  --claw-surface: rgba(255, 255, 255, 0.03);
-  --claw-surface-hover: rgba(255, 255, 255, 0.06);
-  --claw-border: rgba(255, 255, 255, 0.06);
+  /* Brand tokens — ocean navy palette (matches docs.clawnetd.com) */
+  --claw-accent-soft: rgba(96, 165, 250, 0.12);
+  --claw-accent-glow: rgba(96, 165, 250, 0.25);
+  --claw-green-soft: rgba(34, 197, 94, 0.12);
+  --claw-red-soft: rgba(239, 68, 68, 0.12);
+  --claw-yellow-soft: rgba(234, 179, 8, 0.12);
+  /* hsla(220, 56%, 15%, 0.4) — fumadocs ocean card bg */
+  --claw-surface: hsla(220, 56%, 15%, 0.35);
+  --claw-surface-hover: hsla(220, 56%, 18%, 0.45);
+  /* hsla(220, 50%, 50%, 0.2) — fumadocs ocean border */
+  --claw-border: hsla(220, 50%, 50%, 0.14);
 }
 
 body {
@@ -40,7 +42,8 @@ body {
 .dash-hero {
   position: relative;
   padding: 16px 20px 24px;
-  background: linear-gradient(175deg, rgba(96, 165, 250, 0.08) 0%, rgba(0, 84, 233, 0.04) 40%, transparent 70%);
+  /* Same gradient as docs.clawnetd.com dark body — rgba(5,105,255,0.15) */
+  background: linear-gradient(175deg, rgba(5, 105, 255, 0.18) 0%, rgba(5, 105, 255, 0.06) 45%, transparent 75%);
 }
 
 .dash-topbar {
@@ -130,7 +133,8 @@ body {
   font-weight: 700;
   letter-spacing: -1px;
   line-height: 1.1;
-  background: linear-gradient(135deg, #ffffff 30%, #60a5fa 100%);
+  /* White to ocean light-blue gradient */
+  background: linear-gradient(135deg, #e2eaf5 20%, #60a5fa 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -220,24 +224,25 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 22px;
-  background: linear-gradient(135deg, rgba(0, 84, 233, 0.25), rgba(96, 165, 250, 0.15));
+  /* ocean-primary gradient */
+  background: linear-gradient(135deg, hsla(220, 70%, 30%, 0.6), hsla(210, 80%, 45%, 0.25));
   color: #60a5fa;
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
 .dash-action-circle.receive {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.10));
+  background: linear-gradient(135deg, hsla(145, 60%, 25%, 0.6), hsla(145, 60%, 35%, 0.2));
   color: #22c55e;
 }
 
 .dash-action-circle.escrow {
-  background: linear-gradient(135deg, rgba(234, 179, 8, 0.25), rgba(234, 179, 8, 0.10));
+  background: linear-gradient(135deg, hsla(45, 80%, 25%, 0.6), hsla(45, 80%, 40%, 0.2));
   color: #eab308;
 }
 
 .dash-action-circle.history {
-  background: linear-gradient(135deg, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.08));
-  color: #94a3b8;
+  background: linear-gradient(135deg, hsla(220, 40%, 25%, 0.5), hsla(220, 40%, 35%, 0.2));
+  color: #8898b5;
 }
 
 .dash-action-btn:active .dash-action-circle {

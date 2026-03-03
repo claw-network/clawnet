@@ -79,7 +79,7 @@ const AppRoutes: React.FC = () => {
             position: 'fixed',
             inset: 0,
             zIndex: 99999,
-            background: 'var(--ion-background-color, #0a0a0f)',
+            background: 'var(--ion-background-color, #081020)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
