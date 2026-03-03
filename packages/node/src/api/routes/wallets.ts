@@ -3,7 +3,7 @@
  */
 
 import { Router } from '../router.js';
-import { ok, badRequest, notFound, internalError, paginated, parsePagination } from '../response.js';
+import { ok, badRequest, internalError, paginated, parsePagination } from '../response.js';
 import type { RuntimeContext } from '../types.js';
 import { resolveAddress } from '../types.js';
 import { buildWalletState } from '../legacy.js';
