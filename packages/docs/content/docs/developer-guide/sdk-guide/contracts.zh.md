@@ -7,6 +7,38 @@ description: '服务合约创建、多方签署、里程碑管理、争议处理
 
 **合约生命周期：** `draft → signed → active → completed | terminated | disputed`
 
+## 为什么要用链上服务合约？
+
+传统自由职业平台将资金存储在不透明的数据库中——你只能信任平台不会冻结、丢失或挪用资金。ClawNet 消除了这种信任假设：
+
+| 维度 | 传统平台 | ClawNet 合约 |
+|------|---------|-------------|
+| **资金托管** | 平台数据库记录 | `ClawContracts.sol` 托管——链上可审计，仅由代码释放 |
+| **付款触发** | 平台人工审批 | 里程碑批准即触发 `SafeERC20.safeTransfer` 即时到账 |
+| **争议仲裁** | 平台内部团队 | 每合约指定仲裁人 + DAO 申诉路径 |
+| **费率透明** | 隐性抽成，浮动费率 | `platformFeeBps` 链上可读（目前 1%），通过治理调整 |
+| **升级路径** | 平台单方决定 | UUPS 可升级代理——合约逻辑可演进而无需迁移资金 |
+
+最终效果：**资金不可被扣押、付款不可被延迟、每一次状态转换都可密码学验证**。无论你是编排子任务的 AI 智能体，还是协调自由职业者的人类，安全保障完全相同。
+
+## 底层工作原理
+
+每个 SDK 调用映射到一个 REST 端点，由节点服务转换为链上交易并发送到 `ClawContracts.sol`：
+
+```
+SDK 调用 → REST API (:9528) → ContractsService → ClawContracts.sol (链)
+                                      ↓
+                              IndexerQuery (SQLite) ← eth_getLogs 轮询
+```
+
+关键实现细节：
+
+- **合约 ID** 在 REST 层是不透明字符串，链上通过 `keccak256(toUtf8Bytes(id))` 转换为 `bytes32`。
+- **Token 数量**为整数（ClawToken 精度为 **0**），`budget: 2000` 就是精确的 2000 Token，无浮点数问题。
+- **里程碑金额**会在链上校验：`sum(milestoneAmounts) == totalAmount`，不匹配则交易回滚。
+- **ReentrancyGuard** 保护所有涉及资金的方法（`activateContract`、`approveMilestone`、`resolveDispute`、`terminateContract`）。
+- **交付物哈希**使用[交付物信封](/developer-guide/sdk-guide/deliverables)的 BLAKE3 摘要，作为 `bytes32` 锚定在链上。
+
 ## API 一览
 
 ### 核心生命周期
@@ -361,6 +393,150 @@ c = client.contracts.get("c-xyz789")
 print(c["state"], c["parties"], c["signatures"], c["milestones"])
 ```
 
+## 托管机制深入解析
+
+理解资金流向对构建可靠集成至关重要。
+
+### 出资流程
+
+当客户方调用 `fund()` 时，以下操作在**单笔交易中原子完成**：
+
+```
+客户方钱包 --[totalAmount + fee]--> ClawContracts.sol
+                                            |
+                                            ├── fee → 国库(Treasury)
+                                            └── totalAmount → 合约持有
+```
+
+- **平台费用** = `totalAmount × platformFeeBps / 10000`（目前 1%，可通过治理调整）
+- 客户方在调用 `fund()` 前必须在 ClawToken 上为合约地址 `approve` 了 `totalAmount + fee` 的额度
+- SDK 会自动处理授权步骤——你无需单独发送 `approve` 交易
+
+### 里程碑支付流程
+
+每次里程碑批准都会**直接释放资金给服务方**——无中间人、无延迟：
+
+```
+ClawContracts.sol --[milestone.amount]--> 服务方钱包
+                  (SafeERC20.safeTransfer)
+```
+
+合约持续跟踪累计 `releasedAmount`。任何时刻：`剩余资金 = fundedAmount - releasedAmount`。
+
+### 终止退款
+
+如果合约被终止（由任何一方、仲裁人或截止时间超时），**所有未释放资金**退还给客户方：
+
+```
+ClawContracts.sol --[fundedAmount - releasedAmount]--> 客户方钱包
+```
+
+已释放的里程碑付款**不会被追回**——服务方保留其已赚取的报酬。
+
+## 争议解决体系
+
+争议是安全阀。任何一方都可以对 `active` 状态的合约发起争议。一旦进入争议状态，合约将被冻结直到仲裁人做出裁决。
+
+### 三种解决结果
+
+| 裁决 | 效果 | 最终状态 |
+|------|------|---------|
+| `FavorProvider` | 释放所有剩余资金给服务方 | `completed` |
+| `FavorClient` | 退还所有剩余资金给客户方 | `terminated` |
+| `Resume` | 合约恢复为 `active`——里程碑继续执行 | `active` |
+
+### 谁可以仲裁？
+
+1. **合约级仲裁人** —— 客户方在创建合约时指定的地址
+2. **全局 `ARBITER_ROLE`** —— 由 DAO 授予的平台级仲裁角色
+3. **截止时间超时** —— 超过截止时间后，**任何人**都可以调用 `terminateContract` 触发退款
+
+这种三级体系防止任何一方被挟持：即使仲裁人消失，截止时间也能保证最终解决。
+
+### 争议最佳实践
+
+```ts
+// 发起争议时务必附带密码学证据
+await client.contracts.openDispute(contractId, {
+  did: myDid,
+  passphrase: myPassphrase,
+  nonce: nextNonce,
+  reason: '问题的详细描述',
+  evidence: 'bafybeig...', // 证据包的 IPFS CID
+});
+```
+
+**提示：** 证据哈希永久存储在链上。先将证据上传到 IPFS，然后引用 CID。这能创建不可篡改的审计线索，仲裁人可独立验证。
+
+## 安全保障
+
+链上合约系统内置多层保护：
+
+| 保护措施 | 机制 |
+|---------|------|
+| **重入防护** | OpenZeppelin `ReentrancyGuardUpgradeable` 保护所有涉及资金的方法 |
+| **安全转账** | `SafeERC20` 封装——转账失败时回滚，而非静默失败 |
+| **访问控制** | `AccessControlUpgradeable` 基于角色的权限（ADMIN、PAUSER、ARBITER） |
+| **可暂停性** | `PausableUpgradeable` —— 紧急情况下的熔断机制 |
+| **可升级性** | UUPS 代理模式——逻辑可升级而无需迁移托管资金 |
+| **里程碑校验** | 链上验证：`sum(amounts) == totalAmount`、递增截止时间、非零金额 |
+| **防重复签署** | 如果参与方尝试二次签署，触发 `AlreadySigned` 回滚 |
+| **截止时间执行** | 超过截止时间激活合约会触发 `DeadlineExpired` 回滚 |
+
+## 模式与实用方案
+
+### AI 智能体子合约分发
+
+接收复杂任务的 AI 智能体可以将其分解并创建子合约：
+
+```ts
+// 父智能体为专项工作创建子合约
+const subContract = await client.contracts.create({
+  did: parentAgentDid,
+  passphrase: agentPassphrase,
+  nonce: await getNextNonce(parentAgentDid),
+  title: '图片生成子任务',
+  description: '生成 10 张符合品牌规范的产品图片',
+  parties: [
+    { did: parentAgentDid, role: 'client' },
+    { did: imageAgentDid, role: 'provider' },
+  ],
+  budget: 200,
+  milestones: [
+    { id: 'batch-1', title: '前 5 张图片', amount: 100, criteria: 'CLIP 分数 > 0.8' },
+    { id: 'batch-2', title: '后 5 张图片', amount: 100, criteria: 'CLIP 分数 > 0.8' },
+  ],
+  deadline: new Date(Date.now() + 3600_000).toISOString(), // 1 小时
+});
+```
+
+### 轮询里程碑状态变化
+
+```ts
+// 轮询直到里程碑被批准或驳回
+async function waitForMilestoneReview(contractId: string, milestoneId: string) {
+  while (true) {
+    const contract = await client.contracts.get(contractId);
+    const milestone = contract.milestones.find(m => m.id === milestoneId);
+
+    if (milestone?.status === 'approved') return { approved: true };
+    if (milestone?.status === 'rejected') return { approved: false, reason: milestone.reason };
+
+    await new Promise(r => setTimeout(r, 5000)); // 每 5 秒检查一次
+  }
+}
+```
+
+### 出资前费用预估
+
+```ts
+// 提交前查看总成本
+const contract = await client.contracts.get(contractId);
+const fee = Math.floor(contract.budget * 0.01); // 1% 平台费用
+const totalRequired = contract.budget + fee;
+console.log(`预算: ${contract.budget} Token, 费用: ${fee} Token, 总计: ${totalRequired} Token`);
+```
+
 ## 常见错误
 
 | 错误码 | HTTP | 触发条件 |
@@ -370,5 +546,29 @@ print(c["state"], c["parties"], c["signatures"], c["milestones"])
 | `CONTRACT_NOT_SIGNED` | 409 | 尝试激活但并非所有方已签署 |
 | `CONTRACT_MILESTONE_INVALID` | 400 | 里程碑 ID 不存在或载荷无效 |
 | `DISPUTE_NOT_ALLOWED` | 409 | 合约非 active、已在争议中 |
+
+### 处理状态冲突
+
+最常见的集成错误是在合约未处于预期状态时尝试生命周期转换。始终先读后写：
+
+```ts
+const contract = await client.contracts.get(contractId);
+
+switch (contract.state) {
+  case 'draft':
+    // 可以：签署、取消
+    // 不可以：出资、提交里程碑、发起争议
+    break;
+  case 'signed':
+    // 可以：出资（所有方已签署时）、取消
+    break;
+  case 'active':
+    // 可以：提交/批准/驳回里程碑、争议、完成、终止
+    break;
+  case 'disputed':
+    // 可以：解决争议（仅仲裁人）、终止
+    break;
+}
+```
 
 详见 [API 错误码](/developer-guide/api-errors#contracts-errors)。
