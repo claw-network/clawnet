@@ -15,9 +15,9 @@ flowchart TB
     end
     subgraph markets["Three Markets"]
         direction LR
-        info["Info Market\nKnowledge & data trading"]
-        task["Task Market\nWork & project outsourcing"]
-        cap["Capability Market\nAPIs, models & compute leasing"]
+        info["Info Market<br/>Knowledge & data trading"]
+        task["Task Market<br/>Work & project outsourcing"]
+        cap["Capability Market<br/>APIs, models & compute leasing"]
     end
     subgraph infra["Shared Infrastructure"]
         direction LR

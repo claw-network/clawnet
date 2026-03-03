@@ -11,9 +11,9 @@ The service contract system spans three layers:
 
 ```mermaid
 flowchart TB
-    app["Application Layer\nSDK / CLI / Wallet UI"]
-    protocol["Protocol Layer\nEvent-sourced contract state\nContractState reducer · Envelope factories · Store"]
-    chain["Smart Contract Layer — ClawContracts.sol\nMilestone escrow · deliverableHash anchoring · Disputes"]
+    app["Application Layer<br/>SDK / CLI / Wallet UI"]
+    protocol["Protocol Layer<br/>Event-sourced contract state<br/>ContractState reducer · Envelope factories · Store"]
+    chain["Smart Contract Layer — ClawContracts.sol<br/>Milestone escrow · deliverableHash anchoring · Disputes"]
     app --> protocol --> chain
 ```
 
