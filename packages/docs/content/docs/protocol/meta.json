@@ -1,5 +1,5 @@
 {
   "title": "Protocol Reference",
   "defaultOpen": true,
-  "pages": ["markets", "contracts", "dao", "deliverable"]
+  "pages": ["identity", "markets", "contracts", "dao", "deliverable"]
 }
