@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useReducer, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
 import { ApiClient } from '../api/client';
 
 // ─── Types ──────────────────────────────────────────────────────
@@ -45,6 +45,8 @@ export interface AppState {
   connection: ConnectionState;
   balance: BalanceState;
   history: HistoryState;
+  /** true while auto-reconnect is in progress on page load */
+  reconnecting: boolean;
 }
 
 // ─── Actions ────────────────────────────────────────────────────
@@ -52,6 +54,8 @@ export interface AppState {
 type Action =
   | { type: 'CONNECTED'; payload: { did: string; network: string; version: string; baseUrl: string; apiKey: string } }
   | { type: 'DISCONNECTED' }
+  | { type: 'RECONNECTING' }
+  | { type: 'RECONNECT_FAILED' }
   | { type: 'BALANCE_LOADING' }
   | { type: 'BALANCE_LOADED'; payload: { balance: number; available: number; pending: number; locked: number } }
   | { type: 'BALANCE_ERROR' }
@@ -82,6 +86,7 @@ const initialState: AppState = {
   },
   balance: { balance: 0, available: 0, pending: 0, locked: 0, loading: false },
   history: { transactions: [], total: 0, hasMore: false, page: 1, loading: false },
+  reconnecting: false,
 };
 
 // ─── Reducer ────────────────────────────────────────────────────
@@ -104,7 +109,12 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...initialState,
         connection: { ...initialState.connection, connected: false },
+        reconnecting: false,
       };
+    case 'RECONNECTING':
+      return { ...state, reconnecting: true };
+    case 'RECONNECT_FAILED':
+      return { ...state, reconnecting: false };
     case 'BALANCE_LOADING':
       return { ...state, balance: { ...state.balance, loading: true } };
     case 'BALANCE_LOADED':
@@ -147,6 +157,32 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const apiRef = useRef(
     new ApiClient({ baseUrl: initialState.connection.baseUrl, apiKey: initialState.connection.apiKey || undefined }),
   );
+
+  // Auto-reconnect on mount if localStorage has saved connection
+  useEffect(() => {
+    if (savedConn.connected && savedConn.baseUrl) {
+      dispatch({ type: 'RECONNECTING' });
+      apiRef.current.updateConfig({ baseUrl: savedConn.baseUrl, apiKey: savedConn.apiKey || undefined });
+      apiRef.current.getNodeStatus().then(
+        (status) => {
+          dispatch({
+            type: 'CONNECTED',
+            payload: {
+              did: status.did,
+              network: status.network,
+              version: status.version,
+              baseUrl: savedConn.baseUrl!,
+              apiKey: savedConn.apiKey || '',
+            },
+          });
+        },
+        () => {
+          dispatch({ type: 'RECONNECT_FAILED' });
+        },
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const connect = useCallback(async (baseUrl: string, apiKey: string) => {
     apiRef.current.updateConfig({ baseUrl, apiKey: apiKey || undefined });
