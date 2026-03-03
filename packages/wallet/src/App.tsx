@@ -1,5 +1,5 @@
 import React from 'react';
-import { IonApp, IonRouterOutlet, IonTabs, IonTabBar, IonTabButton, IonIcon, IonLabel, IonPage, IonContent, IonSpinner, IonText, IonButton, setupIonicReact } from '@ionic/react';
+import { IonApp, IonRouterOutlet, IonTabs, IonTabBar, IonTabButton, IonIcon, IonLabel, IonSpinner, IonText, IonButton, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Route, Redirect } from 'react-router-dom';
 import { walletOutline, sendOutline, timeOutline, lockClosedOutline } from 'ionicons/icons';
@@ -70,35 +70,38 @@ const MainTabs: React.FC = () => {
 const AppRoutes: React.FC = () => {
   const { state, skipReconnect } = useWallet();
 
-  // While auto-reconnecting, don't redirect — show a brief splash
-  if (state.reconnecting) {
-    return (
+  return (
+    <>
+      {/* Reconnecting overlay — fixed position so IonRouterOutlet is never swapped */}
+      {state.reconnecting && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            background: 'var(--ion-background-color, #0a0a0f)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IonSpinner name="crescent" style={{ width: 32, height: 32, marginBottom: 16 }} />
+          <IonText color="medium"><p style={{ fontSize: '0.9rem', margin: 0 }}>Reconnecting…</p></IonText>
+          <IonButton fill="clear" size="small" color="medium" onClick={skipReconnect} style={{ marginTop: 16 }}>
+            Skip
+          </IonButton>
+        </div>
+      )}
+
       <IonRouterOutlet>
-        <Route>
-          <IonPage>
-            <IonContent className="ion-padding" style={{ '--background': 'var(--ion-background-color)' } as React.CSSProperties}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                <IonSpinner name="crescent" style={{ width: 32, height: 32, marginBottom: 16 }} />
-                <IonText color="medium"><p style={{ fontSize: '0.9rem' }}>Reconnecting…</p></IonText>
-                <IonButton fill="clear" size="small" color="medium" onClick={skipReconnect} style={{ marginTop: 16 }}>
-                  Skip
-                </IonButton>
-              </div>
-            </IonContent>
-          </IonPage>
+        <Route exact path="/connect" component={ConnectPage} />
+        <Route path="/tabs" component={MainTabs} />
+        <Route exact path="/">
+          {state.connection.connected ? <Redirect to="/tabs/dashboard" /> : <Redirect to="/connect" />}
         </Route>
       </IonRouterOutlet>
-    );
-  }
-
-  return (
-    <IonRouterOutlet>
-      <Route exact path="/connect" component={ConnectPage} />
-      <Route path="/tabs" component={MainTabs} />
-      <Route exact path="/">
-        {state.connection.connected ? <Redirect to="/tabs/dashboard" /> : <Redirect to="/connect" />}
-      </Route>
-    </IonRouterOutlet>
+    </>
   );
 };
 

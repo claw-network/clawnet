@@ -96,6 +96,7 @@ function reducer(state: AppState, action: Action): AppState {
     case 'CONNECTED':
       return {
         ...state,
+        reconnecting: false,
         connection: {
           connected: true,
           baseUrl: action.payload.baseUrl,
