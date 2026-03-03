@@ -436,6 +436,33 @@ export class P2PNode {
     return this.node.dialProtocol(peerId, protocol);
   }
 
+  /**
+   * Re-dial all configured bootstrap multiaddrs.
+   * Useful when connections have been lost and the node needs to rejoin the mesh.
+   * Returns the number of successfully (re-)connected bootstrap peers.
+   */
+  async reconnectBootstrap(): Promise<number> {
+    if (!this.node?.dial) return 0;
+    let connected = 0;
+    const currentPeers = new Set(this.getConnections());
+    for (const addr of this.config.bootstrap) {
+      try {
+        // Extract peerId from the /p2p/<id> component to skip already-connected peers
+        const p2pMatch = addr.match(/\/p2p\/([^/]+)$/);
+        const peerIdStr = p2pMatch?.[1];
+        if (peerIdStr && currentPeers.has(peerIdStr)) {
+          connected++; // already connected
+          continue;
+        }
+        await this.node.dial(multiaddr(addr));
+        connected++;
+      } catch {
+        // bootstrap peer may be temporarily unreachable
+      }
+    }
+    return connected;
+  }
+
   private getPubsub(): PubsubService {
     const pubsub = this.node?.services?.pubsub;
     if (!pubsub) {

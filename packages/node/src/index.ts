@@ -744,14 +744,22 @@ export class ClawNetNode {
   }
 
   /**
-   * Periodically run KadDHT random walks to discover peers beyond bootstrap.
-   * Runs every 5 s for the first 60 s, then stops because the mesh should
-   * have converged by then.
+   * Persistent connection watchdog with two phases:
+   *
+   *   Phase 1 (0–60 s): Aggressive mesh amplification every 5 s.
+   *                       Discovers peers via DHT random-walk + peerStore dial.
+   *   Phase 2 (60 s+):   Every 30 s, check connection count. If below
+   *                       `minConnections` (1), re-dial bootstrap peers and
+   *                       run another amplify cycle to rejoin the mesh.
+   *
+   * This replaces the old one-shot amplifier that stopped permanently after 60 s
+   * and left the node unable to reconnect after transient network disruptions.
    */
   private startMeshAmplifier(): void {
     let attempts = 0;
-    const maxAttempts = 12; // 12 × 5 s = 60 s
-    const intervalMs = 5_000;
+    const aggressiveAttempts = 12; // 12 × 5 s = 60 s
+    const aggressiveIntervalMs = 5_000;
+    const watchdogIntervalMs = 30_000;
 
     const amplify = async () => {
       attempts++;
@@ -763,16 +771,43 @@ export class ClawNetNode {
       } catch {
         // best-effort
       }
-      if (attempts >= maxAttempts) {
-        this.stopMeshAmplifier();
+      if (attempts === aggressiveAttempts) {
+        // Transition from aggressive phase to watchdog phase
+        if (this.meshAmplifierTimer) {
+          clearInterval(this.meshAmplifierTimer);
+        }
         const conns = this.p2p?.getConnections().length ?? 0;
-        console.log(`[mesh] amplification complete — ${conns} peer connection(s)`);
+        console.log(`[mesh] aggressive phase complete — ${conns} peer connection(s), switching to watchdog`);
+        this.meshAmplifierTimer = setInterval(() => void watchdog(), watchdogIntervalMs);
       }
     };
 
-    // First attempt immediately, then every 5 s
+    const watchdog = async () => {
+      const conns = this.p2p?.getConnections().length ?? 0;
+      if (conns > 0) return; // mesh is healthy
+
+      console.log(`[mesh] 0 connections detected — attempting reconnect`);
+      try {
+        const bootstrapCount = await this.p2p?.reconnectBootstrap() ?? 0;
+        if (bootstrapCount > 0) {
+          console.log(`[mesh] reconnected to ${bootstrapCount} bootstrap peer(s)`);
+        }
+        // Also try DHT walk to discover non-bootstrap peers
+        const n = await this.p2p?.amplifyMesh() ?? 0;
+        if (n > 0) {
+          console.log(`[mesh] +${n} additional peer(s) via DHT walk`);
+        }
+        if (bootstrapCount === 0 && n === 0) {
+          console.log(`[mesh] reconnect failed — will retry in ${watchdogIntervalMs / 1000}s`);
+        }
+      } catch {
+        // best-effort reconnect
+      }
+    };
+
+    // First attempt immediately, then every 5 s for the aggressive phase
     void amplify();
-    this.meshAmplifierTimer = setInterval(() => void amplify(), intervalMs);
+    this.meshAmplifierTimer = setInterval(() => void amplify(), aggressiveIntervalMs);
   }
 
   private stopMeshAmplifier(): void {
