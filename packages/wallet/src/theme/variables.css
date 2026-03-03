@@ -93,13 +93,13 @@ body {
   --ion-color-step-900: #888ba9;
   --ion-color-step-950: #8f93b2;
 
-  --ion-toolbar-background: #0e0f16;
-  --ion-tab-bar-background: #0e0f16;
-  --ion-tab-bar-color: #64748b;
+  --ion-toolbar-background: #0c0d14;
+  --ion-tab-bar-background: #0c0d14;
+  --ion-tab-bar-color: #4a5568;
   --ion-tab-bar-color-selected: #60a5fa;
 
-  --ion-item-background: #12131a;
-  --ion-card-background: #14151e;
+  --ion-item-background: #111219;
+  --ion-card-background: #111219;
 }
 
 ion-modal {

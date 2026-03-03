@@ -1,5 +1,6 @@
 /**
  * ClawNet Wallet — global style overrides.
+ * Modern dark wallet theme inspired by Phantom / Trust Wallet.
  */
 
 /* ─── Font ──────────────────────────────── */
@@ -9,12 +10,15 @@
   --ion-font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
   --claw-font-mono: 'IBM Plex Mono', 'Courier New', monospace;
 
-  /* Custom brand tokens */
-  --claw-accent-soft: rgba(0, 84, 233, 0.12);
-  --claw-accent-glow: rgba(0, 84, 233, 0.25);
-  --claw-green-soft: rgba(34, 197, 94, 0.12);
-  --claw-red-soft: rgba(239, 68, 68, 0.12);
-  --claw-yellow-soft: rgba(234, 179, 8, 0.12);
+  /* Brand tokens */
+  --claw-accent-soft: rgba(96, 165, 250, 0.10);
+  --claw-accent-glow: rgba(96, 165, 250, 0.20);
+  --claw-green-soft: rgba(34, 197, 94, 0.10);
+  --claw-red-soft: rgba(239, 68, 68, 0.10);
+  --claw-yellow-soft: rgba(234, 179, 8, 0.10);
+  --claw-surface: rgba(255, 255, 255, 0.03);
+  --claw-surface-hover: rgba(255, 255, 255, 0.06);
+  --claw-border: rgba(255, 255, 255, 0.06);
 }
 
 body {
@@ -24,51 +28,356 @@ body {
 
 /* ─── Utility classes ───────────────────── */
 
-.mono {
-  font-family: var(--claw-font-mono) !important;
+.mono { font-family: var(--claw-font-mono) !important; }
+.text-muted { color: var(--ion-color-medium) !important; }
+.text-success { color: var(--ion-color-success) !important; }
+.text-danger { color: var(--ion-color-danger) !important; }
+
+/* ═══════════════════════════════════════════
+   Dashboard Hero
+   ═══════════════════════════════════════════ */
+
+.dash-hero {
+  position: relative;
+  padding: 16px 20px 24px;
+  background: linear-gradient(175deg, rgba(96, 165, 250, 0.08) 0%, rgba(0, 84, 233, 0.04) 40%, transparent 70%);
 }
 
-.text-muted {
-  color: var(--ion-color-medium) !important;
-}
-
-.text-success {
-  color: var(--ion-color-success) !important;
-}
-
-.text-danger {
-  color: var(--ion-color-danger) !important;
-}
-
-/* ─── Balance card grid ─────────────────── */
-
-.balance-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.dash-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
+  padding-top: env(safe-area-inset-top, 0);
 }
 
-.balance-grid .primary-card {
-  grid-column: span 2;
+.dash-network-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ion-color-medium);
+  background: var(--claw-surface);
+  border: 1px solid var(--claw-border);
+  border-radius: 20px;
+  padding: 4px 12px 4px 8px;
 }
 
-/* Tablet / iPad landscape */
-@media (min-width: 768px) {
-  .balance-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-  .balance-grid .primary-card {
-    grid-column: span 2;
-  }
+.dash-network-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ion-color-success);
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
 }
 
-/* ─── Transaction items ─────────────────── */
+.dash-icon-btn {
+  background: var(--claw-surface);
+  border: 1px solid var(--claw-border);
+  border-radius: 10px;
+  color: var(--ion-color-medium);
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.dash-icon-btn:hover,
+.dash-icon-btn:active {
+  background: var(--claw-surface-hover);
+  color: var(--ion-text-color);
+}
+
+/* DID chip */
+.dash-did-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--claw-surface);
+  border: 1px solid var(--claw-border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.76rem;
+  color: var(--ion-color-medium);
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 20px;
+}
+
+.dash-did-chip:hover,
+.dash-did-chip:active {
+  background: var(--claw-surface-hover);
+}
+
+/* Main balance */
+.dash-balance-main {
+  text-align: center;
+  margin-bottom: 16px;
+  min-height: 56px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dash-balance-amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #ffffff 30%, #60a5fa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dash-balance-unit {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ion-color-medium);
+  letter-spacing: 0.5px;
+}
+
+/* Sub-balances row */
+.dash-balance-sub {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 28px;
+  background: var(--claw-surface);
+  border: 1px solid var(--claw-border);
+  border-radius: 14px;
+  padding: 12px 4px;
+}
+
+.dash-sub-item {
+  flex: 1;
+  text-align: center;
+}
+
+.dash-sub-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--ion-color-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.dash-sub-value {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ion-text-color);
+}
+
+.dash-sub-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--claw-border);
+}
+
+/* Action circles */
+.dash-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.dash-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--ion-color-medium);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  transition: color 0.2s;
+}
+
+.dash-action-btn:hover,
+.dash-action-btn:active {
+  color: var(--ion-text-color);
+}
+
+.dash-action-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: linear-gradient(135deg, rgba(0, 84, 233, 0.25), rgba(96, 165, 250, 0.15));
+  color: #60a5fa;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.dash-action-circle.receive {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.25), rgba(34, 197, 94, 0.10));
+  color: #22c55e;
+}
+
+.dash-action-circle.escrow {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.25), rgba(234, 179, 8, 0.10));
+  color: #eab308;
+}
+
+.dash-action-circle.history {
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.08));
+  color: #94a3b8;
+}
+
+.dash-action-btn:active .dash-action-circle {
+  transform: scale(0.92);
+}
+
+/* ═══════════════════════════════════════════
+   Transaction Section
+   ═══════════════════════════════════════════ */
+
+.dash-tx-section {
+  padding: 4px 20px 24px;
+}
+
+.dash-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.dash-section-header h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--ion-text-color);
+}
+
+.dash-see-all {
+  background: none;
+  border: none;
+  color: var(--ion-color-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.dash-tx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--claw-surface);
+  border: 1px solid var(--claw-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.dash-tx-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  gap: 12px;
+  transition: background 0.15s;
+}
+
+.dash-tx-item:not(:last-child) {
+  border-bottom: 1px solid var(--claw-border);
+}
+
+.dash-tx-item:hover {
+  background: var(--claw-surface-hover);
+}
+
+.dash-tx-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-tx-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ion-text-color);
+}
+
+.dash-tx-addr {
+  font-size: 0.7rem;
+  color: var(--ion-color-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-tx-right {
+  text-align: right;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.dash-tx-amount {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.dash-tx-amount.sent { color: var(--ion-color-danger); }
+.dash-tx-amount.received { color: var(--ion-color-success); }
+.dash-tx-amount.escrow { color: var(--ion-color-warning); }
+
+.dash-tx-time {
+  font-size: 0.68rem;
+  color: var(--ion-color-medium);
+}
+
+/* Empty state */
+.dash-tx-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  background: var(--claw-surface);
+  border: 1px solid var(--claw-border);
+  border-radius: 16px;
+}
+
+.dash-tx-empty > ion-icon {
+  font-size: 36px;
+  opacity: 0.15;
+  margin-bottom: 12px;
+}
+
+.dash-tx-empty p {
+  margin: 0;
+}
+
+/* ═══════════════════════════════════════════
+   Transaction Icon (shared across pages)
+   ═══════════════════════════════════════════ */
 
 .tx-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,7 +400,9 @@ body {
   color: var(--ion-color-warning);
 }
 
-/* ─── Connect page branding ─────────────── */
+/* ═══════════════════════════════════════════
+   Connect Page
+   ═══════════════════════════════════════════ */
 
 .connect-logo svg {
   width: 48px;
@@ -99,39 +410,124 @@ body {
   margin-bottom: 8px;
 }
 
-/* ─── Safe area for notched devices ─────── */
+.connect-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 2rem 20px;
+}
+
+.connect-container h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 16px 0 6px;
+  letter-spacing: -0.3px;
+}
+
+.connect-container form {
+  width: 100%;
+  margin-top: 32px;
+}
+
+/* ═══════════════════════════════════════════
+   Safe Areas & Global Overrides
+   ═══════════════════════════════════════════ */
 
 ion-tab-bar {
   padding-bottom: env(safe-area-inset-bottom, 0);
+  border-top: 1px solid var(--claw-border);
 }
 
 ion-content {
   --padding-bottom: calc(16px + env(safe-area-inset-bottom, 0));
 }
 
-/* ─── Cards refinement ──────────────────── */
-
+/* Softer cards */
 ion-card {
   border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
+  border: 1px solid var(--claw-border);
+  background: var(--claw-surface);
 }
 
 ion-card-header {
   padding-bottom: 8px;
 }
 
-/* ─── Skeleton shimmer ──────────────────── */
-
+/* Skeleton shimmer */
 ion-skeleton-text {
-  --background: rgba(148, 163, 184, 0.08);
+  --background: rgba(148, 163, 184, 0.06);
   --background-rgb: 148, 163, 184;
 }
 
-/* ─── Tablet / Desktop max width ────────── */
-
+/* Tablet / Desktop max width */
 @media (min-width: 992px) {
-  ion-content .content-inner {
-    max-width: 720px;
-    margin: 0 auto;
+  .dash-hero,
+  .dash-tx-section {
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
+
+/* ═══════════════════════════════════════════
+   Page header styling (non-dashboard pages)
+   ═══════════════════════════════════════════ */
+
+ion-toolbar {
+  --border-width: 0;
+  --min-height: 48px;
+}
+
+ion-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.2px;
+}
+
+/* Segment tabs polish */
+ion-segment {
+  --background: transparent;
+}
+
+ion-segment-button {
+  --indicator-color: var(--ion-color-primary);
+  --color: var(--ion-color-medium);
+  --color-checked: var(--ion-text-color);
+  font-size: 0.82rem;
+  font-weight: 500;
+  min-height: 36px;
+  text-transform: none;
+}
+
+/* IonList in sub-pages */
+ion-list {
+  background: var(--claw-surface);
+  border: 1px solid var(--claw-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+ion-item {
+  --background: transparent;
+  --border-color: var(--claw-border);
+  --min-height: 56px;
+}
+
+/* Buttons polish */
+ion-button {
+  --border-radius: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+/* Input fields polish */
+ion-input[fill="outline"],
+ion-textarea[fill="outline"] {
+  --border-radius: 12px;
+}
+

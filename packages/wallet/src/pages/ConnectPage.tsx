@@ -42,38 +42,29 @@ const ConnectPage: React.FC = () => {
   return (
     <IonPage>
       <IonContent className="ion-padding" scrollY={true}>
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '100%',
-            maxWidth: 420,
-            margin: '0 auto',
-            padding: '2rem 0',
-          }}
-        >
-          <div className="connect-logo" style={{ textAlign: 'center', marginBottom: 32 }}>
-            <ClawLogo size={64} />
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '12px 0 4px' }}>ClawNet Wallet</h1>
+        <div className="connect-container">
+          <div className="connect-logo" style={{ textAlign: 'center' }}>
+            <ClawLogo size={56} />
+            <h1>ClawNet Wallet</h1>
             <IonText color="medium">
-              <p style={{ fontSize: '0.9rem', margin: 0 }}>Connect to your ClawNet node to manage Tokens</p>
+              <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
+                Connect to your ClawNet node to manage Tokens
+              </p>
             </IonText>
           </div>
 
-          <form onSubmit={handleConnect} style={{ width: '100%' }}>
+          <form onSubmit={handleConnect}>
             <IonInput
               label="Node URL"
               labelPlacement="stacked"
               type="url"
-              placeholder="http://127.0.0.1:9528"
+              placeholder="https://api.clawnetd.com"
               value={baseUrl}
               onIonInput={(e) => setBaseUrl(e.detail.value ?? '')}
               fill="outline"
               className="mono"
               style={{ marginBottom: 16 }}
-              helperText="The HTTP REST API endpoint of your ClawNet node (port 9528)"
+              helperText="The HTTP REST API endpoint of your ClawNet node"
               required
             />
 
@@ -86,22 +77,22 @@ const ConnectPage: React.FC = () => {
               onIonInput={(e) => setApiKey(e.detail.value ?? '')}
               fill="outline"
               className="mono"
-              style={{ marginBottom: 24 }}
+              style={{ marginBottom: 28 }}
             />
 
-            <IonButton expand="block" type="submit" disabled={loading}>
+            <IonButton expand="block" type="submit" disabled={loading} style={{ '--border-radius': '14px' }}>
               {loading ? <IonSpinner name="crescent" /> : 'Connect'}
             </IonButton>
           </form>
 
-          <IonText color="medium" style={{ marginTop: 24, textAlign: 'center' }}>
-            <p style={{ fontSize: '0.82rem' }}>
+          <IonText color="medium" style={{ marginTop: 28, textAlign: 'center' }}>
+            <p style={{ fontSize: '0.78rem' }}>
               Don't have a node?{' '}
               <a
                 href="https://docs.clawnetd.com/getting-started/deployment"
                 target="_blank"
                 rel="noopener"
-                style={{ color: 'var(--ion-color-primary)' }}
+                style={{ color: 'var(--ion-color-secondary)' }}
               >
                 Get started →
               </a>
