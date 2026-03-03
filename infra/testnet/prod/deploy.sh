@@ -2,15 +2,14 @@
 # ==============================================================================
 # ClawNet Testnet — Full Redeployment Script
 # ==============================================================================
-# This script performs a complete testnet redeployment on all 4 servers:
+# This script performs a complete testnet redeployment on all 3 servers:
 #   1. Stop existing Geth on all servers
 #   2. Wipe chain data
 #   3. Upload genesis.json and re-initialize
-#   4. Import validator keys (A/B/C only — D is non-validator)
+#   4. Import validator keys
 #   5. Create .env files + security hardening
 #   6. Start Server A (mining), wait for blocks
 #   7. Start Server B & C (sync then mine)
-#   7b. Start Server D (sync-only, non-validator full node)
 #   8. Deploy contracts
 #   9. Run bootstrap mint
 #
@@ -102,10 +101,9 @@ if [[ "$LIQUIDITY_ADDRESS" == "$RESERVE_ADDRESS" ]]; then
 fi
 
 # Server config
-SERVER_A="${SERVER_A:-66.94.125.242}"      # geth-a  — Validator 1, primary, api.clawnetd.com
-SERVER_B="${SERVER_B:-167.86.93.216}"     # bob     — Validator 2
-SERVER_C="${SERVER_C:-85.239.235.67}"     # geth-c  — Validator 3
-SERVER_D="${SERVER_D:-173.249.46.252}"    # alice   — Non-validator full node
+SERVER_A="${SERVER_A:-66.94.125.242}"
+SERVER_B="${SERVER_B:-85.239.236.49}"
+SERVER_C="${SERVER_C:-85.239.235.67}"
 SSH_PASS="${SSH_PASSWORD:-G66tdTcmvBz*k1sf}"
 SSH_CMD="sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no"
 CLAW_PASSPHRASE="${CLAW_PASSPHRASE:-$(openssl rand -hex 32)}"
@@ -146,17 +144,10 @@ rpc_peer_count() {
 
 install_peer_clawnetd_service() {
   local host="$1"
-  shift  # remaining args are bootstrap multiaddrs
+  local bootstrap_multiaddr="$2"
 
   echo "  [$host] Writing /opt/clawnet/node-data/config.yaml..."
   run_remote "$host" "mkdir -p /opt/clawnet/node-data"
-
-  # Build bootstrap list from all supplied multiaddrs
-  local bootstrap_yaml=""
-  for addr in "$@"; do
-    bootstrap_yaml="${bootstrap_yaml}    - ${addr}\n"
-  done
-
   run_remote "$host" "cat > /opt/clawnet/node-data/config.yaml << CFGEOF
 v: 1
 network: testnet
@@ -165,7 +156,8 @@ p2p:
   listen:
     - /ip4/0.0.0.0/tcp/9527
   bootstrap:
-$(echo -e "$bootstrap_yaml")
+    - $bootstrap_multiaddr
+
 logging:
   level: info
 
@@ -297,55 +289,6 @@ CADDYEOF"
   echo "  [$host] Docs deployment complete ($docs_domain → localhost:3001)."
 }
 
-# Build and deploy the wallet webapp (static SPA via Vite)
-install_wallet_site() {
-  local host="$1"
-  local wallet_domain="$2"
-
-  echo "  [$host] Building wallet web app..."
-  run_remote "$host" "cd /opt/clawnet && pnpm install --filter @claw-network/wallet && cd packages/wallet && pnpm exec vite build"
-
-  # Add wallet static site block to Caddyfile if not already present
-  local HAS_WALLET_BLOCK
-  HAS_WALLET_BLOCK=$(run_remote "$host" "grep -c '$wallet_domain' /etc/caddy/Caddyfile 2>/dev/null || echo 0")
-  if [[ "$HAS_WALLET_BLOCK" == "0" ]]; then
-    echo "  [$host] Adding $wallet_domain to Caddyfile..."
-    run_remote "$host" "cat >> /etc/caddy/Caddyfile << 'CADDYEOF'
-
-# ── Wallet Web App ───────────────────────────────────────────────────────
-$wallet_domain {
-    root * /opt/clawnet/packages/wallet/dist
-    try_files {path} /index.html
-    file_server
-
-    header {
-        Strict-Transport-Security \"max-age=63072000; includeSubDomains\"
-        X-Content-Type-Options    nosniff
-        X-Frame-Options           SAMEORIGIN
-        Referrer-Policy           strict-origin-when-cross-origin
-        -Server
-    }
-
-    log {
-        output file /var/log/caddy/wallet-access.log {
-            roll_size 50mb
-            roll_keep 5
-        }
-    }
-}
-CADDYEOF"
-  else
-    echo "  [$host] Caddyfile already contains $wallet_domain, skipping."
-  fi
-
-  # Ensure log file has correct ownership
-  run_remote "$host" "touch /var/log/caddy/wallet-access.log && chown caddy:caddy /var/log/caddy/wallet-access.log"
-
-  echo "  [$host] Reloading Caddy..."
-  run_remote "$host" "systemctl reload caddy || systemctl restart caddy"
-  echo "  [$host] Wallet deployment complete ($wallet_domain → static SPA)."
-}
-
 echo ">>> Phase 0: Preflight checks..."
 require_local_command sshpass
 require_local_command ssh
@@ -365,7 +308,7 @@ if [[ "$(uname)" != "Darwin" ]]; then
   chmod 600 "$SECRETS_FILE" 2>/dev/null || true
 fi
 
-for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C; do
   echo "  [preflight] SSH check: $HOST"
   run_remote "$HOST" 'echo ok >/dev/null'
   echo "  [preflight] Runtime check on $HOST"
@@ -384,7 +327,6 @@ echo "Timestamp : $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "Server A  : $SERVER_A (Validator 1 — $VALIDATOR_1_ADDRESS)"
 echo "Server B  : $SERVER_B (Validator 2 — $VALIDATOR_2_ADDRESS)"
 echo "Server C  : $SERVER_C (Validator 3 — $VALIDATOR_3_ADDRESS)"
-echo "Server D  : $SERVER_D (Full node — non-validator peer)"
 echo "Deployer  : $DEPLOYER_ADDRESS"
 echo "Treasury  : $TREASURY_ADDRESS"
 echo "Liquidity : $LIQUIDITY_ADDRESS"
@@ -396,7 +338,7 @@ echo ""
 # Phase 1: Stop all Geth instances
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 1: Stopping Geth on all servers..."
-for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C; do
   echo "  Stopping Geth on $HOST..."
   run_remote "$HOST" 'cd /opt/clawnet && docker compose -f docker-compose.chain.yml down 2>/dev/null; docker stop clawnet-geth 2>/dev/null; docker rm clawnet-geth 2>/dev/null; echo "done"' || true
 done
@@ -408,7 +350,7 @@ echo ""
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 2: Wiping chain data and re-initializing..."
 
-for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C; do
   echo "  [$HOST] Wiping chain data..."
   run_remote "$HOST" 'rm -rf /opt/clawnet/chain-data/*'
 
@@ -464,7 +406,7 @@ echo ""
 # Phase 4: Update code on all servers
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 4: Updating code on all servers..."
-for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C; do
   echo "  [$HOST] git pull..."
   run_remote "$HOST" 'cd /opt/clawnet && git pull' || true
 done
@@ -487,11 +429,6 @@ run_remote "$SERVER_C" "cat > /opt/clawnet/.env << 'ENVEOF'
 VALIDATOR_ADDRESS=$VALIDATOR_3_ADDRESS
 ENVEOF"
 
-# Server D is a non-validator full node — no VALIDATOR_ADDRESS needed
-run_remote "$SERVER_D" "cat > /opt/clawnet/.env << 'ENVEOF'
-# Non-validator full node (sync only, no mining)
-ENVEOF"
-
 echo "  .env files created."
 echo ""
 
@@ -512,7 +449,7 @@ for f in "$HARDEN_SCRIPT" "$AUDIT_SCRIPT" "$SYSCTL_CONF"; do
   fi
 done
 
-for HOST in $SERVER_A $SERVER_B $SERVER_C $SERVER_D; do
+for HOST in $SERVER_A $SERVER_B $SERVER_C; do
   echo "  [$HOST] Uploading security files..."
   scp_to "$HARDEN_SCRIPT" "$HOST" "/tmp/harden-server.sh"
   scp_to "$AUDIT_SCRIPT"  "$HOST" "/opt/clawnet/security-audit.sh"
@@ -619,31 +556,6 @@ echo "  Server C enode: $ENODE_C"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 8b: Start Server D (sync-only, non-validator full node)
-# ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 8b: Starting Geth on Server D (sync-only, non-validator)..."
-
-BOOTNODES_D="${ENODE_A},${ENODE_B},${ENODE_C}"
-
-run_remote "$SERVER_D" "cd /opt/clawnet && cp infra/testnet/docker-compose.sync.yml docker-compose.chain.yml && \
-  sed -i 's|enode://.*@66.94.125.242:30303|${BOOTNODES_D}|g' docker-compose.chain.yml && \
-  sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${BOOTNODES_D#enode://}|g' docker-compose.chain.yml && \
-  docker compose -f docker-compose.chain.yml up -d"
-
-echo "  Waiting 15s for Server D to sync..."
-sleep 15
-
-D_BLOCK=$(run_remote "$SERVER_D" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"')
-echo "  Server D block number: $D_BLOCK"
-
-# Get enode for Server D
-ENODE_D_RAW=$(run_remote "$SERVER_D" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"admin_nodeInfo\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"result\"][\"enode\"])"')
-ENODE_D=$(echo "$ENODE_D_RAW" | sed "s/127.0.0.1/$SERVER_D/")
-echo "  Server D enode: $ENODE_D"
-echo "  Server D syncing (non-validator, no mining)."
-echo ""
-
-# ══════════════════════════════════════════════════════════════════
 # Phase 9: Deploy contracts
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 9: Deploying smart contracts..."
@@ -716,7 +628,6 @@ cat > "$SCRIPT_DIR/enodes.env" << EOF
 ENODE_A=$ENODE_A
 ENODE_B=$ENODE_B
 ENODE_C=$ENODE_C
-ENODE_D=$ENODE_D
 EOF
 
 echo "  Saved: contracts.json, enodes.env"
@@ -733,19 +644,16 @@ B_BLOCK_FINAL=$(rpc_block_number "$SERVER_B")
 B_PEERS_FINAL=$(rpc_peer_count "$SERVER_B")
 C_BLOCK_FINAL=$(rpc_block_number "$SERVER_C")
 C_PEERS_FINAL=$(rpc_peer_count "$SERVER_C")
-D_BLOCK_FINAL=$(rpc_block_number "$SERVER_D")
-D_PEERS_FINAL=$(rpc_peer_count "$SERVER_D")
 
 echo "  Server A: block=$A_BLOCK_FINAL peers=$A_PEERS_FINAL"
 echo "  Server B: block=$B_BLOCK_FINAL peers=$B_PEERS_FINAL"
 echo "  Server C: block=$C_BLOCK_FINAL peers=$C_PEERS_FINAL"
-echo "  Server D: block=$D_BLOCK_FINAL peers=$D_PEERS_FINAL"
 
-if [[ "$A_BLOCK_FINAL" -le 0 || "$B_BLOCK_FINAL" -le 0 || "$C_BLOCK_FINAL" -le 0 || "$D_BLOCK_FINAL" -le 0 ]]; then
+if [[ "$A_BLOCK_FINAL" -le 0 || "$B_BLOCK_FINAL" -le 0 || "$C_BLOCK_FINAL" -le 0 ]]; then
   echo "ERROR: one or more nodes report block number <= 0"
   exit 1
 fi
-if [[ "$A_PEERS_FINAL" -lt 1 || "$B_PEERS_FINAL" -lt 1 || "$C_PEERS_FINAL" -lt 1 || "$D_PEERS_FINAL" -lt 1 ]]; then
+if [[ "$A_PEERS_FINAL" -lt 1 || "$B_PEERS_FINAL" -lt 1 || "$C_PEERS_FINAL" -lt 1 ]]; then
   echo "ERROR: one or more nodes have peerCount < 1"
   exit 1
 fi
@@ -899,90 +807,39 @@ echo "  clawnetd deployed on Server A."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 14: Deploy clawnetd on all peer servers with full-mesh bootstrap
+# Phase 14: Deploy clawnetd on Server B/C via systemd + node.env
 # ══════════════════════════════════════════════════════════════════
-# Strategy: start nodes sequentially to collect PeerIDs, then re-install
-# ALL nodes (including A) with every other node as a bootstrap peer.
-# This guarantees full-mesh connectivity regardless of restart order.
-echo ">>> Phase 14: Setting up clawnetd on B/C/D + full-mesh bootstrap for all 4 nodes..."
+echo ">>> Phase 14: Setting up clawnetd on Server B/C..."
 
-# --- 14a: Read Server A PeerId ---
 A_NODE_PEER_ID=$(run_remote "$SERVER_A" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'")
 if [[ -z "$A_NODE_PEER_ID" ]]; then
   echo "ERROR: failed to read Server A peerId from clawnetd API"
   exit 1
 fi
-A_BOOTSTRAP="/ip4/$SERVER_A/tcp/9527/p2p/$A_NODE_PEER_ID"
-echo "  A bootstrap: $A_BOOTSTRAP"
 
-# --- 14b: Start B (bootstrap: A only) and read its PeerId ---
-install_peer_clawnetd_service "$SERVER_B" "$A_BOOTSTRAP"
-echo "  Waiting 6s for Server B clawnetd to start..."
-sleep 6
-B_NODE_PEER_ID=$(run_remote "$SERVER_B" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
-B_BOOTSTRAP="/ip4/$SERVER_B/tcp/9527/p2p/$B_NODE_PEER_ID"
-echo "  B bootstrap: $B_BOOTSTRAP"
+A_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_A/tcp/9527/p2p/$A_NODE_PEER_ID"
+echo "  Server A bootstrap addr: $A_BOOTSTRAP_MULTIADDR"
 
-# --- 14c: Start C (bootstrap: A + B) and read its PeerId ---
-install_peer_clawnetd_service "$SERVER_C" "$A_BOOTSTRAP" "$B_BOOTSTRAP"
-echo "  Waiting 6s for Server C clawnetd to start..."
-sleep 6
-C_NODE_PEER_ID=$(run_remote "$SERVER_C" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
-C_BOOTSTRAP="/ip4/$SERVER_C/tcp/9527/p2p/$C_NODE_PEER_ID"
-echo "  C bootstrap: $C_BOOTSTRAP"
+install_peer_clawnetd_service "$SERVER_B" "$A_BOOTSTRAP_MULTIADDR"
+install_peer_clawnetd_service "$SERVER_C" "$A_BOOTSTRAP_MULTIADDR"
 
-# --- 14d: Start D (bootstrap: A + B + C) and read its PeerId ---
-install_peer_clawnetd_service "$SERVER_D" "$A_BOOTSTRAP" "$B_BOOTSTRAP" "$C_BOOTSTRAP"
-echo "  Waiting 6s for Server D clawnetd to start..."
-sleep 6
-D_NODE_PEER_ID=$(run_remote "$SERVER_D" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
-D_BOOTSTRAP="/ip4/$SERVER_D/tcp/9527/p2p/$D_NODE_PEER_ID"
-echo "  D bootstrap: $D_BOOTSTRAP"
+echo "  Waiting 8s for mesh convergence..."
+sleep 8
 
-# --- 14e: Full-mesh re-install — every node bootstraps to ALL 3 others ---
-echo "  Re-installing all nodes with full 3-peer bootstrap..."
-install_peer_clawnetd_service "$SERVER_B" "$A_BOOTSTRAP" "$C_BOOTSTRAP" "$D_BOOTSTRAP"
-install_peer_clawnetd_service "$SERVER_C" "$A_BOOTSTRAP" "$B_BOOTSTRAP" "$D_BOOTSTRAP"
-install_peer_clawnetd_service "$SERVER_D" "$A_BOOTSTRAP" "$B_BOOTSTRAP" "$C_BOOTSTRAP"
+A_NODE_PEERS=$(run_remote "$SERVER_A" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"peers\", 0)))'")
+A_NODE_CONNECTIONS=$(run_remote "$SERVER_A" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"connections\", 0)))'")
+echo "  Server A clawnetd mesh: peers=$A_NODE_PEERS connections=$A_NODE_CONNECTIONS"
 
-# Update Server A config.yaml bootstrap list (A uses different data dir)
-echo "  Updating Server A bootstrap to full mesh..."
-run_remote "$SERVER_A" "python3 -c \"
-import yaml
-with open('$CLAWNETD_DATA_DIR/config.yaml') as f:
-    cfg = yaml.safe_load(f)
-cfg['p2p']['bootstrap'] = [
-    '$B_BOOTSTRAP',
-    '$C_BOOTSTRAP',
-    '$D_BOOTSTRAP'
-]
-with open('$CLAWNETD_DATA_DIR/config.yaml', 'w') as f:
-    yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
-\""
-run_remote "$SERVER_A" "systemctl restart clawnetd"
-
-echo "  Waiting 15s for full-mesh convergence..."
-sleep 15
-
-# --- 14f: Verify all 4 nodes have peers=3 ---
-MESH_OK=true
-for PAIR in "A:$SERVER_A" "B:$SERVER_B" "C:$SERVER_C" "D:$SERVER_D"; do
-  LABEL="${PAIR%%:*}"
-  HOST="${PAIR#*:}"
-  PEERS=$(run_remote "$HOST" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"peers\", 0)))'" 2>/dev/null || echo 0)
-  CONNS=$(run_remote "$HOST" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"connections\", 0)))'" 2>/dev/null || echo 0)
-  echo "  Server $LABEL: peers=$PEERS connections=$CONNS"
-  if [[ "$PEERS" -lt 3 || "$CONNS" -lt 3 ]]; then
-    MESH_OK=false
-  fi
-done
-
-if [[ "$MESH_OK" != "true" ]]; then
-  echo "WARNING: full-mesh not fully converged yet (some nodes < 3 peers)"
-  echo "  This may resolve via KadDHT within 60s. Continuing..."
+if [[ "$A_NODE_PEERS" -lt 2 || "$A_NODE_CONNECTIONS" -lt 2 ]]; then
+  echo "ERROR: clawnetd mesh not converged on Server A (expected peers/connections >= 2)"
+  echo "Debug: Server A/B/C clawnetd status"
+  run_remote "$SERVER_A" "systemctl status clawnetd --no-pager -n 80 || true"
+  run_remote "$SERVER_B" "systemctl status clawnetd --no-pager -n 80 || true"
+  run_remote "$SERVER_C" "systemctl status clawnetd --no-pager -n 80 || true"
+  exit 1
 fi
 
-echo "  All 4 clawnetd nodes deployed with full-mesh bootstrap."
+echo "  Server B/C clawnetd deployed and managed by systemd."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
@@ -991,14 +848,6 @@ echo ""
 echo ">>> Phase 15: Deploying documentation site on Server A..."
 install_docs_service "$SERVER_A" "docs.clawnetd.com"
 echo "  Documentation site deployed."
-echo ""
-
-# ══════════════════════════════════════════════════════════════════
-# Phase 16: Deploy wallet web app on Server A
-# ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 16: Deploying wallet web app on Server A..."
-install_wallet_site "$SERVER_A" "wallet.clawnetd.com"
-echo "  Wallet web app deployed."
 echo ""
 
 echo "============================================================"

@@ -260,68 +260,12 @@ CADDYEOF"
   echo "  [$host] Docs deployment complete ($docs_domain → localhost:3001)."
 }
 
-# Build and deploy the wallet webapp (static SPA via Vite)
-install_wallet_site() {
-  local host="$1"
-  local wallet_domain="$2"
-
-  echo "  [$host] Building wallet web app..."
-  run_remote "$host" "cd /opt/clawnet && pnpm install --filter @claw-network/wallet && cd packages/wallet && pnpm exec vite build"
-
-  # Add wallet static site block to Caddyfile if not already present
-  local HAS_WALLET_BLOCK
-  HAS_WALLET_BLOCK=$(run_remote "$host" "grep -c '$wallet_domain' /etc/caddy/Caddyfile 2>/dev/null || echo 0")
-  if [[ "$HAS_WALLET_BLOCK" == "0" ]]; then
-    echo "  [$host] Adding $wallet_domain to Caddyfile..."
-    run_remote "$host" "cat >> /etc/caddy/Caddyfile << 'CADDYEOF'
-
-# ── Wallet Web App ───────────────────────────────────────────────────────
-$wallet_domain {
-    root * /opt/clawnet/packages/wallet/dist
-    try_files {path} /index.html
-    file_server
-
-    header {
-        Strict-Transport-Security \"max-age=63072000; includeSubDomains\"
-        X-Content-Type-Options    nosniff
-        X-Frame-Options           SAMEORIGIN
-        Referrer-Policy           strict-origin-when-cross-origin
-        -Server
-    }
-
-    log {
-        output file /var/log/caddy/wallet-access.log {
-            roll_size 50mb
-            roll_keep 5
-        }
-    }
-}
-CADDYEOF"
-  else
-    echo "  [$host] Caddyfile already contains $wallet_domain, skipping."
-  fi
-
-  # Ensure log file has correct ownership
-  run_remote "$host" "touch /var/log/caddy/wallet-access.log && chown caddy:caddy /var/log/caddy/wallet-access.log"
-
-  echo "  [$host] Reloading Caddy..."
-  run_remote "$host" "systemctl reload caddy || systemctl restart caddy"
-  echo "  [$host] Wallet deployment complete ($wallet_domain → static SPA)."
-}
-
 install_peer_clawnetd_service() {
   local host="$1"
-  shift  # remaining args are bootstrap multiaddrs
+  local bootstrap_multiaddr="$2"
 
   echo "  [$host] Writing /opt/clawnet/node-data/config.yaml..."
   run_remote "$host" "mkdir -p /opt/clawnet/node-data"
-
-  # Build bootstrap list from all supplied multiaddrs
-  local bootstrap_yaml=""
-  for addr in "$@"; do
-    bootstrap_yaml="${bootstrap_yaml}    - ${addr}\n"
-  done
-
   run_remote "$host" "cat > /opt/clawnet/node-data/config.yaml << CFGEOF
 v: 1
 network: mainnet
@@ -330,7 +274,8 @@ p2p:
   listen:
     - /ip4/0.0.0.0/tcp/9527
   bootstrap:
-$(echo -e "$bootstrap_yaml")
+    - $bootstrap_multiaddr
+
 logging:
   level: info
 
@@ -902,82 +847,27 @@ fi
 NODE_1_BOOTSTRAP_MULTIADDR="/ip4/$SERVER_1/tcp/9527/p2p/$NODE_1_PEER_ID"
 echo "  Node 1 bootstrap addr: $NODE_1_BOOTSTRAP_MULTIADDR"
 
-# ── Full-mesh bootstrap: deploy peers sequentially, collecting peerIds ────────
-# Each peer gets Node 1 + all previously deployed peers as bootstrap targets.
-# After all are up, re-deploy earlier peers with the full set.
-declare -A PEER_IDS
-declare -a PEER_HOSTS=($SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5)
-declare -a PEER_MULTIADDRS=()
+for HOST in $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5; do
+  install_peer_clawnetd_service "$HOST" "$NODE_1_BOOTSTRAP_MULTIADDR"
+done
 
-# Pass 1: Deploy each peer with Node 1 + previously deployed peers
-for HOST in "${PEER_HOSTS[@]}"; do
-  # Build bootstrap list: Node 1 + all peers deployed so far
-  local_bootstrap_args=("$NODE_1_BOOTSTRAP_MULTIADDR")
-  for ma in "${PEER_MULTIADDRS[@]}"; do
-    local_bootstrap_args+=("$ma")
+echo "  Waiting 10s for mesh convergence..."
+sleep 10
+
+NODE_1_CLAWNET_PEERS=$(run_remote "$SERVER_1" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"peers\", 0)))'")
+NODE_1_CLAWNET_CONNECTIONS=$(run_remote "$SERVER_1" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"connections\", 0)))'")
+echo "  Node 1 clawnetd mesh: peers=$NODE_1_CLAWNET_PEERS connections=$NODE_1_CLAWNET_CONNECTIONS"
+
+if [[ "$NODE_1_CLAWNET_PEERS" -lt 4 || "$NODE_1_CLAWNET_CONNECTIONS" -lt 4 ]]; then
+  echo "ERROR: clawnetd mesh not converged on Node 1 (expected peers/connections >= 4)"
+  run_remote "$SERVER_1" "systemctl status clawnetd --no-pager -n 80 || true"
+  for HOST in $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5; do
+    run_remote "$HOST" "systemctl status clawnetd --no-pager -n 80 || true"
   done
-
-  install_peer_clawnetd_service "$HOST" "${local_bootstrap_args[@]}"
-
-  echo "  Waiting 6s for $HOST clawnetd to start..."
-  sleep 6
-  _PEER_ID=$(run_remote "$HOST" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print((json.load(sys.stdin).get(\"data\") or {}).get(\"peerId\", \"\"))'" 2>/dev/null || true)
-  _MULTIADDR="/ip4/$HOST/tcp/9527/p2p/$_PEER_ID"
-  echo "  $HOST bootstrap addr: $_MULTIADDR"
-  PEER_IDS[$HOST]="$_PEER_ID"
-  PEER_MULTIADDRS+=("$_MULTIADDR")
-done
-
-# Pass 2: Re-deploy ALL nodes with full bootstrap set (every other node)
-echo "  Updating all nodes with full-mesh bootstrap..."
-for i in "${!PEER_HOSTS[@]}"; do
-  HOST="${PEER_HOSTS[$i]}"
-  full_bootstrap_args=("$NODE_1_BOOTSTRAP_MULTIADDR")
-  for j in "${!PEER_HOSTS[@]}"; do
-    if [[ "$j" != "$i" ]]; then
-      full_bootstrap_args+=("${PEER_MULTIADDRS[$j]}")
-    fi
-  done
-  install_peer_clawnetd_service "$HOST" "${full_bootstrap_args[@]}"
-done
-
-# Update Node 1 bootstrap (it started with empty bootstrap list)
-echo "  Updating Node 1 bootstrap to full mesh..."
-NODE_1_BOOTSTRAP_YAML=""
-for ma in "${PEER_MULTIADDRS[@]}"; do
-  NODE_1_BOOTSTRAP_YAML="${NODE_1_BOOTSTRAP_YAML}    - ${ma}\n"
-done
-run_remote "$SERVER_1" "python3 -c \"
-import yaml
-with open('$CLAWNETD_DATA_DIR/config.yaml') as f:
-    cfg = yaml.safe_load(f)
-cfg['p2p']['bootstrap'] = [$(printf "'%s', " "${PEER_MULTIADDRS[@]}" | sed 's/, $//')]
-with open('$CLAWNETD_DATA_DIR/config.yaml', 'w') as f:
-    yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
-\""
-run_remote "$SERVER_1" "systemctl restart clawnetd"
-
-echo "  Waiting 15s for full-mesh convergence..."
-sleep 15
-
-# Verify all nodes have expected peer count
-EXPECTED_PEERS=${#PEER_HOSTS[@]}
-MESH_OK=true
-for HOST in "$SERVER_1" "${PEER_HOSTS[@]}"; do
-  PEERS=$(run_remote "$HOST" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"peers\", 0)))'" 2>/dev/null || echo 0)
-  CONNS=$(run_remote "$HOST" "curl -sf http://127.0.0.1:9528/api/v1/node | python3 -c 'import json,sys; print(int((json.load(sys.stdin).get(\"data\") or {}).get(\"connections\", 0)))'" 2>/dev/null || echo 0)
-  echo "  $HOST: peers=$PEERS connections=$CONNS"
-  if [[ "$PEERS" -lt "$EXPECTED_PEERS" || "$CONNS" -lt "$EXPECTED_PEERS" ]]; then
-    MESH_OK=false
-  fi
-done
-
-if [[ "$MESH_OK" != "true" ]]; then
-  echo "WARNING: full-mesh not fully converged yet (some nodes < $EXPECTED_PEERS peers)"
-  echo "  This may resolve via KadDHT within 60s. Continuing..."
+  exit 1
 fi
 
-echo "  All clawnetd nodes deployed with full-mesh bootstrap."
+echo "  Nodes 2-5 clawnetd deployed and managed by systemd."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
@@ -986,14 +876,6 @@ echo ""
 echo ">>> Phase 14: Deploying documentation site on Node 1..."
 install_docs_service "$SERVER_1" "docs.clawnet.io"
 echo "  Documentation site deployed."
-echo ""
-
-# ══════════════════════════════════════════════════════════════════
-# Phase 15: Deploy wallet web app on Node 1
-# ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 15: Deploying wallet web app on Node 1..."
-install_wallet_site "$SERVER_1" "wallet.clawnet.io"
-echo "  Wallet web app deployed."
 echo ""
 
 echo "============================================================"
