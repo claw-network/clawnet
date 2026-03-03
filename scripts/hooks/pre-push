@@ -43,14 +43,43 @@ TOTAL_START=$(date +%s)
 
 # ── banner ──────────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}🔒 Pre-push: build + test across ${TOTAL} packages${RESET}"
+echo -e "${BOLD}🔒 Pre-push: lint + build + test + contracts + integration${RESET}"
 echo -e "${DIM}   Skip with: git push --no-verify${RESET}"
 echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 
-# ── phase 1: build ──────────────────────────────────────────────
+# ── phase 1: lint ───────────────────────────────────────────────
+echo -e "${BOLD}🔍 Phase 1/4 — Lint${RESET}"
+LINT_START=$(date +%s)
+LINT_LOG=$(mktemp)
+
+printf "  %-28s " "pnpm lint"
+
+pnpm lint > "$LINT_LOG" 2>&1
+LINT_EC=$?
+LINT_END=$(date +%s)
+LINT_SECS=$((LINT_END - LINT_START))
+
+if [ $LINT_EC -eq 0 ]; then
+  echo -e "${GREEN}✅ passed${RESET} ${DIM}(${LINT_SECS}s)${RESET}"
+else
+  echo -e "${RED}❌ LINT FAILED${RESET} ${DIM}(${LINT_SECS}s)${RESET}"
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  tail -40 "$LINT_LOG" | sed 's/^/    /'
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  rm -f "$LINT_LOG"
+  echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${RED}${BOLD}❌ Lint failed${RESET}"
+  echo -e "   Push aborted. Fix lint errors and try again."
+  echo ""
+  exit 1
+fi
+rm -f "$LINT_LOG"
+echo ""
+
+# ── phase 2: build ──────────────────────────────────────────────
 BUILD_FAILED=0
 BUILD_FAILED_NAMES=""
-echo -e "${BOLD}📦 Phase 1/2 — Build${RESET}"
+echo -e "${BOLD}📦 Phase 2/4 — Build${RESET}"
 
 BUILD_IDX=0
 for PKG in "${PACKAGES[@]}"; do
@@ -100,8 +129,8 @@ fi
 
 echo ""
 
-# ── phase 2: test ───────────────────────────────────────────────
-echo -e "${BOLD}🧪 Phase 2/2 — Test${RESET}"
+# ── phase 3: test ───────────────────────────────────────────────
+echo -e "${BOLD}🧪 Phase 3/4 — Test${RESET}"
 IDX=0
 for PKG in "${PACKAGES[@]}"; do
   IDX=$((IDX + 1))
@@ -146,7 +175,36 @@ if [ $FAILED -gt 0 ]; then
   exit 1
 fi
 
-echo -e "${GREEN}${BOLD}✅ Build + test: all ${PASSED} packages passed${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+echo ""
+
+# ── phase 4: integration test ───────────────────────────────────
+echo -e "${BOLD}🌐 Phase 4/4 — Integration Test${RESET}"
+INT_START=$(date +%s)
+INT_LOG=$(mktemp)
+
+printf "  %-28s " "integration-test.mjs"
+
+node scripts/integration-test.mjs > "$INT_LOG" 2>&1
+INT_EC=$?
+INT_END=$(date +%s)
+INT_SECS=$((INT_END - INT_START))
+
+if [ $INT_EC -eq 0 ]; then
+  echo -e "${GREEN}✅ passed${RESET} ${DIM}(${INT_SECS}s)${RESET}"
+else
+  echo -e "${YELLOW}⚠️  FAILED (non-blocking)${RESET} ${DIM}(${INT_SECS}s)${RESET}"
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  tail -20 "$INT_LOG" | sed 's/^/    /'
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  echo -e "${YELLOW}   Integration tests failed but push continues (testnet may not be running).${RESET}"
+fi
+rm -f "$INT_LOG"
+
+# ── summary ─────────────────────────────────────────────────────
+TOTAL_END=$(date +%s)
+TOTAL_SECS=$((TOTAL_END - TOTAL_START))
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "${GREEN}${BOLD}✅ Lint + build + test: all ${PASSED} packages passed${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
 echo -e "   Pushing..."
 echo ""
 exit 0
