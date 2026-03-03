@@ -1,5 +1,5 @@
 import React from 'react';
-import { IonApp, IonRouterOutlet, IonTabs, IonTabBar, IonTabButton, IonIcon, IonLabel, IonPage, IonContent, IonSpinner, IonText, setupIonicReact } from '@ionic/react';
+import { IonApp, IonRouterOutlet, IonTabs, IonTabBar, IonTabButton, IonIcon, IonLabel, IonPage, IonContent, IonSpinner, IonText, IonButton, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import { Route, Redirect } from 'react-router-dom';
 import { walletOutline, sendOutline, timeOutline, lockClosedOutline } from 'ionicons/icons';
@@ -68,7 +68,7 @@ const MainTabs: React.FC = () => {
 };
 
 const AppRoutes: React.FC = () => {
-  const { state } = useWallet();
+  const { state, skipReconnect } = useWallet();
 
   // While auto-reconnecting, don't redirect — show a brief splash
   if (state.reconnecting) {
@@ -80,6 +80,9 @@ const AppRoutes: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                 <IonSpinner name="crescent" style={{ width: 32, height: 32, marginBottom: 16 }} />
                 <IonText color="medium"><p style={{ fontSize: '0.9rem' }}>Reconnecting…</p></IonText>
+                <IonButton fill="clear" size="small" color="medium" onClick={skipReconnect} style={{ marginTop: 16 }}>
+                  Skip
+                </IonButton>
               </div>
             </IonContent>
           </IonPage>

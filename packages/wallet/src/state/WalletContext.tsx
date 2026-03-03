@@ -139,6 +139,7 @@ interface WalletContextValue {
   api: ApiClient;
   connect: (baseUrl: string, apiKey: string) => Promise<void>;
   disconnect: () => void;
+  skipReconnect: () => void;
   fetchBalance: () => Promise<void>;
   fetchHistory: (page?: number) => Promise<void>;
   sendTransfer: (params: {
@@ -158,12 +159,19 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     new ApiClient({ baseUrl: initialState.connection.baseUrl, apiKey: initialState.connection.apiKey || undefined }),
   );
 
+  const skipReconnect = useCallback(() => {
+    dispatch({ type: 'RECONNECT_FAILED' });
+  }, []);
+
   // Auto-reconnect on mount if localStorage has saved connection
   useEffect(() => {
     if (savedConn.connected && savedConn.baseUrl) {
       dispatch({ type: 'RECONNECTING' });
       apiRef.current.updateConfig({ baseUrl: savedConn.baseUrl, apiKey: savedConn.apiKey || undefined });
-      apiRef.current.getNodeStatus().then(
+
+      // Race: reconnect vs 5s timeout
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5_000));
+      Promise.race([apiRef.current.getNodeStatus(), timeout]).then(
         (status) => {
           dispatch({
             type: 'CONNECTED',
@@ -260,8 +268,8 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const value = useMemo<WalletContextValue>(
-    () => ({ state, api: apiRef.current, connect, disconnect, fetchBalance, fetchHistory, sendTransfer }),
-    [state, connect, disconnect, fetchBalance, fetchHistory, sendTransfer],
+    () => ({ state, api: apiRef.current, connect, disconnect, skipReconnect, fetchBalance, fetchHistory, sendTransfer }),
+    [state, connect, disconnect, skipReconnect, fetchBalance, fetchHistory, sendTransfer],
   );
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
