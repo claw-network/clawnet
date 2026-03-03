@@ -29,7 +29,9 @@ import {
   chevronForwardOutline,
 } from 'ionicons/icons';
 import { useWallet } from '../state/WalletContext';
+import type { Transaction } from '../state/WalletContext';
 import { formatTokens, formatTime, truncateAddr } from '../utils/format';
+import TxDetailModal from '../components/TxDetailModal';
 
 type Filter = 'all' | 'sent' | 'received' | 'escrow';
 
@@ -37,6 +39,7 @@ const HistoryPage: React.FC = () => {
   const { state, fetchHistory } = useWallet();
   const { history, connection } = state;
   const [filter, setFilter] = useState<Filter>('all');
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   useIonViewWillEnter(() => {
     if (connection.connected) {
@@ -139,7 +142,7 @@ const HistoryPage: React.FC = () => {
                   const isEscrow = t.includes('escrow');
                   const isSent = t === 'sent' || t === 'transfer_out';
                   return (
-                    <IonItem key={tx.txHash} detail={false}>
+                    <IonItem key={tx.txHash} detail={false} button onClick={() => setSelectedTx(tx)} style={{ cursor: 'pointer' }}>
                       <div
                         className={`tx-icon ${isEscrow ? 'escrow' : isSent ? 'sent' : 'received'}`}
                         slot="start"
@@ -206,6 +209,8 @@ const HistoryPage: React.FC = () => {
             </>
           )}
         </div>
+
+        <TxDetailModal tx={selectedTx} isOpen={!!selectedTx} onClose={() => setSelectedTx(null)} />
       </IonContent>
     </IonPage>
   );

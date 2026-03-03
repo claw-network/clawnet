@@ -536,3 +536,129 @@ ion-textarea[fill="outline"] {
   --border-radius: 12px;
 }
 
+/* ═══════════════════════════════════════════
+   Transaction Detail Modal
+   ═══════════════════════════════════════════ */
+
+.txd-container {
+  padding: 12px 20px 32px;
+}
+
+.txd-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0 24px;
+  gap: 6px;
+}
+
+.txd-icon-lg {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  margin-bottom: 8px;
+}
+
+.txd-icon-lg.sent {
+  background: var(--claw-red-soft);
+  color: var(--ion-color-danger);
+}
+
+.txd-icon-lg.received {
+  background: var(--claw-green-soft);
+  color: var(--ion-color-success);
+}
+
+.txd-icon-lg.escrow {
+  background: var(--claw-yellow-soft);
+  color: var(--ion-color-warning);
+}
+
+.txd-amount {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.txd-amount.sent { color: var(--ion-color-danger); }
+.txd-amount.received { color: var(--ion-color-success); }
+.txd-amount.escrow { color: var(--ion-color-warning); }
+
+.txd-type {
+  font-size: 0.82rem;
+  color: var(--ion-color-medium);
+  font-weight: 500;
+}
+
+.txd-status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.txd-rows {
+  background: var(--claw-surface);
+  border: 1px solid var(--claw-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.txd-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 14px;
+  gap: 12px;
+}
+
+.txd-row:not(:last-child) {
+  border-bottom: 1px solid var(--claw-border);
+}
+
+.txd-row-label {
+  font-size: 0.78rem;
+  color: var(--ion-color-medium);
+  flex-shrink: 0;
+  min-width: 60px;
+  font-weight: 500;
+}
+
+.txd-row-value-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.txd-row-value {
+  font-size: 0.78rem;
+  color: var(--ion-text-color);
+  word-break: break-all;
+  text-align: right;
+  line-height: 1.4;
+}
+
+.txd-copy-btn {
+  background: none;
+  border: none;
+  color: var(--ion-color-medium);
+  font-size: 14px;
+  padding: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.txd-copy-btn:hover,
+.txd-copy-btn:active {
+  opacity: 1;
+}
+

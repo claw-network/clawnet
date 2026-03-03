@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   IonContent,
   IonPage,
@@ -21,7 +21,9 @@ import {
   shieldCheckmarkOutline,
 } from 'ionicons/icons';
 import { useWallet } from '../state/WalletContext';
+import type { Transaction } from '../state/WalletContext';
 import { formatTokens, formatTime, truncateAddr } from '../utils/format';
+import TxDetailModal from '../components/TxDetailModal';
 
 const DashboardPage: React.FC = () => {
   const { state, disconnect, fetchBalance, fetchHistory } = useWallet();
@@ -60,6 +62,7 @@ const DashboardPage: React.FC = () => {
   };
 
   const recentTx = history.transactions.slice(0, 5);
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
   return (
     <IonPage>
@@ -189,7 +192,7 @@ const DashboardPage: React.FC = () => {
                 const variant = isEscrow ? 'escrow' : isSent ? 'sent' : 'received';
 
                 return (
-                  <div className="dash-tx-item" key={tx.txHash}>
+                  <div className="dash-tx-item" key={tx.txHash} onClick={() => setSelectedTx(tx)} style={{ cursor: 'pointer' }}>
                     <div className={`tx-icon ${variant}`}>
                       <IonIcon icon={icon} />
                     </div>
@@ -211,6 +214,8 @@ const DashboardPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        <TxDetailModal tx={selectedTx} isOpen={!!selectedTx} onClose={() => setSelectedTx(null)} />
       </IonContent>
     </IonPage>
   );
