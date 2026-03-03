@@ -80,9 +80,9 @@
   - import 路径：`from clawnet import ClawNetClient`
   - 验收：wheel install + import → OK ✅
 
-- [!] **R-3.3** 发布到 PyPI
-  - 操作：`hatch publish`（需要 PyPI API token）
-  - 状态：阻塞 — 等待 PyPI token
+- [x] **R-3.3** 发布到 PyPI（2026-03-03）
+  - 操作：`hatch publish`
+  - 验收：`pip install clawnet-sdk` → OK ✅
 
 ### R-4. Testnet 稳定性观察（T-3.9）
 
