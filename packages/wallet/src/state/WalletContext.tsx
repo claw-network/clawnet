@@ -175,6 +175,16 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               apiKey: savedConn.apiKey || '',
             },
           });
+          // Fetch balance & history right after reconnect
+          const did = status.did;
+          apiRef.current.getBalance(did).then(
+            (bal) => dispatch({ type: 'BALANCE_LOADED', payload: bal }),
+            () => dispatch({ type: 'BALANCE_ERROR' }),
+          );
+          apiRef.current.getTransactions(did, { page: 1, per_page: 15 }).then(
+            (res) => dispatch({ type: 'HISTORY_LOADED', payload: { transactions: res.transactions, total: res.total, hasMore: res.hasMore, page: 1 } }),
+            () => dispatch({ type: 'HISTORY_ERROR' }),
+          );
         },
         () => {
           dispatch({ type: 'RECONNECT_FAILED' });
