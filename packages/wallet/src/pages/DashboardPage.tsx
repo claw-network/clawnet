@@ -181,8 +181,9 @@ const DashboardPage: React.FC = () => {
           ) : (
             <div className="dash-tx-list">
               {recentTx.map((tx) => {
-                const isSent = tx.from === connection.did;
-                const isEscrow = tx.type?.includes('escrow');
+                const t = (tx.type ?? '').toLowerCase();
+                const isEscrow = t.includes('escrow');
+                const isSent = t === 'sent' || t === 'transfer_out';
                 const icon = isEscrow ? lockClosedOutline : isSent ? arrowUpOutline : arrowDownOutline;
                 const label = isEscrow ? 'Escrow' : isSent ? 'Sent' : 'Received';
                 const variant = isEscrow ? 'escrow' : isSent ? 'sent' : 'received';

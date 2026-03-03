@@ -53,9 +53,12 @@ const HistoryPage: React.FC = () => {
 
   const filtered = history.transactions.filter((tx) => {
     if (filter === 'all') return true;
-    if (filter === 'sent') return tx.from === connection.did;
-    if (filter === 'received') return tx.to === connection.did && !tx.type?.includes('escrow');
-    if (filter === 'escrow') return tx.type?.includes('escrow');
+    // The API returns a `type` field: "sent", "received", "escrow_*", etc.
+    // Use it directly since `from`/`to` are EVM addresses, not DIDs.
+    const t = (tx.type ?? '').toLowerCase();
+    if (filter === 'sent') return t === 'sent' || t === 'transfer_out';
+    if (filter === 'received') return t === 'received' || t === 'transfer_in' || t === 'mint';
+    if (filter === 'escrow') return t.includes('escrow');
     return true;
   });
 
@@ -132,8 +135,9 @@ const HistoryPage: React.FC = () => {
 
               <IonList style={{ borderRadius: 12, overflow: 'hidden' }}>
                 {filtered.map((tx) => {
-                  const isSent = tx.from === connection.did;
-                  const isEscrow = tx.type?.includes('escrow');
+                  const t = (tx.type ?? '').toLowerCase();
+                  const isEscrow = t.includes('escrow');
+                  const isSent = t === 'sent' || t === 'transfer_out';
                   return (
                     <IonItem key={tx.txHash} detail={false}>
                       <div

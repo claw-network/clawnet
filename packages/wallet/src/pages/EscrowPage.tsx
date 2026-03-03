@@ -231,7 +231,7 @@ const EscrowPage: React.FC = () => {
           ) : (
             <IonList style={{ borderRadius: 12, overflow: 'hidden' }}>
               {escrowTxs.map((tx) => {
-                const isBuyer = tx.from === connection.did;
+                const isBuyer = (tx.type ?? '').toLowerCase().includes('escrow_create') || (tx.type ?? '').toLowerCase() === 'sent';
                 return (
                   <IonItem key={tx.txHash} detail={false}>
                     <div className="tx-icon escrow" slot="start">
