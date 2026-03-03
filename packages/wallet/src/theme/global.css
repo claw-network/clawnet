@@ -1,0 +1,137 @@
+/**
+ * ClawNet Wallet — global style overrides.
+ */
+
+/* ─── Font ──────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --ion-font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --claw-font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+
+  /* Custom brand tokens */
+  --claw-accent-soft: rgba(0, 84, 233, 0.12);
+  --claw-accent-glow: rgba(0, 84, 233, 0.25);
+  --claw-green-soft: rgba(34, 197, 94, 0.12);
+  --claw-red-soft: rgba(239, 68, 68, 0.12);
+  --claw-yellow-soft: rgba(234, 179, 8, 0.12);
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── Utility classes ───────────────────── */
+
+.mono {
+  font-family: var(--claw-font-mono) !important;
+}
+
+.text-muted {
+  color: var(--ion-color-medium) !important;
+}
+
+.text-success {
+  color: var(--ion-color-success) !important;
+}
+
+.text-danger {
+  color: var(--ion-color-danger) !important;
+}
+
+/* ─── Balance card grid ─────────────────── */
+
+.balance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.balance-grid .primary-card {
+  grid-column: span 2;
+}
+
+/* Tablet / iPad landscape */
+@media (min-width: 768px) {
+  .balance-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .balance-grid .primary-card {
+    grid-column: span 2;
+  }
+}
+
+/* ─── Transaction items ─────────────────── */
+
+.tx-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.tx-icon.sent {
+  background: var(--claw-red-soft);
+  color: var(--ion-color-danger);
+}
+
+.tx-icon.received {
+  background: var(--claw-green-soft);
+  color: var(--ion-color-success);
+}
+
+.tx-icon.escrow {
+  background: var(--claw-yellow-soft);
+  color: var(--ion-color-warning);
+}
+
+/* ─── Connect page branding ─────────────── */
+
+.connect-logo svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+}
+
+/* ─── Safe area for notched devices ─────── */
+
+ion-tab-bar {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+ion-content {
+  --padding-bottom: calc(16px + env(safe-area-inset-bottom, 0));
+}
+
+/* ─── Cards refinement ──────────────────── */
+
+ion-card {
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+ion-card-header {
+  padding-bottom: 8px;
+}
+
+/* ─── Skeleton shimmer ──────────────────── */
+
+ion-skeleton-text {
+  --background: rgba(148, 163, 184, 0.08);
+  --background-rgb: 148, 163, 184;
+}
+
+/* ─── Tablet / Desktop max width ────────── */
+
+@media (min-width: 992px) {
+  ion-content .content-inner {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+}

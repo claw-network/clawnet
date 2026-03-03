@@ -1,6 +1,6 @@
 /**
  * Lightweight API client for ClawNet node.
- * No SDK dependency — uses raw fetch to keep the webapp bundle small.
+ * No SDK dependency — uses raw fetch to keep the app bundle small.
  */
 
 export interface ApiConfig {
@@ -34,15 +34,9 @@ export class ApiClient {
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = {
-      'Accept': 'application/json',
-    };
-    if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
-    }
-    if (this.apiKey) {
-      headers['X-API-Key'] = this.apiKey;
-    }
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    if (this.apiKey) headers['X-API-Key'] = this.apiKey;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
@@ -57,18 +51,11 @@ export class ApiClient {
 
       if (!res.ok) {
         let errBody: { code?: string; message?: string } = {};
-        try {
-          errBody = await res.json();
-        } catch { /* ignore */ }
-        throw new ApiError(
-          res.status,
-          errBody.code ?? 'UNKNOWN',
-          errBody.message ?? `HTTP ${res.status}`,
-        );
+        try { errBody = await res.json(); } catch { /* ignore */ }
+        throw new ApiError(res.status, errBody.code ?? 'UNKNOWN', errBody.message ?? `HTTP ${res.status}`);
       }
 
       const json = await res.json();
-
       // Unwrap API envelope { data: T, links?, meta? }
       if (json && typeof json === 'object' && 'data' in json && !('_raw' in json)) {
         return json.data as T;
@@ -81,61 +68,45 @@ export class ApiClient {
 
   /** Like request() but returns the full envelope (for paginated endpoints). */
   private async requestFull<T>(method: string, path: string): Promise<T> {
-    const headers: Record<string, string> = { 'Accept': 'application/json' };
+    const headers: Record<string, string> = { Accept: 'application/json' };
     if (this.apiKey) headers['X-API-Key'] = this.apiKey;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15_000);
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, {
-        method,
-        headers,
-        signal: controller.signal,
-      });
+      const res = await fetch(`${this.baseUrl}${path}`, { method, headers, signal: controller.signal });
       if (!res.ok) {
         let errBody: { code?: string; message?: string } = {};
         try { errBody = await res.json(); } catch { /* ignore */ }
         throw new ApiError(res.status, errBody.code ?? 'UNKNOWN', errBody.message ?? `HTTP ${res.status}`);
       }
-      return await res.json() as T;
+      return (await res.json()) as T;
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
-    let url = path;
-    if (params) {
-      const qs = new URLSearchParams();
-      for (const [k, v] of Object.entries(params)) {
-        if (v !== undefined && v !== null) qs.set(k, String(v));
-      }
-      const s = qs.toString();
-      if (s) url += `?${s}`;
-    }
-    return this.request<T>('GET', url);
+  // ── High-level methods ──
+
+  async getNodeStatus(): Promise<{
+    did: string;
+    synced: boolean;
+    blockHeight: number;
+    peers: number;
+    network: string;
+    version: string;
+    uptime: number;
+  }> {
+    return this.request('GET', '/api/v1/node');
   }
 
-  post<T>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>('POST', path, body);
-  }
-
-  // ── High-level wallet methods ──
-
-  /** GET /api/v1/identities/self */
-  async getSelf(): Promise<{ did: string; publicKey: string; [k: string]: unknown }> {
-    return this.get('/api/v1/identities/self');
-  }
-
-  /** GET /api/v1/wallets/:address */
   async getBalance(address: string): Promise<{
     balance: number;
     available: number;
     pending: number;
     locked: number;
   }> {
-    const raw = await this.get<Record<string, unknown>>(`/api/v1/wallets/${encodeURIComponent(address)}`);
-    // On-chain service returns string values (from BigInt); convert to numbers
+    const raw = await this.request<Record<string, unknown>>('GET', `/api/v1/wallets/${encodeURIComponent(address)}`);
     return {
       balance: Number(raw.balance ?? 0),
       available: Number(raw.available ?? 0),
@@ -144,7 +115,6 @@ export class ApiClient {
     };
   }
 
-  /** POST /api/v1/transfers */
   async transfer(params: {
     did: string;
     passphrase: string;
@@ -162,10 +132,9 @@ export class ApiClient {
     status: string;
     timestamp: number;
   }> {
-    return this.post('/api/v1/transfers', params);
+    return this.request('POST', '/api/v1/transfers', params);
   }
 
-  /** GET /api/v1/wallets/:address/transactions */
   async getTransactions(
     address: string,
     opts?: { page?: number; per_page?: number; type?: string },
@@ -193,13 +162,11 @@ export class ApiClient {
       const s = qs.toString();
       if (s) url += `?${s}`;
     }
-    // Paginated response: { data: [...], meta: { pagination: {...} }, links: {...} }
     const envelope = await this.requestFull<{
       data: Array<Record<string, unknown>>;
       meta?: { pagination?: { total?: number; page?: number; totalPages?: number } };
       links?: { next?: string | null };
     }>('GET', url);
-    const page = opts?.page ?? 1;
     const pagination = envelope.meta?.pagination;
     return {
       transactions: (envelope.data ?? []) as any,
@@ -208,26 +175,11 @@ export class ApiClient {
     };
   }
 
-  /** GET /api/v1/node */
-  async getNodeStatus(): Promise<{
-    did: string;
-    synced: boolean;
-    blockHeight: number;
-    peers: number;
-    network: string;
-    version: string;
-    uptime: number;
-  }> {
-    return this.get('/api/v1/node');
-  }
-
-  /** POST /api/v1/escrows */
   async createEscrow(params: unknown): Promise<unknown> {
-    return this.post('/api/v1/escrows', params);
+    return this.request('POST', '/api/v1/escrows', params);
   }
 
-  /** GET /api/v1/escrows/:id */
   async getEscrow(id: string): Promise<unknown> {
-    return this.get(`/api/v1/escrows/${encodeURIComponent(id)}`);
+    return this.request('GET', `/api/v1/escrows/${encodeURIComponent(id)}`);
   }
 }

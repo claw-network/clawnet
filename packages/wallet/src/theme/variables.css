@@ -1,0 +1,107 @@
+/**
+ * Ionic CSS variables — ClawNet dark theme.
+ * Adapts the original wallet dark palette to Ionic's CSS variable system.
+ */
+
+:root {
+  /* ClawNet brand palette */
+  --ion-color-primary: #0054e9;
+  --ion-color-primary-rgb: 0, 84, 233;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #004acd;
+  --ion-color-primary-tint: #1a65eb;
+
+  --ion-color-secondary: #60a5fa;
+  --ion-color-secondary-rgb: 96, 165, 250;
+  --ion-color-secondary-contrast: #000000;
+  --ion-color-secondary-contrast-rgb: 0, 0, 0;
+  --ion-color-secondary-shade: #5491dc;
+  --ion-color-secondary-tint: #70aefb;
+
+  --ion-color-success: #22c55e;
+  --ion-color-success-rgb: 34, 197, 94;
+  --ion-color-success-contrast: #000000;
+  --ion-color-success-contrast-rgb: 0, 0, 0;
+  --ion-color-success-shade: #1ead53;
+  --ion-color-success-tint: #38cb6e;
+
+  --ion-color-warning: #eab308;
+  --ion-color-warning-rgb: 234, 179, 8;
+  --ion-color-warning-contrast: #000000;
+  --ion-color-warning-contrast-rgb: 0, 0, 0;
+  --ion-color-warning-shade: #ce9e07;
+  --ion-color-warning-tint: #ecbb21;
+
+  --ion-color-danger: #ef4444;
+  --ion-color-danger-rgb: 239, 68, 68;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #d23c3c;
+  --ion-color-danger-tint: #f15757;
+
+  --ion-color-dark: #0a0a0f;
+  --ion-color-dark-rgb: 10, 10, 15;
+  --ion-color-dark-contrast: #f0f2f5;
+  --ion-color-dark-contrast-rgb: 240, 242, 245;
+  --ion-color-dark-shade: #09090d;
+  --ion-color-dark-tint: #232327;
+
+  --ion-color-medium: #94a3b8;
+  --ion-color-medium-rgb: 148, 163, 184;
+  --ion-color-medium-contrast: #000000;
+  --ion-color-medium-contrast-rgb: 0, 0, 0;
+  --ion-color-medium-shade: #828fa2;
+  --ion-color-medium-tint: #9facbf;
+
+  --ion-color-light: #f0f2f5;
+  --ion-color-light-rgb: 240, 242, 245;
+  --ion-color-light-contrast: #0a0a0f;
+  --ion-color-light-contrast-rgb: 10, 10, 15;
+  --ion-color-light-shade: #d3d5d8;
+  --ion-color-light-tint: #f2f4f6;
+}
+
+/* ─────── Force dark mode ─────── */
+
+body {
+  --ion-background-color: #0a0a0f;
+  --ion-background-color-rgb: 10, 10, 15;
+
+  --ion-text-color: #f0f2f5;
+  --ion-text-color-rgb: 240, 242, 245;
+
+  --ion-border-color: rgba(148, 163, 184, 0.12);
+
+  --ion-color-step-50: #111118;
+  --ion-color-step-100: #181920;
+  --ion-color-step-150: #1f2029;
+  --ion-color-step-200: #262731;
+  --ion-color-step-250: #2d2e3a;
+  --ion-color-step-300: #343542;
+  --ion-color-step-350: #3b3d4b;
+  --ion-color-step-400: #424454;
+  --ion-color-step-450: #494b5c;
+  --ion-color-step-500: #505265;
+  --ion-color-step-550: #57596d;
+  --ion-color-step-600: #5e6076;
+  --ion-color-step-650: #65677e;
+  --ion-color-step-700: #6c6f87;
+  --ion-color-step-750: #737690;
+  --ion-color-step-800: #7a7d98;
+  --ion-color-step-850: #8184a1;
+  --ion-color-step-900: #888ba9;
+  --ion-color-step-950: #8f93b2;
+
+  --ion-toolbar-background: #0e0f16;
+  --ion-tab-bar-background: #0e0f16;
+  --ion-tab-bar-color: #64748b;
+  --ion-tab-bar-color-selected: #60a5fa;
+
+  --ion-item-background: #12131a;
+  --ion-card-background: #14151e;
+}
+
+ion-modal {
+  --ion-background-color: #12131a;
+}
