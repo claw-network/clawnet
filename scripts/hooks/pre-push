@@ -178,7 +178,8 @@ fi
 echo ""
 
 # ── phase 4: integration test ───────────────────────────────────
-TESTNET_URL="${CLAWNET_TESTNET_URL:-https://clawnetd.com}"
+TESTNET_URL="${CLAWNET_TESTNET_URL:-https://api.clawnetd.com}"
+TESTNET_API_KEY="${CLAW_API_KEY:-401ca444cbe821f7799e505c26df7f9ee3226f9082f9da2c464236b0b2034ae2}"
 echo -e "${BOLD}🌐 Phase 4/4 — Integration Test${RESET}"
 echo -e "  ${DIM}target: ${TESTNET_URL}${RESET}"
 INT_START=$(date +%s)
@@ -186,7 +187,7 @@ INT_LOG=$(mktemp)
 
 printf "  %-28s " "integration-test.mjs"
 
-node scripts/integration-test.mjs --nodes="${TESTNET_URL}" > "$INT_LOG" 2>&1
+node scripts/integration-test.mjs --nodes="${TESTNET_URL}" --api-key="${TESTNET_API_KEY}" > "$INT_LOG" 2>&1
 INT_EC=$?
 INT_END=$(date +%s)
 INT_SECS=$((INT_END - INT_START))
