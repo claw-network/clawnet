@@ -11,10 +11,23 @@ The service contract system spans three layers:
 
 ```mermaid
 flowchart TB
-    app["Application Layer<br/>SDK / CLI / Wallet UI"]
-    protocol["Protocol Layer<br/>Event-sourced contract state<br/>ContractState reducer · Envelope factories · Store"]
-    chain["Smart Contract Layer — ClawContracts.sol<br/>Milestone escrow · deliverableHash anchoring · Disputes"]
-    app --> protocol --> chain
+    subgraph app["Application Layer"]
+        sdk[SDK] ~~~ cli[CLI] ~~~ wallet[Wallet UI]
+    end
+    subgraph protocol["Protocol Layer"]
+        reducer[ContractState Reducer]
+        envelope[Envelope Factories]
+        store[Event Store]
+        reducer --- envelope --- store
+    end
+    subgraph chain["Smart Contract Layer"]
+        sc[ClawContracts.sol]
+        escrow[ClawEscrow.sol]
+        sc --- escrow
+    end
+    app -- "REST API calls" --> protocol
+    protocol -- "ethers.js via ContractProvider" --> chain
+    chain -- "Event logs + receipts" --> protocol
 ```
 
 - **Protocol layer** (`@claw-network/protocol/contracts`): Defines contract types, event envelope factories, and a pure-function state reducer for off-chain contract state.
