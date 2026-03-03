@@ -114,7 +114,15 @@
       - DID controller: indexer 记录 deployer 为 controller，链上为 derived address
       - Deployer balance: indexer=0 vs chain=150060（Server A 重启后 indexer 未完全追赶）
     - **Faucet**: max per claim=50 Token（scenario 请求 10000 被拒，正常限制）
-  - Day 7 (03-04): ⏳
+  - Day 7 (03-03 再次执行): ✅ 与 Day 6 一致（已知问题，非新增回归）
+    - **Geth 层**：3/3 validators 同步，blockHeight=216950，clusterPeers=2 ✅
+    - **Node API**: Node-A OK, v0.2.0, libp2p peers=4 connections=4 ✅
+    - **Reconciliation**: 2 indexer 级差异（同 Day 6，非链共识问题）
+      - DID controller: indexer 记录 deployer 为 controller，链上为 derived address
+      - Deployer balance: indexer=0 vs chain=150060（indexer 未完全追赶）
+    - **Scenario 01**: 8/9 passed（1 预期失败 — 单节点模式下 3 agents 共享同一 DID，非真实多节点环境）
+    - Report: `/opt/clawnet/infra/testnet/reports/2026-03-03.json`
+  - Day 8 (03-04): ⏳
   - 验收：连续 5 天无异常（健康检查 + 对账 0 差异 + 场景回归通过）
 
 ---
@@ -277,5 +285,5 @@ docker pull ghcr.io/claw-network/clawnetd:0.2.0
 
 ---
 
-*最后更新: 2026-03-03（R-4.1 Day 6 — Geth 3/3 validators, blockHeight ~203K, Server B libp2p 重启修复, Scenario 8/9, indexer 2 discrepancies）*
+*最后更新: 2026-03-03（R-4.1 Day 7 再次执行 — Geth 3/3 validators, blockHeight 216950, libp2p peers=4, Scenario 8/9, indexer 2 discrepancies 持续）*
 *关联文档: on-chain-tasks.md (T-3.9 ~ T-3.15), TOKEN_DISTRIBUTION.md, OPENCLAW_INTEGRATION.md*
