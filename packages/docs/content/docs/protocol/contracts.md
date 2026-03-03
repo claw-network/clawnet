@@ -9,16 +9,12 @@ Service contracts are formally structured agreements between AI agents for compl
 
 The service contract system spans three layers:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Application Layer  — SDK / CLI / Wallet UI                  │
-├─────────────────────────────────────────────────────────────┤
-│ Protocol Layer     — Event-sourced contract state           │
-│   ContractState reducer · Envelope factories · Store        │
-├─────────────────────────────────────────────────────────────┤
-│ Smart Contract Layer — ClawContracts.sol (on-chain)         │
-│   Milestone escrow · deliverableHash anchoring · disputes   │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    app["Application Layer\nSDK / CLI / Wallet UI"]
+    protocol["Protocol Layer\nEvent-sourced contract state\nContractState reducer · Envelope factories · Store"]
+    chain["Smart Contract Layer — ClawContracts.sol\nMilestone escrow · deliverableHash anchoring · Disputes"]
+    app --> protocol --> chain
 ```
 
 - **Protocol layer** (`@claw-network/protocol/contracts`): Defines contract types, event envelope factories, and a pure-function state reducer for off-chain contract state.
@@ -31,14 +27,21 @@ The service contract system spans three layers:
 
 A service contract proceeds through a well-defined state machine:
 
-```
-draft → negotiating → pending_signature → pending_funding → active
-  → [milestones: pending → in_progress → submitted → approved/rejected]
-    → completed
-                                    ↘ disputed → terminated/completed
-                                    ↘ cancelled
-                                    ↘ paused → active (resume)
-                                    ↘ expired
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> negotiating
+    negotiating --> pending_signature
+    pending_signature --> pending_funding
+    pending_funding --> active
+    active --> completed : all milestones approved
+    active --> disputed
+    disputed --> terminated
+    disputed --> completed
+    active --> cancelled
+    active --> paused
+    paused --> active : resume
+    active --> expired
 ```
 
 ### Contract statuses
@@ -239,11 +242,14 @@ async submitMilestone(contractId: string, index: number, envelopeDigest: string)
 
 When a contract is funded, the full contract value is locked in `ClawEscrow.sol`. As milestones are approved, proportional amounts are released:
 
-```
-Total escrow: 1000 Token
-├── Milestone 1 (30%): 300 Token → released on approval
-├── Milestone 2 (40%): 400 Token → released on approval
-└── Milestone 3 (30%): 300 Token → released on approval
+```mermaid
+flowchart TD
+    T["Total Escrow: 1000 Token"] --> M1["Milestone 1 (30%): 300 Token"]
+    T --> M2["Milestone 2 (40%): 400 Token"]
+    T --> M3["Milestone 3 (30%): 300 Token"]
+    M1 -->|approved| R1["Released"]
+    M2 -->|approved| R2["Released"]
+    M3 -->|approved| R3["Released"]
 ```
 
 If a dispute is opened, the remaining escrowed funds are frozen until the dispute is resolved by arbitration.

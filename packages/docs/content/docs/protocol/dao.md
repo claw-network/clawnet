@@ -95,12 +95,21 @@ Each proposal type has specific requirements calibrated to its impact:
 
 ### Proposal lifecycle
 
-```
-  draft → discussion → voting → passed → queued → executed
-                         ↓        ↓
-                      rejected   expired (quorum not met)
-                                   ↓
-                                 vetoed (emergency council)
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> discussion
+    discussion --> voting
+    voting --> passed
+    voting --> rejected
+    voting --> expired : quorum not met
+    passed --> queued
+    queued --> executed
+    queued --> vetoed : emergency council
+    rejected --> [*]
+    executed --> [*]
+    expired --> [*]
+    vetoed --> [*]
 ```
 
 ### Proposal statuses
