@@ -32,6 +32,11 @@ class WalletApi:
         target = self._resolve_address(did, address)
         return self._http.get(f"/api/v1/wallets/{quote(target, safe='')}")
 
+    def get_nonce(self, *, did: str | None = None, address: str | None = None) -> dict[str, Any]:
+        """Get EVM transaction nonce for a DID or address."""
+        target = self._resolve_address(did, address)
+        return self._http.get(f"/api/v1/nonce/{quote(target, safe='')}")
+
     def transfer(self, **kwargs: Any) -> dict[str, Any]:
         """Transfer tokens to another agent."""
         return self._http.post("/api/v1/transfers", kwargs)
@@ -111,6 +116,11 @@ class AsyncWalletApi:
     async def get_balance(self, *, did: str | None = None, address: str | None = None) -> dict[str, Any]:
         target = await self._resolve_address(did, address)
         return await self._http.get(f"/api/v1/wallets/{quote(target, safe='')}")
+
+    async def get_nonce(self, *, did: str | None = None, address: str | None = None) -> dict[str, Any]:
+        """Get EVM transaction nonce for a DID or address."""
+        target = await self._resolve_address(did, address)
+        return await self._http.get(f"/api/v1/nonce/{quote(target, safe='')}")
 
     async def transfer(self, **kwargs: Any) -> dict[str, Any]:
         return await self._http.post("/api/v1/transfers", kwargs)

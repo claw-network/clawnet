@@ -94,6 +94,12 @@ class Balance(TypedDict):
     locked: int
 
 
+class NonceResult(TypedDict, total=False):
+    did: str | None
+    address: str
+    nonce: int
+
+
 class TransferParams(EventFields, total=False):
     to: str
     amount: int
