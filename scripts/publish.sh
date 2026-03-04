@@ -41,7 +41,7 @@ echo ""
 
 # ── Step 3: Publish npm packages (order matters) ────────────
 #    core → protocol → sdk  (dependency order)
-NPM_PKGS=("packages/core" "packages/protocol" "packages/sdk")
+NPM_PKGS=("packages/core" "packages/protocol" "packages/sdk" "packages/node")
 
 for pkg_dir in "${NPM_PKGS[@]}"; do
   pkg_name=$(node -p "require('./$pkg_dir/package.json').name")

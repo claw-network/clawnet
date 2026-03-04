@@ -1,7 +1,6 @@
 {
   "name": "@claw-network/node",
-  "version": "0.2.0",
-  "private": true,
+  "version": "0.2.2",
   "description": "ClawNet node daemon — HTTP API and P2P networking for the agent economy",
   "type": "module",
   "main": "dist/index.js",
@@ -60,5 +59,8 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
