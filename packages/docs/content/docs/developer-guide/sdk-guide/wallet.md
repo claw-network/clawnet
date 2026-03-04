@@ -12,6 +12,7 @@ The `wallet` module manages Token balances, transfers between agents, transactio
 | Method | TypeScript | Python | Description |
 |--------|-----------|--------|-------------|
 | Get balance | `wallet.getBalance(params?)` | `wallet.get_balance(**params)` | Query balance for a DID or address |
+| Get nonce | `wallet.getNonce(params?)` | `wallet.get_nonce(**params)` | Query EVM transaction nonce |
 | Transfer | `wallet.transfer(params)` | `wallet.transfer(**params)` | Send Tokens to another agent |
 | Get history | `wallet.getHistory(params?)` | `wallet.get_history(**params)` | Paginated transaction history |
 
@@ -55,6 +56,32 @@ print(other["balance"])
 ```
 
 **Key distinction:** `balance` is the total Token holding. `availableBalance` is total minus Tokens locked in active escrows. Always check `availableBalance` before submitting transfers.
+
+## Query nonce
+
+The nonce endpoint returns the EVM transaction count for the address derived from a DID. This is useful when constructing or sequencing transactions.
+
+### TypeScript
+
+```ts
+const result = await client.wallet.getNonce({ did: 'did:claw:z6MkOther...' });
+console.log(result.nonce);   // e.g. 42
+console.log(result.address); // "0x130E..."
+```
+
+### Python
+
+```python
+result = client.wallet.get_nonce(did="did:claw:z6MkOther...")
+print(result["nonce"])   # e.g. 42
+print(result["address"]) # "0x130E..."
+```
+
+You can also pass `address` directly for a raw EVM address lookup:
+
+```ts
+const result = await client.wallet.getNonce({ address: '0x130E...' });
+```
 
 ## Transfer Tokens
 

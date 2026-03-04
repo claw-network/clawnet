@@ -128,7 +128,32 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M.../capabi
 
 ## Wallet
 
-Wallet 端点覆盖余额、转账、托管生命周期。生产环境请重点关注 `nonce` 顺序与状态冲突处理。
+Wallet 端点覆盖余额、转账、nonce 查询、托管生命周期。生产环境请重点关注 `nonce` 顺序与状态冲突处理。
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/nonce/&#123;did&#125;</span>
+
+- 返回指定 DID 或 EVM 地址的 EVM 交易计数（nonce）。
+- 路径参数：`did`（必填）— `did:claw:…` DID 或 `0x…` EVM 地址。
+- DID 会优先通过链上身份注册表解析为 controller 地址；未注册时使用确定性派生地址。
+- 成功：`200`，结构 `{ did?, address, nonce }`。
+- 常见失败：`400` 无效 DID/地址、`404` 地址无法解析、`500` 服务错误。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/nonce/did:claw:z6M..."
+```
+
+响应示例：
+
+```json
+{
+  "data": {
+    "did": "did:claw:z6M...",
+    "address": "0x130Eb2b6C2CA8193c159c824fccE472BB48F0De3",
+    "nonce": 42
+  },
+  "links": { "self": "/api/v1/nonce/did%3Aclaw%3Az6M..." }
+}
+```
 
 #### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/wallets/&#123;address&#125;</span>
 

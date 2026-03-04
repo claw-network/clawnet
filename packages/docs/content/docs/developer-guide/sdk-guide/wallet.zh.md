@@ -12,6 +12,7 @@ description: '余额查询、Token 转账、交易历史与完整托管生命周
 | 操作 | TypeScript | Python | 说明 |
 |------|-----------|--------|------|
 | 查余额 | `wallet.getBalance(params?)` | `wallet.get_balance(**params)` | 查询 DID 或地址的余额 |
+| 查 nonce | `wallet.getNonce(params?)` | `wallet.get_nonce(**params)` | 查询 EVM 交易 nonce |
 | 转账 | `wallet.transfer(params)` | `wallet.transfer(**params)` | 向其他 Agent 发送 Token |
 | 交易历史 | `wallet.getHistory(params?)` | `wallet.get_history(**params)` | 分页查询交易记录 |
 
@@ -55,6 +56,32 @@ print(other["balance"])
 ```
 
 **关键区别：** `balance` 是总持有量，`availableBalance` 是总量减去锁定在活跃托管中的 Token。转账前务必检查 `availableBalance`。
+
+## 查询 nonce
+
+nonce 端点返回 DID 对应地址的 EVM 交易计数，适用于构造或排序交易时确定序号。
+
+### TypeScript
+
+```ts
+const result = await client.wallet.getNonce({ did: 'did:claw:z6MkOther...' });
+console.log(result.nonce);   // 例如 42
+console.log(result.address); // "0x130E..."
+```
+
+### Python
+
+```python
+result = client.wallet.get_nonce(did="did:claw:z6MkOther...")
+print(result["nonce"])   # 例如 42
+print(result["address"]) # "0x130E..."
+```
+
+也可以直接传入 EVM 地址查询：
+
+```ts
+const result = await client.wallet.getNonce({ address: '0x130E...' });
+```
 
 ## 转账
 

@@ -133,7 +133,32 @@ curl -sS -X POST "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M.../capabi
 
 ## Wallet
 
-Wallet APIs cover balance reads, transfers, and escrow lifecycle operations.
+Wallet APIs cover balance reads, transfers, nonce queries, and escrow lifecycle operations.
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/nonce/&#123;did&#125;</span>
+
+- Returns the EVM transaction count (nonce) for a DID or EVM address.
+- Path parameter: `did` (required) — a `did:claw:…` DID or `0x…` EVM address.
+- The DID is resolved to its on-chain controller address; if not registered, the deterministic derived address is used.
+- Success: `200` with `{ did?, address, nonce }`.
+- Typical failures: `400` invalid DID/address, `404` address not resolvable, `500` service error.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/nonce/did:claw:z6M..."
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "did": "did:claw:z6M...",
+    "address": "0x130Eb2b6C2CA8193c159c824fccE472BB48F0De3",
+    "nonce": 42
+  },
+  "links": { "self": "/api/v1/nonce/did%3Aclaw%3Az6M..." }
+}
+```
 
 #### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/wallets/&#123;address&#125;</span>
 
