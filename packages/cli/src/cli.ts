@@ -328,6 +328,10 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     await runBalance(argv.slice(1));
     return;
   }
+  if (command === 'nonce') {
+    await runNonce(argv.slice(1));
+    return;
+  }
   if (command === 'transfer') {
     await runTransfer(argv.slice(1));
     return;
@@ -1308,6 +1312,27 @@ async function runBalance(rawArgs: string[]): Promise<void> {
   } finally {
     await store.close();
   }
+}
+
+async function runNonce(rawArgs: string[]): Promise<void> {
+  const parsed = parseNonceArgs(rawArgs);
+  const target = parsed.did ?? parsed.address;
+  if (!target) fail('missing --did or --address');
+
+  const apiBase = parsed.api ?? 'http://127.0.0.1:9528';
+  const url = `${apiBase}/api/v1/nonce/${encodeURIComponent(target!)}`;
+
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (parsed.token) headers['Authorization'] = `Bearer ${parsed.token}`;
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    const body = await res.text();
+    fail(`nonce query failed (${res.status}): ${body}`);
+    return;
+  }
+  const json = (await res.json()) as Record<string, unknown>;
+  console.log(JSON.stringify(json.data ?? json, null, 2));
 }
 
 async function runLogs(rawArgs: string[]): Promise<void> {
@@ -2549,6 +2574,45 @@ function parseBalanceArgs(rawArgs: string[]) {
   return { did: did ?? '', address, dataDir };
 }
 
+function parseNonceArgs(rawArgs: string[]) {
+  let did: string | undefined;
+  let address: string | undefined;
+  let api: string | undefined;
+  let token: string | undefined;
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
+    switch (arg) {
+      case '--did': {
+        did = rawArgs[++i];
+        break;
+      }
+      case '--address': {
+        address = rawArgs[++i];
+        break;
+      }
+      case '--api': {
+        api = rawArgs[++i];
+        break;
+      }
+      case '--token': {
+        token = rawArgs[++i];
+        break;
+      }
+      default: {
+        console.warn(`[clawnet] unknown argument: ${arg}`);
+        break;
+      }
+    }
+  }
+
+  if (!did && !address) {
+    fail('missing --did or --address');
+  }
+
+  return { did, address, api, token };
+}
+
 function parseTransferArgs(rawArgs: string[]) {
   let did: string | undefined;
   let passphrase: string | undefined;
@@ -3535,6 +3599,7 @@ clawnet status [options]
 clawnet peers [options]
 clawnet identity capability-register [options]
 clawnet balance [options]
+clawnet nonce [options]
 clawnet transfer [options]
 clawnet logs [options]
 clawnet reputation [options]
@@ -3591,6 +3656,12 @@ Balance options:
   --did <did>                    DID to query balance for
   --address <addr>               Address to query balance for
   --data-dir <path>              Override storage root
+
+Nonce options:
+  --did <did>                    DID to query nonce for
+  --address <addr>               EVM address to query nonce for
+  --api <url>                    Node API base URL (default: http://127.0.0.1:9528)
+  --token <token>                API token (optional)
 
 Transfer options:
   --did <did>                    Issuer DID

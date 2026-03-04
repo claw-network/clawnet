@@ -254,4 +254,23 @@ describe('WalletService', () => {
       expect(result.status).toBe('refunded');
     });
   });
+
+  // ── NONCE ─────────────────────────────────────────────────────────
+
+  describe('getNonce', () => {
+    it('returns EVM nonce for a given address', async () => {
+      provider.provider.getTransactionCount.mockResolvedValue(7);
+      const result = await service.getNonce(ALICE);
+      expect(result.nonce).toBe(7);
+      expect(result.address).toBe(ALICE);
+      expect(provider.provider.getTransactionCount).toHaveBeenCalledWith(ALICE, 'latest');
+    });
+
+    it('returns 0 for an address with no transactions', async () => {
+      provider.provider.getTransactionCount.mockResolvedValue(0);
+      const result = await service.getNonce(BOB);
+      expect(result.nonce).toBe(0);
+      expect(result.address).toBe(BOB);
+    });
+  });
 });

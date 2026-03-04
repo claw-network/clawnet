@@ -157,6 +157,18 @@ export class WalletService {
   }
 
   /**
+   * Return the EVM transaction count (nonce) for a given address.
+   *
+   * This is the standard Ethereum nonce — the number of transactions
+   * sent from the address. Useful for clients that need to construct
+   * or sequence their own transactions.
+   */
+  async getNonce(address: string): Promise<{ nonce: number; address: string }> {
+    const count = await this.contracts.provider.getTransactionCount(address, 'latest');
+    return { nonce: count, address };
+  }
+
+  /**
    * Resolve a DID `did:claw:…` to an EVM address via the on-chain
    * ClawIdentity registry.
    *

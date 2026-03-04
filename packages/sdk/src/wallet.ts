@@ -4,6 +4,7 @@
 import type { HttpClient, RequestOptions } from './http.js';
 import type {
   Balance,
+  NonceResult,
   TransferParams,
   TransferResult,
   TransactionHistoryResponse,
@@ -48,6 +49,19 @@ export class WalletApi {
   ): Promise<Balance> {
     const target = await this.resolveWalletAddress(params, opts);
     return this.http.get<Balance>(`/api/v1/wallets/${encodeURIComponent(target)}`, undefined, opts);
+  }
+
+  /** Get EVM transaction nonce for a DID or address. Defaults to this node's wallet. */
+  async getNonce(
+    params?: { did?: string; address?: string },
+    opts?: RequestOptions,
+  ): Promise<NonceResult> {
+    const target = await this.resolveWalletAddress(params, opts);
+    return this.http.get<NonceResult>(
+      `/api/v1/nonce/${encodeURIComponent(target)}`,
+      undefined,
+      opts,
+    );
   }
 
   /** Transfer tokens to another agent. */

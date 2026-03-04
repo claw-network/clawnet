@@ -309,6 +309,64 @@ paths:
           $ref: '#/components/responses/InternalError'
 
   # --------------------------------------------------------------------------
+  # Nonce
+  # --------------------------------------------------------------------------
+  /api/v1/nonce/{did}:
+    get:
+      tags: [Wallet]
+      summary: 查询 nonce
+      description: 获取指定 DID 或 EVM 地址的 EVM 交易 nonce（transaction count）
+      operationId: getNonce
+      parameters:
+        - name: did
+          in: path
+          required: true
+          schema:
+            type: string
+          description: DID（did:claw:…）或 EVM 地址（0x…）
+      responses:
+        '200':
+          description: Nonce 信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      did:
+                        type: string
+                        description: 原始 DID（仅当输入为 DID 时返回）
+                      address:
+                        type: string
+                        description: 对应的 EVM 地址
+                      nonce:
+                        type: integer
+                        description: EVM 交易计数（nonce）
+                    required: [address, nonce]
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: string
+              example:
+                data:
+                  did: 'did:claw:zFy3Ed8bYu5SRHq5YK1YRz58iUpWxL27exCwngDwuH8gR'
+                  address: '0x130Eb2b6C2CA8193c159c824fccE472BB48F0De3'
+                  nonce: 42
+                links:
+                  self: '/api/v1/nonce/did%3Aclaw%3AzFy3Ed8bYu5SRHq5YK1YRz58iUpWxL27exCwngDwuH8gR'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # --------------------------------------------------------------------------
   # Wallet
   # --------------------------------------------------------------------------
   /api/v1/wallets/{address}:

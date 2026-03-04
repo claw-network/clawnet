@@ -115,6 +115,12 @@ export interface Balance {
   locked: number;
 }
 
+export interface NonceResult {
+  did?: string;
+  address: string;
+  nonce: number;
+}
+
 export interface TransferParams extends EventFields {
   /** Recipient DID or claw address. */
   to: string;
