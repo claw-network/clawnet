@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/node",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "ClawNet node daemon — HTTP API and P2P networking for the agent economy",
   "type": "module",
   "main": "dist/index.js",
