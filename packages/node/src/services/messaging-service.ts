@@ -10,8 +10,18 @@
  */
 
 import type { P2PNode, StreamDuplex } from '@claw-network/core';
+import {
+  generateX25519Keypair,
+  x25519SharedSecret,
+  hkdfSha256,
+  encryptAes256Gcm,
+  decryptAes256Gcm,
+  bytesToHex,
+  hexToBytes,
+} from '@claw-network/core';
 import { MessageStore } from './message-store.js';
 import { createLogger } from '../logger.js';
+import { gzipSync, gunzipSync } from 'node:zlib';
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -50,13 +60,29 @@ const OUTBOX_RETRY_BASE_MS = 1_000;
 const OUTBOX_RETRY_MAX_MS = 60_000;
 
 /** Valid DID format: did:claw:<multibase-base58btc-encoded-key>. */
-const DID_PATTERN = /^did:claw:z[1-9A-HJ-NP-Za-km-z]{32,64}$/
+const DID_PATTERN = /^did:claw:z[1-9A-HJ-NP-Za-km-z]{32,64}$/;
+
+/** Payload size threshold for automatic gzip compression (1 KB). */
+const COMPRESSION_THRESHOLD_BYTES = 1024;
+
+/** HKDF info tag for E2E messaging encryption. */
+const E2E_MSG_INFO = Buffer.from('clawnet:e2e-msg:v1', 'utf-8');
+
+/** Priority levels — higher number = higher priority. */
+export enum MessagePriority {
+  LOW = 0,
+  NORMAL = 1,
+  HIGH = 2,
+  URGENT = 3,
+}
 
 // ── Types ────────────────────────────────────────────────────────
 
 export interface SendResult {
   messageId: string;
   delivered: boolean;
+  compressed?: boolean;
+  encrypted?: boolean;
 }
 
 export interface MulticastResult {
@@ -66,6 +92,7 @@ export interface MulticastResult {
 export interface InboxQueryOptions {
   topic?: string;
   sinceMs?: number;
+  sinceSeq?: number;
   limit?: number;
 }
 
@@ -75,6 +102,19 @@ export interface InboxMessage {
   topic: string;
   payload: string;
   receivedAtMs: number;
+  priority: number;
+  seq: number;
+}
+
+export interface SendOptions {
+  ttlSec?: number;
+  priority?: MessagePriority;
+  /** If true, compress payload > 1 KB with gzip before sending. */
+  compress?: boolean;
+  /** Recipient's X25519 public key hex for E2E encryption. */
+  encryptForKeyHex?: string;
+  /** Idempotency key for deduplication. */
+  idempotencyKey?: string;
 }
 
 /** Callback for WebSocket subscribers — called when a new message arrives in the inbox. */
@@ -216,12 +256,18 @@ export class MessagingService {
    * If the target peer is online and reachable, delivers directly.
    * Otherwise queues in outbox for later delivery.
    */
-  async send(targetDid: string, topic: string, payload: string, ttlSec = 86400): Promise<SendResult> {
+  async send(targetDid: string, topic: string, payload: string, opts: SendOptions = {}): Promise<SendResult> {
+    const ttlSec = opts.ttlSec ?? 86400;
+    const priority = opts.priority ?? MessagePriority.NORMAL;
+
     // Rate limit check
     this.enforceRateLimit(this.localDid);
 
-    // Validate payload size
-    const payloadBytes = Buffer.byteLength(payload, 'utf-8');
+    // Apply compression + encryption to payload
+    const { encoded, compressed, encrypted } = this.encodePayload(payload, opts);
+
+    // Validate payload size after encoding
+    const payloadBytes = Buffer.byteLength(encoded, 'utf-8');
     if (payloadBytes > MAX_PAYLOAD_BYTES) {
       throw new Error(`Payload too large: ${payloadBytes} bytes (max ${MAX_PAYLOAD_BYTES})`);
     }
@@ -229,16 +275,16 @@ export class MessagingService {
     const peerId = this.didToPeerId.get(targetDid);
     if (peerId) {
       // Try direct delivery
-      const delivered = await this.deliverDirect(peerId, targetDid, topic, payload, ttlSec);
+      const delivered = await this.deliverDirect(peerId, targetDid, topic, encoded, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
       if (delivered) {
-        return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true };
+        return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
       }
     }
 
     // Queue in outbox for later delivery
-    const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec });
+    const messageId = this.store.addToOutbox({ targetDid, topic, payload: encoded, ttlSec, priority });
     this.log.info('message queued in outbox', { messageId, targetDid, topic });
-    return { messageId, delivered: false };
+    return { messageId, delivered: false, compressed, encrypted };
   }
 
   /**
@@ -249,18 +295,24 @@ export class MessagingService {
     targetDids: string[],
     topic: string,
     payload: string,
-    ttlSec = 86400,
+    opts: SendOptions = {},
   ): Promise<MulticastResult> {
+    const ttlSec = opts.ttlSec ?? 86400;
+    const priority = opts.priority ?? MessagePriority.NORMAL;
+
     // Rate limit check (counts as 1 call for rate-limit purposes)
     this.enforceRateLimit(this.localDid);
 
-    const payloadBytes = Buffer.byteLength(payload, 'utf-8');
+    // Apply compression (encryption not applied in multicast — each recipient needs their own key)
+    const { encoded, compressed, encrypted } = this.encodePayload(payload, { ...opts, encryptForKeyHex: undefined });
+
+    const payloadBytes = Buffer.byteLength(encoded, 'utf-8');
     if (payloadBytes > MAX_PAYLOAD_BYTES) {
       throw new Error(`Payload too large: ${payloadBytes} bytes (max ${MAX_PAYLOAD_BYTES})`);
     }
 
     // Deliver to all targets concurrently with bounded concurrency
-    const results = await this.deliverMulticast(targetDids, topic, payload, ttlSec);
+    const results = await this.deliverMulticast(targetDids, topic, encoded, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
     return { results };
   }
 
@@ -435,6 +487,90 @@ export class MessagingService {
     }
   }
 
+  // ── Private: Payload Encoding (compression + encryption) ────────
+
+  /**
+   * Encode a payload: optionally compress (gzip) then optionally encrypt (X25519+AES-256-GCM).
+   * Returns the encoded string and flags indicating what was applied.
+   */
+  private encodePayload(
+    payload: string,
+    opts: Pick<SendOptions, 'compress' | 'encryptForKeyHex'>,
+  ): { encoded: string; compressed: boolean; encrypted: boolean } {
+    let data = payload;
+    let compressed = false;
+    let encrypted = false;
+
+    // Compression: gzip if enabled and payload > threshold
+    if (opts.compress !== false && Buffer.byteLength(data, 'utf-8') > COMPRESSION_THRESHOLD_BYTES) {
+      const gzipped = gzipSync(Buffer.from(data, 'utf-8'));
+      data = gzipped.toString('base64');
+      compressed = true;
+    }
+
+    // E2E Encryption: X25519 ECDH + HKDF + AES-256-GCM
+    if (opts.encryptForKeyHex) {
+      const recipientPubKey = hexToBytes(opts.encryptForKeyHex);
+      const ephemeral = generateX25519Keypair();
+      const shared = x25519SharedSecret(ephemeral.privateKey, recipientPubKey);
+      const derived = hkdfSha256(shared, undefined, new Uint8Array(E2E_MSG_INFO), 32);
+      const plainBytes = Buffer.from(data, 'utf-8');
+      const enc = encryptAes256Gcm(derived, new Uint8Array(plainBytes));
+      data = JSON.stringify({
+        _e2e: 1,
+        pk: bytesToHex(ephemeral.publicKey),
+        n: enc.nonceHex,
+        c: enc.ciphertextHex,
+        t: enc.tagHex,
+      });
+      encrypted = true;
+    }
+
+    return { encoded: data, compressed, encrypted };
+  }
+
+  /**
+   * Decrypt an E2E-encrypted payload using the local node's X25519 private key.
+   * Returns the decrypted payload string or null if not encrypted / decryption fails.
+   */
+  static decryptPayload(payload: string, recipientPrivateKey: Uint8Array): string | null {
+    try {
+      const envelope = JSON.parse(payload) as { _e2e?: number; pk?: string; n?: string; c?: string; t?: string };
+      if (envelope._e2e !== 1 || !envelope.pk || !envelope.n || !envelope.c || !envelope.t) return null;
+
+      const senderPub = hexToBytes(envelope.pk);
+      const shared = x25519SharedSecret(recipientPrivateKey, senderPub);
+      const derived = hkdfSha256(shared, undefined, new Uint8Array(E2E_MSG_INFO), 32);
+      const decrypted = decryptAes256Gcm(derived, {
+        nonceHex: envelope.n,
+        ciphertextHex: envelope.c,
+        tagHex: envelope.t,
+      });
+      return Buffer.from(decrypted).toString('utf-8');
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Decompress a gzip-compressed payload (base64-encoded gzip → utf-8 string).
+   * Returns the decompressed string, or null if decompression fails.
+   */
+  static decompressPayload(payload: string): string | null {
+    try {
+      const buf = Buffer.from(payload, 'base64');
+      const decompressed = gunzipSync(buf);
+      return decompressed.toString('utf-8');
+    } catch {
+      return null;
+    }
+  }
+
+  /** Get the current inbox sequence number (for WS replay). */
+  getCurrentSeq(): number {
+    return this.store.currentSeq();
+  }
+
   // ── Private: Direct Delivery ───────────────────────────────────
 
   private async deliverDirect(
@@ -443,6 +579,10 @@ export class MessagingService {
     topic: string,
     payload: string,
     ttlSec: number,
+    priority: number = MessagePriority.NORMAL,
+    compressed = false,
+    encrypted = false,
+    idempotencyKey?: string,
   ): Promise<boolean> {
     let stream: StreamDuplex | null = null;
     try {
@@ -455,6 +595,10 @@ export class MessagingService {
         payload,
         ttlSec,
         sentAtMs: Date.now(),
+        priority,
+        compressed,
+        encrypted,
+        idempotencyKey,
       });
 
       await writeStream(stream.sink, message);
@@ -505,6 +649,10 @@ export class MessagingService {
         payload?: string;
         ttlSec?: number;
         sentAtMs?: number;
+        priority?: number;
+        compressed?: boolean;
+        encrypted?: boolean;
+        idempotencyKey?: string;
       };
 
       if (!msg.sourceDid || !msg.topic || !msg.payload) {
@@ -512,7 +660,7 @@ export class MessagingService {
         return;
       }
 
-      // Store in inbox
+      // Store in inbox (deduplication handled by store if idempotencyKey is present)
       const messageId = this.store.addToInbox({
         sourceDid: msg.sourceDid,
         targetDid: msg.targetDid ?? this.localDid,
@@ -520,6 +668,8 @@ export class MessagingService {
         payload: msg.payload,
         ttlSec: msg.ttlSec,
         sentAtMs: msg.sentAtMs,
+        priority: msg.priority ?? MessagePriority.NORMAL,
+        idempotencyKey: msg.idempotencyKey,
       });
 
       // Record DID → PeerId mapping from the sender
@@ -532,12 +682,15 @@ export class MessagingService {
       this.log.info('message received', { messageId, sourceDid: msg.sourceDid, topic: msg.topic });
 
       // Push to WebSocket subscribers
+      const currentSeq = this.store.currentSeq();
       this.notifySubscribers({
         messageId,
         sourceDid: msg.sourceDid,
         topic: msg.topic,
         payload: msg.payload,
         receivedAtMs: Date.now(),
+        priority: msg.priority ?? MessagePriority.NORMAL,
+        seq: currentSeq,
       });
 
       // Send delivery receipt back to sender
@@ -619,6 +772,10 @@ export class MessagingService {
     topic: string,
     payload: string,
     ttlSec: number,
+    priority: number = MessagePriority.NORMAL,
+    compressed = false,
+    encrypted = false,
+    idempotencyKey?: string,
   ): Promise<Array<SendResult & { targetDid: string }>> {
     const results: Array<SendResult & { targetDid: string }> = [];
     // Process in batches of MULTICAST_CONCURRENCY
@@ -628,12 +785,12 @@ export class MessagingService {
         batch.map(async (targetDid) => {
           const peerId = this.didToPeerId.get(targetDid);
           if (peerId) {
-            const delivered = await this.deliverDirect(peerId, targetDid, topic, payload, ttlSec);
+            const delivered = await this.deliverDirect(peerId, targetDid, topic, payload, ttlSec, priority, compressed, encrypted, idempotencyKey);
             if (delivered) {
               return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true };
             }
           }
-          const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec });
+          const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec, priority });
           return { targetDid, messageId, delivered: false };
         }),
       );
@@ -712,6 +869,8 @@ export class MessagingService {
           topic: '_receipt',
           payload: JSON.stringify(receipt),
           receivedAtMs: receipt.deliveredAtMs ?? Date.now(),
+          priority: MessagePriority.NORMAL,
+          seq: 0, // Receipts don't have inbox seq
         });
       }
     } catch {

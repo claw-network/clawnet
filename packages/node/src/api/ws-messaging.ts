@@ -5,12 +5,14 @@
  * Authentication is via the `apiKey` query parameter or `X-Api-Key` header.
  *
  * Query parameters:
- *  - topic  (optional) — filter messages by topic
- *  - apiKey (optional) — API key for authentication
+ *  - topic    (optional) — filter messages by topic
+ *  - apiKey   (optional) — API key for authentication
+ *  - sinceSeq (optional) — replay missed messages since this sequence number
  *
  * Server pushes JSON frames:
  *   { type: "message", data: InboxMessage }
  *   { type: "receipt", data: ReceiptInfo }
+ *   { type: "replay_done", lastSeq: number }
  *   { type: "ping" }
  */
 
@@ -89,6 +91,7 @@ export function attachWebSocketHandler(
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
     const topicParam = url.searchParams.get('topic') ?? undefined;
+    const sinceSeqParam = url.searchParams.get('sinceSeq');
 
     // Validate topic filter format
     if (topicParam && !TOPIC_PATTERN.test(topicParam)) {
@@ -115,6 +118,23 @@ export function attachWebSocketHandler(
 
     svc?.addSubscriber(subscriber);
 
+    // Send initial connected confirmation with current seq for client tracking
+    const currentSeq = svc?.getCurrentSeq() ?? 0;
+    ws.send(JSON.stringify({ type: 'connected', topicFilter: topicParam ?? null, seq: currentSeq }));
+
+    // Replay missed messages since sinceSeq (reconnect support)
+    if (svc && sinceSeqParam != null) {
+      const sinceSeq = parseInt(sinceSeqParam, 10);
+      if (!isNaN(sinceSeq) && sinceSeq >= 0) {
+        const missed = svc.getInbox({ sinceSeq, topic: topicParam, limit: 500 });
+        for (const msg of missed) {
+          if (ws.readyState !== ws.OPEN) break;
+          ws.send(JSON.stringify({ type: 'message', data: msg }));
+        }
+        ws.send(JSON.stringify({ type: 'replay_done', lastSeq: svc.getCurrentSeq() }));
+      }
+    }
+
     ws.on('close', () => {
       clients.delete(client);
       svc?.removeSubscriber(subscriber);
@@ -124,9 +144,6 @@ export function attachWebSocketHandler(
       clients.delete(client);
       svc?.removeSubscriber(subscriber);
     });
-
-    // Send initial connected confirmation
-    ws.send(JSON.stringify({ type: 'connected', topicFilter: topicParam ?? null }));
   });
 
   return wss;

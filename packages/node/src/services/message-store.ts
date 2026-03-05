@@ -28,6 +28,8 @@ export interface InboxMessage {
   topic: string;
   payload: string;
   receivedAtMs: number;
+  priority: number;
+  seq: number;
 }
 
 export interface OutboxEntry {
@@ -53,7 +55,9 @@ CREATE TABLE IF NOT EXISTS inbox (
   ttl_sec       INTEGER NOT NULL DEFAULT 86400,
   sent_at_ms    INTEGER NOT NULL,
   received_at_ms INTEGER NOT NULL,
-  consumed      INTEGER NOT NULL DEFAULT 0
+  consumed      INTEGER NOT NULL DEFAULT 0,
+  priority      INTEGER NOT NULL DEFAULT 0,
+  seq           INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_inbox_topic ON inbox(topic, consumed);
@@ -69,12 +73,33 @@ CREATE TABLE IF NOT EXISTS outbox (
   ttl_sec       INTEGER NOT NULL DEFAULT 86400,
   sent_at_ms    INTEGER NOT NULL,
   attempts      INTEGER NOT NULL DEFAULT 0,
-  last_attempt  INTEGER
+  last_attempt  INTEGER,
+  priority      INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_outbox_target ON outbox(target_did);
 CREATE INDEX IF NOT EXISTS idx_outbox_retry ON outbox(attempts, last_attempt);
+
+-- Deduplication table: stores idempotency keys with TTL for duplicate detection
+CREATE TABLE IF NOT EXISTS dedup (
+  idempotency_key TEXT PRIMARY KEY,
+  message_id      TEXT NOT NULL,
+  created_at_ms   INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_dedup_created ON dedup(created_at_ms);
+
+-- Sequence counter for ordered inbox replay
+CREATE TABLE IF NOT EXISTS meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO meta (key, value) VALUES ('inbox_seq', '0');
 `;
+
+/** Deduplication window: 24 hours */
+const DEDUP_TTL_MS = 24 * 60 * 60 * 1000;
 
 // ── Store ────────────────────────────────────────────────────────
 
@@ -89,7 +114,10 @@ export class MessageStore {
 
   // ── Inbox ──────────────────────────────────────────────────────
 
-  /** Store an inbound message in the inbox. Returns the messageId. */
+  /**
+   * Store an inbound message in the inbox. Returns the messageId.
+   * If `idempotencyKey` is provided, deduplicates — returns existing messageId on duplicate.
+   */
   addToInbox(msg: {
     sourceDid: string;
     targetDid: string;
@@ -97,24 +125,56 @@ export class MessageStore {
     payload: string;
     ttlSec?: number;
     sentAtMs?: number;
+    priority?: number;
+    idempotencyKey?: string;
   }): string {
+    // Deduplication check
+    if (msg.idempotencyKey) {
+      const existing = this.db.prepare(
+        'SELECT message_id FROM dedup WHERE idempotency_key = ?',
+      ).get(msg.idempotencyKey) as { message_id: string } | undefined;
+      if (existing) return existing.message_id;
+    }
+
     const id = `msg_${crypto.randomBytes(12).toString('hex')}`;
     const now = Date.now();
+    const seq = this.nextSeq();
     this.db.prepare(`
-      INSERT INTO inbox (id, source_did, target_did, topic, payload, ttl_sec, sent_at_ms, received_at_ms)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, msg.sourceDid, msg.targetDid, msg.topic, msg.payload, msg.ttlSec ?? 86400, msg.sentAtMs ?? now, now);
+      INSERT INTO inbox (id, source_did, target_did, topic, payload, ttl_sec, sent_at_ms, received_at_ms, priority, seq)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, msg.sourceDid, msg.targetDid, msg.topic, msg.payload, msg.ttlSec ?? 86400, msg.sentAtMs ?? now, now, msg.priority ?? 0, seq);
+
+    // Record dedup key
+    if (msg.idempotencyKey) {
+      this.db.prepare(
+        'INSERT OR IGNORE INTO dedup (idempotency_key, message_id, created_at_ms) VALUES (?, ?, ?)',
+      ).run(msg.idempotencyKey, id, now);
+    }
     return id;
   }
 
-  /** Fetch unconsumed inbox messages for a given topic. */
+  /** Increment and return the next inbox sequence number (monotonic). */
+  private nextSeq(): number {
+    this.db.prepare("UPDATE meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'inbox_seq'").run();
+    const row = this.db.prepare("SELECT value FROM meta WHERE key = 'inbox_seq'").get() as { value: string };
+    return parseInt(row.value, 10);
+  }
+
+  /** Get the current (latest) inbox sequence number. */
+  currentSeq(): number {
+    const row = this.db.prepare("SELECT value FROM meta WHERE key = 'inbox_seq'").get() as { value: string } | undefined;
+    return row ? parseInt(row.value, 10) : 0;
+  }
+
+  /** Fetch unconsumed inbox messages, ordered by priority then time. */
   getInbox(opts: {
     topic?: string;
     sinceMs?: number;
+    sinceSeq?: number;
     limit?: number;
   } = {}): InboxMessage[] {
     const limit = Math.min(opts.limit ?? 100, 500);
-    let sql = 'SELECT id, source_did, topic, payload, received_at_ms FROM inbox WHERE consumed = 0';
+    let sql = 'SELECT id, source_did, topic, payload, received_at_ms, priority, seq FROM inbox WHERE consumed = 0';
     const params: unknown[] = [];
 
     if (opts.topic) {
@@ -125,12 +185,18 @@ export class MessageStore {
       sql += ' AND received_at_ms > ?';
       params.push(opts.sinceMs);
     }
+    if (opts.sinceSeq !== undefined) {
+      sql += ' AND seq > ?';
+      params.push(opts.sinceSeq);
+    }
 
-    sql += ' ORDER BY received_at_ms ASC LIMIT ?';
+    // Higher priority first, then by received time
+    sql += ' ORDER BY priority DESC, received_at_ms ASC LIMIT ?';
     params.push(limit);
 
     const rows = this.db.prepare(sql).all(...params) as Array<{
-      id: string; source_did: string; topic: string; payload: string; received_at_ms: number;
+      id: string; source_did: string; topic: string; payload: string;
+      received_at_ms: number; priority: number; seq: number;
     }>;
 
     return rows.map((r) => ({
@@ -139,6 +205,8 @@ export class MessageStore {
       topic: r.topic,
       payload: r.payload,
       receivedAtMs: r.received_at_ms,
+      priority: r.priority,
+      seq: r.seq,
     }));
   }
 
@@ -150,7 +218,7 @@ export class MessageStore {
     return result.changes > 0;
   }
 
-  /** Delete consumed and expired messages in batches to avoid locking. */
+  /** Delete consumed and expired messages in batches to avoid locking. Also cleans dedup table. */
   cleanupInbox(): number {
     const now = Date.now();
     let total = 0;
@@ -163,6 +231,11 @@ export class MessageStore {
       changes = stmt.run(now).changes;
       total += changes;
     } while (changes > 0);
+
+    // Clean expired dedup entries
+    const dedupCutoff = now - DEDUP_TTL_MS;
+    this.db.prepare('DELETE FROM dedup WHERE created_at_ms < ?').run(dedupCutoff);
+
     return total;
   }
 
@@ -174,24 +247,25 @@ export class MessageStore {
     topic: string;
     payload: string;
     ttlSec?: number;
+    priority?: number;
   }): string {
     const id = `msg_${crypto.randomBytes(12).toString('hex')}`;
     const now = Date.now();
     this.db.prepare(`
-      INSERT INTO outbox (id, target_did, topic, payload, ttl_sec, sent_at_ms)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, msg.targetDid, msg.topic, msg.payload, msg.ttlSec ?? 86400, now);
+      INSERT INTO outbox (id, target_did, topic, payload, ttl_sec, sent_at_ms, priority)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, msg.targetDid, msg.topic, msg.payload, msg.ttlSec ?? 86400, now, msg.priority ?? 0);
     return id;
   }
 
-  /** Get pending outbox messages for a specific target DID. */
+  /** Get pending outbox messages for a specific target DID, ordered by priority then time. */
   getOutboxForTarget(targetDid: string, limit = 100): OutboxEntry[] {
     const now = Date.now();
     const rows = this.db.prepare(`
       SELECT id, target_did, topic, payload, ttl_sec, sent_at_ms, attempts, last_attempt
       FROM outbox
       WHERE target_did = ? AND (sent_at_ms + ttl_sec * 1000) > ?
-      ORDER BY sent_at_ms ASC LIMIT ?
+      ORDER BY priority DESC, sent_at_ms ASC LIMIT ?
     `).all(targetDid, now, limit) as Array<{
       id: string; target_did: string; topic: string; payload: string;
       ttl_sec: number; sent_at_ms: number; attempts: number; last_attempt: number | null;

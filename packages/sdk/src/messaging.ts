@@ -14,6 +14,14 @@ export interface SendMessageParams {
   payload: string;
   /** Time-to-live in seconds (default: 86400 = 24h) */
   ttlSec?: number;
+  /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
+  priority?: number;
+  /** Enable gzip compression for payloads > 1KB */
+  compress?: boolean;
+  /** Recipient's X25519 public key hex for E2E encryption */
+  encryptForKeyHex?: string;
+  /** Idempotency key for deduplication (unique per message) */
+  idempotencyKey?: string;
 }
 
 export interface SendBatchParams {
@@ -25,11 +33,19 @@ export interface SendBatchParams {
   payload: string;
   /** Time-to-live in seconds (default: 86400 = 24h) */
   ttlSec?: number;
+  /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
+  priority?: number;
+  /** Enable gzip compression for payloads > 1KB */
+  compress?: boolean;
+  /** Idempotency key for deduplication */
+  idempotencyKey?: string;
 }
 
 export interface SendMessageResult {
   messageId: string;
   delivered: boolean;
+  compressed?: boolean;
+  encrypted?: boolean;
 }
 
 export interface SendBatchResult {
@@ -42,6 +58,8 @@ export interface InboxMessage {
   topic: string;
   payload: string;
   receivedAtMs: number;
+  priority: number;
+  seq: number;
 }
 
 export interface InboxQueryParams {
@@ -49,6 +67,8 @@ export interface InboxQueryParams {
   topic?: string;
   /** Only messages received after this timestamp (ms) */
   since?: number;
+  /** Only messages with sequence number > sinceSeq (for replay) */
+  sinceSeq?: number;
   /** Max messages to return (1-500, default 100) */
   limit?: number;
 }
@@ -96,6 +116,7 @@ export class MessagingApi {
     const query: Record<string, string | number | boolean | undefined> = {};
     if (params?.topic) query.topic = params.topic;
     if (params?.since !== undefined) query.since = params.since;
+    if (params?.sinceSeq !== undefined) query.sinceSeq = params.sinceSeq;
     if (params?.limit !== undefined) query.limit = params.limit;
     return this.http.get<InboxResponse>('/api/v1/messaging/inbox', query, opts);
   }

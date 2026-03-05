@@ -33,6 +33,10 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
     const topic = body.topic as string | undefined;
     const payload = body.payload as string | undefined;
     const ttlSec = typeof body.ttlSec === 'number' ? body.ttlSec : undefined;
+    const priority = typeof body.priority === 'number' ? body.priority : undefined;
+    const compress = typeof body.compress === 'boolean' ? body.compress : undefined;
+    const encryptForKeyHex = typeof body.encryptForKeyHex === 'string' ? body.encryptForKeyHex : undefined;
+    const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey : undefined;
 
     if (!targetDid || typeof targetDid !== 'string') {
       badRequest(res, 'Missing or invalid "targetDid"', route.url.pathname);
@@ -56,7 +60,9 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
     }
 
     try {
-      const result = await ctx.messagingService.send(targetDid, topic, payload, ttlSec);
+      const result = await ctx.messagingService.send(targetDid, topic, payload, {
+        ttlSec, priority, compress, encryptForKeyHex, idempotencyKey,
+      });
       created(res, result, { self: '/api/v1/messaging/inbox' });
     } catch (err) {
       const message = (err as Error).message;
@@ -89,6 +95,9 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
     const topic = body.topic as string | undefined;
     const payload = body.payload as string | undefined;
     const ttlSec = typeof body.ttlSec === 'number' ? body.ttlSec : undefined;
+    const priority = typeof body.priority === 'number' ? body.priority : undefined;
+    const compress = typeof body.compress === 'boolean' ? body.compress : undefined;
+    const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey : undefined;
 
     if (!Array.isArray(targetDids) || targetDids.length === 0) {
       badRequest(res, 'Missing or empty "targetDids" array', route.url.pathname);
@@ -118,7 +127,9 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
     }
 
     try {
-      const result = await ctx.messagingService.sendMulticast(targetDids, topic, payload, ttlSec);
+      const result = await ctx.messagingService.sendMulticast(targetDids, topic, payload, {
+        ttlSec, priority, compress, idempotencyKey,
+      });
       created(res, result, { self: '/api/v1/messaging/inbox' });
     } catch (err) {
       const message = (err as Error).message;
@@ -143,9 +154,11 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
 
     const topic = route.query.get('topic') ?? undefined;
     const sinceStr = route.query.get('since');
+    const sinceSeqStr = route.query.get('sinceSeq');
     const limitStr = route.query.get('limit');
 
     const sinceMs = sinceStr ? Number(sinceStr) : undefined;
+    const sinceSeq = sinceSeqStr ? Number(sinceSeqStr) : undefined;
     const limit = limitStr ? Math.min(Math.max(Number(limitStr), 1), 500) : undefined;
 
     if (sinceStr && (isNaN(sinceMs!) || sinceMs! < 0)) {
@@ -153,7 +166,7 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
       return;
     }
 
-    const messages = ctx.messagingService.getInbox({ topic, sinceMs, limit });
+    const messages = ctx.messagingService.getInbox({ topic, sinceMs, sinceSeq, limit });
     ok(res, { messages }, { self: '/api/v1/messaging/inbox' });
   });
 

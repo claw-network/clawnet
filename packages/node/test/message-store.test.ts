@@ -214,4 +214,166 @@ describe('MessageStore', () => {
       expect(entries).toHaveLength(0);
     });
   });
+
+  // ── Deduplication ──────────────────────────────────────────────
+
+  describe('deduplication', () => {
+    it('deduplicates messages with same idempotency key', () => {
+      const id1 = store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'data1',
+        idempotencyKey: 'dedup-key-1',
+      });
+
+      const id2 = store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'data1-duplicate',
+        idempotencyKey: 'dedup-key-1',
+      });
+
+      // Same message ID returned
+      expect(id2).toBe(id1);
+
+      // Only one message in inbox
+      const messages = store.getInbox();
+      expect(messages).toHaveLength(1);
+      expect(messages[0].payload).toBe('data1');
+    });
+
+    it('allows different idempotency keys', () => {
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'msg-a',
+        idempotencyKey: 'key-a',
+      });
+
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'msg-b',
+        idempotencyKey: 'key-b',
+      });
+
+      const messages = store.getInbox();
+      expect(messages).toHaveLength(2);
+    });
+
+    it('messages without idempotency key are never deduplicated', () => {
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'same',
+      });
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'same',
+      });
+
+      expect(store.getInbox()).toHaveLength(2);
+    });
+  });
+
+  // ── Priority Ordering ─────────────────────────────────────────
+
+  describe('priority', () => {
+    it('returns higher priority messages first', () => {
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'low',
+        priority: 0,
+      });
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'urgent',
+        priority: 3,
+      });
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'normal',
+        priority: 1,
+      });
+
+      const messages = store.getInbox();
+      expect(messages).toHaveLength(3);
+      expect(messages[0].payload).toBe('urgent');
+      expect(messages[0].priority).toBe(3);
+      expect(messages[1].payload).toBe('normal');
+      expect(messages[2].payload).toBe('low');
+    });
+  });
+
+  // ── Sequence Numbers ──────────────────────────────────────────
+
+  describe('sequence', () => {
+    it('assigns monotonically increasing seq numbers', () => {
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'msg1',
+      });
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'msg2',
+      });
+
+      // With priority 0 (same), ordering is by received_at_ms ASC
+      const messages = store.getInbox();
+      expect(messages[0].seq).toBe(1);
+      expect(messages[1].seq).toBe(2);
+    });
+
+    it('currentSeq returns the latest sequence number', () => {
+      expect(store.currentSeq()).toBe(0);
+
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'msg1',
+      });
+
+      expect(store.currentSeq()).toBe(1);
+    });
+
+    it('filters by sinceSeq', () => {
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'old',
+      });
+
+      const seqAfterFirst = store.currentSeq();
+
+      store.addToInbox({
+        sourceDid: 'did:claw:alice',
+        targetDid: 'did:claw:bob',
+        topic: 'test',
+        payload: 'new',
+      });
+
+      const missed = store.getInbox({ sinceSeq: seqAfterFirst });
+      expect(missed).toHaveLength(1);
+      expect(missed[0].payload).toBe('new');
+    });
+  });
 });

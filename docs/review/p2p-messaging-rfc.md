@@ -1,10 +1,10 @@
 # RFC: TelAgent 消息通信迁移至 ClawNet P2P 层
 
-- 文档版本：v0.4（Phase 2 实现完成后更新）
-- 状态：**ClawNet messaging API Phase 1 + Phase 2 已全部实现**，TelAgent 可开始适配
+- 文档版本：v0.5（Phase 3 增强功能实现后更新）
+- 状态：**ClawNet messaging API Phase 1 + Phase 2 + Phase 3 已全部实现**，TelAgent 可开始适配
 - 作者：TelAgent 团队
 - 审阅 & 实现：ClawNet 项目组
-- 日期：2026-03-05
+- 日期：2026-03-06
 
 ---
 
@@ -283,16 +283,20 @@ ClawNet 自身的业务消息可使用 `clawnet/*` 命名空间。
 | **速率限制** | 建议对每个 DID 的发送频率限流（如 600 条/分钟），防止滥用 |
 | **载荷大小限制** | 单条消息不超过 64 KB |
 
-### 3.4 可选增强能力
+### 3.4 增强能力（已全部实现）
 
-以下能力不是第一期必须，但如果后续支持会很有价值：
+以下能力在 Phase 2 和 Phase 3 中已全部实现：
 
-| 能力 | 说明 |
-|------|------|
-| **多播（Multicast）** | 群聊场景下向多个 DID 同时发送消息，避免逐一发送 |
-| **投递回执** | ClawNet 层面的投递确认（区别于 TelAgent 层面的已读回执） |
-| **优先级队列** | 支持不同优先级的消息（如 control 消息优先于普通文本） |
-| **流量控制** | 当接收方处理不过来时的背压机制 |
+| 能力 | 状态 | 说明 |
+|------|------|------|
+| **多播（Multicast）** | ✅ Phase 2 | 群聊场景下向多个 DID 同时发送消息，最多 100 DID |
+| **投递回执** | ✅ Phase 2 | ClawNet 层面的投递确认（区别于 TelAgent 层面的已读回执） |
+| **优先级队列** | ✅ Phase 3 | 4 级优先级（LOW/NORMAL/HIGH/URGENT），高优先级消息优先投递 |
+| **消息去重（幂等键）** | ✅ Phase 3 | 通过 `idempotencyKey` 实现 at-least-once → exactly-once |
+| **传输层 E2E 加密** | ✅ Phase 3 | X25519 + HKDF + AES-256-GCM，可选对载荷进行传输层加密 |
+| **消息压缩** | ✅ Phase 3 | 载荷 > 1 KB 时自动 gzip 压缩，减少带宽消耗 |
+| **WS 断线重连补发** | ✅ Phase 3 | 通过 `sinceSeq` 参数在 WS 重连后补发遗漏消息 |
+| **流量控制** | ⏳ 待定 | 当接收方处理不过来时的背压机制 |
 
 ---
 
@@ -475,6 +479,11 @@ routeHint: {
 | **多播 / 批量发送** | ✅ Phase 2 已实现 | `POST /api/v1/messaging/send/batch`，单次最多 100 个目标 DID |
 | **速率限制** | ✅ Phase 2 已实现 | 滑动窗口 600 条/分钟/DID，超限返回 429 + `Retry-After: 60` |
 | **投递回执** | ✅ Phase 2 已实现 | `/clawnet/1.0.0/receipt` 协议，收到消息后自动回执，通过 WS 推送给发送方 |
+| **消息去重（幂等键）** | ✅ Phase 3 已实现 | `idempotencyKey` 参数，相同幂等键的消息只入库一次（24h 去重窗口） |
+| **传输层 E2E 加密** | ✅ Phase 3 已实现 | X25519 ECDH + HKDF-SHA-256 + AES-256-GCM；发送方指定 `encryptForKeyHex` |
+| **消息压缩** | ✅ Phase 3 已实现 | `compress: true` 时载荷 > 1 KB 自动 gzip 压缩，接收方自动解压 |
+| **QoS 优先级队列** | ✅ Phase 3 已实现 | `priority` 参数 (0-3)，inbox/outbox 按优先级排序投递 |
+| **WS 断线重连补发** | ✅ Phase 3 已实现 | `sinceSeq` 查询参数，WS 重连后自动补发遗漏消息 + `replay_done` 帧 |
 
 ### C.2 SDK 接口（最终版）
 
@@ -499,10 +508,14 @@ const result = await claw.messaging.send({
   topic: 'telagent/envelope',
   payload: '<base64-encoded Envelope JSON>',
   ttlSec: 86400,          // 可选，默认 24 小时
+  priority: 1,             // 可选，0=LOW 1=NORMAL 2=HIGH 3=URGENT
+  compress: true,          // 可选，载荷 > 1KB 时自动 gzip 压缩
+  encryptForKeyHex: '...',  // 可选，收件人 X25519 公钥 hex，启用 E2E 加密
+  idempotencyKey: 'uuid-xxx',  // 可选，幂等键，相同键只入库一次
 });
 
 console.log(result);
-// { messageId: "msg_abc123def456", delivered: true }
+// { messageId: "msg_abc123def456", delivered: true, compressed: true, encrypted: true }
 // delivered=true  → 目标在线，已直接投递
 // delivered=false → 目标离线，已入 outbox 等待重投
 
@@ -513,6 +526,9 @@ const batchResult = await claw.messaging.sendBatch({
   topic: 'telagent/envelope',
   payload: '<base64-encoded data>',
   ttlSec: 86400,
+  priority: 2,             // 可选，HIGH 优先级
+  compress: true,          // 可选
+  idempotencyKey: 'batch-uuid-xxx',  // 可选
 });
 
 console.log(batchResult);
@@ -523,18 +539,11 @@ console.log(batchResult);
 // ] }
 
 // ── 轮询 inbox ────────────────────────────────────────────────
-});
-
-console.log(result);
-// { messageId: "msg_abc123def456", delivered: true }
-// delivered=true  → 目标在线，已直接投递
-// delivered=false → 目标离线，已入 outbox 等待重投
-
-// ── 轮询 inbox ────────────────────────────────────────────────
 
 const inbox = await claw.messaging.inbox({
   topic: 'telagent/envelope',  // 可选，按 topic 过滤
   since: 1709654400000,        // 可选，只返回该时间戳之后的消息
+  sinceSeq: 42,                // 可选，只返回 seq > 42 的消息（用于断线重连补发）
   limit: 100,                  // 可选，默认 100，最大 500
 });
 
@@ -545,7 +554,9 @@ for (const msg of inbox.messages) {
   //   sourceDid: "did:claw:zAliceKey...",
   //   topic: "telagent/envelope",
   //   payload: "<base64>",
-  //   receivedAtMs: 1709654400123
+  //   receivedAtMs: 1709654400123,
+  //   priority: 1,
+  //   seq: 43
   // }
 
   // 处理完消息后确认（acknowledge）
@@ -572,16 +583,33 @@ X-Api-Key: <api-key>
   "targetDid": "did:claw:z6Mk...",
   "topic": "telagent/envelope",
   "payload": "<base64-encoded opaque data>",
-  "ttlSec": 86400
+  "ttlSec": 86400,
+  "priority": 1,
+  "compress": true,
+  "encryptForKeyHex": "<recipient X25519 pubkey hex>",
+  "idempotencyKey": "<unique key for dedup>"
 }
 ```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `targetDid` | string | ✅ | 目标节点 DID (`did:claw:z...`) |
+| `topic` | string | ✅ | 消息主题/通道名 |
+| `payload` | string | ✅ | 不透明载荷（base64 编码） |
+| `ttlSec` | number | ❌ | 存活时间（秒），默认 86400 |
+| `priority` | number | ❌ | 优先级 0=LOW 1=NORMAL 2=HIGH 3=URGENT，默认 1 |
+| `compress` | boolean | ❌ | 载荷 > 1KB 时启用 gzip 压缩 |
+| `encryptForKeyHex` | string | ❌ | 收件人 X25519 公钥 hex，启用 E2E 加密 |
+| `idempotencyKey` | string | ❌ | 幂等键，相同键的消息只入库一次 |
 
 **Response (201 Created)**:
 ```json
 {
   "data": {
     "messageId": "msg_abc123def456",
-    "delivered": true
+    "delivered": true,
+    "compressed": true,
+    "encrypted": true
   },
   "links": {
     "self": "/api/v1/messaging/inbox"
@@ -592,9 +620,16 @@ X-Api-Key: <api-key>
 #### GET /api/v1/messaging/inbox
 
 ```http
-GET /api/v1/messaging/inbox?topic=telagent/envelope&since=1709654400000&limit=100
+GET /api/v1/messaging/inbox?topic=telagent/envelope&since=1709654400000&sinceSeq=42&limit=100
 X-Api-Key: <api-key>
 ```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `topic` | string | ❌ | 按主题过滤 |
+| `since` | number | ❌ | 只返回该时间戳之后的消息（ms） |
+| `sinceSeq` | number | ❌ | 只返回 seq > 该值的消息（断线重连补发） |
+| `limit` | number | ❌ | 最大返回数 (1-500，默认 100) |
 
 **Response (200 OK)**:
 ```json
@@ -606,7 +641,9 @@ X-Api-Key: <api-key>
         "sourceDid": "did:claw:z6MkAlice...",
         "topic": "telagent/envelope",
         "payload": "<base64>",
-        "receivedAtMs": 1709654400123
+        "receivedAtMs": 1709654400123,
+        "priority": 1,
+        "seq": 43
       }
     ]
   },
@@ -686,6 +723,7 @@ class ClawNetTransportService {
   private ws?: WebSocket;
   private baseUrl: string;
   private apiKey: string;
+  private lastSeq = 0;        // 跟踪最后收到的 seq，用于断线重连补发
 
   constructor(baseUrl: string, apiKey: string) {
     this.baseUrl = baseUrl;
@@ -701,6 +739,9 @@ class ClawNetTransportService {
       topic: 'telagent/envelope',
       payload,
       ttlSec: envelope.ttlSec,
+      priority: envelope.contentType.startsWith('control/') ? 3 : 1,  // control 消息用 URGENT
+      compress: true,          // 自动压缩大载荷
+      idempotencyKey: envelope.envelopeId,  // 用 envelopeId 作为幂等键，实现 exactly-once
     });
     if (!result.delivered) {
       console.log(`Envelope ${envelope.envelopeId} queued for offline delivery`);
@@ -715,19 +756,28 @@ class ClawNetTransportService {
       topic: 'telagent/envelope',
       payload,
       ttlSec: envelope.ttlSec,
+      priority: envelope.contentType.startsWith('control/') ? 3 : 1,
+      compress: true,
+      idempotencyKey: envelope.envelopeId,
     });
   }
 
   /**
-   * 订阅入站消息（推荐方式：WebSocket）
-   * 实时推送，延迟 < 50ms，无需轮询。
+   * 订阅入站消息（推荐方式：WebSocket + 断线重连补发）
+   *
+   * 首次连接时不传 sinceSeq，后续重连时带上 sinceSeq 参数，
+   * 服务端会自动补发断线期间遗漏的消息。
    */
   startListening(
     onEnvelope: (sourceDid: string, envelope: Envelope) => Promise<void>,
   ): void {
-    const wsUrl = this.baseUrl.replace(/^http/, 'ws')
+    // 构建 WS URL，带上 sinceSeq 参数实现断线重连补发
+    let wsUrl = this.baseUrl.replace(/^http/, 'ws')
       + '/api/v1/messaging/subscribe?topic=telagent/envelope'
       + `&apiKey=${this.apiKey}`;
+    if (this.lastSeq > 0) {
+      wsUrl += `&sinceSeq=${this.lastSeq}`;
+    }
 
     this.ws = new WebSocket(wsUrl);
 
@@ -735,16 +785,34 @@ class ClawNetTransportService {
       try {
         const frame = JSON.parse(data.toString()) as {
           type: string;
-          data?: { sourceDid: string; payload: string; messageId: string };
+          seq?: number;
+          lastSeq?: number;
+          data?: { sourceDid: string; payload: string; messageId: string; seq: number };
         };
+
+        if (frame.type === 'connected' && frame.seq) {
+          // 记录服务端当前 seq，用于下次重连
+          if (this.lastSeq === 0) this.lastSeq = frame.seq;
+        }
+
         if (frame.type === 'message' && frame.data) {
           const envelope = JSON.parse(
             Buffer.from(frame.data.payload, 'base64').toString('utf-8'),
           ) as Envelope;
           await onEnvelope(frame.data.sourceDid, envelope);
+          // 更新 lastSeq 用于后续重连
+          if (frame.data.seq > this.lastSeq) this.lastSeq = frame.data.seq;
           // ACK via REST（可选，用于清理 inbox）
           await this.client.messaging.ack(frame.data.messageId);
         }
+
+        if (frame.type === 'replay_done') {
+          console.log(`Replay done, caught up to seq ${frame.lastSeq}`);
+          if (frame.lastSeq && frame.lastSeq > this.lastSeq) {
+            this.lastSeq = frame.lastSeq;
+          }
+        }
+
         if (frame.type === 'receipt') {
           // 投递回执，可用于更新 UI 或消息状态
           console.log('Delivery receipt:', frame.data);
@@ -755,7 +823,7 @@ class ClawNetTransportService {
     });
 
     this.ws.on('close', () => {
-      // 自动重连
+      // 自动重连，带上 lastSeq 以补发遗漏消息
       setTimeout(() => this.startListening(onEnvelope), 3000);
     });
   }
@@ -767,20 +835,20 @@ class ClawNetTransportService {
 }
 ```
 
-**轮询回退模式**（如 WebSocket 不可用）：
+**轮询回退模式**（如 WebSocket 不可用，使用 sinceSeq 代替 since）：
 
 ```typescript
-// 如果 WebSocket 不可用，可回退到轮询模式
-let lastSince = Date.now();
+// 使用 sinceSeq 进行轮询，比时间戳更可靠
+let lastSeq = 0;
 setInterval(async () => {
   const inbox = await claw.messaging.inbox({
     topic: 'telagent/envelope',
-    since: lastSince,
+    sinceSeq: lastSeq,
   });
   for (const msg of inbox.messages) {
     // ... 处理消息 ...
     await claw.messaging.ack(msg.messageId);
-    lastSince = Math.max(lastSince, msg.receivedAtMs);
+    lastSeq = Math.max(lastSeq, msg.seq);
   }
 }, 2000);
 ```
@@ -801,9 +869,10 @@ Phase 2 所有能力均已实现并通过测试（297 tests passing）：
 
 ```jsonc
 // 服务端 → 客户端
-{ "type": "connected", "topicFilter": "telagent/envelope" }  // 连接确认
-{ "type": "message", "data": { "messageId": "...", "sourceDid": "...", "topic": "...", "payload": "...", "receivedAtMs": ... } }
+{ "type": "connected", "topicFilter": "telagent/envelope", "seq": 42 }  // 连接确认，包含当前序列号
+{ "type": "message", "data": { "messageId": "...", "sourceDid": "...", "topic": "...", "payload": "...", "receivedAtMs": ..., "priority": 1, "seq": 43 } }
 { "type": "receipt", "data": { "type": "delivered", "messageId": "...", "recipientDid": "...", "deliveredAtMs": ... } }
+{ "type": "replay_done", "lastSeq": 45 }                              // 断线补发完成标志
 ```
 
 #### 速率限制响应
@@ -832,7 +901,10 @@ X-Api-Key: <api-key>
   "targetDids": ["did:claw:zAlice...", "did:claw:zBob...", "did:claw:zCharlie..."],
   "topic": "telagent/envelope",
   "payload": "<base64>",
-  "ttlSec": 86400
+  "ttlSec": 86400,
+  "priority": 2,
+  "compress": true,
+  "idempotencyKey": "batch-uuid-xxx"
 }
 ```
 
@@ -848,3 +920,106 @@ X-Api-Key: <api-key>
   }
 }
 ```
+
+### C.8 Phase 3 增强功能总结（v0.5）
+
+Phase 3 在 Phase 2 基础上新增了 5 项生产级增强功能，全部已实现并通过测试（307 tests passing）：
+
+| 能力 | 实现方式 | 文件 |
+|------|---------|------|
+| **消息去重（幂等键）** | SQLite `dedup` 表 (idempotencyKey → messageId)，24h 去重窗口 | `message-store.ts` |
+| **传输层 E2E 加密** | X25519 ECDH + HKDF-SHA-256 + AES-256-GCM | `messaging-service.ts` |
+| **消息压缩** | gzip 压缩（自动对 >1KB 载荷生效），接收方自动解压 | `messaging-service.ts` |
+| **QoS 优先级队列** | `priority` 列 (0-3)，inbox/outbox 按优先级排序投递 | `message-store.ts`, `messaging-service.ts` |
+| **WS 断线重连补发** | `sinceSeq` 查询参数 + 单调递增 `seq` + `replay_done` 帧 | `ws-messaging.ts`, `message-store.ts` |
+
+#### 消息去重（幂等键）
+
+发送方在请求中指定 `idempotencyKey`，ClawNet 节点在存储时检查 `dedup` 表：
+
+- 若该 key 已存在 → 返回之前的 `messageId`，不重复入库
+- 若不存在 → 正常入库，同时记录到 dedup 表
+- 去重记录 24 小时后自动清理（随 TTL cleanup 一起执行）
+
+```
+POST /send { idempotencyKey: "abc" }
+  → 首次: 新建消息 msg_001, 记录 dedup["abc"] = msg_001
+  → 重试: 命中 dedup["abc"], 直接返回 msg_001, 不重复入库
+```
+
+**TelAgent 适配建议**：使用 `envelope.envelopeId` 作为 `idempotencyKey`，实现 at-least-once → exactly-once 语义升级。
+
+#### 传输层 E2E 加密
+
+可选的传输层加密，在 TelAgent 自有 E2E 加密之上提供额外保护层。加密流程：
+
+```
+发送方:
+  1. 生成临时 X25519 密钥对 (ephemeralPub, ephemeralPriv)
+  2. ECDH: sharedSecret = x25519(ephemeralPriv, recipientPubKey)
+  3. HKDF: key = HKDF-SHA-256(sharedSecret, info="clawnet:e2e-msg:v1")
+  4. AES-256-GCM 加密 payload → ciphertext + tag
+  5. 发送: { _e2e: 1, pk: ephemeralPubHex, n: nonceHex, c: ciphertextHex, t: tagHex }
+
+接收方:
+  1. ECDH: sharedSecret = x25519(recipientPriv, ephemeralPub)
+  2. HKDF + AES-256-GCM 解密
+```
+
+SDK 静态方法：
+- `MessagingService.decryptPayload(payload, recipientPrivateKeyHex)` — 解密 E2E 信封
+- `MessagingService.decompressPayload(payload)` — 解压 gzip 载荷
+
+#### 消息压缩
+
+发送时指定 `compress: true`，若载荷大于 1 KB：
+
+1. 用 gzip 压缩载荷
+2. 转为 base64 字符串
+3. 包装为 `{ _compressed: 1, data: "<gzip-base64>" }`
+4. 接收方检测到 `_compressed` 字段后自动解压
+
+低于 1 KB 的载荷即使指定 `compress: true` 也不会被压缩（避免膨胀）。
+
+#### QoS 优先级队列
+
+4 级优先级：
+
+| 值 | 名称 | 用途 |
+|----|------|------|
+| 0 | LOW | 不紧急的通知、日志 |
+| 1 | NORMAL | 普通消息（默认） |
+| 2 | HIGH | 重要消息、群组同步 |
+| 3 | URGENT | 控制消息、紧急通知 |
+
+影响范围：
+- **inbox 查询**：按 `priority DESC, received_at_ms ASC` 排序
+- **outbox 重投**：按 `priority DESC` 排序，高优先级消息优先投递
+- **SDK 字段**：`InboxMessage.priority`（只读）
+
+#### WS 断线重连补发
+
+基于单调递增序列号 `seq` 的 gap-fill 机制：
+
+```
+WS 连接 #1:
+  ← connected { seq: 100 }       // 客户端记录 lastSeq = 100
+  ← message { seq: 101 }
+  ← message { seq: 102 }
+  ✕ 网络断开，客户端 lastSeq = 102
+
+WS 连接 #2 (重连):
+  → WS /subscribe?sinceSeq=102
+  ← connected { seq: 105 }       // 服务端当前 seq
+  ← message { seq: 103 }         // 补发 #1
+  ← message { seq: 104 }         // 补发 #2
+  ← message { seq: 105 }         // 补发 #3
+  ← replay_done { lastSeq: 105 } // 补发完成
+  ← message { seq: 106 }         // 实时推送恢复
+```
+
+客户端只需：
+1. 连接时记录 `connected.seq`
+2. 每条消息更新 `lastSeq = msg.seq`
+3. 重连时带上 `?sinceSeq=<lastSeq>`
+4. 收到 `replay_done` 后进入正常实时模式

@@ -20,10 +20,13 @@ function createMockMessagingService() {
     topic: string;
     payload: string;
     receivedAtMs: number;
+    priority: number;
+    seq: number;
   }> = [];
   let consumed = new Set<string>();
-  const subscribers = new Set<(msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) => void>();
+  const subscribers = new Set<(msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number; priority: number; seq: number }) => void>();
   let rateLimitOn = false;
+  let seqCounter = 0;
 
   return {
     send: vi.fn(async (_target: string, _topic: string, _payload: string) => {
@@ -36,10 +39,11 @@ function createMockMessagingService() {
         results: targets.map((t) => ({ targetDid: t, messageId: `msg_${t.slice(-4)}`, delivered: true })),
       };
     }),
-    getInbox: vi.fn((opts?: { topic?: string; sinceMs?: number; limit?: number }) => {
+    getInbox: vi.fn((opts?: { topic?: string; sinceMs?: number; sinceSeq?: number; limit?: number }) => {
       let result = inbox.filter((m) => !consumed.has(m.messageId));
       if (opts?.topic) result = result.filter((m) => m.topic === opts.topic);
       if (opts?.sinceMs) result = result.filter((m) => m.receivedAtMs > opts.sinceMs!);
+      if (opts?.sinceSeq !== undefined) result = result.filter((m) => m.seq > opts.sinceSeq!);
       if (opts?.limit) result = result.slice(0, opts.limit);
       return result;
     }),
@@ -49,27 +53,31 @@ function createMockMessagingService() {
       return found;
     }),
     getDidPeerMap: vi.fn(() => ({ 'did:claw:alice': '12D3KooW...' })),
-    addSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) => void) => {
+    getCurrentSeq: vi.fn(() => seqCounter),
+    addSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number; priority: number; seq: number }) => void) => {
       subscribers.add(cb);
     }),
-    removeSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) => void) => {
+    removeSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number; priority: number; seq: number }) => void) => {
       subscribers.delete(cb);
     }),
     // Helpers for test control
     _addToInbox(msg: { sourceDid: string; topic: string; payload: string }) {
       const id = `msg_${inbox.length}`;
+      seqCounter++;
       inbox.push({
         messageId: id,
         sourceDid: msg.sourceDid,
         topic: msg.topic,
         payload: msg.payload,
         receivedAtMs: Date.now(),
+        priority: 1,
+        seq: seqCounter,
       });
       return id;
     },
     _setRateLimit(on: boolean) { rateLimitOn = on; },
     _notifySubscribers(msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) {
-      for (const cb of subscribers) cb(msg);
+      for (const cb of subscribers) cb({ ...msg, priority: 1, seq: ++seqCounter });
     },
     get _subscriberCount() { return subscribers.size; },
   };
@@ -121,7 +129,7 @@ describe('messaging api', () => {
       'did:claw:zBobPeerId123',
       'telagent/envelope',
       'dGVzdA==',
-      3600,
+      { ttlSec: 3600, priority: undefined, compress: undefined, encryptForKeyHex: undefined, idempotencyKey: undefined },
     );
   });
 
@@ -236,7 +244,7 @@ describe('messaging api', () => {
       ['did:claw:zAlice', 'did:claw:zBob'],
       'test/batch',
       'hello-all',
-      undefined,
+      { ttlSec: undefined, priority: undefined, compress: undefined, idempotencyKey: undefined },
     );
   });
 
@@ -391,5 +399,79 @@ describe('messaging api', () => {
     expect((msgFrames[0] as { data: { messageId: string } }).data.messageId).toBe('msg_2');
 
     ws.close();
+  });
+
+  // ── WS replay missed messages ─────────────────────────────────
+
+  it('replays missed messages on WS reconnect via sinceSeq', async () => {
+    // Add messages to inbox before connecting
+    mockService._addToInbox({ sourceDid: 'did:claw:zAlice', topic: 'test', payload: 'missed-1' });
+    mockService._addToInbox({ sourceDid: 'did:claw:zAlice', topic: 'test', payload: 'missed-2' });
+
+    // Connect with sinceSeq=0 to replay all
+    const wsUrl = baseUrl.replace('http', 'ws') + '/api/v1/messaging/subscribe?sinceSeq=0';
+    const ws = new WebSocket(wsUrl);
+
+    const messages: unknown[] = [];
+    ws.on('message', (data) => {
+      messages.push(JSON.parse(data.toString()));
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      ws.on('open', resolve);
+      ws.on('error', reject);
+      setTimeout(() => reject(new Error('ws open timeout')), 3000);
+    });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+
+    // Should have: connected + 2 replayed messages + replay_done
+    const connected = messages.find((m) => (m as { type: string }).type === 'connected');
+    expect(connected).toBeDefined();
+
+    const replayed = messages.filter((m) => (m as { type: string }).type === 'message');
+    expect(replayed).toHaveLength(2);
+
+    const replayDone = messages.find((m) => (m as { type: string }).type === 'replay_done');
+    expect(replayDone).toBeDefined();
+    expect((replayDone as { lastSeq: number }).lastSeq).toBe(2);
+
+    ws.close();
+  });
+
+  // ── Send with priority and idempotency ─────────────────────────
+
+  it('passes priority and idempotencyKey to send', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDid: 'did:claw:zBobPeerId123',
+        topic: 'urgent/alert',
+        payload: 'important-data',
+        priority: 3,
+        idempotencyKey: 'idem-123',
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockService.send).toHaveBeenCalledWith(
+      'did:claw:zBobPeerId123',
+      'urgent/alert',
+      'important-data',
+      expect.objectContaining({ priority: 3, idempotencyKey: 'idem-123' }),
+    );
+  });
+
+  // ── Inbox with sinceSeq ────────────────────────────────────────
+
+  it('queries inbox with sinceSeq parameter', async () => {
+    mockService._addToInbox({ sourceDid: 'did:claw:alice', topic: 'test', payload: 'msg1' });
+    mockService._addToInbox({ sourceDid: 'did:claw:alice', topic: 'test', payload: 'msg2' });
+
+    const res = await fetch(`${baseUrl}/api/v1/messaging/inbox?sinceSeq=1`);
+    expect(res.status).toBe(200);
+    const data = await readData<{ messages: unknown[] }>(res);
+    expect(data.messages).toHaveLength(1);
   });
 });
