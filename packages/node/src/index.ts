@@ -54,6 +54,8 @@ import { IdentityService } from './services/identity-service.js';
 import { ReputationService } from './services/reputation-service.js';
 import { ContractsService } from './services/contracts-service.js';
 import { DaoService } from './services/dao-service.js';
+import { MessagingService } from './services/messaging-service.js';
+import { MessageStore } from './services/message-store.js';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 import { ApiKeyStore } from './api/api-key-store.js';
 
@@ -129,6 +131,8 @@ export class ClawNetNode {
   private reputationService?: ReputationService;
   private contractsService?: ContractsService;
   private daoService?: DaoService;
+  private messagingService?: MessagingService;
+  private messageStore?: MessageStore;
   private apiKeyStore?: ApiKeyStore;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
@@ -271,6 +275,20 @@ export class ClawNetNode {
           this.apiKeyStore = new ApiKeyStore(apiKeysDbPath);
         }
 
+        // ── Messaging service (P2P direct messaging) ─────────────────
+        if (this.p2p && this.cachedDid) {
+          const storagePaths3 = resolveStoragePaths(this.config.dataDir);
+          const msgDbPath = join(storagePaths3.root, 'messages.sqlite');
+          this.messageStore = new MessageStore(msgDbPath);
+          this.messagingService = new MessagingService(this.p2p, this.messageStore, this.cachedDid);
+          await this.messagingService.start();
+
+          // Wire peer:connect to messaging announce + outbox flush
+          this.p2p.onPeerConnect((peerId: string) => {
+            void this.messagingService?.onPeerConnected(peerId);
+          });
+        }
+
         const apiConfig: ApiServerConfig = {
           host: this.config.api?.host ?? '127.0.0.1',
           port: this.config.api?.port ?? 9528,
@@ -300,6 +318,7 @@ export class ClawNetNode {
           getNodePeers: () => this.buildNodePeers(),
           getNodeConfig: () => this.buildNodeConfig(),
           apiKeyStore: this.apiKeyStore,
+          messagingService: this.messagingService,
         });
         await this.apiServer.start();
       }
@@ -326,6 +345,7 @@ export class ClawNetNode {
     this.stopMeshAmplifier();
 
     const tasks: Array<() => Promise<void>> = [
+      async () => this.messagingService?.stop(),
       async () => this.apiServer?.stop(),
       async () => this.eventIndexer?.stop(),
       async () => this.contractProvider?.destroy(),
@@ -346,6 +366,7 @@ export class ClawNetNode {
     // Synchronous cleanup (SQLite)
     try { this.indexerStore?.close(); } catch { /* ignore */ }
     try { this.apiKeyStore?.close(); } catch { /* ignore */ }
+    try { this.messageStore?.close(); } catch { /* ignore */ }
 
     this.apiServer = undefined;
     this.sync = undefined;
@@ -367,6 +388,8 @@ export class ClawNetNode {
     this.reputationService = undefined;
     this.contractsService = undefined;
     this.daoService = undefined;
+    this.messagingService = undefined;
+    this.messageStore = undefined;
     this.peerId = undefined;
     this.peerPrivateKey = undefined;
     this.stopping = undefined;

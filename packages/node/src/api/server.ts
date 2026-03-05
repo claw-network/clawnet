@@ -29,6 +29,7 @@ import { marketsSearchRoutes } from './routes/markets-search.js';
 import { devRoutes } from './routes/dev.js';
 import { adminRoutes } from './routes/admin.js';
 import { nonceRoutes } from './routes/nonce.js';
+import { messagingRoutes } from './routes/messaging.js';
 
 export { ApiServerConfig } from './types.js';
 export type { RuntimeContext } from './types.js';
@@ -56,6 +57,7 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/markets/disputes', marketsDisputeRoutes(ctx));
   api.mount('/api/v1/markets/search', marketsSearchRoutes(ctx));
   api.mount('/api/v1/nonce', nonceRoutes(ctx));
+  api.mount('/api/v1/messaging', messagingRoutes(ctx));
 
   // Dev routes (faucet, etc.) are NOT available on mainnet — prevents unauthorized minting.
   if (ctx.config.network !== 'mainnet') {
@@ -95,6 +97,7 @@ export class ApiServer {
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
       getNodeConfig?: () => Promise<Record<string, unknown>>;
       apiKeyStore?: ApiKeyStore;
+      messagingService?: import('../services/messaging-service.js').MessagingService;
     },
   ) {
     // Build the RuntimeContext from constructor args
@@ -117,6 +120,7 @@ export class ApiServer {
       getNodePeers: this.runtime.getNodePeers,
       getNodeConfig: this.runtime.getNodeConfig,
       apiKeyStore: this.runtime.apiKeyStore,
+      messagingService: this.runtime.messagingService,
     };
 
     this.router = buildRouter(ctx);

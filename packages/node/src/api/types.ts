@@ -20,6 +20,7 @@ import type { IdentityService } from '../services/identity-service.js';
 import type { ReputationService } from '../services/reputation-service.js';
 import type { ContractsService } from '../services/contracts-service.js';
 import type { DaoService } from '../services/dao-service.js';
+import type { MessagingService } from '../services/messaging-service.js';
 import type { ApiKeyStore } from './api-key-store.js';
 
 export {
@@ -74,6 +75,7 @@ export interface RuntimeContext {
   getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
   getNodeConfig?: () => Promise<Record<string, unknown>>;
   apiKeyStore?: ApiKeyStore;
+  messagingService?: MessagingService;
 }
 
 // ─── Address & DID Helpers ──────────────────────────────────────

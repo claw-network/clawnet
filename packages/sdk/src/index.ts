@@ -24,6 +24,14 @@ export { ReputationApi } from './reputation.js';
 export { MarketsApi, InfoMarketApi, TaskMarketApi, CapabilityMarketApi, MarketDisputeApi } from './markets.js';
 export { ContractsApi } from './contracts.js';
 export { DaoApi } from './dao.js';
+export { MessagingApi } from './messaging.js';
+export type {
+  SendMessageParams,
+  SendMessageResult,
+  InboxMessage,
+  InboxQueryParams,
+  InboxResponse,
+} from './messaging.js';
 
 // ── Shared types ─────────────────────────────────────────────────────────
 export * from './types.js';
@@ -36,6 +44,7 @@ import { ReputationApi } from './reputation.js';
 import { MarketsApi } from './markets.js';
 import { ContractsApi } from './contracts.js';
 import { DaoApi } from './dao.js';
+import { MessagingApi } from './messaging.js';
 
 /** Configuration for the top-level client. */
 export type ClientConfig = HttpClientConfig;
@@ -58,6 +67,7 @@ export class ClawNetClient {
   readonly markets: MarketsApi;
   readonly contracts: ContractsApi;
   readonly dao: DaoApi;
+  readonly messaging: MessagingApi;
 
   constructor(config?: Partial<ClientConfig>) {
     this.http = new HttpClient({
@@ -71,5 +81,6 @@ export class ClawNetClient {
     this.markets = new MarketsApi(this.http);
     this.contracts = new ContractsApi(this.http);
     this.dao = new DaoApi(this.http);
+    this.messaging = new MessagingApi(this.http);
   }
 }

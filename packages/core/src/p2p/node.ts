@@ -104,6 +104,7 @@ type Libp2pNode = {
 };
 
 export type PeerDisconnectHandler = (peerId: string) => void;
+export type PeerConnectHandler = (peerId: string) => void;
 
 export class P2PNode {
   private node: Libp2pNode | null = null;
@@ -112,6 +113,8 @@ export class P2PNode {
   private readonly peerIdOverride?: PeerIdLike;
   /** Externally-registered callbacks for peer disconnect events. */
   private disconnectHandlers: PeerDisconnectHandler[] = [];
+  /** Externally-registered callbacks for peer connect events. */
+  private connectHandlers: PeerConnectHandler[] = [];
   /** Set of peer IDs that we have ever successfully connected to. */
   private knownPeers = new Set<string>();
 
@@ -124,6 +127,11 @@ export class P2PNode {
   /** Register a callback that fires whenever a peer disconnects. */
   onPeerDisconnect(handler: PeerDisconnectHandler): void {
     this.disconnectHandlers.push(handler);
+  }
+
+  /** Register a callback that fires whenever a peer connects. */
+  onPeerConnect(handler: PeerConnectHandler): void {
+    this.connectHandlers.push(handler);
   }
 
   async start(): Promise<void> {
@@ -217,6 +225,9 @@ export class P2PNode {
       console.log(`[p2p] peer:connect ${pid}`);
       if (pid !== 'unknown') {
         this.knownPeers.add(pid);
+        for (const handler of this.connectHandlers) {
+          try { handler(pid); } catch { /* best-effort */ }
+        }
       }
     });
     this.node.addEventListener?.('peer:disconnect', (event: unknown) => {
