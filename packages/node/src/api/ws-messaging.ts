@@ -21,10 +21,12 @@ import type { ApiKeyStore } from './api-key-store.js';
 
 const WS_PATH = '/api/v1/messaging/subscribe';
 const HEARTBEAT_INTERVAL_MS = 30_000;
+const TOPIC_PATTERN = /^[a-zA-Z0-9._\-:/]{1,128}$/;
 
 interface WsClient {
   ws: WebSocket;
   topicFilter?: string;
+  alive: boolean;
 }
 
 export function attachWebSocketHandler(
@@ -39,9 +41,15 @@ export function attachWebSocketHandler(
 
   const heartbeat = setInterval(() => {
     for (const client of clients) {
-      if (client.ws.readyState === client.ws.OPEN) {
-        client.ws.ping();
+      if (client.ws.readyState !== client.ws.OPEN) continue;
+      if (!client.alive) {
+        // No pong received since last ping — connection is stale
+        client.ws.terminate();
+        clients.delete(client);
+        continue;
       }
+      client.alive = false;
+      client.ws.ping();
     }
   }, HEARTBEAT_INTERVAL_MS);
 
@@ -80,10 +88,19 @@ export function attachWebSocketHandler(
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
-    const topicFilter = url.searchParams.get('topic') ?? undefined;
+    const topicParam = url.searchParams.get('topic') ?? undefined;
 
-    const client: WsClient = { ws, topicFilter };
+    // Validate topic filter format
+    if (topicParam && !TOPIC_PATTERN.test(topicParam)) {
+      ws.close(4001, 'Invalid topic filter');
+      return;
+    }
+
+    const client: WsClient = { ws, topicFilter: topicParam, alive: true };
     clients.add(client);
+
+    // Track pong responses for stale connection detection
+    ws.on('pong', () => { client.alive = true; });
 
     // Register inbox subscriber on the messaging service
     const svc = getMessagingService();
@@ -109,7 +126,7 @@ export function attachWebSocketHandler(
     });
 
     // Send initial connected confirmation
-    ws.send(JSON.stringify({ type: 'connected', topicFilter: topicFilter ?? null }));
+    ws.send(JSON.stringify({ type: 'connected', topicFilter: topicParam ?? null }));
   });
 
   return wss;

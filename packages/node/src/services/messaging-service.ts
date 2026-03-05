@@ -34,6 +34,24 @@ const RATE_LIMIT_PER_MIN = 600;
 /** Rate limit window in milliseconds (1 minute). */
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
+/** Inbound P2P rate limit: max inbound messages per peer per minute. */
+const INBOUND_RATE_LIMIT = 300;
+
+/** Interval at which empty rate-limit buckets are pruned (2 minutes). */
+const RATE_BUCKET_GC_INTERVAL_MS = 2 * 60_000;
+
+/** Maximum concurrency for multicast delivery. */
+const MULTICAST_CONCURRENCY = 20;
+
+/** Base delay for exponential backoff in outbox retry (ms). */
+const OUTBOX_RETRY_BASE_MS = 1_000;
+
+/** Maximum backoff delay for outbox retry (ms). */
+const OUTBOX_RETRY_MAX_MS = 60_000;
+
+/** Valid DID format: did:claw:<multibase-base58btc-encoded-key>. */
+const DID_PATTERN = /^did:claw:z[1-9A-HJ-NP-Za-km-z]{32,64}$/
+
 // ── Types ────────────────────────────────────────────────────────
 
 export interface SendResult {
@@ -66,11 +84,19 @@ type Logger = ReturnType<typeof createLogger>;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-/** Read all data from a stream source into a single Buffer. */
-async function readStream(source: AsyncIterable<{ subarray: () => Uint8Array } | Uint8Array>): Promise<Buffer> {
+/** Read all data from a stream source into a single Buffer, enforcing a size limit. */
+async function readStream(
+  source: AsyncIterable<{ subarray: () => Uint8Array } | Uint8Array>,
+  maxBytes: number = MAX_PAYLOAD_BYTES * 2,
+): Promise<Buffer> {
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of source) {
     const bytes = chunk instanceof Uint8Array ? chunk : chunk.subarray();
+    total += bytes.length;
+    if (total > maxBytes) {
+      throw new Error(`Stream exceeded size limit: ${total} > ${maxBytes}`);
+    }
     chunks.push(Buffer.from(bytes));
   }
   return Buffer.concat(chunks);
@@ -108,6 +134,12 @@ export class MessagingService {
 
   /** Sliding-window rate limiter: DID → array of timestamps (ms). */
   private readonly rateBuckets = new Map<string, number[]>();
+
+  /** Inbound rate limiter: peerId → array of timestamps. */
+  private readonly inboundRateBuckets = new Map<string, number[]>();
+
+  /** Timer for periodic rate-bucket garbage collection. */
+  private rateBucketGcTimer?: NodeJS.Timeout;
 
   constructor(p2p: P2PNode, store: MessageStore, localDid: string) {
     this.log = createLogger({ level: 'info' });
@@ -148,6 +180,11 @@ export class MessagingService {
       }
     }, CLEANUP_INTERVAL_MS);
 
+    // Periodic GC for rate-limit buckets to prevent memory leaks
+    this.rateBucketGcTimer = setInterval(() => {
+      this.pruneRateBuckets();
+    }, RATE_BUCKET_GC_INTERVAL_MS);
+
     this.log.info('[messaging] service started', { localDid: this.localDid });
   }
 
@@ -155,6 +192,10 @@ export class MessagingService {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = undefined;
+    }
+    if (this.rateBucketGcTimer) {
+      clearInterval(this.rateBucketGcTimer);
+      this.rateBucketGcTimer = undefined;
     }
     try {
       await this.p2p.unhandleProtocol(PROTO_DM);
@@ -218,19 +259,8 @@ export class MessagingService {
       throw new Error(`Payload too large: ${payloadBytes} bytes (max ${MAX_PAYLOAD_BYTES})`);
     }
 
-    const results: Array<SendResult & { targetDid: string }> = [];
-    for (const targetDid of targetDids) {
-      const peerId = this.didToPeerId.get(targetDid);
-      if (peerId) {
-        const delivered = await this.deliverDirect(peerId, targetDid, topic, payload, ttlSec);
-        if (delivered) {
-          results.push({ targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true });
-          continue;
-        }
-      }
-      const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec });
-      results.push({ targetDid, messageId, delivered: false });
-    }
+    // Deliver to all targets concurrently with bounded concurrency
+    const results = await this.deliverMulticast(targetDids, topic, payload, ttlSec);
     return { results };
   }
 
@@ -244,16 +274,23 @@ export class MessagingService {
     return this.store.consumeMessage(messageId);
   }
 
-  /** Flush outbox: attempt to deliver all pending messages for a specific DID. */
+  /** Flush outbox: attempt to deliver all pending messages for a specific DID with exponential backoff. */
   async flushOutboxForDid(targetDid: string): Promise<number> {
     const peerId = this.didToPeerId.get(targetDid);
     if (!peerId) return 0;
 
     const entries = this.store.getOutboxForTarget(targetDid);
     let delivered = 0;
+    const now = Date.now();
     for (const entry of entries) {
       if (entry.attempts > MAX_DELIVERY_ATTEMPTS) {
         this.store.removeFromOutbox(entry.id);
+        continue;
+      }
+      // Exponential backoff: skip if too soon since last attempt
+      const backoff = Math.min(OUTBOX_RETRY_BASE_MS * (2 ** entry.attempts), OUTBOX_RETRY_MAX_MS);
+      const lastAttempt = entry.lastAttempt ?? 0;
+      if (lastAttempt > 0 && now - lastAttempt < backoff) {
         continue;
       }
       this.store.recordAttempt(entry.id);
@@ -306,10 +343,13 @@ export class MessagingService {
     return this.subscribers.size;
   }
 
-  /** Notify all subscribers of a new inbox message. */
+  /** Notify all subscribers of a new inbox message (non-blocking). */
   private notifySubscribers(msg: InboxMessage): void {
+    // Use queueMicrotask to avoid blocking the current handler when there are many subscribers
     for (const cb of this.subscribers) {
-      try { cb(msg); } catch { /* best-effort */ }
+      queueMicrotask(() => {
+        try { cb(msg); } catch { /* best-effort */ }
+      });
     }
   }
 
@@ -317,24 +357,10 @@ export class MessagingService {
 
   /**
    * Check rate limit for a DID. Throws if limit exceeded.
-   * Uses a sliding window of timestamps.
+   * Uses a sliding window of timestamps with binary search eviction.
    */
   enforceRateLimit(did: string): void {
-    const now = Date.now();
-    const windowStart = now - RATE_LIMIT_WINDOW_MS;
-    let timestamps = this.rateBuckets.get(did);
-    if (!timestamps) {
-      timestamps = [];
-      this.rateBuckets.set(did, timestamps);
-    }
-    // Evict expired entries
-    while (timestamps.length > 0 && timestamps[0] < windowStart) {
-      timestamps.shift();
-    }
-    if (timestamps.length >= RATE_LIMIT_PER_MIN) {
-      throw new RateLimitError(did, RATE_LIMIT_PER_MIN);
-    }
-    timestamps.push(now);
+    this.checkRateBucket(this.rateBuckets, did, RATE_LIMIT_PER_MIN);
   }
 
   /** Check if a DID is currently rate-limited (without consuming a slot). */
@@ -343,11 +369,70 @@ export class MessagingService {
     const windowStart = now - RATE_LIMIT_WINDOW_MS;
     const timestamps = this.rateBuckets.get(did);
     if (!timestamps) return false;
-    // Evict expired
-    while (timestamps.length > 0 && timestamps[0] < windowStart) {
-      timestamps.shift();
+    const startIdx = this.bisectLeft(timestamps, windowStart);
+    return (timestamps.length - startIdx) >= RATE_LIMIT_PER_MIN;
+  }
+
+  /**
+   * Enforce inbound rate limit for a peerId. Throws if limit exceeded.
+   * Prevents P2P peers from spamming without limit.
+   */
+  private enforceInboundRateLimit(peerId: string): void {
+    this.checkRateBucket(this.inboundRateBuckets, peerId, INBOUND_RATE_LIMIT);
+  }
+
+  /**
+   * Core rate-limit check: evict expired entries via binary search,
+   * push new timestamp, throw if over limit.
+   */
+  private checkRateBucket(
+    buckets: Map<string, number[]>,
+    key: string,
+    limit: number,
+  ): void {
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+    let timestamps = buckets.get(key);
+    if (!timestamps) {
+      timestamps = [];
+      buckets.set(key, timestamps);
     }
-    return timestamps.length >= RATE_LIMIT_PER_MIN;
+    // Binary search eviction — O(log n) instead of O(n)
+    const startIdx = this.bisectLeft(timestamps, windowStart);
+    if (startIdx > 0) {
+      timestamps.splice(0, startIdx);
+    }
+    if (timestamps.length >= limit) {
+      throw new RateLimitError(key, limit);
+    }
+    timestamps.push(now);
+  }
+
+  /** Binary search: find first index where timestamps[i] >= target. */
+  private bisectLeft(arr: number[], target: number): number {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (arr[mid] < target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  /** Remove empty and stale rate-limit buckets to prevent memory leaks. */
+  private pruneRateBuckets(): void {
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+    for (const [key, ts] of this.rateBuckets) {
+      if (ts.length === 0 || ts[ts.length - 1] < windowStart) {
+        this.rateBuckets.delete(key);
+      }
+    }
+    for (const [key, ts] of this.inboundRateBuckets) {
+      if (ts.length === 0 || ts[ts.length - 1] < windowStart) {
+        this.inboundRateBuckets.delete(key);
+      }
+    }
   }
 
   // ── Private: Direct Delivery ───────────────────────────────────
@@ -397,13 +482,21 @@ export class MessagingService {
   }): Promise<void> {
     const { stream, connection } = incoming;
     try {
+      // Inbound rate limit check — prevent P2P spam
+      const remotePeer = connection.remotePeer?.toString();
+      if (remotePeer) {
+        try {
+          this.enforceInboundRateLimit(remotePeer);
+        } catch {
+          this.log.warn('inbound rate limit exceeded, dropping stream', { peerId: remotePeer });
+          try { await stream.close(); } catch { /* ignore */ }
+          return;
+        }
+      }
+
+      // readStream enforces size limit before reading all into memory
       const raw = await readStream(stream.source);
       await stream.close();
-
-      if (raw.length > MAX_PAYLOAD_BYTES * 2) {
-        this.log.warn('inbound message too large, discarding');
-        return;
-      }
 
       const msg = JSON.parse(raw.toString('utf-8')) as {
         sourceDid?: string;
@@ -465,11 +558,17 @@ export class MessagingService {
   }): Promise<void> {
     const { stream, connection } = incoming;
     try {
-      const raw = await readStream(stream.source);
+      const raw = await readStream(stream.source, 1024); // DID announces are tiny
       await stream.close();
 
       const msg = JSON.parse(raw.toString('utf-8')) as { did?: string };
       const remotePeerId = connection.remotePeer?.toString();
+
+      // Validate DID format to prevent spoofing / garbage entries
+      if (msg.did && !DID_PATTERN.test(msg.did)) {
+        this.log.warn('invalid DID in announce, ignoring', { did: msg.did, peerId: remotePeerId });
+        return;
+      }
 
       if (msg.did && remotePeerId) {
         this.didToPeerId.set(msg.did, remotePeerId);
@@ -509,6 +608,45 @@ export class MessagingService {
     for (const peerId of peers) {
       await this.announceDidToPeer(peerId);
     }
+  }
+
+  /**
+   * Deliver to multiple targets concurrently with bounded concurrency.
+   * Uses Promise.allSettled so one failure doesn't block others.
+   */
+  private async deliverMulticast(
+    targetDids: string[],
+    topic: string,
+    payload: string,
+    ttlSec: number,
+  ): Promise<Array<SendResult & { targetDid: string }>> {
+    const results: Array<SendResult & { targetDid: string }> = [];
+    // Process in batches of MULTICAST_CONCURRENCY
+    for (let i = 0; i < targetDids.length; i += MULTICAST_CONCURRENCY) {
+      const batch = targetDids.slice(i, i + MULTICAST_CONCURRENCY);
+      const settled = await Promise.allSettled(
+        batch.map(async (targetDid) => {
+          const peerId = this.didToPeerId.get(targetDid);
+          if (peerId) {
+            const delivered = await this.deliverDirect(peerId, targetDid, topic, payload, ttlSec);
+            if (delivered) {
+              return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true };
+            }
+          }
+          const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec });
+          return { targetDid, messageId, delivered: false };
+        }),
+      );
+      for (const result of settled) {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          // This shouldn't normally happen since deliverDirect catches its own errors
+          this.log.warn('multicast delivery error', { error: String(result.reason) });
+        }
+      }
+    }
+    return results;
   }
 
   // ── Private: Delivery Receipt Protocol ─────────────────────────

@@ -38,6 +38,7 @@ export interface OutboxEntry {
   ttlSec: number;
   sentAtMs: number;
   attempts: number;
+  lastAttempt: number;
 }
 
 // ── Schema ───────────────────────────────────────────────────────
@@ -57,6 +58,8 @@ CREATE TABLE IF NOT EXISTS inbox (
 
 CREATE INDEX IF NOT EXISTS idx_inbox_topic ON inbox(topic, consumed);
 CREATE INDEX IF NOT EXISTS idx_inbox_received ON inbox(received_at_ms);
+CREATE INDEX IF NOT EXISTS idx_inbox_source ON inbox(source_did, consumed);
+CREATE INDEX IF NOT EXISTS idx_inbox_unconsumed ON inbox(consumed, received_at_ms) WHERE consumed = 0;
 
 CREATE TABLE IF NOT EXISTS outbox (
   id            TEXT PRIMARY KEY,
@@ -70,6 +73,7 @@ CREATE TABLE IF NOT EXISTS outbox (
 );
 
 CREATE INDEX IF NOT EXISTS idx_outbox_target ON outbox(target_did);
+CREATE INDEX IF NOT EXISTS idx_outbox_retry ON outbox(attempts, last_attempt);
 `;
 
 // ── Store ────────────────────────────────────────────────────────
@@ -146,13 +150,20 @@ export class MessageStore {
     return result.changes > 0;
   }
 
-  /** Delete consumed and expired messages. */
+  /** Delete consumed and expired messages in batches to avoid locking. */
   cleanupInbox(): number {
     const now = Date.now();
-    const result = this.db.prepare(
-      'DELETE FROM inbox WHERE consumed = 1 OR (sent_at_ms + ttl_sec * 1000) <= ?',
-    ).run(now);
-    return result.changes;
+    let total = 0;
+    // Delete in batches of 500 to avoid long table locks
+    const stmt = this.db.prepare(
+      'DELETE FROM inbox WHERE id IN (SELECT id FROM inbox WHERE consumed = 1 OR (sent_at_ms + ttl_sec * 1000) <= ? LIMIT 500)',
+    );
+    let changes: number;
+    do {
+      changes = stmt.run(now).changes;
+      total += changes;
+    } while (changes > 0);
+    return total;
   }
 
   // ── Outbox ─────────────────────────────────────────────────────
@@ -177,13 +188,13 @@ export class MessageStore {
   getOutboxForTarget(targetDid: string, limit = 100): OutboxEntry[] {
     const now = Date.now();
     const rows = this.db.prepare(`
-      SELECT id, target_did, topic, payload, ttl_sec, sent_at_ms, attempts
+      SELECT id, target_did, topic, payload, ttl_sec, sent_at_ms, attempts, last_attempt
       FROM outbox
       WHERE target_did = ? AND (sent_at_ms + ttl_sec * 1000) > ?
       ORDER BY sent_at_ms ASC LIMIT ?
     `).all(targetDid, now, limit) as Array<{
       id: string; target_did: string; topic: string; payload: string;
-      ttl_sec: number; sent_at_ms: number; attempts: number;
+      ttl_sec: number; sent_at_ms: number; attempts: number; last_attempt: number | null;
     }>;
 
     return rows.map((r) => ({
@@ -194,6 +205,7 @@ export class MessageStore {
       ttlSec: r.ttl_sec,
       sentAtMs: r.sent_at_ms,
       attempts: r.attempts,
+      lastAttempt: r.last_attempt ?? 0,
     }));
   }
 
@@ -210,13 +222,19 @@ export class MessageStore {
     return result.changes > 0;
   }
 
-  /** Clean up expired outbox entries. */
+  /** Clean up expired outbox entries in batches. */
   cleanupOutbox(): number {
     const now = Date.now();
-    const result = this.db.prepare(
-      'DELETE FROM outbox WHERE (sent_at_ms + ttl_sec * 1000) <= ?',
-    ).run(now);
-    return result.changes;
+    let total = 0;
+    const stmt = this.db.prepare(
+      'DELETE FROM outbox WHERE id IN (SELECT id FROM outbox WHERE (sent_at_ms + ttl_sec * 1000) <= ? LIMIT 500)',
+    );
+    let changes: number;
+    do {
+      changes = stmt.run(now).changes;
+      total += changes;
+    } while (changes > 0);
+    return total;
   }
 
   /** Total count of inbox messages (for rate limiting / stats). */
