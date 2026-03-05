@@ -103,16 +103,27 @@ type Libp2pNode = {
   dialProtocol?: (peerId: unknown, protocol: string) => Promise<StreamDuplex>;
 };
 
+export type PeerDisconnectHandler = (peerId: string) => void;
+
 export class P2PNode {
   private node: Libp2pNode | null = null;
   private readonly config: P2PConfig;
   private readonly privateKeyOverride?: PrivateKeyLike;
   private readonly peerIdOverride?: PeerIdLike;
+  /** Externally-registered callbacks for peer disconnect events. */
+  private disconnectHandlers: PeerDisconnectHandler[] = [];
+  /** Set of peer IDs that we have ever successfully connected to. */
+  private knownPeers = new Set<string>();
 
   constructor(config: Partial<P2PConfig> = {}, privateKey?: PrivateKeyLike, peerId?: PeerIdLike) {
     this.config = { ...DEFAULT_P2P_CONFIG, ...config };
     this.privateKeyOverride = privateKey;
     this.peerIdOverride = peerId;
+  }
+
+  /** Register a callback that fires whenever a peer disconnects. */
+  onPeerDisconnect(handler: PeerDisconnectHandler): void {
+    this.disconnectHandlers.push(handler);
   }
 
   async start(): Promise<void> {
@@ -202,11 +213,21 @@ export class P2PNode {
     // Log connection events for debugging
     this.node.addEventListener?.('peer:connect', (event: unknown) => {
       const detail = (event as { detail?: { toString?: () => string } })?.detail;
-      console.log(`[p2p] peer:connect ${detail?.toString?.() ?? 'unknown'}`);
+      const pid = detail?.toString?.() ?? 'unknown';
+      console.log(`[p2p] peer:connect ${pid}`);
+      if (pid !== 'unknown') {
+        this.knownPeers.add(pid);
+      }
     });
     this.node.addEventListener?.('peer:disconnect', (event: unknown) => {
       const detail = (event as { detail?: { toString?: () => string } })?.detail;
-      console.log(`[p2p] peer:disconnect ${detail?.toString?.() ?? 'unknown'}`);
+      const pid = detail?.toString?.() ?? 'unknown';
+      console.log(`[p2p] peer:disconnect ${pid}`);
+      if (pid !== 'unknown') {
+        for (const handler of this.disconnectHandlers) {
+          try { handler(pid); } catch { /* best-effort */ }
+        }
+      }
     });
     this.node.addEventListener?.('peer:discovery', (event: unknown) => {
       const detail = (event as { detail?: { id?: { toString?: () => string } } })?.detail;
@@ -287,6 +308,36 @@ export class P2PNode {
     return this.node.getConnections()
       .map((c) => c.remotePeer?.toString() ?? '')
       .filter(Boolean);
+  }
+
+  /** Returns the set of peer IDs that have been successfully connected at least once. */
+  getKnownPeers(): Set<string> {
+    return new Set(this.knownPeers);
+  }
+
+  /**
+   * Attempt to re-dial a specific peer by its ID, using the addresses in peerStore.
+   * Returns true if the dial succeeded.
+   */
+  async dialPeer(peerId: string): Promise<boolean> {
+    if (!this.node?.dial) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodeAny = this.node as any;
+    try {
+      const peerStore = nodeAny.peerStore;
+      if (peerStore?.get) {
+        const record = await peerStore.get(peerId);
+        if (record?.id) {
+          await this.node.dial(record.id);
+          return true;
+        }
+      }
+      // Fallback: try dialling the raw string (works for multiaddr-encoded IDs)
+      await this.node.dial(peerId);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   getSubscribers(topic: string): string[] {

@@ -748,18 +748,56 @@ export class ClawNetNode {
    *
    *   Phase 1 (0–60 s): Aggressive mesh amplification every 5 s.
    *                       Discovers peers via DHT random-walk + peerStore dial.
-   *   Phase 2 (60 s+):   Every 30 s, check connection count. If below
-   *                       `minConnections` (1), re-dial bootstrap peers and
-   *                       run another amplify cycle to rejoin the mesh.
+   *   Phase 2 (60 s+):   Every 30 s, check connection count. If any known peer
+   *                       has disconnected, re-dial it. If connections drop to 0,
+   *                       re-dial bootstrap peers and run a DHT walk.
    *
-   * This replaces the old one-shot amplifier that stopped permanently after 60 s
-   * and left the node unable to reconnect after transient network disruptions.
+   * Additionally, a `peer:disconnect` handler triggers an immediate re-dial
+   * attempt (with a short delay to let transient disconnects settle), so the
+   * node doesn't have to wait for the next 30 s watchdog tick.
    */
   private startMeshAmplifier(): void {
     let attempts = 0;
     const aggressiveAttempts = 12; // 12 × 5 s = 60 s
     const aggressiveIntervalMs = 5_000;
     const watchdogIntervalMs = 30_000;
+    const reconnectDelayMs = 5_000; // delay before re-dial after disconnect
+    let reconnectTimer: NodeJS.Timeout | undefined;
+
+    // ── Reactive reconnect on peer:disconnect ─────────────────────────
+    this.p2p?.onPeerDisconnect((peerId: string) => {
+      // Debounce: if a reconnect is already scheduled, don't stack another
+      if (reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = undefined;
+        void reconnectPeer(peerId);
+      }, reconnectDelayMs);
+    });
+
+    const reconnectPeer = async (peerId: string) => {
+      const currentConns = new Set(this.p2p?.getConnections() ?? []);
+      if (currentConns.has(peerId)) return; // already reconnected
+
+      console.log(`[mesh] peer ${peerId.slice(0, 16)}… disconnected — attempting re-dial`);
+      try {
+        const ok = await this.p2p?.dialPeer(peerId) ?? false;
+        if (ok) {
+          console.log(`[mesh] re-dialled ${peerId.slice(0, 16)}… successfully`);
+          return;
+        }
+      } catch { /* best-effort */ }
+
+      // If direct re-dial failed, try bootstrap + DHT walk as fallback
+      try {
+        const bootstrapCount = await this.p2p?.reconnectBootstrap() ?? 0;
+        const dhtCount = await this.p2p?.amplifyMesh() ?? 0;
+        if (bootstrapCount > 0 || dhtCount > 0) {
+          console.log(`[mesh] fallback reconnect: bootstrap=${bootstrapCount}, dht=${dhtCount}`);
+        } else {
+          console.log(`[mesh] re-dial failed for ${peerId.slice(0, 16)}… — watchdog will keep retrying`);
+        }
+      } catch { /* best-effort */ }
+    };
 
     const amplify = async () => {
       attempts++;
@@ -783,25 +821,45 @@ export class ClawNetNode {
     };
 
     const watchdog = async () => {
-      const conns = this.p2p?.getConnections().length ?? 0;
-      if (conns > 0) return; // mesh is healthy
+      const currentConns = new Set(this.p2p?.getConnections() ?? []);
+      const knownPeers = this.p2p?.getKnownPeers() ?? new Set();
 
-      console.log(`[mesh] 0 connections detected — attempting reconnect`);
-      try {
-        const bootstrapCount = await this.p2p?.reconnectBootstrap() ?? 0;
-        if (bootstrapCount > 0) {
-          console.log(`[mesh] reconnected to ${bootstrapCount} bootstrap peer(s)`);
+      // Find peers that were previously connected but are now missing
+      const missingPeers = [...knownPeers].filter((p) => !currentConns.has(p));
+
+      if (missingPeers.length === 0) return; // mesh is fully healthy
+
+      console.log(`[mesh] watchdog: ${missingPeers.length} known peer(s) missing (connected=${currentConns.size}, known=${knownPeers.size})`);
+
+      // Try to re-dial each missing peer directly
+      let recovered = 0;
+      for (const peerId of missingPeers) {
+        try {
+          const ok = await this.p2p?.dialPeer(peerId) ?? false;
+          if (ok) {
+            recovered++;
+            console.log(`[mesh] re-dialled ${peerId.slice(0, 16)}…`);
+          }
+        } catch { /* best-effort */ }
+      }
+
+      // If direct re-dial didn't recover all, try bootstrap + DHT
+      if (recovered < missingPeers.length) {
+        try {
+          const bootstrapCount = await this.p2p?.reconnectBootstrap() ?? 0;
+          if (bootstrapCount > 0) {
+            console.log(`[mesh] reconnected to ${bootstrapCount} bootstrap peer(s)`);
+          }
+          const n = await this.p2p?.amplifyMesh() ?? 0;
+          if (n > 0) {
+            console.log(`[mesh] +${n} additional peer(s) via DHT walk`);
+          }
+          if (bootstrapCount === 0 && n === 0 && recovered === 0) {
+            console.log(`[mesh] reconnect failed — will retry in ${watchdogIntervalMs / 1000}s`);
+          }
+        } catch {
+          // best-effort reconnect
         }
-        // Also try DHT walk to discover non-bootstrap peers
-        const n = await this.p2p?.amplifyMesh() ?? 0;
-        if (n > 0) {
-          console.log(`[mesh] +${n} additional peer(s) via DHT walk`);
-        }
-        if (bootstrapCount === 0 && n === 0) {
-          console.log(`[mesh] reconnect failed — will retry in ${watchdogIntervalMs / 1000}s`);
-        }
-      } catch {
-        // best-effort reconnect
       }
     };
 
