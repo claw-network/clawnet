@@ -28,6 +28,8 @@ export { MessagingApi } from './messaging.js';
 export type {
   SendMessageParams,
   SendMessageResult,
+  SendBatchParams,
+  SendBatchResult,
   InboxMessage,
   InboxQueryParams,
   InboxResponse,

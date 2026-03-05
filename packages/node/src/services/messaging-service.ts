@@ -17,6 +17,7 @@ import { createLogger } from '../logger.js';
 
 const PROTO_DM = '/clawnet/1.0.0/dm';
 const PROTO_DID_ANNOUNCE = '/clawnet/1.0.0/did-announce';
+const PROTO_RECEIPT = '/clawnet/1.0.0/receipt';
 
 /** Maximum payload size in bytes (64 KB). */
 const MAX_PAYLOAD_BYTES = 65_536;
@@ -27,11 +28,21 @@ const CLEANUP_INTERVAL_MS = 5 * 60_000;
 /** Max attempts before giving up on an outbox message. */
 const MAX_DELIVERY_ATTEMPTS = 50;
 
+/** Rate limit: max messages per DID per minute. */
+const RATE_LIMIT_PER_MIN = 600;
+
+/** Rate limit window in milliseconds (1 minute). */
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
 // ── Types ────────────────────────────────────────────────────────
 
 export interface SendResult {
   messageId: string;
   delivered: boolean;
+}
+
+export interface MulticastResult {
+  results: Array<SendResult & { targetDid: string }>;
 }
 
 export interface InboxQueryOptions {
@@ -47,6 +58,9 @@ export interface InboxMessage {
   payload: string;
   receivedAtMs: number;
 }
+
+/** Callback for WebSocket subscribers — called when a new message arrives in the inbox. */
+export type InboxSubscriber = (message: InboxMessage) => void;
 
 type Logger = ReturnType<typeof createLogger>;
 
@@ -89,6 +103,12 @@ export class MessagingService {
   private readonly didToPeerId = new Map<string, string>();
   private readonly peerIdToDid = new Map<string, string>();
 
+  /** WebSocket subscribers that receive real-time inbox pushes. */
+  private readonly subscribers = new Set<InboxSubscriber>();
+
+  /** Sliding-window rate limiter: DID → array of timestamps (ms). */
+  private readonly rateBuckets = new Map<string, number[]>();
+
   constructor(p2p: P2PNode, store: MessageStore, localDid: string) {
     this.log = createLogger({ level: 'info' });
     this.p2p = p2p;
@@ -105,6 +125,9 @@ export class MessagingService {
     });
     await this.p2p.handleProtocol(PROTO_DID_ANNOUNCE, (incoming) => {
       void this.handleDidAnnounce(incoming);
+    });
+    await this.p2p.handleProtocol(PROTO_RECEIPT, (incoming) => {
+      void this.handleDeliveryReceipt(incoming);
     });
 
     // When a new peer connects, exchange DID announcements
@@ -139,6 +162,10 @@ export class MessagingService {
     try {
       await this.p2p.unhandleProtocol(PROTO_DID_ANNOUNCE);
     } catch { /* ignore */ }
+    try {
+      await this.p2p.unhandleProtocol(PROTO_RECEIPT);
+    } catch { /* ignore */ }
+    this.subscribers.clear();
   }
 
   // ── Public API ─────────────────────────────────────────────────
@@ -149,6 +176,9 @@ export class MessagingService {
    * Otherwise queues in outbox for later delivery.
    */
   async send(targetDid: string, topic: string, payload: string, ttlSec = 86400): Promise<SendResult> {
+    // Rate limit check
+    this.enforceRateLimit(this.localDid);
+
     // Validate payload size
     const payloadBytes = Buffer.byteLength(payload, 'utf-8');
     if (payloadBytes > MAX_PAYLOAD_BYTES) {
@@ -168,6 +198,40 @@ export class MessagingService {
     const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec });
     this.log.info('message queued in outbox', { messageId, targetDid, topic });
     return { messageId, delivered: false };
+  }
+
+  /**
+   * Send a message to multiple target DIDs (multicast).
+   * Each target is attempted independently — partial success is possible.
+   */
+  async sendMulticast(
+    targetDids: string[],
+    topic: string,
+    payload: string,
+    ttlSec = 86400,
+  ): Promise<MulticastResult> {
+    // Rate limit check (counts as 1 call for rate-limit purposes)
+    this.enforceRateLimit(this.localDid);
+
+    const payloadBytes = Buffer.byteLength(payload, 'utf-8');
+    if (payloadBytes > MAX_PAYLOAD_BYTES) {
+      throw new Error(`Payload too large: ${payloadBytes} bytes (max ${MAX_PAYLOAD_BYTES})`);
+    }
+
+    const results: Array<SendResult & { targetDid: string }> = [];
+    for (const targetDid of targetDids) {
+      const peerId = this.didToPeerId.get(targetDid);
+      if (peerId) {
+        const delivered = await this.deliverDirect(peerId, targetDid, topic, payload, ttlSec);
+        if (delivered) {
+          results.push({ targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true });
+          continue;
+        }
+      }
+      const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec });
+      results.push({ targetDid, messageId, delivered: false });
+    }
+    return { results };
   }
 
   /** Query the local inbox. */
@@ -223,6 +287,67 @@ export class MessagingService {
   /** Return the current DID→PeerId mapping (for debugging/status). */
   getDidPeerMap(): Record<string, string> {
     return Object.fromEntries(this.didToPeerId);
+  }
+
+  // ── Subscriber Management (WebSocket push) ─────────────────────
+
+  /** Register a subscriber for real-time inbox pushes. */
+  addSubscriber(cb: InboxSubscriber): void {
+    this.subscribers.add(cb);
+  }
+
+  /** Remove a subscriber. */
+  removeSubscriber(cb: InboxSubscriber): void {
+    this.subscribers.delete(cb);
+  }
+
+  /** Number of active WS subscribers. */
+  get subscriberCount(): number {
+    return this.subscribers.size;
+  }
+
+  /** Notify all subscribers of a new inbox message. */
+  private notifySubscribers(msg: InboxMessage): void {
+    for (const cb of this.subscribers) {
+      try { cb(msg); } catch { /* best-effort */ }
+    }
+  }
+
+  // ── Rate Limiting ──────────────────────────────────────────────
+
+  /**
+   * Check rate limit for a DID. Throws if limit exceeded.
+   * Uses a sliding window of timestamps.
+   */
+  enforceRateLimit(did: string): void {
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+    let timestamps = this.rateBuckets.get(did);
+    if (!timestamps) {
+      timestamps = [];
+      this.rateBuckets.set(did, timestamps);
+    }
+    // Evict expired entries
+    while (timestamps.length > 0 && timestamps[0] < windowStart) {
+      timestamps.shift();
+    }
+    if (timestamps.length >= RATE_LIMIT_PER_MIN) {
+      throw new RateLimitError(did, RATE_LIMIT_PER_MIN);
+    }
+    timestamps.push(now);
+  }
+
+  /** Check if a DID is currently rate-limited (without consuming a slot). */
+  isRateLimited(did: string): boolean {
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+    const timestamps = this.rateBuckets.get(did);
+    if (!timestamps) return false;
+    // Evict expired
+    while (timestamps.length > 0 && timestamps[0] < windowStart) {
+      timestamps.shift();
+    }
+    return timestamps.length >= RATE_LIMIT_PER_MIN;
   }
 
   // ── Private: Direct Delivery ───────────────────────────────────
@@ -312,6 +437,20 @@ export class MessagingService {
       }
 
       this.log.info('message received', { messageId, sourceDid: msg.sourceDid, topic: msg.topic });
+
+      // Push to WebSocket subscribers
+      this.notifySubscribers({
+        messageId,
+        sourceDid: msg.sourceDid,
+        topic: msg.topic,
+        payload: msg.payload,
+        receivedAtMs: Date.now(),
+      });
+
+      // Send delivery receipt back to sender
+      if (remotePeerId) {
+        void this.sendDeliveryReceipt(remotePeerId, messageId, msg.sourceDid);
+      }
     } catch (err) {
       this.log.warn('failed to handle inbound message', { error: (err as Error).message });
       try { await stream.close(); } catch { /* ignore */ }
@@ -370,5 +509,89 @@ export class MessagingService {
     for (const peerId of peers) {
       await this.announceDidToPeer(peerId);
     }
+  }
+
+  // ── Private: Delivery Receipt Protocol ─────────────────────────
+
+  /** Send a delivery receipt to the sender after receiving a message. */
+  private async sendDeliveryReceipt(
+    peerId: string,
+    messageId: string,
+    recipientDid: string,
+  ): Promise<void> {
+    let stream: StreamDuplex | null = null;
+    try {
+      stream = await this.p2p.newStream(peerId, PROTO_RECEIPT);
+      await writeStream(
+        stream.sink,
+        JSON.stringify({
+          type: 'delivered',
+          messageId,
+          recipientDid: this.localDid,
+          senderDid: recipientDid,
+          deliveredAtMs: Date.now(),
+        }),
+      );
+      await stream.close();
+      this.log.info('delivery receipt sent', { peerId, messageId });
+    } catch {
+      // Best-effort — receipts are not critical
+      if (stream) {
+        try { await stream.close(); } catch { /* ignore */ }
+      }
+    }
+  }
+
+  /** Handle an incoming delivery receipt from a remote peer. */
+  private async handleDeliveryReceipt(incoming: {
+    stream: StreamDuplex;
+    connection: { remotePeer?: { toString: () => string } };
+  }): Promise<void> {
+    const { stream } = incoming;
+    try {
+      const raw = await readStream(stream.source);
+      await stream.close();
+
+      const receipt = JSON.parse(raw.toString('utf-8')) as {
+        type?: string;
+        messageId?: string;
+        recipientDid?: string;
+        deliveredAtMs?: number;
+      };
+
+      if (receipt.type === 'delivered' && receipt.messageId) {
+        // Remove from outbox if it was queued
+        this.store.removeFromOutbox(receipt.messageId);
+        this.log.info('delivery receipt received', {
+          messageId: receipt.messageId,
+          recipientDid: receipt.recipientDid,
+        });
+
+        // Notify subscribers about the receipt
+        this.notifySubscribers({
+          messageId: receipt.messageId,
+          sourceDid: receipt.recipientDid ?? '',
+          topic: '_receipt',
+          payload: JSON.stringify(receipt),
+          receivedAtMs: receipt.deliveredAtMs ?? Date.now(),
+        });
+      }
+    } catch {
+      try { await stream.close(); } catch { /* ignore */ }
+    }
+  }
+}
+
+// ── Rate Limit Error ─────────────────────────────────────────────
+
+export class RateLimitError extends Error {
+  readonly did: string;
+  readonly limit: number;
+
+  constructor(did: string, limit: number) {
+    super(`Rate limit exceeded for ${did}: max ${limit} messages/minute`);
+    this.name = 'RateLimitError';
+    this.did = did;
+    this.limit = limit;
   }
 }

@@ -11,6 +11,7 @@ import { identify } from '@libp2p/identify';
 import { autoNAT } from '@libp2p/autonat';
 import { dcutr } from '@libp2p/dcutr';
 import { ping } from '@libp2p/ping';
+import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2';
 import { multiaddr } from '@multiformats/multiaddr';
 import type { Libp2pOptions } from 'libp2p';
 import { sha256Bytes } from '../crypto/hash.js';
@@ -176,6 +177,10 @@ export class P2PNode {
       services.dcutr = dcutr();
     }
 
+    if (this.config.enableCircuitRelay) {
+      services.circuitRelay = circuitRelayServer();
+    }
+
     const options: Record<string, unknown> = {
       addresses: {
         listen: this.config.listen,
@@ -187,7 +192,10 @@ export class P2PNode {
         // slow for mesh formation in small networks).
         autoDialInterval: 5_000,
       },
-      transports: [tcp()],
+      transports: [
+        tcp(),
+        ...(this.config.enableCircuitRelay ? [circuitRelayTransport()] : []),
+      ],
       streamMuxers: [yamux()],
       connectionEncrypters: [noise()],
       peerDiscovery: [

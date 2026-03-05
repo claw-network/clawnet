@@ -16,9 +16,24 @@ export interface SendMessageParams {
   ttlSec?: number;
 }
 
+export interface SendBatchParams {
+  /** Target DIDs (max 100) */
+  targetDids: string[];
+  /** Topic / channel name */
+  topic: string;
+  /** Opaque payload */
+  payload: string;
+  /** Time-to-live in seconds (default: 86400 = 24h) */
+  ttlSec?: number;
+}
+
 export interface SendMessageResult {
   messageId: string;
   delivered: boolean;
+}
+
+export interface SendBatchResult {
+  results: Array<SendMessageResult & { targetDid: string }>;
 }
 
 export interface InboxMessage {
@@ -59,6 +74,16 @@ export class MessagingApi {
    */
   async send(params: SendMessageParams, opts?: RequestOptions): Promise<SendMessageResult> {
     return this.http.post<SendMessageResult>('/api/v1/messaging/send', params, opts);
+  }
+
+  /**
+   * Multicast: send a message to multiple target DIDs.
+   *
+   * Each target is attempted independently — partial success is possible.
+   * Maximum 100 targets per call.
+   */
+  async sendBatch(params: SendBatchParams, opts?: RequestOptions): Promise<SendBatchResult> {
+    return this.http.post<SendBatchResult>('/api/v1/messaging/send/batch', params, opts);
   }
 
   /**

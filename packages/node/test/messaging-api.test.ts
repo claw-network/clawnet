@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { ApiServer } from '../src/api/server.js';
+import { RateLimitError } from '../src/services/messaging-service.js';
+import WebSocket from 'ws';
 
 async function readData<T>(res: Response): Promise<T> {
   const payload = (await res.json()) as { data?: T };
@@ -20,12 +22,20 @@ function createMockMessagingService() {
     receivedAtMs: number;
   }> = [];
   let consumed = new Set<string>();
+  const subscribers = new Set<(msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) => void>();
+  let rateLimitOn = false;
 
   return {
-    send: vi.fn(async (_target: string, _topic: string, _payload: string) => ({
-      messageId: 'msg_test123',
-      delivered: true,
-    })),
+    send: vi.fn(async (_target: string, _topic: string, _payload: string) => {
+      if (rateLimitOn) throw new RateLimitError('did:claw:test', 600);
+      return { messageId: 'msg_test123', delivered: true };
+    }),
+    sendMulticast: vi.fn(async (targets: string[], _topic: string, _payload: string) => {
+      if (rateLimitOn) throw new RateLimitError('did:claw:test', 600);
+      return {
+        results: targets.map((t) => ({ targetDid: t, messageId: `msg_${t.slice(-4)}`, delivered: true })),
+      };
+    }),
     getInbox: vi.fn((opts?: { topic?: string; sinceMs?: number; limit?: number }) => {
       let result = inbox.filter((m) => !consumed.has(m.messageId));
       if (opts?.topic) result = result.filter((m) => m.topic === opts.topic);
@@ -39,7 +49,13 @@ function createMockMessagingService() {
       return found;
     }),
     getDidPeerMap: vi.fn(() => ({ 'did:claw:alice': '12D3KooW...' })),
-    // Helper to seed test data
+    addSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) => void) => {
+      subscribers.add(cb);
+    }),
+    removeSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) => void) => {
+      subscribers.delete(cb);
+    }),
+    // Helpers for test control
     _addToInbox(msg: { sourceDid: string; topic: string; payload: string }) {
       const id = `msg_${inbox.length}`;
       inbox.push({
@@ -51,6 +67,11 @@ function createMockMessagingService() {
       });
       return id;
     },
+    _setRateLimit(on: boolean) { rateLimitOn = on; },
+    _notifySubscribers(msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) {
+      for (const cb of subscribers) cb(msg);
+    },
+    get _subscriberCount() { return subscribers.size; },
   };
 }
 
@@ -192,5 +213,183 @@ describe('messaging api', () => {
     expect(res.status).toBe(200);
     const data = await readData<{ didPeerMap: Record<string, string> }>(res);
     expect(data.didPeerMap['did:claw:alice']).toBe('12D3KooW...');
+  });
+
+  // ── POST /api/v1/messaging/send/batch — multicast ────────────
+
+  it('sends batch to multiple DIDs', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDids: ['did:claw:zAlice', 'did:claw:zBob'],
+        topic: 'test/batch',
+        payload: 'hello-all',
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const data = await readData<{ results: Array<{ targetDid: string; messageId: string; delivered: boolean }> }>(res);
+    expect(data.results).toHaveLength(2);
+    expect(data.results[0].delivered).toBe(true);
+    expect(mockService.sendMulticast).toHaveBeenCalledWith(
+      ['did:claw:zAlice', 'did:claw:zBob'],
+      'test/batch',
+      'hello-all',
+      undefined,
+    );
+  });
+
+  it('rejects batch with empty targetDids', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDids: [],
+        topic: 'test',
+        payload: 'data',
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects batch with invalid DID in array', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDids: ['did:claw:zAlice', 'not-a-did'],
+        topic: 'test',
+        payload: 'data',
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // ── Rate limiting → 429 ───────────────────────────────────────
+
+  it('returns 429 when rate-limited on send', async () => {
+    mockService._setRateLimit(true);
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDid: 'did:claw:zBob',
+        topic: 'test',
+        payload: 'data',
+      }),
+    });
+    expect(res.status).toBe(429);
+    expect(res.headers.get('retry-after')).toBe('60');
+  });
+
+  it('returns 429 when rate-limited on batch send', async () => {
+    mockService._setRateLimit(true);
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDids: ['did:claw:zAlice'],
+        topic: 'test',
+        payload: 'data',
+      }),
+    });
+    expect(res.status).toBe(429);
+  });
+
+  // ── WebSocket subscribe ───────────────────────────────────────
+
+  it('connects to WebSocket and receives messages', async () => {
+    const wsUrl = baseUrl.replace('http', 'ws') + '/api/v1/messaging/subscribe';
+    const ws = new WebSocket(wsUrl);
+
+    const messages: unknown[] = [];
+    ws.on('message', (data) => {
+      messages.push(JSON.parse(data.toString()));
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      ws.on('open', resolve);
+      ws.on('error', reject);
+      setTimeout(() => reject(new Error('ws open timeout')), 3000);
+    });
+
+    // Wait for the connected frame
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+
+    // The mock service should now have a subscriber registered
+    expect(mockService.addSubscriber).toHaveBeenCalled();
+    expect(mockService._subscriberCount).toBe(1);
+
+    // Simulate an incoming message by notifying subscribers
+    mockService._notifySubscribers({
+      messageId: 'msg_ws_test',
+      sourceDid: 'did:claw:zAlice',
+      topic: 'telagent/envelope',
+      payload: 'ws-payload',
+      receivedAtMs: Date.now(),
+    });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+
+    // Should have received: { type: 'connected' } + { type: 'message', data: ... }
+    expect(messages.length).toBeGreaterThanOrEqual(2);
+    const connectFrame = messages[0] as { type: string };
+    expect(connectFrame.type).toBe('connected');
+
+    const msgFrame = messages[1] as { type: string; data: { messageId: string } };
+    expect(msgFrame.type).toBe('message');
+    expect(msgFrame.data.messageId).toBe('msg_ws_test');
+
+    ws.close();
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+
+    // Subscriber should be removed after close
+    expect(mockService.removeSubscriber).toHaveBeenCalled();
+  });
+
+  it('filters WS messages by topic query param', async () => {
+    const wsUrl = baseUrl.replace('http', 'ws') + '/api/v1/messaging/subscribe?topic=wanted';
+    const ws = new WebSocket(wsUrl);
+
+    const messages: unknown[] = [];
+    ws.on('message', (data) => {
+      messages.push(JSON.parse(data.toString()));
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      ws.on('open', resolve);
+      ws.on('error', reject);
+      setTimeout(() => reject(new Error('ws open timeout')), 3000);
+    });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+
+    // Send a message with wrong topic — should be filtered
+    mockService._notifySubscribers({
+      messageId: 'msg_1',
+      sourceDid: 'did:claw:zAlice',
+      topic: 'unwanted',
+      payload: 'nope',
+      receivedAtMs: Date.now(),
+    });
+
+    // Send a message with matching topic
+    mockService._notifySubscribers({
+      messageId: 'msg_2',
+      sourceDid: 'did:claw:zBob',
+      topic: 'wanted',
+      payload: 'yes',
+      receivedAtMs: Date.now(),
+    });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
+
+    // Should have: connected + 1 message (not the unwanted one)
+    const msgFrames = messages.filter((m) => (m as { type: string }).type === 'message');
+    expect(msgFrames).toHaveLength(1);
+    expect((msgFrames[0] as { data: { messageId: string } }).data.messageId).toBe('msg_2');
+
+    ws.close();
   });
 });

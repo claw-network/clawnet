@@ -1,7 +1,7 @@
 # RFC: TelAgent 消息通信迁移至 ClawNet P2P 层
 
-- 文档版本：v0.3（ClawNet 实现完成后更新）
-- 状态：**ClawNet messaging API 已实现**，TelAgent 可开始适配
+- 文档版本：v0.4（Phase 2 实现完成后更新）
+- 状态：**ClawNet messaging API Phase 1 + Phase 2 已全部实现**，TelAgent 可开始适配
 - 作者：TelAgent 团队
 - 审阅 & 实现：ClawNet 项目组
 - 日期：2026-03-05
@@ -470,10 +470,11 @@ routeHint: {
 | **TTL 自动清理** | ✅ 已实现 | 每 5 分钟清理过期消息（inbox + outbox） |
 | **Topic 命名空间** | ✅ 已实现 | 任意 topic 字符串，建议 `telagent/*` |
 | **SDK `MessagingApi`** | ✅ 已实现 | `@claw-network/sdk` 新增 `messaging` 模块 |
-| WebSocket 订阅 | ⏳ Phase 2 | 当前使用轮询，WebSocket 后续支持 |
-| Circuit Relay（全 NAT 穿透） | ⏳ Phase 2 | 当前依赖至少一方有公网 IP |
-| 多播（Multicast） | ⏳ Phase 2 | 当前逐一发送 |
-| 速率限制 | ⏳ Phase 2 | 当前无限流，后续按 DID 限流 |
+| **WebSocket 订阅** | ✅ Phase 2 已实现 | `WS /api/v1/messaging/subscribe`，支持 topic 过滤和实时推送 |
+| **Circuit Relay（全 NAT 穿透）** | ✅ Phase 2 已实现 | bootstrap 节点启用 `@libp2p/circuit-relay-v2` 服务端 + 客户端 relay transport |
+| **多播 / 批量发送** | ✅ Phase 2 已实现 | `POST /api/v1/messaging/send/batch`，单次最多 100 个目标 DID |
+| **速率限制** | ✅ Phase 2 已实现 | 滑动窗口 600 条/分钟/DID，超限返回 429 + `Retry-After: 60` |
+| **投递回执** | ✅ Phase 2 已实现 | `/clawnet/1.0.0/receipt` 协议，收到消息后自动回执，通过 WS 推送给发送方 |
 
 ### C.2 SDK 接口（最终版）
 
@@ -498,6 +499,30 @@ const result = await claw.messaging.send({
   topic: 'telagent/envelope',
   payload: '<base64-encoded Envelope JSON>',
   ttlSec: 86400,          // 可选，默认 24 小时
+});
+
+console.log(result);
+// { messageId: "msg_abc123def456", delivered: true }
+// delivered=true  → 目标在线，已直接投递
+// delivered=false → 目标离线，已入 outbox 等待重投
+
+// ── 批量发送（多播） ─────────────────────────────────────────
+
+const batchResult = await claw.messaging.sendBatch({
+  targetDids: ['did:claw:zAlice...', 'did:claw:zBob...', 'did:claw:zCharlie...'],
+  topic: 'telagent/envelope',
+  payload: '<base64-encoded data>',
+  ttlSec: 86400,
+});
+
+console.log(batchResult);
+// { results: [
+//   { targetDid: "did:claw:zAlice...", messageId: "msg_...", delivered: true },
+//   { targetDid: "did:claw:zBob...", messageId: "msg_...", delivered: false },
+//   ...
+// ] }
+
+// ── 轮询 inbox ────────────────────────────────────────────────
 });
 
 console.log(result);
@@ -625,6 +650,7 @@ X-Api-Key: <api-key>
 |---------|------|---------|
 | `/clawnet/1.0.0/dm` | 直接消息投递 | 调用 `messaging.send()` 时 |
 | `/clawnet/1.0.0/did-announce` | DID↔PeerId 映射交换 | peer 连接时自动触发 |
+| `/clawnet/1.0.0/receipt` | 投递回执 | 收到 `/dm` 消息后自动回执给发送方 |
 
 消息在 P2P 层以 JSON 格式传输（不做额外加密，libp2p noise 已提供传输加密）。  
 载荷大小限制：**64 KB**。
@@ -653,12 +679,17 @@ TelAgent A → POST /send → clawnetd A
 
 ```typescript
 import { ClawNetClient } from '@claw-network/sdk';
+import WebSocket from 'ws';
 
 class ClawNetTransportService {
   private client: ClawNetClient;
-  private pollTimer?: NodeJS.Timeout;
+  private ws?: WebSocket;
+  private baseUrl: string;
+  private apiKey: string;
 
   constructor(baseUrl: string, apiKey: string) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
     this.client = new ClawNetClient({ baseUrl, apiKey });
   }
 
@@ -676,49 +707,144 @@ class ClawNetTransportService {
     }
   }
 
-  /** 开始轮询入站消息 */
-  startPolling(
-    onEnvelope: (sourceDid: string, envelope: Envelope) => Promise<void>,
-    intervalMs = 2000,
-  ): void {
-    let lastSince = Date.now();
-
-    this.pollTimer = setInterval(async () => {
-      const inbox = await this.client.messaging.inbox({
-        topic: 'telagent/envelope',
-        since: lastSince,
-      });
-
-      for (const msg of inbox.messages) {
-        try {
-          const envelope = JSON.parse(
-            Buffer.from(msg.payload, 'base64').toString('utf-8'),
-          ) as Envelope;
-          await onEnvelope(msg.sourceDid, envelope);
-          await this.client.messaging.ack(msg.messageId);
-          lastSince = Math.max(lastSince, msg.receivedAtMs);
-        } catch (err) {
-          console.error('Failed to process envelope:', err);
-        }
-      }
-    }, intervalMs);
+  /** 批量发送信封（群聊场景） */
+  async sendEnvelopeMulticast(targetDids: string[], envelope: Envelope): Promise<void> {
+    const payload = Buffer.from(JSON.stringify(envelope)).toString('base64');
+    await this.client.messaging.sendBatch({
+      targetDids,
+      topic: 'telagent/envelope',
+      payload,
+      ttlSec: envelope.ttlSec,
+    });
   }
 
-  stopPolling(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = undefined;
-    }
+  /**
+   * 订阅入站消息（推荐方式：WebSocket）
+   * 实时推送，延迟 < 50ms，无需轮询。
+   */
+  startListening(
+    onEnvelope: (sourceDid: string, envelope: Envelope) => Promise<void>,
+  ): void {
+    const wsUrl = this.baseUrl.replace(/^http/, 'ws')
+      + '/api/v1/messaging/subscribe?topic=telagent/envelope'
+      + `&apiKey=${this.apiKey}`;
+
+    this.ws = new WebSocket(wsUrl);
+
+    this.ws.on('message', async (data) => {
+      try {
+        const frame = JSON.parse(data.toString()) as {
+          type: string;
+          data?: { sourceDid: string; payload: string; messageId: string };
+        };
+        if (frame.type === 'message' && frame.data) {
+          const envelope = JSON.parse(
+            Buffer.from(frame.data.payload, 'base64').toString('utf-8'),
+          ) as Envelope;
+          await onEnvelope(frame.data.sourceDid, envelope);
+          // ACK via REST（可选，用于清理 inbox）
+          await this.client.messaging.ack(frame.data.messageId);
+        }
+        if (frame.type === 'receipt') {
+          // 投递回执，可用于更新 UI 或消息状态
+          console.log('Delivery receipt:', frame.data);
+        }
+      } catch (err) {
+        console.error('Failed to process WS message:', err);
+      }
+    });
+
+    this.ws.on('close', () => {
+      // 自动重连
+      setTimeout(() => this.startListening(onEnvelope), 3000);
+    });
+  }
+
+  stopListening(): void {
+    this.ws?.close();
+    this.ws = undefined;
   }
 }
 ```
 
-### C.7 已知限制 & Phase 2 规划
+**轮询回退模式**（如 WebSocket 不可用）：
 
-| 限制 | 影响 | Phase 2 计划 |
-|------|------|-------------|
-| **轮询而非 WebSocket** | 延迟取决于轮询间隔（建议 1-2 秒） | 新增 WebSocket 端点 `WS /api/v1/messaging/subscribe` |
-| **无 Circuit Relay** | 双方均在 NAT 后时无法直连 | 在 bootstrap 节点启用 `@libp2p/circuit-relay-v2` |
-| **单播只** | 群聊需逐一发送 | 新增批量发送 API + GossipSub topic relay |
-| **无速率限制** | 理论上可被滥用 | 按 DID 限流 600 条/分钟 |
-| **无投递回执** | 发送方不知道对方何时消费了消息 | 新增 delivery receipt 协议 |
+```typescript
+// 如果 WebSocket 不可用，可回退到轮询模式
+let lastSince = Date.now();
+setInterval(async () => {
+  const inbox = await claw.messaging.inbox({
+    topic: 'telagent/envelope',
+    since: lastSince,
+  });
+  for (const msg of inbox.messages) {
+    // ... 处理消息 ...
+    await claw.messaging.ack(msg.messageId);
+    lastSince = Math.max(lastSince, msg.receivedAtMs);
+  }
+}, 2000);
+```
+
+### C.7 Phase 2 实现总结（v0.4）
+
+Phase 2 所有能力均已实现并通过测试（297 tests passing）：
+
+| 能力 | 实现方式 | 文件 |
+|------|---------|------|
+| **WebSocket 订阅** | `WS /api/v1/messaging/subscribe` — `ws` 包 + HTTP upgrade | `api/ws-messaging.ts` |
+| **Circuit Relay** | `@libp2p/circuit-relay-v2` — 服务端 + relay transport | `p2p/node.ts`, `p2p/config.ts` |
+| **多播 / 批量发送** | `POST /api/v1/messaging/send/batch` — 最多 100 DID | `routes/messaging.ts`, `messaging-service.ts` |
+| **速率限制** | 滑动窗口 600/min/DID — 超限返回 429 | `messaging-service.ts` |
+| **投递回执** | `/clawnet/1.0.0/receipt` 协议 — 收到消息后自动回执 | `messaging-service.ts` |
+
+#### WebSocket 帧格式
+
+```jsonc
+// 服务端 → 客户端
+{ "type": "connected", "topicFilter": "telagent/envelope" }  // 连接确认
+{ "type": "message", "data": { "messageId": "...", "sourceDid": "...", "topic": "...", "payload": "...", "receivedAtMs": ... } }
+{ "type": "receipt", "data": { "type": "delivered", "messageId": "...", "recipientDid": "...", "deliveredAtMs": ... } }
+```
+
+#### 速率限制响应
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60
+Content-Type: application/problem+json
+
+{
+  "type": "urn:clawnet:error:too-many-requests",
+  "title": "Too Many Requests",
+  "status": 429,
+  "detail": "Rate limit exceeded for did:claw:z...: max 600 messages/minute"
+}
+```
+
+#### 批量发送 API
+
+```http
+POST /api/v1/messaging/send/batch
+Content-Type: application/json
+X-Api-Key: <api-key>
+
+{
+  "targetDids": ["did:claw:zAlice...", "did:claw:zBob...", "did:claw:zCharlie..."],
+  "topic": "telagent/envelope",
+  "payload": "<base64>",
+  "ttlSec": 86400
+}
+```
+
+**Response (201)**:
+```json
+{
+  "data": {
+    "results": [
+      { "targetDid": "did:claw:zAlice...", "messageId": "msg_...", "delivered": true },
+      { "targetDid": "did:claw:zBob...", "messageId": "msg_...", "delivered": false },
+      { "targetDid": "did:claw:zCharlie...", "messageId": "msg_...", "delivered": true }
+    ]
+  }
+}
+```

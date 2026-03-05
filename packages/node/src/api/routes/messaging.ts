@@ -2,14 +2,16 @@
  * Messaging routes — /api/v1/messaging
  *
  * POST /send              — Send a message to a target DID
+ * POST /send/batch        — Multicast: send a message to multiple DIDs
  * GET  /inbox             — List inbox messages (polling)
  * DELETE /inbox/:messageId — Acknowledge (consume) a message
  * GET  /peers             — Show DID → PeerId mapping (debug)
  */
 
 import { Router } from '../router.js';
-import { ok, created, noContent, badRequest, internalError } from '../response.js';
+import { ok, created, noContent, badRequest, internalError, tooManyRequests } from '../response.js';
 import type { RuntimeContext } from '../types.js';
+import { RateLimitError } from '../../services/messaging-service.js';
 
 export function messagingRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -58,6 +60,72 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
       created(res, result, { self: '/api/v1/messaging/inbox' });
     } catch (err) {
       const message = (err as Error).message;
+      if (err instanceof RateLimitError) {
+        tooManyRequests(res, message, route.url.pathname, 60);
+        return;
+      }
+      if (message.includes('too large')) {
+        badRequest(res, message, route.url.pathname);
+        return;
+      }
+      internalError(res, message);
+    }
+  });
+
+  // ── POST /send/batch — multicast to multiple DIDs ─────────────
+  r.post('/send/batch', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const body = route.body as Record<string, unknown> | undefined;
+    if (!body) {
+      badRequest(res, 'Request body required', route.url.pathname);
+      return;
+    }
+
+    const targetDids = body.targetDids as string[] | undefined;
+    const topic = body.topic as string | undefined;
+    const payload = body.payload as string | undefined;
+    const ttlSec = typeof body.ttlSec === 'number' ? body.ttlSec : undefined;
+
+    if (!Array.isArray(targetDids) || targetDids.length === 0) {
+      badRequest(res, 'Missing or empty "targetDids" array', route.url.pathname);
+      return;
+    }
+    if (targetDids.length > 100) {
+      badRequest(res, 'Too many targets (max 100)', route.url.pathname);
+      return;
+    }
+    for (const did of targetDids) {
+      if (typeof did !== 'string' || !did.startsWith('did:claw:')) {
+        badRequest(res, `Invalid DID in targetDids: ${String(did)}`, route.url.pathname);
+        return;
+      }
+    }
+    if (!topic || typeof topic !== 'string') {
+      badRequest(res, 'Missing or invalid "topic"', route.url.pathname);
+      return;
+    }
+    if (topic.length > 256) {
+      badRequest(res, 'Topic too long (max 256 characters)', route.url.pathname);
+      return;
+    }
+    if (!payload || typeof payload !== 'string') {
+      badRequest(res, 'Missing or invalid "payload"', route.url.pathname);
+      return;
+    }
+
+    try {
+      const result = await ctx.messagingService.sendMulticast(targetDids, topic, payload, ttlSec);
+      created(res, result, { self: '/api/v1/messaging/inbox' });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (err instanceof RateLimitError) {
+        tooManyRequests(res, message, route.url.pathname, 60);
+        return;
+      }
       if (message.includes('too large')) {
         badRequest(res, message, route.url.pathname);
         return;

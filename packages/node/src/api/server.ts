@@ -9,6 +9,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import { Router } from './router.js';
 import { createCors, createErrorBoundary, requestLogger } from './middleware.js';
 import { apiKeyAuth } from './auth.js';
+import { attachWebSocketHandler } from './ws-messaging.js';
 import type { RuntimeContext, ApiServerConfig } from './types.js';
 import type { ApiKeyStore } from './api-key-store.js';
 
@@ -154,6 +155,13 @@ export class ApiServer {
         });
       });
     });
+
+    // Attach WebSocket handler for /api/v1/messaging/subscribe
+    attachWebSocketHandler(
+      this.server,
+      () => this.runtime.messagingService,
+      this.runtime.apiKeyStore,
+    );
 
     await new Promise<void>((resolve) => {
       this.server?.listen(this.config.port, this.config.host, () => resolve());

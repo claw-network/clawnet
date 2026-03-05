@@ -5,6 +5,8 @@ export interface P2PConfig {
   allowPublishToZeroPeers: boolean;
   enableAutoNAT: boolean;
   enableDcutr: boolean;
+  /** Enable circuit relay v2 for NAT traversal. Default: true */
+  enableCircuitRelay: boolean;
   /** Flood-publish to ALL connected peers instead of only mesh peers. Default: true */
   floodPublish?: boolean;
   /** GossipSub mesh degree target (D). Default: 3 (suitable for small networks) */
@@ -38,6 +40,7 @@ export const DEFAULT_P2P_CONFIG: P2PConfig = {
   allowPublishToZeroPeers: true,
   enableAutoNAT: true,
   enableDcutr: true,
+  enableCircuitRelay: true,
   floodPublish: true,
   meshD: 3,
   meshDlo: 1,
