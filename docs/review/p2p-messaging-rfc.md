@@ -283,9 +283,9 @@ ClawNet 自身的业务消息可使用 `clawnet/*` 命名空间。
 | **速率限制** | 建议对每个 DID 的发送频率限流（如 600 条/分钟），防止滥用 |
 | **载荷大小限制** | 单条消息不超过 64 KB |
 
-### 3.4 增强能力（已全部实现）
+### 3.4 增强能力
 
-以下能力在 Phase 2、Phase 3 和 Phase 4 中已全部实现：
+以下能力在 Phase 2、Phase 3、Phase 4 和 Phase 5 中已全部实现：
 
 | 能力 | 状态 | 说明 |
 |------|------|------|
@@ -467,7 +467,7 @@ routeHint: {
 
 ---
 
-## 附录 C：ClawNet 实现说明（v0.6 更新）
+## 附录 C：ClawNet 实现说明（v0.7 更新）
 
 > **本节由 ClawNet 项目组编写。Messaging API 已实现并合入主分支，TelAgent 可立即开始适配。**
 
@@ -992,7 +992,7 @@ POST /send { idempotencyKey: "abc" }
 ```
 
 SDK 静态方法：
-- `MessagingService.decryptPayload(payload, recipientPrivateKeyHex)` — 解密 E2E 信封
+- `MessagingService.decryptPayload(payload, recipientPrivateKey: Uint8Array)` — 解密 E2E 信封
 - `MessagingService.decompressPayload(payload)` — 解压 gzip 载荷
 
 #### 消息压缩
