@@ -57,16 +57,16 @@ importers:
   packages/cli:
     dependencies:
       '@claw-network/core':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^
         version: link:../core
       '@claw-network/node':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^
         version: link:../node
       '@claw-network/protocol':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^
         version: link:../protocol
       '@claw-network/sdk':
-        specifier: workspace:^0.2.0
+        specifier: workspace:^
         version: link:../sdk
       ethers:
         specifier: ^6.13.0
@@ -241,10 +241,10 @@ importers:
   packages/node:
     dependencies:
       '@claw-network/core':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^
         version: link:../core
       '@claw-network/protocol':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^
         version: link:../protocol
       '@libp2p/crypto':
         specifier: ^5.1.13
@@ -253,8 +253,8 @@ importers:
         specifier: ^4.2.4
         version: 4.2.4
       better-sqlite3:
-        specifier: ^11.10.0
-        version: 11.10.0
+        specifier: ^12.2.0
+        version: 12.6.2
       ethers:
         specifier: ^6.16.0
         version: 6.16.0
@@ -278,7 +278,7 @@ importers:
   packages/protocol:
     dependencies:
       '@claw-network/core':
-        specifier: workspace:^0.1.0
+        specifier: workspace:^
         version: link:../core
       flatbuffers:
         specifier: ^24.3.25
@@ -3592,6 +3592,10 @@ packages:
 
   better-sqlite3@11.10.0:
     resolution: {integrity: sha512-EwhOpyXiOEL/lKzHz9AW1msWFNzGc/z+LzeB3/jnFJpxu+th2yqvzsSWas1v9jgs9+xiXJcD5A8CJxAG2TaghQ==}
+
+  better-sqlite3@12.6.2:
+    resolution: {integrity: sha512-8VYKM3MjCa9WcaSAI3hzwhmyHVlH8tiGFwf0RlTsZPWJ1I5MkzjiudCo4KC4DxOaL/53A5B1sI/IbldNFDbsKA==}
+    engines: {node: 20.x || 22.x || 23.x || 24.x || 25.x}
 
   bignumber.js@9.3.1:
     resolution: {integrity: sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==}
@@ -11162,6 +11166,11 @@ snapshots:
       leven: 3.1.0
 
   better-sqlite3@11.10.0:
+    dependencies:
+      bindings: 1.5.0
+      prebuild-install: 7.1.1
+
+  better-sqlite3@12.6.2:
     dependencies:
       bindings: 1.5.0
       prebuild-install: 7.1.1
