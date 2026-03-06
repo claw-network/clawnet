@@ -1,7 +1,7 @@
 # RFC: TelAgent 消息通信迁移至 ClawNet P2P 层
 
-- 文档版本：v0.6（Phase 4 P2P 健壮性增强后更新）
-- 状态：**ClawNet messaging API Phase 1 + Phase 2 + Phase 3 + Phase 4 已全部实现**，TelAgent 可开始适配
+- 文档版本：v0.7（Phase 5 FlatBuffers 二进制编码后更新）
+- 状态：**ClawNet messaging API Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 已全部实现**，TelAgent 可开始适配
 - 作者：TelAgent 团队
 - 审阅 & 实现：ClawNet 项目组
 - 日期：2026-03-06
@@ -303,6 +303,8 @@ ClawNet 自身的业务消息可使用 `clawnet/*` 命名空间。
 | **SQLite 共享速率限制** | ✅ Phase 4 | 速率限制持久化到 SQLite，进程重启后限流状态不丢失 |
 | **Bootstrap 洪泛防护** | ✅ Phase 4 | 全局入站速率限制、流超时、yamux stream 限制、Docker 资源限制 |
 | **并行 outbox flush** | ✅ Phase 4 | outbox 逐条发送改为并行 flush，加速离线消息投递 |
+| **FlatBuffers 二进制编码** | ✅ Phase 5 | 所有 P2P 协议从 JSON 迁移到 FlatBuffers 二进制，线上体积减少 ~30-40% |
+| **二进制 E2E 信封** | ✅ Phase 5 | E2E 加密信封从 JSON hex 编码改为固定布局二进制（60 字节头），节省 ~140 字节/消息 |
 | **流量控制** | ⏳ 待定 | 当接收方处理不过来时的背压机制 |
 
 ---
@@ -497,6 +499,8 @@ routeHint: {
 | **SQLite 共享速率限制** | ✅ Phase 4 已实现 | `rate_limits` 表持久化滑动窗口事件，进程重启后限流状态延续 |
 | **Bootstrap 洪泛防护** | ✅ Phase 4 已实现 | 全局入站速率限制 3000/min + per-peer 300/min + 流超时 10s + Docker 资源限制 |
 | **并行 outbox flush** | ✅ Phase 4 已实现 | outbox 消息并行投递（bounded concurrency=20），加速离线消息重投 |
+| **FlatBuffers 二进制编码** | ✅ Phase 5 已实现 | 所有 4 个 P2P 协议（dm/did-announce/did-resolve/receipt）从 JSON 迁移到 FlatBuffers 二进制格式 |
+| **二进制 E2E 信封** | ✅ Phase 5 已实现 | E2E 加密信封使用固定二进制布局 `[pk:32][nonce:12][tag:16][ciphertext:...]`，60 字节头 |
 
 ### C.2 SDK 接口（最终版）
 
@@ -700,9 +704,10 @@ X-Api-Key: <api-key>
 |---------|------|---------|
 | `/clawnet/1.0.0/dm` | 直接消息投递 | 调用 `messaging.send()` 时 |
 | `/clawnet/1.0.0/did-announce` | DID↔PeerId 映射交换 | peer 连接时自动触发 |
+| `/clawnet/1.0.0/did-resolve` | DID→PeerId 主动查询 | 未知 DID 时向 peers 查询 |
 | `/clawnet/1.0.0/receipt` | 投递回执 | 收到 `/dm` 消息后自动回执给发送方 |
 
-消息在 P2P 层以 JSON 格式传输（不做额外加密，libp2p noise 已提供传输加密）。  
+消息在 P2P 层以 **FlatBuffers 二进制格式**传输（Phase 5 从 JSON 迁移，线上体积减少 ~30-40%）。libp2p noise 提供传输层加密。  
 载荷大小限制：**64 KB**。
 
 ### C.5 离线暂存与 DID 解析机制
@@ -977,11 +982,13 @@ POST /send { idempotencyKey: "abc" }
   2. ECDH: sharedSecret = x25519(ephemeralPriv, recipientPubKey)
   3. HKDF: key = HKDF-SHA-256(sharedSecret, info="clawnet:e2e-msg:v1")
   4. AES-256-GCM 加密 payload → ciphertext + tag
-  5. 发送: { _e2e: 1, pk: ephemeralPubHex, n: nonceHex, c: ciphertextHex, t: tagHex }
+  5. P2P 线上格式（Phase 5）: 固定二进制布局 [ephemeralPk:32][nonce:12][tag:16][ciphertext:...] = 60 字节头
+     SQLite 存储格式: { _e2e: 1, pk: ephemeralPubHex, n: nonceHex, c: ciphertextHex, t: tagHex }
 
 接收方:
-  1. ECDH: sharedSecret = x25519(recipientPriv, ephemeralPub)
-  2. HKDF + AES-256-GCM 解密
+  1. 从 FlatBuffers DirectMessage.payload 解析二进制 E2E 信封（60 字节头）
+  2. ECDH: sharedSecret = x25519(recipientPriv, ephemeralPub)
+  3. HKDF + AES-256-GCM 解密
 ```
 
 SDK 静态方法：
@@ -992,10 +999,10 @@ SDK 静态方法：
 
 发送时指定 `compress: true`，若载荷大于 1 KB：
 
-1. 用 gzip 压缩载荷
-2. 转为 base64 字符串
-3. 包装为 `{ _compressed: 1, data: "<gzip-base64>" }`
-4. 接收方检测到 `_compressed` 字段后自动解压
+1. 用 gzip 压缩载荷为 raw bytes
+2. P2P 线上格式（Phase 5）：raw gzip bytes 直接作为 FlatBuffers `DirectMessage.payload`（`compressed=true` 标志位）
+3. SQLite 存储格式：`{ _compressed: 1, data: "<gzip-base64>" }`（保持向后兼容）
+4. 接收方根据 `compressed` 标志位自动解压
 
 低于 1 KB 的载荷即使指定 `compress: true` 也不会被压缩（避免膨胀）。
 
@@ -1061,16 +1068,22 @@ send(targetDid):
   3. 都失败 → 进 outbox（保持现有兜底）
 ```
 
-**协议格式**：
+**协议格式**（Phase 5 已迁移至 FlatBuffers 二进制）：
 
-```jsonc
-// 请求 (client → server)
-{ "did": "did:claw:z..." }
+```
+// FlatBuffers schema（参见 docs/implementation/messaging-spec.fbs）
 
-// 响应 (server → client)
-{ "did": "did:claw:z...", "peerId": "12D3KooW...", "found": true }
-// 或
-{ "did": "did:claw:z...", "found": false }
+// 请求: DidResolveRequest
+table DidResolveRequest {
+  did: string;           // 要查询的 DID
+}
+
+// 响应: DidResolveResponse
+table DidResolveResponse {
+  did: string;           // 查询的 DID
+  peerId: string;        // 对应的 PeerId（未找到时为空字符串）
+  found: bool;           // 是否找到
+}
 ```
 
 **安全措施**：
@@ -1152,3 +1165,116 @@ outbox 消息改为 bounded concurrency（`MULTICAST_CONCURRENCY=20`）并行投
 | `packages/node/test/message-store.test.ts` | 28 个测试（含 did_peers + rate_limits） |
 | `packages/core/test/p2p-config.test.ts` | 5 个测试覆盖 BOOTSTRAP_P2P_CONFIG |
 | `docker-compose.*.yml` (6 files) | 所有 compose 文件添加 Docker resource limits |
+
+### C.10 Phase 5 FlatBuffers 二进制编码总结（v0.7）
+
+Phase 5 将所有 4 个 P2P 协议的线上格式从 JSON 迁移到 FlatBuffers 二进制编码。全部已实现并通过测试（217 node tests + 101 protocol tests，含 14 个新增 messaging codec 测试）。
+
+#### 动机
+
+- **JSON 开销大**：字段名、引号、逗号等文本开销占比高；二进制数据（E2E 密文、gzip）需 base64/hex 编码再膨胀 33-100%
+- **FlatBuffers 优势**：零拷贝解析、无 schema 文本开销、二进制数据原生支持
+- **实测效果**：典型文本消息线上体积减少 ~30-40%；E2E 加密信封从 ~200+ 字节 JSON → 60 字节固定二进制头
+
+#### 受影响的 P2P 协议
+
+| 协议 | FlatBuffers 表 | 主要字段 |
+|------|---------------|----------|
+| `/clawnet/1.0.0/dm` | `DirectMessage` | sourceDid, targetDid, topic, payload (`[ubyte]`), ttlSec, sentAtMs, priority, compressed, encrypted, idempotencyKey |
+| `/clawnet/1.0.0/did-announce` | `DidAnnounce` | did |
+| `/clawnet/1.0.0/did-resolve` | `DidResolveRequest` / `DidResolveResponse` | did, peerId, found |
+| `/clawnet/1.0.0/receipt` | `DeliveryReceipt` | messageId, recipientDid, senderDid, deliveredAtMs, type |
+
+#### DirectMessage FlatBuffers 格式
+
+```
+table DirectMessage {
+  sourceDid: string;        // 发送方 DID
+  targetDid: string;        // 目标 DID
+  topic: string;            // 消息主题
+  payload: [ubyte];         // 不透明二进制载荷（plain UTF-8 / raw gzip / binary E2E envelope）
+  ttlSec: int;              // 存活时间（秒）
+  sentAtMs: long;           // 发送时间戳（毫秒）
+  priority: int;            // 优先级 0-3
+  compressed: bool;         // 载荷是否 gzip 压缩
+  encrypted: bool;          // 载荷是否 E2E 加密
+  idempotencyKey: string;   // 幂等键
+}
+```
+
+> `payload` 字段为 `[ubyte]`（原始字节数组）。对比 JSON 方案中 payload 需要 base64/hex 编码，FlatBuffers 直接携带原始二进制，零膨胀。
+
+#### 二进制 E2E 信封格式
+
+替代原有的 JSON hex 编码信封 `{ _e2e:1, pk:hex, n:hex, c:hex, t:hex }`（~200+ 字节），改为固定布局二进制：
+
+```
+[ephemeralPk: 32 bytes][nonce: 12 bytes][tag: 16 bytes][ciphertext: N bytes]
+|<────────────── E2E_HEADER_SIZE = 60 bytes ──────────────>|
+```
+
+- **线上格式**：上述固定布局二进制，作为 `DirectMessage.payload` 的值（`encrypted=true`）
+- **SQLite 存储格式**：接收方解析后转换为 JSON `{ _e2e:1, pk:hex, n:hex, c:hex, t:hex }` 存入 TEXT 列，保持 REST API 向后兼容
+
+#### 二进制压缩格式
+
+- **线上格式**：raw gzip bytes 直接作为 `DirectMessage.payload`（`compressed=true`）
+- **SQLite 存储格式**：接收方转换为 `{ _compressed:1, data:"<gzip-base64>" }`
+
+#### 双格式输出（线上 vs 存储）
+
+`encodePayload()` 现在返回双格式：
+
+| 输出 | 类型 | 用途 |
+|------|------|------|
+| `payloadBytes` | `Uint8Array` | P2P 线上传输（FlatBuffers `[ubyte]`） |
+| `storagePayload` | `string` | SQLite TEXT 列 / REST API 响应 |
+
+这确保 P2P 层使用高效二进制，而 REST API 和 SQLite 保持字符串格式向后兼容。
+
+#### 编解码架构
+
+```
+@claw-network/protocol/messaging          （新增子模块）
+  ├── types.ts          — TypeScript 接口（DirectMessage, DeliveryReceipt, ...）
+  ├── flatbuffers.ts    — 手写 FlatBuffers encode/decode（复用 p2p/flatbuffers.ts 的 FlatBufferReader + Builder）
+  ├── codec.ts          — 高层 encode*Bytes() / decode*Bytes() + 二进制 E2E envelope
+  └── index.ts          — barrel exports
+
+@claw-network/node
+  └── messaging-service.ts  — 所有 P2P handler 从 JSON.stringify/parse 迁移到 FlatBuffers codec
+```
+
+> **无 `flatc` 代码生成**：沿用项目已有的手写 FlatBuffers 模式（`packages/protocol/src/p2p/flatbuffers.ts`），直接使用 `flatbuffers` npm 包的 `Builder` + 自定义 `FlatBufferReader`。
+
+#### 对 SDK / REST API 的影响
+
+**无影响**。FlatBuffers 编码仅影响节点间 P2P stream 传输。SDK 通过 REST API 发送/接收消息，payload 格式（base64 字符串）不变。SQLite 存储格式（TEXT 列）也不变。
+
+#### 向后兼容性
+
+**不向后兼容**。所有节点需同时升级。新旧节点之间无法互通 P2P 消息（旧节点发 JSON，新节点期望 FlatBuffers）。这是有意的设计决策——当前所有节点由同一团队部署，可统一升级。
+
+#### 测试覆盖
+
+| 测试文件 | 测试数 | 覆盖范围 |
+|---------|--------|----------|
+| `packages/protocol/test/messaging-codec.test.ts`（新增） | 14 | 全部 5 个 FlatBuffers 表的 round-trip 编解码 + E2E envelope + size comparison |
+| `packages/node/test/messaging-did-resolve.test.ts`（更新） | 11 | DID resolve handler/client 使用 FlatBuffers 二进制 stream |
+| 其余 node tests | 206 | messaging-api、message-store 等不受影响 |
+| **合计** | 217 + 101 | node 217 tests (24 files) + protocol 101 tests (15 files) |
+
+#### 文件变更清单
+
+| 文件 | 变更 |
+|------|------|
+| `docs/implementation/messaging-spec.fbs`（新增） | FlatBuffers schema 文档，定义 5 个表 |
+| `packages/protocol/src/messaging/types.ts`（新增） | TypeScript 接口：DirectMessage, DeliveryReceipt, DidAnnounce, DidResolveRequest/Response, E2EEnvelope |
+| `packages/protocol/src/messaging/flatbuffers.ts`（新增） | 手写 FlatBuffers encode/decode 函数 |
+| `packages/protocol/src/messaging/codec.ts`（新增） | 高层 codec + 二进制 E2E envelope encode/decode |
+| `packages/protocol/src/messaging/index.ts`（新增） | barrel exports |
+| `packages/protocol/src/index.ts` | 新增 `export * from './messaging/index.js'` |
+| `packages/protocol/package.json` | 新增 `./messaging` subpath export |
+| `packages/protocol/test/messaging-codec.test.ts`（新增） | 14 个 round-trip 测试 |
+| `packages/node/src/services/messaging-service.ts` | 全部 P2P handler 从 JSON 迁移到 FlatBuffers codec；新增 `writeBinaryStream()`；`encodePayload()` 双格式输出 |
+| `packages/node/test/messaging-did-resolve.test.ts` | `fakeStream` 从 JSON 字符串改为 FlatBuffers 二进制 |
