@@ -81,7 +81,7 @@ NAT 后面 ✓          ✓ 无需公网 IP          NAT 后面 ✓
 
 ### 2.1 Envelope（消息信封）
 
-这是 TelAgent 节点间传输的核心数据单元。信封内容已加密，ClawNet 只需当做不透明载荷传输。
+这是 TelAgent 节点间传输的核心数据单元。信封内容已加密，TelAgent 将其序列化为 UTF-8 字符串后交给 ClawNet 传输。
 
 ```typescript
 interface Envelope {
@@ -111,7 +111,7 @@ interface Envelope {
 | 需求 | 说明 |
 |------|------|
 | **寻址** | 通过目标节点的 DID 寻址（`did:claw:z...`） |
-| **载荷格式** | 不透明字符串载荷，ClawNet 不解析内容。TelAgent 场景下通常为 base64(JSON Envelope) |
+| **载荷格式** | UTF-8 字符串。P2P 传输时编码为 UTF-8 字节流，接收方解码还原 |
 | **最大载荷** | 建议支持至少 64 KB（覆盖含附件清单的消息） |
 | **可靠性** | 至少一次送达（at-least-once），TelAgent 层通过 `envelopeId` 去重 |
 | **顺序性** | 不要求严格有序，TelAgent 通过 `seq` 字段在应用层排序 |
@@ -137,7 +137,7 @@ interface ClawNetClient {
      *
      * @param targetDid  - 目标节点的 DID
      * @param topic      - 消息主题/通道名（用于区分不同应用，如 "telagent/envelope"）
-     * @param payload    - 不透明字符串载荷
+     * @param payload    - UTF-8 字符串载荷
      * @param options    - 可选配置
      * @returns 发送结果
      */
@@ -160,7 +160,7 @@ Content-Type: application/json
 {
   "targetDid": "did:claw:z6Mk...",
   "topic": "telagent/envelope",
-  "payload": "<不透明字符串载荷>",
+  "payload": "<UTF-8 字符串>",
   "ttlSec": 86400
 }
 
@@ -197,7 +197,7 @@ interface InboundMessage {
   messageId: string;
   sourceDid: string;      // 发送方 DID
   topic: string;
-  payload: string;        // 不透明字符串（内容由应用层决定）
+  payload: string;        // UTF-8 字符串
   receivedAtMs: number;
 }
 ```
@@ -212,7 +212,7 @@ WS /api/v1/messaging/subscribe?topic=telagent/envelope
   "messageId": "msg_abc123",
   "sourceDid": "did:claw:z6Mk...",
   "topic": "telagent/envelope",
-  "payload": "<opaque string>",
+  "payload": "<UTF-8 string>",
   "receivedAtMs": 1709654400000
 }
 
@@ -237,7 +237,7 @@ Response 200:
         "messageId": "msg_abc123",
         "sourceDid": "did:claw:z6Mk...",
         "topic": "telagent/envelope",
-        "payload": "<opaque string>",
+        "payload": "<UTF-8 string>",
         "receivedAtMs": 1709654400000
       }
     ],
@@ -523,7 +523,7 @@ const claw = new ClawNetClient({
 const result = await claw.messaging.send({
   targetDid: 'did:claw:zBobPublicKey...',
   topic: 'telagent/envelope',
-  payload: '<opaque string>',   // TelAgent 场景下通常为 base64(JSON Envelope)
+  payload: '<UTF-8 string>',
   ttlSec: 86400,          // 可选，默认 24 小时
   priority: 1,             // 可选，0=LOW 1=NORMAL 2=HIGH 3=URGENT
   compress: true,          // 可选，载荷 > 1KB 时自动 gzip 压缩
@@ -541,7 +541,7 @@ console.log(result);
 const batchResult = await claw.messaging.sendBatch({
   targetDids: ['did:claw:zAlice...', 'did:claw:zBob...', 'did:claw:zCharlie...'],
   topic: 'telagent/envelope',
-  payload: '<opaque string>',
+  payload: '<UTF-8 string>',
   ttlSec: 86400,
   priority: 2,             // 可选，HIGH 优先级
   compress: true,          // 可选
@@ -570,7 +570,7 @@ for (const msg of inbox.messages) {
   //   messageId: "msg_...",
   //   sourceDid: "did:claw:zAliceKey...",
   //   topic: "telagent/envelope",
-  //   payload: "<opaque string>",
+  //   payload: "<UTF-8 string>",
   //   receivedAtMs: 1709654400123,
   //   priority: 1,
   //   seq: 43
@@ -599,7 +599,7 @@ X-Api-Key: <api-key>
 {
   "targetDid": "did:claw:z6Mk...",
   "topic": "telagent/envelope",
-  "payload": "<opaque string>",
+  "payload": "<UTF-8 string>",
   "ttlSec": 86400,
   "priority": 1,
   "compress": true,
@@ -612,7 +612,7 @@ X-Api-Key: <api-key>
 |------|------|------|------|
 | `targetDid` | string | ✅ | 目标节点 DID (`did:claw:z...`) |
 | `topic` | string | ✅ | 消息主题/通道名 |
-| `payload` | string | ✅ | 不透明字符串载荷（ClawNet 不解析内容，编码方式由应用层决定） |
+| `payload` | string | ✅ | UTF-8 字符串载荷 |
 | `ttlSec` | number | ❌ | 存活时间（秒），默认 86400 |
 | `priority` | number | ❌ | 优先级 0=LOW 1=NORMAL 2=HIGH 3=URGENT，默认 1 |
 | `compress` | boolean | ❌ | 载荷 > 1KB 时启用 gzip 压缩 |
@@ -657,7 +657,7 @@ X-Api-Key: <api-key>
         "messageId": "msg_abc123",
         "sourceDid": "did:claw:z6MkAlice...",
         "topic": "telagent/envelope",
-        "payload": "<opaque string>",
+        "payload": "<UTF-8 string>",
         "receivedAtMs": 1709654400123,
         "priority": 1,
         "seq": 43
@@ -923,7 +923,7 @@ X-Api-Key: <api-key>
 {
   "targetDids": ["did:claw:zAlice...", "did:claw:zBob...", "did:claw:zCharlie..."],
   "topic": "telagent/envelope",
-  "payload": "<opaque string>",
+  "payload": "<UTF-8 string>",
   "ttlSec": 86400,
   "priority": 2,
   "compress": true,
@@ -1249,7 +1249,7 @@ table DirectMessage {
 
 #### 对 SDK / REST API 的影响
 
-**无影响**。FlatBuffers 编码仅影响节点间 P2P stream 传输。SDK 通过 REST API 发送/接收消息，payload 格式（不透明字符串）不变。SQLite 存储格式（TEXT 列）也不变。
+**无影响**。FlatBuffers 编码仅影响节点间 P2P stream 传输。SDK 通过 REST API 发送/接收消息，payload 格式（UTF-8 字符串）不变。SQLite 存储格式（TEXT 列）也不变。
 
 #### 向后兼容性
 
