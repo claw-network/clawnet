@@ -24,7 +24,7 @@ export { ReputationApi } from './reputation.js';
 export { MarketsApi, InfoMarketApi, TaskMarketApi, CapabilityMarketApi, MarketDisputeApi } from './markets.js';
 export { ContractsApi } from './contracts.js';
 export { DaoApi } from './dao.js';
-export { MessagingApi } from './messaging.js';
+export { MessagingApi, RECEIPT_TOPIC } from './messaging.js';
 export type {
   SendMessageParams,
   SendMessageResult,

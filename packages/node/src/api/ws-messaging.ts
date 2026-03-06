@@ -19,6 +19,7 @@
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { Server, IncomingMessage } from 'node:http';
 import type { MessagingService, InboxMessage } from '../services/messaging-service.js';
+import { RECEIPT_TOPIC } from '../services/messaging-service.js';
 import type { ApiKeyStore } from './api-key-store.js';
 
 const WS_PATH = '/api/v1/messaging/subscribe';
@@ -110,7 +111,7 @@ export function attachWebSocketHandler(
     const subscriber = (msg: InboxMessage) => {
       if (client.topicFilter && msg.topic !== client.topicFilter) return;
       if (ws.readyState !== ws.OPEN) return;
-      const frame = msg.topic === '_receipt'
+      const frame = msg.topic === RECEIPT_TOPIC
         ? { type: 'receipt', data: JSON.parse(msg.payload) }
         : { type: 'message', data: msg };
       ws.send(JSON.stringify(frame));

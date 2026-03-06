@@ -47,9 +47,6 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 /** Inbound P2P rate limit: max inbound messages per peer per minute. */
 const INBOUND_RATE_LIMIT = 300;
 
-/** Interval at which empty rate-limit buckets are pruned (2 minutes). */
-const RATE_BUCKET_GC_INTERVAL_MS = 2 * 60_000;
-
 /** Maximum concurrency for multicast delivery. */
 const MULTICAST_CONCURRENCY = 20;
 
@@ -67,6 +64,9 @@ const COMPRESSION_THRESHOLD_BYTES = 1024;
 
 /** HKDF info tag for E2E messaging encryption. */
 const E2E_MSG_INFO = Buffer.from('clawnet:e2e-msg:v1', 'utf-8');
+
+/** Topic used for delivery receipt notifications via WebSocket. */
+export const RECEIPT_TOPIC = '_receipt' as const;
 
 /** Priority levels — higher number = higher priority. */
 export enum MessagePriority {
@@ -115,6 +115,8 @@ export interface SendOptions {
   encryptForKeyHex?: string;
   /** Idempotency key for deduplication. */
   idempotencyKey?: string;
+  /** Per-recipient X25519 public key hex map (DID → key) for multicast E2E encryption. */
+  recipientKeys?: Record<string, string>;
 }
 
 /** Callback for WebSocket subscribers — called when a new message arrives in the inbox. */
@@ -163,23 +165,13 @@ export class MessagingService {
 
   /**
    * DID → PeerId mapping. Populated via the did-announce protocol when
-   * peers connect. This is a best-effort cache; entries are never evicted
-   * but may become stale when peers go offline.
+   * peers connect. Persisted to SQLite and restored on startup.
    */
   private readonly didToPeerId = new Map<string, string>();
   private readonly peerIdToDid = new Map<string, string>();
 
   /** WebSocket subscribers that receive real-time inbox pushes. */
   private readonly subscribers = new Set<InboxSubscriber>();
-
-  /** Sliding-window rate limiter: DID → array of timestamps (ms). */
-  private readonly rateBuckets = new Map<string, number[]>();
-
-  /** Inbound rate limiter: peerId → array of timestamps. */
-  private readonly inboundRateBuckets = new Map<string, number[]>();
-
-  /** Timer for periodic rate-bucket garbage collection. */
-  private rateBucketGcTimer?: NodeJS.Timeout;
 
   constructor(p2p: P2PNode, store: MessageStore, localDid: string) {
     this.log = createLogger({ level: 'info' });
@@ -191,6 +183,13 @@ export class MessagingService {
   // ── Lifecycle ──────────────────────────────────────────────────
 
   async start(): Promise<void> {
+    // Restore persisted DID→PeerId mappings from SQLite
+    for (const { did, peerId } of this.store.getAllDidPeers()) {
+      this.didToPeerId.set(did, peerId);
+      this.peerIdToDid.set(peerId, did);
+    }
+    this.log.info('[messaging] restored DID mappings', { count: this.didToPeerId.size });
+
     // Register stream protocol handlers
     await this.p2p.handleProtocol(PROTO_DM, (incoming) => {
       void this.handleInboundMessage(incoming);
@@ -210,20 +209,16 @@ export class MessagingService {
     // Announce our DID to all currently connected peers
     void this.announceToAll();
 
-    // Periodic cleanup of expired messages
+    // Periodic cleanup of expired messages and stale rate-limit entries
     this.cleanupTimer = setInterval(() => {
       try {
         this.store.cleanupInbox();
         this.store.cleanupOutbox();
+        this.store.pruneRateEvents(Date.now() - RATE_LIMIT_WINDOW_MS);
       } catch {
         /* best-effort */
       }
     }, CLEANUP_INTERVAL_MS);
-
-    // Periodic GC for rate-limit buckets to prevent memory leaks
-    this.rateBucketGcTimer = setInterval(() => {
-      this.pruneRateBuckets();
-    }, RATE_BUCKET_GC_INTERVAL_MS);
 
     this.log.info('[messaging] service started', { localDid: this.localDid });
   }
@@ -232,10 +227,6 @@ export class MessagingService {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = undefined;
-    }
-    if (this.rateBucketGcTimer) {
-      clearInterval(this.rateBucketGcTimer);
-      this.rateBucketGcTimer = undefined;
     }
     try {
       await this.p2p.unhandleProtocol(PROTO_DM);
@@ -303,16 +294,20 @@ export class MessagingService {
     // Rate limit check (counts as 1 call for rate-limit purposes)
     this.enforceRateLimit(this.localDid);
 
-    // Apply compression (encryption not applied in multicast — each recipient needs their own key)
-    const { encoded, compressed, encrypted } = this.encodePayload(payload, { ...opts, encryptForKeyHex: undefined });
+    // Pre-encode a shared payload (without per-recipient encryption)
+    const { encoded: sharedEncoded, compressed } = this.encodePayload(payload, { ...opts, encryptForKeyHex: undefined });
 
-    const payloadBytes = Buffer.byteLength(encoded, 'utf-8');
+    const payloadBytes = Buffer.byteLength(sharedEncoded, 'utf-8');
     if (payloadBytes > MAX_PAYLOAD_BYTES) {
       throw new Error(`Payload too large: ${payloadBytes} bytes (max ${MAX_PAYLOAD_BYTES})`);
     }
 
     // Deliver to all targets concurrently with bounded concurrency
-    const results = await this.deliverMulticast(targetDids, topic, encoded, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
+    // Per-recipient E2E encryption is applied inside deliverMulticast when recipientKeys are provided
+    const results = await this.deliverMulticast(
+      targetDids, topic, sharedEncoded, ttlSec, priority, compressed,
+      opts.recipientKeys, opts.idempotencyKey,
+    );
     return { results };
   }
 
@@ -326,30 +321,46 @@ export class MessagingService {
     return this.store.consumeMessage(messageId);
   }
 
-  /** Flush outbox: attempt to deliver all pending messages for a specific DID with exponential backoff. */
+  /** Flush outbox: attempt to deliver all pending messages for a specific DID with bounded concurrency. */
   async flushOutboxForDid(targetDid: string): Promise<number> {
     const peerId = this.didToPeerId.get(targetDid);
     if (!peerId) return 0;
 
     const entries = this.store.getOutboxForTarget(targetDid);
-    let delivered = 0;
     const now = Date.now();
+
+    // Pre-filter: separate eligible entries from those still in backoff or over limit
+    const eligible: typeof entries = [];
     for (const entry of entries) {
       if (entry.attempts > MAX_DELIVERY_ATTEMPTS) {
         this.store.removeFromOutbox(entry.id);
         continue;
       }
-      // Exponential backoff: skip if too soon since last attempt
       const backoff = Math.min(OUTBOX_RETRY_BASE_MS * (2 ** entry.attempts), OUTBOX_RETRY_MAX_MS);
       const lastAttempt = entry.lastAttempt ?? 0;
       if (lastAttempt > 0 && now - lastAttempt < backoff) {
         continue;
       }
-      this.store.recordAttempt(entry.id);
-      const ok = await this.deliverDirect(peerId, targetDid, entry.topic, entry.payload, entry.ttlSec);
-      if (ok) {
-        this.store.removeFromOutbox(entry.id);
-        delivered++;
+      eligible.push(entry);
+    }
+
+    // Deliver in batches of MULTICAST_CONCURRENCY using Promise.allSettled
+    let delivered = 0;
+    for (let i = 0; i < eligible.length; i += MULTICAST_CONCURRENCY) {
+      const batch = eligible.slice(i, i + MULTICAST_CONCURRENCY);
+      const settled = await Promise.allSettled(
+        batch.map(async (entry) => {
+          this.store.recordAttempt(entry.id);
+          const ok = await this.deliverDirect(peerId, targetDid, entry.topic, entry.payload, entry.ttlSec);
+          if (ok) {
+            this.store.removeFromOutbox(entry.id);
+            return true;
+          }
+          return false;
+        }),
+      );
+      for (const result of settled) {
+        if (result.status === 'fulfilled' && result.value) delivered++;
       }
     }
     return delivered;
@@ -405,24 +416,20 @@ export class MessagingService {
     }
   }
 
-  // ── Rate Limiting ──────────────────────────────────────────────
+  // ── Rate Limiting (SQLite-backed for multi-instance support) ───
 
   /**
    * Check rate limit for a DID. Throws if limit exceeded.
-   * Uses a sliding window of timestamps with binary search eviction.
+   * Uses SQLite-backed sliding window for cross-process correctness.
    */
   enforceRateLimit(did: string): void {
-    this.checkRateBucket(this.rateBuckets, did, RATE_LIMIT_PER_MIN);
+    this.checkRateBucket(`out:${did}`, RATE_LIMIT_PER_MIN);
   }
 
   /** Check if a DID is currently rate-limited (without consuming a slot). */
   isRateLimited(did: string): boolean {
-    const now = Date.now();
-    const windowStart = now - RATE_LIMIT_WINDOW_MS;
-    const timestamps = this.rateBuckets.get(did);
-    if (!timestamps) return false;
-    const startIdx = this.bisectLeft(timestamps, windowStart);
-    return (timestamps.length - startIdx) >= RATE_LIMIT_PER_MIN;
+    const windowStart = Date.now() - RATE_LIMIT_WINDOW_MS;
+    return this.store.countRateEvents(`out:${did}`, windowStart) >= RATE_LIMIT_PER_MIN;
   }
 
   /**
@@ -430,61 +437,20 @@ export class MessagingService {
    * Prevents P2P peers from spamming without limit.
    */
   private enforceInboundRateLimit(peerId: string): void {
-    this.checkRateBucket(this.inboundRateBuckets, peerId, INBOUND_RATE_LIMIT);
+    this.checkRateBucket(`in:${peerId}`, INBOUND_RATE_LIMIT);
   }
 
   /**
-   * Core rate-limit check: evict expired entries via binary search,
-   * push new timestamp, throw if over limit.
+   * Core rate-limit check: count events in the sliding window via SQLite,
+   * record a new event, throw if over limit.
    */
-  private checkRateBucket(
-    buckets: Map<string, number[]>,
-    key: string,
-    limit: number,
-  ): void {
-    const now = Date.now();
-    const windowStart = now - RATE_LIMIT_WINDOW_MS;
-    let timestamps = buckets.get(key);
-    if (!timestamps) {
-      timestamps = [];
-      buckets.set(key, timestamps);
+  private checkRateBucket(bucket: string, limit: number): void {
+    const windowStart = Date.now() - RATE_LIMIT_WINDOW_MS;
+    const count = this.store.countRateEvents(bucket, windowStart);
+    if (count >= limit) {
+      throw new RateLimitError(bucket, limit);
     }
-    // Binary search eviction — O(log n) instead of O(n)
-    const startIdx = this.bisectLeft(timestamps, windowStart);
-    if (startIdx > 0) {
-      timestamps.splice(0, startIdx);
-    }
-    if (timestamps.length >= limit) {
-      throw new RateLimitError(key, limit);
-    }
-    timestamps.push(now);
-  }
-
-  /** Binary search: find first index where timestamps[i] >= target. */
-  private bisectLeft(arr: number[], target: number): number {
-    let lo = 0, hi = arr.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >>> 1;
-      if (arr[mid] < target) lo = mid + 1;
-      else hi = mid;
-    }
-    return lo;
-  }
-
-  /** Remove empty and stale rate-limit buckets to prevent memory leaks. */
-  private pruneRateBuckets(): void {
-    const now = Date.now();
-    const windowStart = now - RATE_LIMIT_WINDOW_MS;
-    for (const [key, ts] of this.rateBuckets) {
-      if (ts.length === 0 || ts[ts.length - 1] < windowStart) {
-        this.rateBuckets.delete(key);
-      }
-    }
-    for (const [key, ts] of this.inboundRateBuckets) {
-      if (ts.length === 0 || ts[ts.length - 1] < windowStart) {
-        this.inboundRateBuckets.delete(key);
-      }
-    }
+    this.store.recordRateEvent(bucket);
   }
 
   // ── Private: Payload Encoding (compression + encryption) ────────
@@ -672,11 +638,10 @@ export class MessagingService {
         idempotencyKey: msg.idempotencyKey,
       });
 
-      // Record DID → PeerId mapping from the sender
+      // Record DID → PeerId mapping from the sender (persisted to SQLite)
       const remotePeerId = connection.remotePeer?.toString();
       if (remotePeerId && msg.sourceDid) {
-        this.didToPeerId.set(msg.sourceDid, remotePeerId);
-        this.peerIdToDid.set(remotePeerId, msg.sourceDid);
+        this.registerDidPeer(msg.sourceDid, remotePeerId);
       }
 
       this.log.info('message received', { messageId, sourceDid: msg.sourceDid, topic: msg.topic });
@@ -724,8 +689,7 @@ export class MessagingService {
       }
 
       if (msg.did && remotePeerId) {
-        this.didToPeerId.set(msg.did, remotePeerId);
-        this.peerIdToDid.set(remotePeerId, msg.did);
+        this.registerDidPeer(msg.did, remotePeerId);
         this.log.info('peer DID registered', { did: msg.did, peerId: remotePeerId });
 
         // Flush any pending outbox messages for this DID
@@ -766,15 +730,16 @@ export class MessagingService {
   /**
    * Deliver to multiple targets concurrently with bounded concurrency.
    * Uses Promise.allSettled so one failure doesn't block others.
+   * Supports per-recipient E2E encryption when recipientKeys are provided.
    */
   private async deliverMulticast(
     targetDids: string[],
     topic: string,
-    payload: string,
+    sharedPayload: string,
     ttlSec: number,
     priority: number = MessagePriority.NORMAL,
     compressed = false,
-    encrypted = false,
+    recipientKeys?: Record<string, string>,
     idempotencyKey?: string,
   ): Promise<Array<SendResult & { targetDid: string }>> {
     const results: Array<SendResult & { targetDid: string }> = [];
@@ -783,27 +748,49 @@ export class MessagingService {
       const batch = targetDids.slice(i, i + MULTICAST_CONCURRENCY);
       const settled = await Promise.allSettled(
         batch.map(async (targetDid) => {
+          // Per-recipient E2E encryption if a key is provided for this target
+          let payload = sharedPayload;
+          let encrypted = false;
+          const recipientKeyHex = recipientKeys?.[targetDid];
+          if (recipientKeyHex) {
+            const perRecipient = this.encodePayload(sharedPayload, { encryptForKeyHex: recipientKeyHex, compress: false });
+            payload = perRecipient.encoded;
+            encrypted = perRecipient.encrypted;
+          }
+
           const peerId = this.didToPeerId.get(targetDid);
           if (peerId) {
             const delivered = await this.deliverDirect(peerId, targetDid, topic, payload, ttlSec, priority, compressed, encrypted, idempotencyKey);
             if (delivered) {
-              return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true };
+              return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
             }
           }
           const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec, priority });
-          return { targetDid, messageId, delivered: false };
+          return { targetDid, messageId, delivered: false, compressed, encrypted };
         }),
       );
       for (const result of settled) {
         if (result.status === 'fulfilled') {
           results.push(result.value);
         } else {
-          // This shouldn't normally happen since deliverDirect catches its own errors
           this.log.warn('multicast delivery error', { error: String(result.reason) });
         }
       }
     }
     return results;
+  }
+
+  // ── Private: DID → PeerId Persistence ──────────────────────────
+
+  /** Update in-memory maps AND persist the DID→PeerId mapping to SQLite. */
+  private registerDidPeer(did: string, peerId: string): void {
+    this.didToPeerId.set(did, peerId);
+    this.peerIdToDid.set(peerId, did);
+    try {
+      this.store.upsertDidPeer(did, peerId);
+    } catch {
+      // Best-effort persistence — in-memory map is authoritative
+    }
   }
 
   // ── Private: Delivery Receipt Protocol ─────────────────────────
@@ -866,7 +853,7 @@ export class MessagingService {
         this.notifySubscribers({
           messageId: receipt.messageId,
           sourceDid: receipt.recipientDid ?? '',
-          topic: '_receipt',
+          topic: RECEIPT_TOPIC,
           payload: JSON.stringify(receipt),
           receivedAtMs: receipt.deliveredAtMs ?? Date.now(),
           priority: MessagePriority.NORMAL,

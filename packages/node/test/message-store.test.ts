@@ -376,4 +376,81 @@ describe('MessageStore', () => {
       expect(missed[0].payload).toBe('new');
     });
   });
+
+  // ── DID → PeerId Mapping ──────────────────────────────────────
+
+  describe('did peers', () => {
+    it('upserts and retrieves DID → PeerId mappings', () => {
+      store.upsertDidPeer('did:claw:alice', '12D3KooWAlice');
+      store.upsertDidPeer('did:claw:bob', '12D3KooWBob');
+
+      const peers = store.getAllDidPeers();
+      expect(peers).toHaveLength(2);
+      expect(peers.find((p) => p.did === 'did:claw:alice')?.peerId).toBe('12D3KooWAlice');
+      expect(peers.find((p) => p.did === 'did:claw:bob')?.peerId).toBe('12D3KooWBob');
+    });
+
+    it('overwrites peerId on upsert for existing DID', () => {
+      store.upsertDidPeer('did:claw:alice', '12D3KooWOld');
+      store.upsertDidPeer('did:claw:alice', '12D3KooWNew');
+
+      const peers = store.getAllDidPeers();
+      expect(peers).toHaveLength(1);
+      expect(peers[0].peerId).toBe('12D3KooWNew');
+    });
+
+    it('removes a DID mapping', () => {
+      store.upsertDidPeer('did:claw:alice', '12D3KooWAlice');
+      expect(store.removeDidPeer('did:claw:alice')).toBe(true);
+      expect(store.getAllDidPeers()).toHaveLength(0);
+      expect(store.removeDidPeer('did:claw:alice')).toBe(false);
+    });
+
+    it('persists mappings across store instances', () => {
+      const dbPath = join(tmpDir, 'messages.sqlite');
+      store.upsertDidPeer('did:claw:alice', '12D3KooWAlice');
+      store.close();
+
+      const store2 = new MessageStore(dbPath);
+      const peers = store2.getAllDidPeers();
+      expect(peers).toHaveLength(1);
+      expect(peers[0].did).toBe('did:claw:alice');
+      expect(peers[0].peerId).toBe('12D3KooWAlice');
+      store2.close();
+
+      // Re-open original store for afterEach cleanup
+      store = new MessageStore(dbPath);
+    });
+  });
+
+  // ── Rate Limiting ─────────────────────────────────────────────
+
+  describe('rate limiting', () => {
+    it('records and counts rate events within window', () => {
+      store.recordRateEvent('out:did:claw:alice');
+      store.recordRateEvent('out:did:claw:alice');
+      store.recordRateEvent('out:did:claw:bob');
+
+      const windowStart = Date.now() - 60_000;
+      expect(store.countRateEvents('out:did:claw:alice', windowStart)).toBe(2);
+      expect(store.countRateEvents('out:did:claw:bob', windowStart)).toBe(1);
+      expect(store.countRateEvents('out:did:claw:unknown', windowStart)).toBe(0);
+    });
+
+    it('does not count events outside the window', () => {
+      store.recordRateEvent('out:test');
+
+      // Count with a window starting in the future — should find nothing
+      expect(store.countRateEvents('out:test', Date.now() + 1000)).toBe(0);
+    });
+
+    it('prunes old rate events', () => {
+      store.recordRateEvent('out:test');
+
+      // Prune with cutoff in the future — should remove the event
+      const pruned = store.pruneRateEvents(Date.now() + 1000);
+      expect(pruned).toBe(1);
+      expect(store.countRateEvents('out:test', 0)).toBe(0);
+    });
+  });
 });
