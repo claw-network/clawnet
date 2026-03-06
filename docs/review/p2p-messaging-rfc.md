@@ -1,7 +1,7 @@
 # RFC: TelAgent 消息通信迁移至 ClawNet P2P 层
 
-- 文档版本：v0.5（Phase 3 增强功能实现后更新）
-- 状态：**ClawNet messaging API Phase 1 + Phase 2 + Phase 3 已全部实现**，TelAgent 可开始适配
+- 文档版本：v0.7（Phase 5 FlatBuffers 二进制编码后更新）
+- 状态：**ClawNet messaging API Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5 已全部实现**，TelAgent 可开始适配
 - 作者：TelAgent 团队
 - 审阅 & 实现：ClawNet 项目组
 - 日期：2026-03-06
@@ -68,10 +68,10 @@ NAT 后面 ✓          ✓ 无需公网 IP          NAT 后面 ✓
 
 **核心优势**：
 
-- NAT 穿透：ClawNet P2P 层已具备部分 NAT 穿透能力（autoNAT + dcutr hole-punching），但**尚未配置 circuit relay 中继节点**，对称 NAT (Symmetric NAT) 场景下双方均在 NAT 后面时无法直连。需要 ClawNet 在 bootstrap 节点上启用 `@libp2p/circuit-relay-v2` 服务端，才能覆盖所有 NAT 场景。
-- 去中心化路由：无需 DNS、无需 TLS 证书、无需公网 IP（在 relay 启用后）
-- DID 原生寻址：用 DID 直接寻址，无需域名映射（**注意：ClawNet 当前没有 DID → PeerId 的映射机制，需要新建——见下方 §3.5**）
-- 离线中继：**当前不支持**。ClawNet P2P 层是实时 GossipSub + Stream，不具备 store-and-forward 能力。离线暂存需要新建 mailbox 服务（见 §3.1.3 的修订）
+- NAT 穿透：ClawNet P2P 层具备完整 NAT 穿透能力——autoNAT + dcutr hole-punching + **circuit relay 中继**（Phase 2 已在 bootstrap 节点启用 `@libp2p/circuit-relay-v2` 服务端），覆盖包括对称 NAT 在内的所有 NAT 场景。
+- 去中心化路由：无需 DNS、无需 TLS 证书、无需公网 IP
+- DID 原生寻址：用 DID 直接寻址，无需域名映射。DID→PeerId 映射通过 `/clawnet/1.0.0/did-announce`（连接时自动交换）和 `/clawnet/1.0.0/did-resolve`（主动查询）两个协议实现，映射持久化到 SQLite 并带 30min TTL 自动刷新。
+- 离线暂存：**已支持**。目标节点离线时消息自动进入 outbox（SQLite），peer 上线后并行 flush 投递，遵循 TTL 自动清理。
 
 ---
 
@@ -81,7 +81,7 @@ NAT 后面 ✓          ✓ 无需公网 IP          NAT 后面 ✓
 
 ### 2.1 Envelope（消息信封）
 
-这是 TelAgent 节点间传输的核心数据单元。信封内容已加密，ClawNet 只需当做不透明载荷传输。
+这是 TelAgent 节点间传输的核心数据单元。信封内容已加密，TelAgent 将其序列化为 UTF-8 字符串后交给 ClawNet 传输。
 
 ```typescript
 interface Envelope {
@@ -111,7 +111,7 @@ interface Envelope {
 | 需求 | 说明 |
 |------|------|
 | **寻址** | 通过目标节点的 DID 寻址（`did:claw:z...`） |
-| **载荷格式** | JSON 序列化的 Envelope，ClawNet 当做不透明 bytes 传输 |
+| **载荷格式** | UTF-8 字符串。P2P 传输时编码为 UTF-8 字节流，接收方解码还原 |
 | **最大载荷** | 建议支持至少 64 KB（覆盖含附件清单的消息） |
 | **可靠性** | 至少一次送达（at-least-once），TelAgent 层通过 `envelopeId` 去重 |
 | **顺序性** | 不要求严格有序，TelAgent 通过 `seq` 字段在应用层排序 |
@@ -137,14 +137,14 @@ interface ClawNetClient {
      *
      * @param targetDid  - 目标节点的 DID
      * @param topic      - 消息主题/通道名（用于区分不同应用，如 "telagent/envelope"）
-     * @param payload    - 不透明载荷（JSON string 或 Buffer）
+     * @param payload    - UTF-8 字符串载荷
      * @param options    - 可选配置
      * @returns 发送结果
      */
     send(params: {
       targetDid: string;
       topic: string;
-      payload: string | Buffer;
+      payload: string;
       ttlSec?: number;
     }): Promise<{ messageId: string; delivered: boolean }>;
   };
@@ -160,7 +160,7 @@ Content-Type: application/json
 {
   "targetDid": "did:claw:z6Mk...",
   "topic": "telagent/envelope",
-  "payload": "<base64 编码的 Envelope JSON>",
+  "payload": "<UTF-8 字符串>",
   "ttlSec": 86400
 }
 
@@ -197,7 +197,7 @@ interface InboundMessage {
   messageId: string;
   sourceDid: string;      // 发送方 DID
   topic: string;
-  payload: string;        // base64 或 UTF-8
+  payload: string;        // UTF-8 字符串
   receivedAtMs: number;
 }
 ```
@@ -212,7 +212,7 @@ WS /api/v1/messaging/subscribe?topic=telagent/envelope
   "messageId": "msg_abc123",
   "sourceDid": "did:claw:z6Mk...",
   "topic": "telagent/envelope",
-  "payload": "<base64>",
+  "payload": "<UTF-8 string>",
   "receivedAtMs": 1709654400000
 }
 
@@ -237,7 +237,7 @@ Response 200:
         "messageId": "msg_abc123",
         "sourceDid": "did:claw:z6Mk...",
         "topic": "telagent/envelope",
-        "payload": "<base64>",
+        "payload": "<UTF-8 string>",
         "receivedAtMs": 1709654400000
       }
     ],
@@ -283,9 +283,9 @@ ClawNet 自身的业务消息可使用 `clawnet/*` 命名空间。
 | **速率限制** | 建议对每个 DID 的发送频率限流（如 600 条/分钟），防止滥用 |
 | **载荷大小限制** | 单条消息不超过 64 KB |
 
-### 3.4 增强能力（已全部实现）
+### 3.4 增强能力
 
-以下能力在 Phase 2 和 Phase 3 中已全部实现：
+以下能力在 Phase 2、Phase 3、Phase 4 和 Phase 5 中已全部实现：
 
 | 能力 | 状态 | 说明 |
 |------|------|------|
@@ -296,6 +296,15 @@ ClawNet 自身的业务消息可使用 `clawnet/*` 命名空间。
 | **传输层 E2E 加密** | ✅ Phase 3 | X25519 + HKDF + AES-256-GCM，可选对载荷进行传输层加密 |
 | **消息压缩** | ✅ Phase 3 | 载荷 > 1 KB 时自动 gzip 压缩，减少带宽消耗 |
 | **WS 断线重连补发** | ✅ Phase 3 | 通过 `sinceSeq` 参数在 WS 重连后补发遗漏消息 |
+| **DID Resolve 介绍协议** | ✅ Phase 4 | 通过 bootstrap/peers 解析未知 DID→PeerId，首次消息无需等待 announce |
+| **DID 映射 TTL 刷新** | ✅ Phase 4 | 30 分钟 TTL，投递失败时自动重新解析过期映射 |
+| **DID→PeerId 持久化** | ✅ Phase 4 | SQLite did_peers 表持久化映射+时间戳，重启后恢复 |
+| **多播 per-recipient E2E 加密** | ✅ Phase 4 | 批量发送时为每个收件人独立加密 |
+| **SQLite 共享速率限制** | ✅ Phase 4 | 速率限制持久化到 SQLite，进程重启后限流状态不丢失 |
+| **Bootstrap 洪泛防护** | ✅ Phase 4 | 全局入站速率限制、流超时、yamux stream 限制、Docker 资源限制 |
+| **并行 outbox flush** | ✅ Phase 4 | outbox 逐条发送改为并行 flush，加速离线消息投递 |
+| **FlatBuffers 二进制编码** | ✅ Phase 5 | 所有 P2P 协议从 JSON 迁移到 FlatBuffers 二进制，线上体积减少 ~30-40% |
+| **二进制 E2E 信封** | ✅ Phase 5 | E2E 加密信封从 JSON hex 编码改为固定布局二进制（60 字节头），节省 ~140 字节/消息 |
 | **流量控制** | ⏳ 待定 | 当接收方处理不过来时的背压机制 |
 
 ---
@@ -458,7 +467,7 @@ routeHint: {
 
 ---
 
-## 附录 C：ClawNet 实现说明（v0.3 新增）
+## 附录 C：ClawNet 实现说明（v0.7 更新）
 
 > **本节由 ClawNet 项目组编写。Messaging API 已实现并合入主分支，TelAgent 可立即开始适配。**
 
@@ -469,7 +478,7 @@ routeHint: {
 | **发送消息** (`POST /api/v1/messaging/send`) | ✅ 已实现 | 通过 P2P libp2p stream 直接投递到目标 DID |
 | **接收消息** (`GET /api/v1/messaging/inbox`) | ✅ 已实现 | 轮询接口，支持 topic/since/limit 过滤 |
 | **确认消息** (`DELETE /api/v1/messaging/inbox/:messageId`) | ✅ 已实现 | 确认后消息从 inbox 中移除 |
-| **DID→PeerId 解析** | ✅ 已实现 | 自定义 `/clawnet/1.0.0/did-announce` 协议，peer 连接时自动交换 DID |
+| **DID→PeerId 解析** | ✅ 已实现 | `/clawnet/1.0.0/did-announce` (连接时交换) + `/clawnet/1.0.0/did-resolve` (主动查询) |
 | **离线暂存 + 自动重投** | ✅ 已实现 | 目标离线时消息进入 outbox，peer 重连后自动投递 |
 | **TTL 自动清理** | ✅ 已实现 | 每 5 分钟清理过期消息（inbox + outbox） |
 | **Topic 命名空间** | ✅ 已实现 | 任意 topic 字符串，建议 `telagent/*` |
@@ -484,6 +493,14 @@ routeHint: {
 | **消息压缩** | ✅ Phase 3 已实现 | `compress: true` 时载荷 > 1 KB 自动 gzip 压缩，接收方自动解压 |
 | **QoS 优先级队列** | ✅ Phase 3 已实现 | `priority` 参数 (0-3)，inbox/outbox 按优先级排序投递 |
 | **WS 断线重连补发** | ✅ Phase 3 已实现 | `sinceSeq` 查询参数，WS 重连后自动补发遗漏消息 + `replay_done` 帧 |
+| **DID Resolve 介绍协议** | ✅ Phase 4 已实现 | `/clawnet/1.0.0/did-resolve` 协议，向 peers 查询未知 DID→PeerId |
+| **DID 映射 TTL 刷新** | ✅ Phase 4 已实现 | 30min TTL，投递失败+映射过期时自动 re-resolve 获取新 PeerId |
+| **多播 per-recipient E2E 加密** | ✅ Phase 4 已实现 | 批量发送时通过 `recipientKeys` 为每个收件人独立加密 |
+| **SQLite 共享速率限制** | ✅ Phase 4 已实现 | `rate_limits` 表持久化滑动窗口事件，进程重启后限流状态延续 |
+| **Bootstrap 洪泛防护** | ✅ Phase 4 已实现 | 全局入站速率限制 3000/min + per-peer 300/min + 流超时 10s + Docker 资源限制 |
+| **并行 outbox flush** | ✅ Phase 4 已实现 | outbox 消息并行投递（bounded concurrency=20），加速离线消息重投 |
+| **FlatBuffers 二进制编码** | ✅ Phase 5 已实现 | 所有 4 个 P2P 协议（dm/did-announce/did-resolve/receipt）从 JSON 迁移到 FlatBuffers 二进制格式 |
+| **二进制 E2E 信封** | ✅ Phase 5 已实现 | E2E 加密信封使用固定二进制布局 `[pk:32][nonce:12][tag:16][ciphertext:...]`，60 字节头 |
 
 ### C.2 SDK 接口（最终版）
 
@@ -506,7 +523,7 @@ const claw = new ClawNetClient({
 const result = await claw.messaging.send({
   targetDid: 'did:claw:zBobPublicKey...',
   topic: 'telagent/envelope',
-  payload: '<base64-encoded Envelope JSON>',
+  payload: '<UTF-8 string>',
   ttlSec: 86400,          // 可选，默认 24 小时
   priority: 1,             // 可选，0=LOW 1=NORMAL 2=HIGH 3=URGENT
   compress: true,          // 可选，载荷 > 1KB 时自动 gzip 压缩
@@ -524,7 +541,7 @@ console.log(result);
 const batchResult = await claw.messaging.sendBatch({
   targetDids: ['did:claw:zAlice...', 'did:claw:zBob...', 'did:claw:zCharlie...'],
   topic: 'telagent/envelope',
-  payload: '<base64-encoded data>',
+  payload: '<UTF-8 string>',
   ttlSec: 86400,
   priority: 2,             // 可选，HIGH 优先级
   compress: true,          // 可选
@@ -553,7 +570,7 @@ for (const msg of inbox.messages) {
   //   messageId: "msg_...",
   //   sourceDid: "did:claw:zAliceKey...",
   //   topic: "telagent/envelope",
-  //   payload: "<base64>",
+  //   payload: "<UTF-8 string>",
   //   receivedAtMs: 1709654400123,
   //   priority: 1,
   //   seq: 43
@@ -582,7 +599,7 @@ X-Api-Key: <api-key>
 {
   "targetDid": "did:claw:z6Mk...",
   "topic": "telagent/envelope",
-  "payload": "<base64-encoded opaque data>",
+  "payload": "<UTF-8 string>",
   "ttlSec": 86400,
   "priority": 1,
   "compress": true,
@@ -595,7 +612,7 @@ X-Api-Key: <api-key>
 |------|------|------|------|
 | `targetDid` | string | ✅ | 目标节点 DID (`did:claw:z...`) |
 | `topic` | string | ✅ | 消息主题/通道名 |
-| `payload` | string | ✅ | 不透明载荷（base64 编码） |
+| `payload` | string | ✅ | UTF-8 字符串载荷 |
 | `ttlSec` | number | ❌ | 存活时间（秒），默认 86400 |
 | `priority` | number | ❌ | 优先级 0=LOW 1=NORMAL 2=HIGH 3=URGENT，默认 1 |
 | `compress` | boolean | ❌ | 载荷 > 1KB 时启用 gzip 压缩 |
@@ -640,7 +657,7 @@ X-Api-Key: <api-key>
         "messageId": "msg_abc123",
         "sourceDid": "did:claw:z6MkAlice...",
         "topic": "telagent/envelope",
-        "payload": "<base64>",
+        "payload": "<UTF-8 string>",
         "receivedAtMs": 1709654400123,
         "priority": 1,
         "seq": 43
@@ -687,23 +704,29 @@ X-Api-Key: <api-key>
 |---------|------|---------|
 | `/clawnet/1.0.0/dm` | 直接消息投递 | 调用 `messaging.send()` 时 |
 | `/clawnet/1.0.0/did-announce` | DID↔PeerId 映射交换 | peer 连接时自动触发 |
+| `/clawnet/1.0.0/did-resolve` | DID→PeerId 主动查询 | 未知 DID 时向 peers 查询 |
 | `/clawnet/1.0.0/receipt` | 投递回执 | 收到 `/dm` 消息后自动回执给发送方 |
 
-消息在 P2P 层以 JSON 格式传输（不做额外加密，libp2p noise 已提供传输加密）。  
+消息在 P2P 层以 **FlatBuffers 二进制格式**传输（Phase 5 从 JSON 迁移，线上体积减少 ~30-40%）。libp2p noise 提供传输层加密。  
 载荷大小限制：**64 KB**。
 
-### C.5 离线暂存机制
+### C.5 离线暂存与 DID 解析机制
 
 ```
 TelAgent A → POST /send → clawnetd A
                             │
                             ├── 目标 PeerId 已知且在线？
                             │     ├── 是 → 打开 /clawnet/1.0.0/dm stream → 直接投递 → delivered=true
-                            │     └── 否 → 存入 outbox (SQLite) → delivered=false
+                            │     │        └── 投递失败且映射超过 30min？
+                            │     │              ├── 是 → did-resolve 重新查询 → 拿到新 PeerId → 重试投递
+                            │     │              └── 否 → 存入 outbox
+                            │     └── 否 → did-resolve 向已连接 peers 查询（最多 3 个，5s 超时）
+                            │           ├── 查到 → registerDidPeer + dialPeer + deliverDirect → delivered=true
+                            │           └── 未查到 → 存入 outbox (SQLite) → delivered=false
                             │
                             └── 目标 peer 上线时 (peer:connect event)
                                   ├── 交换 DID (did-announce 协议)
-                                  └── flush outbox → 逐条投递 → 成功后从 outbox 删除
+                                  └── flush outbox → 并行投递 → 成功后从 outbox 删除
 ```
 
 - 每条消息最多重试 50 次
@@ -900,7 +923,7 @@ X-Api-Key: <api-key>
 {
   "targetDids": ["did:claw:zAlice...", "did:claw:zBob...", "did:claw:zCharlie..."],
   "topic": "telagent/envelope",
-  "payload": "<base64>",
+  "payload": "<UTF-8 string>",
   "ttlSec": 86400,
   "priority": 2,
   "compress": true,
@@ -959,25 +982,27 @@ POST /send { idempotencyKey: "abc" }
   2. ECDH: sharedSecret = x25519(ephemeralPriv, recipientPubKey)
   3. HKDF: key = HKDF-SHA-256(sharedSecret, info="clawnet:e2e-msg:v1")
   4. AES-256-GCM 加密 payload → ciphertext + tag
-  5. 发送: { _e2e: 1, pk: ephemeralPubHex, n: nonceHex, c: ciphertextHex, t: tagHex }
+  5. P2P 线上格式（Phase 5）: 固定二进制布局 [ephemeralPk:32][nonce:12][tag:16][ciphertext:...] = 60 字节头
+     SQLite 存储格式: { _e2e: 1, pk: ephemeralPubHex, n: nonceHex, c: ciphertextHex, t: tagHex }
 
 接收方:
-  1. ECDH: sharedSecret = x25519(recipientPriv, ephemeralPub)
-  2. HKDF + AES-256-GCM 解密
+  1. 从 FlatBuffers DirectMessage.payload 解析二进制 E2E 信封（60 字节头）
+  2. ECDH: sharedSecret = x25519(recipientPriv, ephemeralPub)
+  3. HKDF + AES-256-GCM 解密
 ```
 
 SDK 静态方法：
-- `MessagingService.decryptPayload(payload, recipientPrivateKeyHex)` — 解密 E2E 信封
+- `MessagingService.decryptPayload(payload, recipientPrivateKey: Uint8Array)` — 解密 E2E 信封
 - `MessagingService.decompressPayload(payload)` — 解压 gzip 载荷
 
 #### 消息压缩
 
 发送时指定 `compress: true`，若载荷大于 1 KB：
 
-1. 用 gzip 压缩载荷
-2. 转为 base64 字符串
-3. 包装为 `{ _compressed: 1, data: "<gzip-base64>" }`
-4. 接收方检测到 `_compressed` 字段后自动解压
+1. 用 gzip 压缩载荷为 raw bytes
+2. P2P 线上格式（Phase 5）：raw gzip bytes 直接作为 FlatBuffers `DirectMessage.payload`（`compressed=true` 标志位）
+3. SQLite 存储格式：`{ _compressed: 1, data: "<gzip-base64>" }`（保持向后兼容）
+4. 接收方根据 `compressed` 标志位自动解压
 
 低于 1 KB 的载荷即使指定 `compress: true` 也不会被压缩（避免膨胀）。
 
@@ -1023,3 +1048,233 @@ WS 连接 #2 (重连):
 2. 每条消息更新 `lastSeq = msg.seq`
 3. 重连时带上 `?sinceSeq=<lastSeq>`
 4. 收到 `replay_done` 后进入正常实时模式
+
+### C.9 Phase 4 P2P 健壮性增强总结（v0.6）
+
+Phase 4 聚焦于 P2P 层健壮性和 DID 发现机制的完善。全部已实现并通过测试（217 tests passing across 24 test files）。
+
+#### DID Resolve 介绍协议
+
+**问题**：当节点 A 首次向节点 B 发消息，但 A 不知道 B 的 PeerId 时（B 从未连过 A），消息只能进 outbox 等待 B 碰巧上线并 announce 自己。
+
+**方案**：新增 `/clawnet/1.0.0/did-resolve` 协议，让节点主动向已连接的 peers（尤其是 bootstrap）查询未知 DID 的 PeerId。Bootstrap 拥有最完整的映射表（所有新节点都会连它并 announce）。
+
+```
+send(targetDid):
+  1. didToPeerId.get(targetDid)  → 找到 → 直连
+  2.【新增】resolveDidViaPeers(targetDid) → 向已连接 peers 查询
+     - 最多并发查 3 个节点，5s 超时
+     - 拿到 peerId → dialPeer(peerId) → deliverDirect()
+  3. 都失败 → 进 outbox（保持现有兜底）
+```
+
+**协议格式**（Phase 5 已迁移至 FlatBuffers 二进制）：
+
+```
+// FlatBuffers schema（参见 docs/implementation/messaging-spec.fbs）
+
+// 请求: DidResolveRequest
+table DidResolveRequest {
+  did: string;           // 要查询的 DID
+}
+
+// 响应: DidResolveResponse
+table DidResolveResponse {
+  did: string;           // 查询的 DID
+  peerId: string;        // 对应的 PeerId（未找到时为空字符串）
+  found: bool;           // 是否找到
+}
+```
+
+**安全措施**：
+- DID 格式校验后才查表，防止注入
+- 复用 inbound rate limit（per-peer 300/min + global 3000/min）
+- 只返回 PeerId（不泄露 multiaddrs，地址由 KadDHT/peerStore 负责）
+- 5s 超时，resolve 失败不阻塞 `send()`
+
+#### DID→PeerId 映射 TTL 刷新
+
+**问题**：节点重启后 PeerId 可能改变，但旧的 DID→PeerId 映射仍在本地缓存，导致投递持续失败。
+
+**方案**：为映射加 30 分钟 TTL。当 `deliverDirect()` 投递失败且映射超过 TTL 时，自动触发 re-resolve：
+
+```
+deliverDirect(targetDid) 失败：
+  映射 < 30min → 直接进 outbox（映射还新鲜，可能是临时网络问题）
+  映射 > 30min → resolveDidViaPeers(targetDid)
+    → 新 PeerId ≠ 旧 PeerId → registerDidPeer + dialPeer + 重试投递
+    → 新 PeerId = 旧 PeerId 或查不到 → 进 outbox
+```
+
+**实现细节**：
+- `didPeerUpdatedAt` Map 追踪每个映射的最后确认时间
+- `isStalePeerMapping(did)` 检查映射是否超过 `DID_PEER_TTL_MS`（30min）
+- `getAllDidPeers()` 现在返回 `updatedAtMs` 字段，重启后时间戳从 SQLite 恢复
+- `registerDidPeer()` 每次更新时同时更新内存时间戳和 SQLite `updated_at_ms`
+
+#### DID→PeerId 持久化
+
+映射持久化到 SQLite `did_peers` 表，重启后自动恢复：
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `did` | TEXT PK | DID 标识 |
+| `peer_id` | TEXT | 对应的 libp2p PeerId |
+| `updated_at_ms` | INTEGER | 映射最后确认时间（用于 TTL 判断） |
+
+#### 多播 per-recipient E2E 加密
+
+批量发送时，通过 `recipientKeys` Map（DID → X25519 公钥 hex）为每个收件人独立加密载荷，防止群组消息被非目标节点解密。
+
+#### SQLite 共享速率限制
+
+速率限制事件持久化到 SQLite `rate_limits` 表（滑动窗口），进程重启后限流状态延续。三级限制：
+
+| 级别 | Bucket 前缀 | 限额 |
+|------|------------|------|
+| 出站 per-DID | `out:<did>` | 600/min |
+| 入站 per-peer | `in:<peerId>` | 300/min |
+| 入站 全局汇总 | `in:_global` | 3000/min |
+
+#### Bootstrap 洪泛防护
+
+专用 `BOOTSTRAP_P2P_CONFIG` 配置，降低 bootstrap 节点被恶意 peer 攻击的风险：
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `floodPublish` | `false` | 不向所有连接广播 GossipSub 消息 |
+| `maxConnections` | `500` | 当前默认 100 |
+| `yamuxMaxInboundStreams` | `128` | 限制每个连接的流数量（默认 256） |
+| Stream read timeout | `10s` | 慢/挂起的流自动终止 |
+| Per-protocol `maxInboundStreams` | 64-256 | 各协议独立限制 |
+| Docker resource limits | 2G memory / 2 CPU | 容器级硬限制 |
+
+#### 并行 Outbox Flush
+
+outbox 消息改为 bounded concurrency（`MULTICAST_CONCURRENCY=20`）并行投递，显著加速离线消息重投。此前为逐条串行。
+
+#### 文件变更清单
+
+| 文件 | 变更 |
+|------|------|
+| `packages/node/src/services/messaging-service.ts` | DID resolve 协议 handler + client, TTL 机制, multicast resolve, per-recipient E2E, 并行 flush |
+| `packages/node/src/services/message-store.ts` | `getAllDidPeers()` 返回 `updatedAtMs` |
+| `packages/core/src/p2p/config.ts` | `BOOTSTRAP_P2P_CONFIG` 配置 |
+| `packages/core/src/p2p/node.ts` | `handleProtocol()` 支持 `maxInboundStreams` option |
+| `packages/node/test/messaging-did-resolve.test.ts` | 11 个测试覆盖 resolve handler/client/TTL/timeout |
+| `packages/node/test/message-store.test.ts` | 28 个测试（含 did_peers + rate_limits） |
+| `packages/core/test/p2p-config.test.ts` | 5 个测试覆盖 BOOTSTRAP_P2P_CONFIG |
+| `docker-compose.*.yml` (6 files) | 所有 compose 文件添加 Docker resource limits |
+
+### C.10 Phase 5 FlatBuffers 二进制编码总结（v0.7）
+
+Phase 5 将所有 4 个 P2P 协议的线上格式从 JSON 迁移到 FlatBuffers 二进制编码。全部已实现并通过测试（217 node tests + 101 protocol tests，含 14 个新增 messaging codec 测试）。
+
+#### 动机
+
+- **JSON 开销大**：字段名、引号、逗号等文本开销占比高；二进制数据（E2E 密文、gzip）需 base64/hex 编码再膨胀 33-100%
+- **FlatBuffers 优势**：零拷贝解析、无 schema 文本开销、二进制数据原生支持
+- **实测效果**：典型文本消息线上体积减少 ~30-40%；E2E 加密信封从 ~200+ 字节 JSON → 60 字节固定二进制头
+
+#### 受影响的 P2P 协议
+
+| 协议 | FlatBuffers 表 | 主要字段 |
+|------|---------------|----------|
+| `/clawnet/1.0.0/dm` | `DirectMessage` | sourceDid, targetDid, topic, payload (`[ubyte]`), ttlSec, sentAtMs, priority, compressed, encrypted, idempotencyKey |
+| `/clawnet/1.0.0/did-announce` | `DidAnnounce` | did |
+| `/clawnet/1.0.0/did-resolve` | `DidResolveRequest` / `DidResolveResponse` | did, peerId, found |
+| `/clawnet/1.0.0/receipt` | `DeliveryReceipt` | messageId, recipientDid, senderDid, deliveredAtMs, type |
+
+#### DirectMessage FlatBuffers 格式
+
+```
+table DirectMessage {
+  sourceDid: string;        // 发送方 DID
+  targetDid: string;        // 目标 DID
+  topic: string;            // 消息主题
+  payload: [ubyte];         // 不透明二进制载荷（plain UTF-8 / raw gzip / binary E2E envelope）
+  ttlSec: int;              // 存活时间（秒）
+  sentAtMs: long;           // 发送时间戳（毫秒）
+  priority: int;            // 优先级 0-3
+  compressed: bool;         // 载荷是否 gzip 压缩
+  encrypted: bool;          // 载荷是否 E2E 加密
+  idempotencyKey: string;   // 幂等键
+}
+```
+
+> `payload` 字段为 `[ubyte]`（原始字节数组）。对比 JSON 方案中 payload 需要 base64/hex 编码，FlatBuffers 直接携带原始二进制，零膨胀。
+
+#### 二进制 E2E 信封格式
+
+替代原有的 JSON hex 编码信封 `{ _e2e:1, pk:hex, n:hex, c:hex, t:hex }`（~200+ 字节），改为固定布局二进制：
+
+```
+[ephemeralPk: 32 bytes][nonce: 12 bytes][tag: 16 bytes][ciphertext: N bytes]
+|<────────────── E2E_HEADER_SIZE = 60 bytes ──────────────>|
+```
+
+- **线上格式**：上述固定布局二进制，作为 `DirectMessage.payload` 的值（`encrypted=true`）
+- **SQLite 存储格式**：接收方解析后转换为 JSON `{ _e2e:1, pk:hex, n:hex, c:hex, t:hex }` 存入 TEXT 列，保持 REST API 向后兼容
+
+#### 二进制压缩格式
+
+- **线上格式**：raw gzip bytes 直接作为 `DirectMessage.payload`（`compressed=true`）
+- **SQLite 存储格式**：接收方转换为 `{ _compressed:1, data:"<gzip-base64>" }`
+
+#### 双格式输出（线上 vs 存储）
+
+`encodePayload()` 现在返回双格式：
+
+| 输出 | 类型 | 用途 |
+|------|------|------|
+| `payloadBytes` | `Uint8Array` | P2P 线上传输（FlatBuffers `[ubyte]`） |
+| `storagePayload` | `string` | SQLite TEXT 列 / REST API 响应 |
+
+这确保 P2P 层使用高效二进制，而 REST API 和 SQLite 保持字符串格式向后兼容。
+
+#### 编解码架构
+
+```
+@claw-network/protocol/messaging          （新增子模块）
+  ├── types.ts          — TypeScript 接口（DirectMessage, DeliveryReceipt, ...）
+  ├── flatbuffers.ts    — 手写 FlatBuffers encode/decode（复用 p2p/flatbuffers.ts 的 FlatBufferReader + Builder）
+  ├── codec.ts          — 高层 encode*Bytes() / decode*Bytes() + 二进制 E2E envelope
+  └── index.ts          — barrel exports
+
+@claw-network/node
+  └── messaging-service.ts  — 所有 P2P handler 从 JSON.stringify/parse 迁移到 FlatBuffers codec
+```
+
+> **无 `flatc` 代码生成**：沿用项目已有的手写 FlatBuffers 模式（`packages/protocol/src/p2p/flatbuffers.ts`），直接使用 `flatbuffers` npm 包的 `Builder` + 自定义 `FlatBufferReader`。
+
+#### 对 SDK / REST API 的影响
+
+**无影响**。FlatBuffers 编码仅影响节点间 P2P stream 传输。SDK 通过 REST API 发送/接收消息，payload 格式（UTF-8 字符串）不变。SQLite 存储格式（TEXT 列）也不变。
+
+#### 向后兼容性
+
+**不向后兼容**。所有节点需同时升级。新旧节点之间无法互通 P2P 消息（旧节点发 JSON，新节点期望 FlatBuffers）。这是有意的设计决策——当前所有节点由同一团队部署，可统一升级。
+
+#### 测试覆盖
+
+| 测试文件 | 测试数 | 覆盖范围 |
+|---------|--------|----------|
+| `packages/protocol/test/messaging-codec.test.ts`（新增） | 14 | 全部 5 个 FlatBuffers 表的 round-trip 编解码 + E2E envelope + size comparison |
+| `packages/node/test/messaging-did-resolve.test.ts`（更新） | 11 | DID resolve handler/client 使用 FlatBuffers 二进制 stream |
+| 其余 node tests | 206 | messaging-api、message-store 等不受影响 |
+| **合计** | 217 + 101 | node 217 tests (24 files) + protocol 101 tests (15 files) |
+
+#### 文件变更清单
+
+| 文件 | 变更 |
+|------|------|
+| `docs/implementation/messaging-spec.fbs`（新增） | FlatBuffers schema 文档，定义 5 个表 |
+| `packages/protocol/src/messaging/types.ts`（新增） | TypeScript 接口：DirectMessage, DeliveryReceipt, DidAnnounce, DidResolveRequest/Response, E2EEnvelope |
+| `packages/protocol/src/messaging/flatbuffers.ts`（新增） | 手写 FlatBuffers encode/decode 函数 |
+| `packages/protocol/src/messaging/codec.ts`（新增） | 高层 codec + 二进制 E2E envelope encode/decode |
+| `packages/protocol/src/messaging/index.ts`（新增） | barrel exports |
+| `packages/protocol/src/index.ts` | 新增 `export * from './messaging/index.js'` |
+| `packages/protocol/package.json` | 新增 `./messaging` subpath export |
+| `packages/protocol/test/messaging-codec.test.ts`（新增） | 14 个 round-trip 测试 |
+| `packages/node/src/services/messaging-service.ts` | 全部 P2P handler 从 JSON 迁移到 FlatBuffers codec；新增 `writeBinaryStream()`；`encodePayload()` 双格式输出 |
+| `packages/node/test/messaging-did-resolve.test.ts` | `fakeStream` 从 JSON 字符串改为 FlatBuffers 二进制 |

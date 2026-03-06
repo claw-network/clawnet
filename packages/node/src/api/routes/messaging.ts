@@ -13,6 +13,15 @@ import { ok, created, noContent, badRequest, internalError, tooManyRequests } fr
 import type { RuntimeContext } from '../types.js';
 import { RateLimitError } from '../../services/messaging-service.js';
 
+/** Type guard: checks if a value is a Record<string, string>. */
+function isStringRecord(v: unknown): v is Record<string, string> {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
+  for (const val of Object.values(v)) {
+    if (typeof val !== 'string') return false;
+  }
+  return true;
+}
+
 export function messagingRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
 
@@ -98,6 +107,7 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
     const priority = typeof body.priority === 'number' ? body.priority : undefined;
     const compress = typeof body.compress === 'boolean' ? body.compress : undefined;
     const idempotencyKey = typeof body.idempotencyKey === 'string' ? body.idempotencyKey : undefined;
+    const recipientKeys = isStringRecord(body.recipientKeys) ? body.recipientKeys : undefined;
 
     if (!Array.isArray(targetDids) || targetDids.length === 0) {
       badRequest(res, 'Missing or empty "targetDids" array', route.url.pathname);
@@ -128,7 +138,7 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
 
     try {
       const result = await ctx.messagingService.sendMulticast(targetDids, topic, payload, {
-        ttlSec, priority, compress, idempotencyKey,
+        ttlSec, priority, compress, idempotencyKey, recipientKeys,
       });
       created(res, result, { self: '/api/v1/messaging/inbox' });
     } catch (err) {

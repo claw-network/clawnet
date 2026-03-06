@@ -20,6 +20,11 @@ services:
       - CLAW_API_PORT=9528
       # - CLAW_PRIVATE_KEY=        # Required for on-chain interaction (EventIndexer)
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/v1/node"]
       interval: 30s

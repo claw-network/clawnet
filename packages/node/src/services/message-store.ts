@@ -96,6 +96,24 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 
 INSERT OR IGNORE INTO meta (key, value) VALUES ('inbox_seq', '0');
+
+-- DID → PeerId mapping persistence (survives restarts)
+CREATE TABLE IF NOT EXISTS did_peers (
+  did           TEXT PRIMARY KEY,
+  peer_id       TEXT NOT NULL,
+  updated_at_ms INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_did_peers_peer ON did_peers(peer_id);
+
+-- Rate limiting: sliding-window event log (shared across processes via SQLite)
+CREATE TABLE IF NOT EXISTS rate_limits (
+  id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  bucket TEXT NOT NULL,
+  ts_ms  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_bucket_ts ON rate_limits(bucket, ts_ms);
 `;
 
 /** Deduplication window: 24 hours */
@@ -321,5 +339,45 @@ export class MessageStore {
 
   close(): void {
     this.db.close();
+  }
+
+  // ── DID → PeerId Mapping ───────────────────────────────────
+
+  /** Persist or update a DID → PeerId mapping. */
+  upsertDidPeer(did: string, peerId: string): void {
+    this.db.prepare(
+      'INSERT INTO did_peers (did, peer_id, updated_at_ms) VALUES (?, ?, ?) ON CONFLICT(did) DO UPDATE SET peer_id = excluded.peer_id, updated_at_ms = excluded.updated_at_ms',
+    ).run(did, peerId, Date.now());
+  }
+
+  /** Load all persisted DID → PeerId mappings (including update timestamps for TTL). */
+  getAllDidPeers(): Array<{ did: string; peerId: string; updatedAtMs: number }> {
+    const rows = this.db.prepare('SELECT did, peer_id, updated_at_ms FROM did_peers').all() as Array<{ did: string; peer_id: string; updated_at_ms: number }>;
+    return rows.map((r) => ({ did: r.did, peerId: r.peer_id, updatedAtMs: r.updated_at_ms }));
+  }
+
+  /** Remove a DID mapping (e.g. when a peer is permanently gone). */
+  removeDidPeer(did: string): boolean {
+    return this.db.prepare('DELETE FROM did_peers WHERE did = ?').run(did).changes > 0;
+  }
+
+  // ── Rate Limiting ──────────────────────────────────────────
+
+  /** Record a rate-limit event for the given bucket. */
+  recordRateEvent(bucket: string): void {
+    this.db.prepare('INSERT INTO rate_limits (bucket, ts_ms) VALUES (?, ?)').run(bucket, Date.now());
+  }
+
+  /** Count rate-limit events for a bucket within the sliding window. */
+  countRateEvents(bucket: string, windowStartMs: number): number {
+    const row = this.db.prepare(
+      'SELECT COUNT(*) as cnt FROM rate_limits WHERE bucket = ? AND ts_ms > ?',
+    ).get(bucket, windowStartMs) as { cnt: number };
+    return row.cnt;
+  }
+
+  /** Delete rate-limit events older than the given timestamp. */
+  pruneRateEvents(beforeMs: number): number {
+    return this.db.prepare('DELETE FROM rate_limits WHERE ts_ms <= ?').run(beforeMs).changes;
   }
 }

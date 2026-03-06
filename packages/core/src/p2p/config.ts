@@ -22,6 +22,8 @@ export interface P2PConfig {
     maxConnections?: number;
     dialTimeout?: number;
   };
+  /** Max inbound yamux streams per connection. Default: 256 */
+  yamuxMaxInboundStreams?: number;
   pubsubTopics?: string[];
 }
 
@@ -46,4 +48,33 @@ export const DEFAULT_P2P_CONFIG: P2PConfig = {
   meshDlo: 1,
   meshDhi: 5,
   heartbeatInterval: 700,
+  yamuxMaxInboundStreams: 256,
+};
+
+/**
+ * Hardened config preset for bootstrap/seed nodes that accept many connections.
+ * Key differences from DEFAULT_P2P_CONFIG:
+ * - floodPublish disabled — prevents O(N) amplification when relaying messages
+ * - Higher maxConnections — bootstrap must handle the entire network
+ * - Tighter yamux stream limits — caps per-connection resource usage
+ * - Higher mesh parameters — better GossipSub propagation with many peers
+ */
+export const BOOTSTRAP_P2P_CONFIG: P2PConfig = {
+  listen: ['/ip4/0.0.0.0/tcp/9527'],
+  bootstrap: [],   // bootstrap node has no bootstrap peers
+  enableDHT: true,
+  allowPublishToZeroPeers: true,
+  enableAutoNAT: true,
+  enableDcutr: true,
+  enableCircuitRelay: true,
+  floodPublish: false,              // CRITICAL: prevent O(N) flood amplification
+  meshD: 6,                         // higher mesh degree for hub topology
+  meshDlo: 3,
+  meshDhi: 12,
+  heartbeatInterval: 700,
+  yamuxMaxInboundStreams: 128,      // tighter per-connection limit for many peers
+  connectionManager: {
+    minConnections: 5,
+    maxConnections: 500,            // bootstrap must handle many peers
+  },
 };

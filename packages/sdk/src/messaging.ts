@@ -3,6 +3,9 @@
  */
 import type { HttpClient, RequestOptions } from './http.js';
 
+/** Topic used for delivery receipt notifications via WebSocket. */
+export const RECEIPT_TOPIC = '_receipt' as const;
+
 // ── Types ────────────────────────────────────────────────────────
 
 export interface SendMessageParams {
@@ -39,6 +42,8 @@ export interface SendBatchParams {
   compress?: boolean;
   /** Idempotency key for deduplication */
   idempotencyKey?: string;
+  /** Per-recipient X25519 public key hex for E2E encryption (DID → key hex) */
+  recipientKeys?: Record<string, string>;
 }
 
 export interface SendMessageResult {
