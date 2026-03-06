@@ -452,5 +452,36 @@ describe('MessageStore', () => {
       expect(pruned).toBe(1);
       expect(store.countRateEvents('out:test', 0)).toBe(0);
     });
+
+    it('supports global inbound rate bucket', () => {
+      // Simulate global inbound rate limiting bucket
+      const globalBucket = 'in:_global';
+      for (let i = 0; i < 5; i++) {
+        store.recordRateEvent(globalBucket);
+      }
+
+      const windowStart = Date.now() - 60_000;
+      expect(store.countRateEvents(globalBucket, windowStart)).toBe(5);
+
+      // Per-peer buckets are tracked separately from global
+      store.recordRateEvent('in:peer123');
+      expect(store.countRateEvents('in:peer123', windowStart)).toBe(1);
+      expect(store.countRateEvents(globalBucket, windowStart)).toBe(5);
+    });
+
+    it('handles high-volume rate event recording', () => {
+      // Simulate burst of 100 events to verify SQLite handles it
+      const bucket = 'in:flood-test';
+      for (let i = 0; i < 100; i++) {
+        store.recordRateEvent(bucket);
+      }
+
+      const windowStart = Date.now() - 60_000;
+      expect(store.countRateEvents(bucket, windowStart)).toBe(100);
+
+      // Prune should clear all
+      const pruned = store.pruneRateEvents(Date.now() + 1000);
+      expect(pruned).toBe(100);
+    });
   });
 });

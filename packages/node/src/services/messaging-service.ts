@@ -47,6 +47,12 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 /** Inbound P2P rate limit: max inbound messages per peer per minute. */
 const INBOUND_RATE_LIMIT = 300;
 
+/** Global inbound rate limit: max total inbound messages per minute (all peers combined). */
+const GLOBAL_INBOUND_RATE_LIMIT = 3000;
+
+/** Stream read timeout in milliseconds — abort slow/stalled streams. */
+const STREAM_READ_TIMEOUT_MS = 10_000;
+
 /** Maximum concurrency for multicast delivery. */
 const MULTICAST_CONCURRENCY = 20;
 
@@ -126,20 +132,28 @@ type Logger = ReturnType<typeof createLogger>;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-/** Read all data from a stream source into a single Buffer, enforcing a size limit. */
+/** Read all data from a stream source into a single Buffer, enforcing a size limit and timeout. */
 async function readStream(
   source: AsyncIterable<{ subarray: () => Uint8Array } | Uint8Array>,
   maxBytes: number = MAX_PAYLOAD_BYTES * 2,
+  timeoutMs: number = STREAM_READ_TIMEOUT_MS,
 ): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
-  for await (const chunk of source) {
-    const bytes = chunk instanceof Uint8Array ? chunk : chunk.subarray();
-    total += bytes.length;
-    if (total > maxBytes) {
-      throw new Error(`Stream exceeded size limit: ${total} > ${maxBytes}`);
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    for await (const chunk of source) {
+      if (ac.signal.aborted) throw new Error(`Stream read timed out after ${timeoutMs}ms`);
+      const bytes = chunk instanceof Uint8Array ? chunk : chunk.subarray();
+      total += bytes.length;
+      if (total > maxBytes) {
+        throw new Error(`Stream exceeded size limit: ${total} > ${maxBytes}`);
+      }
+      chunks.push(Buffer.from(bytes));
     }
-    chunks.push(Buffer.from(bytes));
+  } finally {
+    clearTimeout(timer);
   }
   return Buffer.concat(chunks);
 }
@@ -190,16 +204,16 @@ export class MessagingService {
     }
     this.log.info('[messaging] restored DID mappings', { count: this.didToPeerId.size });
 
-    // Register stream protocol handlers
+    // Register stream protocol handlers with per-protocol inbound stream limits
     await this.p2p.handleProtocol(PROTO_DM, (incoming) => {
       void this.handleInboundMessage(incoming);
-    });
+    }, { maxInboundStreams: 256 });
     await this.p2p.handleProtocol(PROTO_DID_ANNOUNCE, (incoming) => {
       void this.handleDidAnnounce(incoming);
-    });
+    }, { maxInboundStreams: 64 });
     await this.p2p.handleProtocol(PROTO_RECEIPT, (incoming) => {
       void this.handleDeliveryReceipt(incoming);
-    });
+    }, { maxInboundStreams: 64 });
 
     // When a new peer connects, exchange DID announcements
     this.p2p.onPeerDisconnect(() => {
@@ -441,6 +455,14 @@ export class MessagingService {
   }
 
   /**
+   * Enforce global aggregate inbound rate limit (all peers combined).
+   * Prevents total flooding even when spread across many peers.
+   */
+  private enforceGlobalInboundRateLimit(): void {
+    this.checkRateBucket('in:_global', GLOBAL_INBOUND_RATE_LIMIT);
+  }
+
+  /**
    * Core rate-limit check: count events in the sliding window via SQLite,
    * record a new event, throw if over limit.
    */
@@ -597,6 +619,7 @@ export class MessagingService {
       if (remotePeer) {
         try {
           this.enforceInboundRateLimit(remotePeer);
+          this.enforceGlobalInboundRateLimit();
         } catch {
           this.log.warn('inbound rate limit exceeded, dropping stream', { peerId: remotePeer });
           try { await stream.close(); } catch { /* ignore */ }
@@ -676,11 +699,23 @@ export class MessagingService {
   }): Promise<void> {
     const { stream, connection } = incoming;
     try {
+      // Rate limit DID announcements to prevent mapping table poisoning
+      const remotePeerId = connection.remotePeer?.toString();
+      if (remotePeerId) {
+        try {
+          this.enforceInboundRateLimit(remotePeerId);
+          this.enforceGlobalInboundRateLimit();
+        } catch {
+          this.log.warn('announce rate limit exceeded, dropping', { peerId: remotePeerId });
+          try { await stream.close(); } catch { /* ignore */ }
+          return;
+        }
+      }
+
       const raw = await readStream(stream.source, 1024); // DID announces are tiny
       await stream.close();
 
       const msg = JSON.parse(raw.toString('utf-8')) as { did?: string };
-      const remotePeerId = connection.remotePeer?.toString();
 
       // Validate DID format to prevent spoofing / garbage entries
       if (msg.did && !DID_PATTERN.test(msg.did)) {
@@ -829,8 +864,21 @@ export class MessagingService {
     stream: StreamDuplex;
     connection: { remotePeer?: { toString: () => string } };
   }): Promise<void> {
-    const { stream } = incoming;
+    const { stream, connection } = incoming;
     try {
+      // Rate limit receipts to prevent receipt flooding
+      const remotePeerId = connection.remotePeer?.toString();
+      if (remotePeerId) {
+        try {
+          this.enforceInboundRateLimit(remotePeerId);
+          this.enforceGlobalInboundRateLimit();
+        } catch {
+          this.log.warn('receipt rate limit exceeded, dropping', { peerId: remotePeerId });
+          try { await stream.close(); } catch { /* ignore */ }
+          return;
+        }
+      }
+
       const raw = await readStream(stream.source);
       await stream.close();
 

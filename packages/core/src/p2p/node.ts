@@ -99,7 +99,7 @@ type Libp2pNode = {
   addEventListener?: (type: string, listener: (event: unknown) => void) => void;
   services?: Libp2pNodeServices;
   peerStore?: PeerStoreLike;
-  handle?: (protocol: string, handler: StreamHandler) => Promise<void>;
+  handle?: (protocol: string, handler: StreamHandler, options?: { maxInboundStreams?: number; maxOutboundStreams?: number }) => Promise<void>;
   unhandle?: (protocol: string) => Promise<void>;
   dialProtocol?: (peerId: unknown, protocol: string) => Promise<StreamDuplex>;
 };
@@ -196,7 +196,9 @@ export class P2PNode {
         tcp(),
         ...(this.config.enableCircuitRelay ? [circuitRelayTransport()] : []),
       ],
-      streamMuxers: [yamux()],
+      streamMuxers: [yamux({
+        maxInboundStreams: this.config.yamuxMaxInboundStreams ?? 256,
+      })],
       connectionEncrypters: [noise()],
       peerDiscovery: [
         // mDNS: discovers all peers on the same LAN / Docker bridge network
@@ -474,11 +476,15 @@ export class P2PNode {
    * Register a stream protocol handler.
    * When a remote peer opens a stream for the given protocol ID, `handler` is called.
    */
-  async handleProtocol(protocol: string, handler: StreamHandler): Promise<void> {
+  async handleProtocol(
+    protocol: string,
+    handler: StreamHandler,
+    options?: { maxInboundStreams?: number; maxOutboundStreams?: number },
+  ): Promise<void> {
     if (!this.node?.handle) {
       throw new Error('node not started or does not support handle()');
     }
-    await this.node.handle(protocol, handler);
+    await this.node.handle(protocol, handler, options);
   }
 
   /**
