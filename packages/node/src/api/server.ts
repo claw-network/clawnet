@@ -31,6 +31,7 @@ import { devRoutes } from './routes/dev.js';
 import { adminRoutes } from './routes/admin.js';
 import { nonceRoutes } from './routes/nonce.js';
 import { messagingRoutes } from './routes/messaging.js';
+import { authRoutes } from './routes/auth.js';
 
 export { ApiServerConfig } from './types.js';
 export type { RuntimeContext } from './types.js';
@@ -59,6 +60,7 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/markets/search', marketsSearchRoutes(ctx));
   api.mount('/api/v1/nonce', nonceRoutes(ctx));
   api.mount('/api/v1/messaging', messagingRoutes(ctx));
+  api.mount('/api/v1/auth', authRoutes(ctx));
 
   // Dev routes (faucet, etc.) are NOT available on mainnet — prevents unauthorized minting.
   if (ctx.config.network !== 'mainnet') {

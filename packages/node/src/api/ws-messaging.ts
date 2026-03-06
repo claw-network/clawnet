@@ -23,11 +23,39 @@ import type { ApiKeyStore } from './api-key-store.js';
 
 const WS_PATH = '/api/v1/messaging/subscribe';
 const HEARTBEAT_INTERVAL_MS = 30_000;
-const TOPIC_PATTERN = /^[a-zA-Z0-9._\-:/]{1,128}$/;
+/** Validates a single topic segment (allows trailing `*` for prefix matching). */
+const TOPIC_PATTERN = /^[a-zA-Z0-9._\-:/]{1,127}\*?$/;
+
+/**
+ * Parse a topic filter string into a matcher function.
+ * Supports:
+ * - Exact match: `telagent/envelope`
+ * - Wildcard prefix: `telagent/*` matches any topic starting with `telagent/`
+ * - Comma-separated list: `telagent/envelope,telagent/receipt`
+ */
+function buildTopicMatcher(filter: string): ((topic: string) => boolean) | null {
+  const parts = filter.split(',').map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+
+  for (const part of parts) {
+    if (!TOPIC_PATTERN.test(part)) return null; // invalid
+  }
+
+  const matchers = parts.map(part => {
+    if (part.endsWith('*')) {
+      const prefix = part.slice(0, -1);
+      return (topic: string) => topic.startsWith(prefix);
+    }
+    return (topic: string) => topic === part;
+  });
+
+  return (topic: string) => matchers.some(m => m(topic));
+}
 
 interface WsClient {
   ws: WebSocket;
   topicFilter?: string;
+  matchTopic?: (topic: string) => boolean;
   alive: boolean;
 }
 
@@ -94,12 +122,17 @@ export function attachWebSocketHandler(
     const sinceSeqParam = url.searchParams.get('sinceSeq');
 
     // Validate topic filter format
-    if (topicParam && !TOPIC_PATTERN.test(topicParam)) {
-      ws.close(4001, 'Invalid topic filter');
-      return;
+    let matchTopic: ((topic: string) => boolean) | undefined;
+    if (topicParam) {
+      const matcher = buildTopicMatcher(topicParam);
+      if (!matcher) {
+        ws.close(4001, 'Invalid topic filter');
+        return;
+      }
+      matchTopic = matcher;
     }
 
-    const client: WsClient = { ws, topicFilter: topicParam, alive: true };
+    const client: WsClient = { ws, topicFilter: topicParam, matchTopic, alive: true };
     clients.add(client);
 
     // Track pong responses for stale connection detection
@@ -108,7 +141,7 @@ export function attachWebSocketHandler(
     // Register inbox subscriber on the messaging service
     const svc = getMessagingService();
     const subscriber = (msg: InboxMessage) => {
-      if (client.topicFilter && msg.topic !== client.topicFilter) return;
+      if (client.matchTopic && !client.matchTopic(msg.topic)) return;
       if (ws.readyState !== ws.OPEN) return;
       const frame = msg.topic === '_receipt'
         ? { type: 'receipt', data: JSON.parse(msg.payload) }

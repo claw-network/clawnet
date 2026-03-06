@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/cli",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "bin": {
@@ -12,10 +12,10 @@
     "lint": "eslint src --max-warnings=0"
   },
   "dependencies": {
-    "@claw-network/core": "workspace:^0.1.0",
-    "@claw-network/protocol": "workspace:^0.1.0",
-    "@claw-network/node": "workspace:^0.1.0",
-    "@claw-network/sdk": "workspace:^0.2.0",
+    "@claw-network/core": "workspace:^",
+    "@claw-network/protocol": "workspace:^",
+    "@claw-network/node": "workspace:^",
+    "@claw-network/sdk": "workspace:^",
     "ethers": "^6.13.0"
   }
 }
