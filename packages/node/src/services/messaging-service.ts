@@ -28,6 +28,13 @@ import { gzipSync, gunzipSync } from 'node:zlib';
 const PROTO_DM = '/clawnet/1.0.0/dm';
 const PROTO_DID_ANNOUNCE = '/clawnet/1.0.0/did-announce';
 const PROTO_RECEIPT = '/clawnet/1.0.0/receipt';
+const PROTO_DID_RESOLVE = '/clawnet/1.0.0/did-resolve';
+
+/** Timeout for DID resolve queries (ms). */
+const DID_RESOLVE_TIMEOUT_MS = 5_000;
+
+/** Maximum number of peers to query in parallel for DID resolve. */
+const DID_RESOLVE_MAX_PEERS = 3;
 
 /** Maximum payload size in bytes (64 KB). */
 const MAX_PAYLOAD_BYTES = 65_536;
@@ -214,6 +221,9 @@ export class MessagingService {
     await this.p2p.handleProtocol(PROTO_RECEIPT, (incoming) => {
       void this.handleDeliveryReceipt(incoming);
     }, { maxInboundStreams: 64 });
+    await this.p2p.handleProtocol(PROTO_DID_RESOLVE, (incoming) => {
+      void this.handleDidResolve(incoming);
+    }, { maxInboundStreams: 128 });
 
     // When a new peer connects, exchange DID announcements
     this.p2p.onPeerDisconnect(() => {
@@ -251,6 +261,9 @@ export class MessagingService {
     try {
       await this.p2p.unhandleProtocol(PROTO_RECEIPT);
     } catch { /* ignore */ }
+    try {
+      await this.p2p.unhandleProtocol(PROTO_DID_RESOLVE);
+    } catch { /* ignore */ }
     this.subscribers.clear();
   }
 
@@ -283,6 +296,21 @@ export class MessagingService {
       const delivered = await this.deliverDirect(peerId, targetDid, topic, encoded, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
       if (delivered) {
         return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
+      }
+    }
+
+    // DID unknown locally — ask connected peers (bootstrap/others) to resolve
+    if (!peerId) {
+      const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
+      if (resolvedPeerId) {
+        this.registerDidPeer(targetDid, resolvedPeerId);
+        try {
+          await this.p2p.dialPeer(resolvedPeerId);
+        } catch { /* peer may already be connected or unreachable */ }
+        const delivered = await this.deliverDirect(resolvedPeerId, targetDid, topic, encoded, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
+        if (delivered) {
+          return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
+        }
       }
     }
 
@@ -739,6 +767,92 @@ export class MessagingService {
     }
   }
 
+  // ── Private: DID Resolve Protocol ────────────────────────────
+
+  private async handleDidResolve(incoming: {
+    stream: StreamDuplex;
+    connection: { remotePeer?: { toString: () => string } };
+  }): Promise<void> {
+    const { stream, connection } = incoming;
+    try {
+      const remotePeerId = connection.remotePeer?.toString();
+      if (remotePeerId) {
+        try {
+          this.enforceInboundRateLimit(remotePeerId);
+          this.enforceGlobalInboundRateLimit();
+        } catch {
+          this.log.warn('resolve rate limit exceeded, dropping', { peerId: remotePeerId });
+          try { await stream.close(); } catch { /* ignore */ }
+          return;
+        }
+      }
+
+      const raw = await readStream(stream.source, 1024);
+      const msg = JSON.parse(raw.toString('utf-8')) as { did?: string };
+
+      if (!msg.did || !DID_PATTERN.test(msg.did)) {
+        await writeStream(stream.sink, JSON.stringify({ did: msg.did ?? '', found: false }));
+        await stream.close();
+        return;
+      }
+
+      const peerId = this.didToPeerId.get(msg.did);
+      const response = peerId
+        ? { did: msg.did, peerId, found: true }
+        : { did: msg.did, found: false };
+
+      await writeStream(stream.sink, JSON.stringify(response));
+      await stream.close();
+      this.log.info('DID resolve handled', { did: msg.did, found: !!peerId });
+    } catch (err) {
+      this.log.warn('failed to handle DID resolve', { error: (err as Error).message });
+      try { await stream.close(); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Query connected peers to resolve an unknown DID → PeerId.
+   * Sends DID resolve requests to up to DID_RESOLVE_MAX_PEERS peers concurrently.
+   * Returns the first PeerId found, or null if none of the queried peers know the DID.
+   */
+  private async resolveDidViaPeers(targetDid: string): Promise<string | null> {
+    const connectedPeers = this.p2p.getConnections().slice(0, DID_RESOLVE_MAX_PEERS);
+    if (connectedPeers.length === 0) return null;
+
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('resolve timeout')), DID_RESOLVE_TIMEOUT_MS);
+    });
+
+    try {
+      const result = await Promise.race([
+        Promise.any(
+          connectedPeers.map(async (peerId) => {
+            let stream: StreamDuplex | null = null;
+            try {
+              stream = await this.p2p.newStream(peerId, PROTO_DID_RESOLVE);
+              await writeStream(stream.sink, JSON.stringify({ did: targetDid }));
+              const raw = await readStream(stream.source, 1024, DID_RESOLVE_TIMEOUT_MS);
+              await stream.close();
+              const resp = JSON.parse(raw.toString('utf-8')) as { did: string; peerId?: string; found: boolean };
+              if (resp.found && resp.peerId) return resp.peerId;
+              throw new Error('not found');
+            } catch (err) {
+              if (stream) { try { await stream.close(); } catch { /* ignore */ } }
+              throw err;
+            }
+          }),
+        ),
+        timeout,
+      ]);
+      return result;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer!);
+    }
+  }
+
   /** Announce our DID to a specific peer. */
   private async announceDidToPeer(peerId: string): Promise<void> {
     let stream: StreamDuplex | null = null;
@@ -800,6 +914,20 @@ export class MessagingService {
               return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
             }
           }
+
+          // DID unknown — try resolve via connected peers
+          if (!peerId) {
+            const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
+            if (resolvedPeerId) {
+              this.registerDidPeer(targetDid, resolvedPeerId);
+              try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
+              const delivered = await this.deliverDirect(resolvedPeerId, targetDid, topic, payload, ttlSec, priority, compressed, encrypted, idempotencyKey);
+              if (delivered) {
+                return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
+              }
+            }
+          }
+
           const messageId = this.store.addToOutbox({ targetDid, topic, payload, ttlSec, priority });
           return { targetDid, messageId, delivered: false, compressed, encrypted };
         }),
