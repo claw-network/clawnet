@@ -5,6 +5,11 @@ import { join } from 'node:path';
 import { MessagingService } from '../src/services/messaging-service.js';
 import { MessageStore } from '../src/services/message-store.js';
 import type { P2PNode, StreamDuplex } from '@claw-network/core';
+import {
+  encodeDidResolveRequestBytes,
+  encodeDidResolveResponseBytes,
+  decodeDidResolveResponseBytes,
+} from '@claw-network/protocol/messaging';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -13,21 +18,21 @@ const BOB_DID = 'did:claw:zHk7Xc4fR2mP9Qa3UjLBvN6wDS8Yt1eK5oAGnE35CrTbf';
 const PEER_BOOTSTRAP = '12D3KooWBootstrap';
 const PEER_BOB = '12D3KooWBob';
 
-/** Create a fake stream that returns the given JSON as source and captures sink writes. */
-function fakeStream(sourceJson: string): StreamDuplex & { written: string[] } {
-  const written: string[] = [];
+/** Create a fake stream that returns binary data as source and captures sink writes. */
+function fakeStream(sourceData: Uint8Array): StreamDuplex & { writtenBytes: Uint8Array[] } {
+  const writtenBytes: Uint8Array[] = [];
   return {
     source: (async function* () {
-      yield Buffer.from(sourceJson, 'utf-8');
+      yield sourceData;
     })(),
     sink: async (iter: AsyncIterable<Uint8Array>) => {
       for await (const chunk of iter) {
-        written.push(Buffer.from(chunk).toString('utf-8'));
+        writtenBytes.push(new Uint8Array(chunk));
       }
     },
     close: vi.fn(async () => {}),
-    written,
-  } as unknown as StreamDuplex & { written: string[] };
+    writtenBytes,
+  } as unknown as StreamDuplex & { writtenBytes: Uint8Array[] };
 }
 
 /** Helper: register a DID→PeerId mapping on the service (bypassing async announce handler). */
@@ -53,7 +58,7 @@ function createMockP2P() {
     onPeerDisconnect: vi.fn(),
     onPeerConnect: vi.fn(),
     getConnections: vi.fn(() => [] as string[]),
-    newStream: vi.fn(async () => fakeStream('{}') as StreamDuplex),
+    newStream: vi.fn(async () => fakeStream(new Uint8Array(0)) as StreamDuplex),
     dialPeer: vi.fn(async () => true),
     _protocolHandlers: protocolHandlers,
   } as unknown as P2PNode & {
@@ -103,7 +108,7 @@ describe('DID Resolve Protocol', () => {
 
       // Now resolve Bob's DID
       const resolveHandler = getResolveHandler()!;
-      const stream = fakeStream(JSON.stringify({ did: BOB_DID }));
+      const stream = fakeStream(encodeDidResolveRequestBytes({ did: BOB_DID }));
       await resolveHandler({
         stream,
         connection: { remotePeer: { toString: () => PEER_BOOTSTRAP } },
@@ -111,10 +116,10 @@ describe('DID Resolve Protocol', () => {
 
       // Wait for async handler to write response
       await vi.waitFor(() => {
-        expect(stream.written.length).toBeGreaterThan(0);
+        expect(stream.writtenBytes.length).toBeGreaterThan(0);
       });
 
-      const resp = JSON.parse(stream.written[0]);
+      const resp = decodeDidResolveResponseBytes(stream.writtenBytes[0]);
       expect(resp.found).toBe(true);
       expect(resp.peerId).toBe(PEER_BOB);
       expect(resp.did).toBe(BOB_DID);
@@ -122,35 +127,35 @@ describe('DID Resolve Protocol', () => {
 
     it('returns found:false when DID is unknown', async () => {
       const resolveHandler = getResolveHandler()!;
-      const stream = fakeStream(JSON.stringify({ did: BOB_DID }));
+      const stream = fakeStream(encodeDidResolveRequestBytes({ did: BOB_DID }));
       await resolveHandler({
         stream,
         connection: { remotePeer: { toString: () => PEER_BOOTSTRAP } },
       });
 
       await vi.waitFor(() => {
-        expect(stream.written.length).toBeGreaterThan(0);
+        expect(stream.writtenBytes.length).toBeGreaterThan(0);
       });
 
-      const resp = JSON.parse(stream.written[0]);
+      const resp = decodeDidResolveResponseBytes(stream.writtenBytes[0]);
       expect(resp.found).toBe(false);
       expect(resp.did).toBe(BOB_DID);
-      expect(resp.peerId).toBeUndefined();
+      expect(resp.peerId).toBe('');
     });
 
     it('returns found:false for invalid DID format', async () => {
       const resolveHandler = getResolveHandler()!;
-      const stream = fakeStream(JSON.stringify({ did: 'invalid-did' }));
+      const stream = fakeStream(encodeDidResolveRequestBytes({ did: 'invalid-did' }));
       await resolveHandler({
         stream,
         connection: { remotePeer: { toString: () => PEER_BOOTSTRAP } },
       });
 
       await vi.waitFor(() => {
-        expect(stream.written.length).toBeGreaterThan(0);
+        expect(stream.writtenBytes.length).toBeGreaterThan(0);
       });
 
-      const resp = JSON.parse(stream.written[0]);
+      const resp = decodeDidResolveResponseBytes(stream.writtenBytes[0]);
       expect(resp.found).toBe(false);
     });
   });
@@ -163,10 +168,10 @@ describe('DID Resolve Protocol', () => {
       p2p.getConnections.mockReturnValue([PEER_BOOTSTRAP]);
       p2p.newStream.mockImplementation(async (_peerId: string, proto: string) => {
         if (proto === '/clawnet/1.0.0/did-resolve') {
-          return fakeStream(JSON.stringify({ did: BOB_DID, peerId: PEER_BOB, found: true }));
+          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB, found: true }));
         }
         // DM stream — capture but don't fail
-        return fakeStream('{}');
+        return fakeStream(new Uint8Array(0));
       });
       p2p.dialPeer.mockResolvedValue(true);
 
@@ -181,9 +186,9 @@ describe('DID Resolve Protocol', () => {
       p2p.getConnections.mockReturnValue([PEER_BOOTSTRAP]);
       p2p.newStream.mockImplementation(async (_peerId: string, proto: string) => {
         if (proto === '/clawnet/1.0.0/did-resolve') {
-          return fakeStream(JSON.stringify({ did: BOB_DID, found: false }));
+          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, found: false, peerId: '' }));
         }
-        return fakeStream('{}');
+        return fakeStream(new Uint8Array(0));
       });
 
       const result = await service.send(BOB_DID, 'test/topic', 'hello');
@@ -248,12 +253,12 @@ describe('DID Resolve Protocol', () => {
             throw new Error('connection reset');
           }
           // Second DM attempt (to new PEER_BOB_NEW) succeeds
-          return fakeStream('{}');
+          return fakeStream(new Uint8Array(0));
         }
         if (proto === '/clawnet/1.0.0/did-resolve') {
-          return fakeStream(JSON.stringify({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true }));
+          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true }));
         }
-        return fakeStream('{}');
+        return fakeStream(new Uint8Array(0));
       });
       p2p.dialPeer.mockResolvedValue(true);
 
@@ -276,9 +281,9 @@ describe('DID Resolve Protocol', () => {
           throw new Error('connection reset');
         }
         if (proto === '/clawnet/1.0.0/did-resolve') {
-          return fakeStream(JSON.stringify({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true }));
+          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true }));
         }
-        return fakeStream('{}');
+        return fakeStream(new Uint8Array(0));
       });
 
       const result = await service.send(BOB_DID, 'test/topic', 'hello');

@@ -1,0 +1,49 @@
+// FlatBuffers schema for ClawNet P2P messaging protocols.
+// Replaces JSON serialization for all messaging stream protocols.
+
+namespace clawnet.messaging;
+
+// ── /clawnet/1.0.0/dm ────────────────────────────────────────
+
+table DirectMessage {
+  source_did:string;        // did:claw:z... of sender
+  target_did:string;        // did:claw:z... of recipient (optional, defaults to stream peer)
+  topic:string;             // channel name, e.g. "telagent/envelope"
+  payload:[ubyte];          // raw bytes: UTF-8 text, gzip bytes, or binary E2E envelope
+  ttl_sec:uint;             // time-to-live in seconds (default 86400)
+  sent_at_ms:ulong;         // sender timestamp (Unix ms)
+  priority:ubyte;           // 0=LOW, 1=NORMAL, 2=HIGH, 3=URGENT
+  compressed:bool;          // true if payload is gzip-compressed raw bytes
+  encrypted:bool;           // true if payload is binary E2E encrypted envelope
+  idempotency_key:string;   // deduplication key (optional)
+}
+
+// ── /clawnet/1.0.0/receipt ───────────────────────────────────
+
+table DeliveryReceipt {
+  type:ubyte;               // 0 = delivered
+  message_id:string;
+  recipient_did:string;     // who received the message
+  sender_did:string;        // original sender
+  delivered_at_ms:ulong;
+}
+
+// ── /clawnet/1.0.0/did-announce ──────────────────────────────
+
+table DidAnnounce {
+  did:string;               // did:claw:z... of announcing peer
+}
+
+// ── /clawnet/1.0.0/did-resolve ───────────────────────────────
+
+table DidResolveRequest {
+  did:string;               // DID to look up
+}
+
+table DidResolveResponse {
+  did:string;
+  peer_id:string;           // libp2p PeerId (present only when found=true)
+  found:bool;
+}
+
+root_type DirectMessage;
