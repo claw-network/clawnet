@@ -1,7 +1,7 @@
 # RFC: TelAgent 消息通信迁移至 ClawNet P2P 层
 
-- 文档版本：v0.5（Phase 3 增强功能实现后更新）
-- 状态：**ClawNet messaging API Phase 1 + Phase 2 + Phase 3 已全部实现**，TelAgent 可开始适配
+- 文档版本：v0.6（Phase 4 P2P 健壮性增强后更新）
+- 状态：**ClawNet messaging API Phase 1 + Phase 2 + Phase 3 + Phase 4 已全部实现**，TelAgent 可开始适配
 - 作者：TelAgent 团队
 - 审阅 & 实现：ClawNet 项目组
 - 日期：2026-03-06
@@ -68,10 +68,10 @@ NAT 后面 ✓          ✓ 无需公网 IP          NAT 后面 ✓
 
 **核心优势**：
 
-- NAT 穿透：ClawNet P2P 层已具备部分 NAT 穿透能力（autoNAT + dcutr hole-punching），但**尚未配置 circuit relay 中继节点**，对称 NAT (Symmetric NAT) 场景下双方均在 NAT 后面时无法直连。需要 ClawNet 在 bootstrap 节点上启用 `@libp2p/circuit-relay-v2` 服务端，才能覆盖所有 NAT 场景。
-- 去中心化路由：无需 DNS、无需 TLS 证书、无需公网 IP（在 relay 启用后）
-- DID 原生寻址：用 DID 直接寻址，无需域名映射（**注意：ClawNet 当前没有 DID → PeerId 的映射机制，需要新建——见下方 §3.5**）
-- 离线中继：**当前不支持**。ClawNet P2P 层是实时 GossipSub + Stream，不具备 store-and-forward 能力。离线暂存需要新建 mailbox 服务（见 §3.1.3 的修订）
+- NAT 穿透：ClawNet P2P 层具备完整 NAT 穿透能力——autoNAT + dcutr hole-punching + **circuit relay 中继**（Phase 2 已在 bootstrap 节点启用 `@libp2p/circuit-relay-v2` 服务端），覆盖包括对称 NAT 在内的所有 NAT 场景。
+- 去中心化路由：无需 DNS、无需 TLS 证书、无需公网 IP
+- DID 原生寻址：用 DID 直接寻址，无需域名映射。DID→PeerId 映射通过 `/clawnet/1.0.0/did-announce`（连接时自动交换）和 `/clawnet/1.0.0/did-resolve`（主动查询）两个协议实现，映射持久化到 SQLite 并带 30min TTL 自动刷新。
+- 离线暂存：**已支持**。目标节点离线时消息自动进入 outbox（SQLite），peer 上线后并行 flush 投递，遵循 TTL 自动清理。
 
 ---
 
@@ -285,7 +285,7 @@ ClawNet 自身的业务消息可使用 `clawnet/*` 命名空间。
 
 ### 3.4 增强能力（已全部实现）
 
-以下能力在 Phase 2 和 Phase 3 中已全部实现：
+以下能力在 Phase 2、Phase 3 和 Phase 4 中已全部实现：
 
 | 能力 | 状态 | 说明 |
 |------|------|------|
@@ -296,6 +296,13 @@ ClawNet 自身的业务消息可使用 `clawnet/*` 命名空间。
 | **传输层 E2E 加密** | ✅ Phase 3 | X25519 + HKDF + AES-256-GCM，可选对载荷进行传输层加密 |
 | **消息压缩** | ✅ Phase 3 | 载荷 > 1 KB 时自动 gzip 压缩，减少带宽消耗 |
 | **WS 断线重连补发** | ✅ Phase 3 | 通过 `sinceSeq` 参数在 WS 重连后补发遗漏消息 |
+| **DID Resolve 介绍协议** | ✅ Phase 4 | 通过 bootstrap/peers 解析未知 DID→PeerId，首次消息无需等待 announce |
+| **DID 映射 TTL 刷新** | ✅ Phase 4 | 30 分钟 TTL，投递失败时自动重新解析过期映射 |
+| **DID→PeerId 持久化** | ✅ Phase 4 | SQLite did_peers 表持久化映射+时间戳，重启后恢复 |
+| **多播 per-recipient E2E 加密** | ✅ Phase 4 | 批量发送时为每个收件人独立加密 |
+| **SQLite 共享速率限制** | ✅ Phase 4 | 速率限制持久化到 SQLite，进程重启后限流状态不丢失 |
+| **Bootstrap 洪泛防护** | ✅ Phase 4 | 全局入站速率限制、流超时、yamux stream 限制、Docker 资源限制 |
+| **并行 outbox flush** | ✅ Phase 4 | outbox 逐条发送改为并行 flush，加速离线消息投递 |
 | **流量控制** | ⏳ 待定 | 当接收方处理不过来时的背压机制 |
 
 ---
@@ -458,7 +465,7 @@ routeHint: {
 
 ---
 
-## 附录 C：ClawNet 实现说明（v0.3 新增）
+## 附录 C：ClawNet 实现说明（v0.6 更新）
 
 > **本节由 ClawNet 项目组编写。Messaging API 已实现并合入主分支，TelAgent 可立即开始适配。**
 
@@ -469,7 +476,7 @@ routeHint: {
 | **发送消息** (`POST /api/v1/messaging/send`) | ✅ 已实现 | 通过 P2P libp2p stream 直接投递到目标 DID |
 | **接收消息** (`GET /api/v1/messaging/inbox`) | ✅ 已实现 | 轮询接口，支持 topic/since/limit 过滤 |
 | **确认消息** (`DELETE /api/v1/messaging/inbox/:messageId`) | ✅ 已实现 | 确认后消息从 inbox 中移除 |
-| **DID→PeerId 解析** | ✅ 已实现 | 自定义 `/clawnet/1.0.0/did-announce` 协议，peer 连接时自动交换 DID |
+| **DID→PeerId 解析** | ✅ 已实现 | `/clawnet/1.0.0/did-announce` (连接时交换) + `/clawnet/1.0.0/did-resolve` (主动查询) |
 | **离线暂存 + 自动重投** | ✅ 已实现 | 目标离线时消息进入 outbox，peer 重连后自动投递 |
 | **TTL 自动清理** | ✅ 已实现 | 每 5 分钟清理过期消息（inbox + outbox） |
 | **Topic 命名空间** | ✅ 已实现 | 任意 topic 字符串，建议 `telagent/*` |
@@ -484,6 +491,12 @@ routeHint: {
 | **消息压缩** | ✅ Phase 3 已实现 | `compress: true` 时载荷 > 1 KB 自动 gzip 压缩，接收方自动解压 |
 | **QoS 优先级队列** | ✅ Phase 3 已实现 | `priority` 参数 (0-3)，inbox/outbox 按优先级排序投递 |
 | **WS 断线重连补发** | ✅ Phase 3 已实现 | `sinceSeq` 查询参数，WS 重连后自动补发遗漏消息 + `replay_done` 帧 |
+| **DID Resolve 介绍协议** | ✅ Phase 4 已实现 | `/clawnet/1.0.0/did-resolve` 协议，向 peers 查询未知 DID→PeerId |
+| **DID 映射 TTL 刷新** | ✅ Phase 4 已实现 | 30min TTL，投递失败+映射过期时自动 re-resolve 获取新 PeerId |
+| **多播 per-recipient E2E 加密** | ✅ Phase 4 已实现 | 批量发送时通过 `recipientKeys` 为每个收件人独立加密 |
+| **SQLite 共享速率限制** | ✅ Phase 4 已实现 | `rate_limits` 表持久化滑动窗口事件，进程重启后限流状态延续 |
+| **Bootstrap 洪泛防护** | ✅ Phase 4 已实现 | 全局入站速率限制 3000/min + per-peer 300/min + 流超时 10s + Docker 资源限制 |
+| **并行 outbox flush** | ✅ Phase 4 已实现 | outbox 消息并行投递（bounded concurrency=20），加速离线消息重投 |
 
 ### C.2 SDK 接口（最终版）
 
@@ -692,18 +705,23 @@ X-Api-Key: <api-key>
 消息在 P2P 层以 JSON 格式传输（不做额外加密，libp2p noise 已提供传输加密）。  
 载荷大小限制：**64 KB**。
 
-### C.5 离线暂存机制
+### C.5 离线暂存与 DID 解析机制
 
 ```
 TelAgent A → POST /send → clawnetd A
                             │
                             ├── 目标 PeerId 已知且在线？
                             │     ├── 是 → 打开 /clawnet/1.0.0/dm stream → 直接投递 → delivered=true
-                            │     └── 否 → 存入 outbox (SQLite) → delivered=false
+                            │     │        └── 投递失败且映射超过 30min？
+                            │     │              ├── 是 → did-resolve 重新查询 → 拿到新 PeerId → 重试投递
+                            │     │              └── 否 → 存入 outbox
+                            │     └── 否 → did-resolve 向已连接 peers 查询（最多 3 个，5s 超时）
+                            │           ├── 查到 → registerDidPeer + dialPeer + deliverDirect → delivered=true
+                            │           └── 未查到 → 存入 outbox (SQLite) → delivered=false
                             │
                             └── 目标 peer 上线时 (peer:connect event)
                                   ├── 交换 DID (did-announce 协议)
-                                  └── flush outbox → 逐条投递 → 成功后从 outbox 删除
+                                  └── flush outbox → 并行投递 → 成功后从 outbox 删除
 ```
 
 - 每条消息最多重试 50 次
@@ -1023,3 +1041,114 @@ WS 连接 #2 (重连):
 2. 每条消息更新 `lastSeq = msg.seq`
 3. 重连时带上 `?sinceSeq=<lastSeq>`
 4. 收到 `replay_done` 后进入正常实时模式
+
+### C.9 Phase 4 P2P 健壮性增强总结（v0.6）
+
+Phase 4 聚焦于 P2P 层健壮性和 DID 发现机制的完善。全部已实现并通过测试（217 tests passing across 24 test files）。
+
+#### DID Resolve 介绍协议
+
+**问题**：当节点 A 首次向节点 B 发消息，但 A 不知道 B 的 PeerId 时（B 从未连过 A），消息只能进 outbox 等待 B 碰巧上线并 announce 自己。
+
+**方案**：新增 `/clawnet/1.0.0/did-resolve` 协议，让节点主动向已连接的 peers（尤其是 bootstrap）查询未知 DID 的 PeerId。Bootstrap 拥有最完整的映射表（所有新节点都会连它并 announce）。
+
+```
+send(targetDid):
+  1. didToPeerId.get(targetDid)  → 找到 → 直连
+  2.【新增】resolveDidViaPeers(targetDid) → 向已连接 peers 查询
+     - 最多并发查 3 个节点，5s 超时
+     - 拿到 peerId → dialPeer(peerId) → deliverDirect()
+  3. 都失败 → 进 outbox（保持现有兜底）
+```
+
+**协议格式**：
+
+```jsonc
+// 请求 (client → server)
+{ "did": "did:claw:z..." }
+
+// 响应 (server → client)
+{ "did": "did:claw:z...", "peerId": "12D3KooW...", "found": true }
+// 或
+{ "did": "did:claw:z...", "found": false }
+```
+
+**安全措施**：
+- DID 格式校验后才查表，防止注入
+- 复用 inbound rate limit（per-peer 300/min + global 3000/min）
+- 只返回 PeerId（不泄露 multiaddrs，地址由 KadDHT/peerStore 负责）
+- 5s 超时，resolve 失败不阻塞 `send()`
+
+#### DID→PeerId 映射 TTL 刷新
+
+**问题**：节点重启后 PeerId 可能改变，但旧的 DID→PeerId 映射仍在本地缓存，导致投递持续失败。
+
+**方案**：为映射加 30 分钟 TTL。当 `deliverDirect()` 投递失败且映射超过 TTL 时，自动触发 re-resolve：
+
+```
+deliverDirect(targetDid) 失败：
+  映射 < 30min → 直接进 outbox（映射还新鲜，可能是临时网络问题）
+  映射 > 30min → resolveDidViaPeers(targetDid)
+    → 新 PeerId ≠ 旧 PeerId → registerDidPeer + dialPeer + 重试投递
+    → 新 PeerId = 旧 PeerId 或查不到 → 进 outbox
+```
+
+**实现细节**：
+- `didPeerUpdatedAt` Map 追踪每个映射的最后确认时间
+- `isStalePeerMapping(did)` 检查映射是否超过 `DID_PEER_TTL_MS`（30min）
+- `getAllDidPeers()` 现在返回 `updatedAtMs` 字段，重启后时间戳从 SQLite 恢复
+- `registerDidPeer()` 每次更新时同时更新内存时间戳和 SQLite `updated_at_ms`
+
+#### DID→PeerId 持久化
+
+映射持久化到 SQLite `did_peers` 表，重启后自动恢复：
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `did` | TEXT PK | DID 标识 |
+| `peer_id` | TEXT | 对应的 libp2p PeerId |
+| `updated_at_ms` | INTEGER | 映射最后确认时间（用于 TTL 判断） |
+
+#### 多播 per-recipient E2E 加密
+
+批量发送时，通过 `recipientKeys` Map（DID → X25519 公钥 hex）为每个收件人独立加密载荷，防止群组消息被非目标节点解密。
+
+#### SQLite 共享速率限制
+
+速率限制事件持久化到 SQLite `rate_limits` 表（滑动窗口），进程重启后限流状态延续。三级限制：
+
+| 级别 | Bucket 前缀 | 限额 |
+|------|------------|------|
+| 出站 per-DID | `out:<did>` | 600/min |
+| 入站 per-peer | `in:<peerId>` | 300/min |
+| 入站 全局汇总 | `in:_global` | 3000/min |
+
+#### Bootstrap 洪泛防护
+
+专用 `BOOTSTRAP_P2P_CONFIG` 配置，降低 bootstrap 节点被恶意 peer 攻击的风险：
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `floodPublish` | `false` | 不向所有连接广播 GossipSub 消息 |
+| `maxConnections` | `500` | 当前默认 100 |
+| `yamuxMaxInboundStreams` | `128` | 限制每个连接的流数量（默认 256） |
+| Stream read timeout | `10s` | 慢/挂起的流自动终止 |
+| Per-protocol `maxInboundStreams` | 64-256 | 各协议独立限制 |
+| Docker resource limits | 2G memory / 2 CPU | 容器级硬限制 |
+
+#### 并行 Outbox Flush
+
+outbox 消息改为 bounded concurrency（`MULTICAST_CONCURRENCY=20`）并行投递，显著加速离线消息重投。此前为逐条串行。
+
+#### 文件变更清单
+
+| 文件 | 变更 |
+|------|------|
+| `packages/node/src/services/messaging-service.ts` | DID resolve 协议 handler + client, TTL 机制, multicast resolve, per-recipient E2E, 并行 flush |
+| `packages/node/src/services/message-store.ts` | `getAllDidPeers()` 返回 `updatedAtMs` |
+| `packages/core/src/p2p/config.ts` | `BOOTSTRAP_P2P_CONFIG` 配置 |
+| `packages/core/src/p2p/node.ts` | `handleProtocol()` 支持 `maxInboundStreams` option |
+| `packages/node/test/messaging-did-resolve.test.ts` | 11 个测试覆盖 resolve handler/client/TTL/timeout |
+| `packages/node/test/message-store.test.ts` | 28 个测试（含 did_peers + rate_limits） |
+| `packages/core/test/p2p-config.test.ts` | 5 个测试覆盖 BOOTSTRAP_P2P_CONFIG |
+| `docker-compose.*.yml` (6 files) | 所有 compose 文件添加 Docker resource limits |

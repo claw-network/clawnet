@@ -350,10 +350,10 @@ export class MessageStore {
     ).run(did, peerId, Date.now());
   }
 
-  /** Load all persisted DID → PeerId mappings. */
-  getAllDidPeers(): Array<{ did: string; peerId: string }> {
-    const rows = this.db.prepare('SELECT did, peer_id FROM did_peers').all() as Array<{ did: string; peer_id: string }>;
-    return rows.map((r) => ({ did: r.did, peerId: r.peer_id }));
+  /** Load all persisted DID → PeerId mappings (including update timestamps for TTL). */
+  getAllDidPeers(): Array<{ did: string; peerId: string; updatedAtMs: number }> {
+    const rows = this.db.prepare('SELECT did, peer_id, updated_at_ms FROM did_peers').all() as Array<{ did: string; peer_id: string; updated_at_ms: number }>;
+    return rows.map((r) => ({ did: r.did, peerId: r.peer_id, updatedAtMs: r.updated_at_ms }));
   }
 
   /** Remove a DID mapping (e.g. when a peer is permanently gone). */

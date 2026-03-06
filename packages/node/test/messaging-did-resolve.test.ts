@@ -30,7 +30,18 @@ function fakeStream(sourceJson: string): StreamDuplex & { written: string[] } {
   } as unknown as StreamDuplex & { written: string[] };
 }
 
-/** Create a mock P2PNode with the methods MessagingService needs. */
+/** Helper: register a DID→PeerId mapping on the service (bypassing async announce handler). */
+function registerDid(svc: MessagingService, did: string, peerId: string): void {
+  // Access private maps directly for test setup
+  const s = svc as unknown as {
+    didToPeerId: Map<string, string>;
+    peerIdToDid: Map<string, string>;
+    didPeerUpdatedAt: Map<string, number>;
+  };
+  s.didToPeerId.set(did, peerId);
+  s.peerIdToDid.set(peerId, did);
+  s.didPeerUpdatedAt.set(did, Date.now());
+}
 function createMockP2P() {
   const protocolHandlers = new Map<string, (incoming: unknown) => void>();
 
@@ -87,13 +98,8 @@ describe('DID Resolve Protocol', () => {
     });
 
     it('returns found:true with peerId when DID is known', async () => {
-      // Simulate a DID announce so Alice knows about Bob
-      const announceHandler = p2p._protocolHandlers.get('/clawnet/1.0.0/did-announce');
-      const announceStream = fakeStream(JSON.stringify({ did: BOB_DID }));
-      await announceHandler!({
-        stream: announceStream,
-        connection: { remotePeer: { toString: () => PEER_BOB } },
-      });
+      // Register Bob's mapping directly
+      registerDid(service, BOB_DID, PEER_BOB);
 
       // Now resolve Bob's DID
       const resolveHandler = getResolveHandler()!;
@@ -217,6 +223,72 @@ describe('DID Resolve Protocol', () => {
       const result = await service.send(BOB_DID, 'test/topic', 'hello');
       expect(result.delivered).toBe(false);
     }, 15_000); // generous test timeout
+  });
+
+  // ── TTL-based stale mapping re-resolve ──────────────────────────
+
+  describe('stale mapping re-resolve', () => {
+    const PEER_BOB_NEW = '12D3KooWBobNew';
+
+    it('re-resolves when delivery fails and mapping is stale', async () => {
+      // Register Bob with current timestamp
+      registerDid(service, BOB_DID, PEER_BOB);
+
+      // Make Date.now() return 31 min later so the mapping appears stale
+      const realNow = Date.now();
+      const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(realNow + 31 * 60_000);
+
+      let dmAttempt = 0;
+      p2p.getConnections.mockReturnValue([PEER_BOOTSTRAP]);
+      p2p.newStream.mockImplementation(async (peerId: string, proto: string) => {
+        if (proto === '/clawnet/1.0.0/dm') {
+          dmAttempt++;
+          if (dmAttempt === 1) {
+            // First DM attempt (to old PEER_BOB) fails
+            throw new Error('connection reset');
+          }
+          // Second DM attempt (to new PEER_BOB_NEW) succeeds
+          return fakeStream('{}');
+        }
+        if (proto === '/clawnet/1.0.0/did-resolve') {
+          return fakeStream(JSON.stringify({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true }));
+        }
+        return fakeStream('{}');
+      });
+      p2p.dialPeer.mockResolvedValue(true);
+
+      const result = await service.send(BOB_DID, 'test/topic', 'hello');
+      dateNowSpy.mockRestore();
+
+      expect(result.delivered).toBe(true);
+      // Should have resolved to the new peerId
+      expect(p2p.dialPeer).toHaveBeenCalledWith(PEER_BOB_NEW);
+    });
+
+    it('does NOT re-resolve when mapping is fresh and delivery fails', async () => {
+      // Register Bob just now (fresh mapping)
+      registerDid(service, BOB_DID, PEER_BOB);
+
+      // DM fails, but mapping is fresh — should NOT attempt resolve, go straight to outbox
+      p2p.getConnections.mockReturnValue([PEER_BOOTSTRAP]);
+      p2p.newStream.mockImplementation(async (_peerId: string, proto: string) => {
+        if (proto === '/clawnet/1.0.0/dm') {
+          throw new Error('connection reset');
+        }
+        if (proto === '/clawnet/1.0.0/did-resolve') {
+          return fakeStream(JSON.stringify({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true }));
+        }
+        return fakeStream('{}');
+      });
+
+      const result = await service.send(BOB_DID, 'test/topic', 'hello');
+
+      expect(result.delivered).toBe(false);
+      // Resolve should NOT have been called since mapping is fresh
+      expect(p2p.newStream).not.toHaveBeenCalledWith(
+        expect.anything(), '/clawnet/1.0.0/did-resolve',
+      );
+    });
   });
 
   // ── Unregister on stop ─────────────────────────────────────────

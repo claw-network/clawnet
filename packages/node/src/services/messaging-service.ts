@@ -36,6 +36,9 @@ const DID_RESOLVE_TIMEOUT_MS = 5_000;
 /** Maximum number of peers to query in parallel for DID resolve. */
 const DID_RESOLVE_MAX_PEERS = 3;
 
+/** DID→PeerId mapping TTL: re-resolve after 30 minutes to handle stale mappings. */
+const DID_PEER_TTL_MS = 30 * 60_000;
+
 /** Maximum payload size in bytes (64 KB). */
 const MAX_PAYLOAD_BYTES = 65_536;
 
@@ -190,6 +193,8 @@ export class MessagingService {
    */
   private readonly didToPeerId = new Map<string, string>();
   private readonly peerIdToDid = new Map<string, string>();
+  /** Tracks when each DID→PeerId mapping was last confirmed (for TTL-based re-resolve). */
+  private readonly didPeerUpdatedAt = new Map<string, number>();
 
   /** WebSocket subscribers that receive real-time inbox pushes. */
   private readonly subscribers = new Set<InboxSubscriber>();
@@ -205,9 +210,10 @@ export class MessagingService {
 
   async start(): Promise<void> {
     // Restore persisted DID→PeerId mappings from SQLite
-    for (const { did, peerId } of this.store.getAllDidPeers()) {
+    for (const { did, peerId, updatedAtMs } of this.store.getAllDidPeers()) {
       this.didToPeerId.set(did, peerId);
       this.peerIdToDid.set(peerId, did);
+      this.didPeerUpdatedAt.set(did, updatedAtMs);
     }
     this.log.info('[messaging] restored DID mappings', { count: this.didToPeerId.size });
 
@@ -296,6 +302,18 @@ export class MessagingService {
       const delivered = await this.deliverDirect(peerId, targetDid, topic, encoded, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
       if (delivered) {
         return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
+      }
+      // Delivery failed — if mapping is stale, try re-resolving
+      if (this.isStalePeerMapping(targetDid)) {
+        const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
+        if (resolvedPeerId && resolvedPeerId !== peerId) {
+          this.registerDidPeer(targetDid, resolvedPeerId);
+          try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
+          const reDelivered = await this.deliverDirect(resolvedPeerId, targetDid, topic, encoded, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
+          if (reDelivered) {
+            return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
+          }
+        }
       }
     }
 
@@ -913,6 +931,18 @@ export class MessagingService {
             if (delivered) {
               return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
             }
+            // Delivery failed — if mapping is stale, try re-resolving
+            if (this.isStalePeerMapping(targetDid)) {
+              const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
+              if (resolvedPeerId && resolvedPeerId !== peerId) {
+                this.registerDidPeer(targetDid, resolvedPeerId);
+                try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
+                const reDelivered = await this.deliverDirect(resolvedPeerId, targetDid, topic, payload, ttlSec, priority, compressed, encrypted, idempotencyKey);
+                if (reDelivered) {
+                  return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
+                }
+              }
+            }
           }
 
           // DID unknown — try resolve via connected peers
@@ -949,11 +979,18 @@ export class MessagingService {
   private registerDidPeer(did: string, peerId: string): void {
     this.didToPeerId.set(did, peerId);
     this.peerIdToDid.set(peerId, did);
+    this.didPeerUpdatedAt.set(did, Date.now());
     try {
       this.store.upsertDidPeer(did, peerId);
     } catch {
       // Best-effort persistence — in-memory map is authoritative
     }
+  }
+
+  /** Check if a DID→PeerId mapping is older than the TTL threshold. */
+  private isStalePeerMapping(did: string): boolean {
+    const updatedAt = this.didPeerUpdatedAt.get(did) ?? 0;
+    return (Date.now() - updatedAt) > DID_PEER_TTL_MS;
   }
 
   // ── Private: Delivery Receipt Protocol ─────────────────────────
