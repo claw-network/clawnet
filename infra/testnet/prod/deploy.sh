@@ -104,8 +104,8 @@ fi
 SERVER_A="${SERVER_A:-66.94.125.242}"
 SERVER_B="${SERVER_B:-85.239.236.49}"
 SERVER_C="${SERVER_C:-85.239.235.67}"
+SSH_KEY_PATH="${SSH_KEY_PATH:-}"
 SSH_PASS="${SSH_PASSWORD:-G66tdTcmvBz*k1sf}"
-SSH_CMD="sshpass -p '$SSH_PASS' ssh -o StrictHostKeyChecking=no"
 CLAW_PASSPHRASE="${CLAW_PASSPHRASE:-$(openssl rand -hex 32)}"
 CLAW_API_KEY="${CLAW_API_KEY:-$(openssl rand -hex 32)}"
 
@@ -121,7 +121,11 @@ require_local_command() {
 run_remote() {
   local host="$1"
   shift
-  sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no "root@$host" "$@"
+  if [[ -n "$SSH_KEY_PATH" ]]; then
+    ssh -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "root@$host" "$@"
+  else
+    sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no "root@$host" "$@"
+  fi
 }
 
 # Helper: copy file to remote server
@@ -129,7 +133,11 @@ scp_to() {
   local file="$1"
   local host="$2"
   local dest="$3"
-  sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no "$file" "root@$host:$dest"
+  if [[ -n "$SSH_KEY_PATH" ]]; then
+    scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "$file" "root@$host:$dest"
+  else
+    sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no "$file" "root@$host:$dest"
+  fi
 }
 
 rpc_block_number() {
@@ -290,7 +298,11 @@ CADDYEOF"
 }
 
 echo ">>> Phase 0: Preflight checks..."
-require_local_command sshpass
+if [[ -n "$SSH_KEY_PATH" ]]; then
+  echo "  Using SSH key: $SSH_KEY_PATH"
+else
+  require_local_command sshpass
+fi
 require_local_command ssh
 require_local_command scp
 require_local_command python3
@@ -602,9 +614,15 @@ echo ""
 echo ">>> Phase 11: Saving deployment record..."
 
 # Copy contracts deployment record from Server A
-sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
-  "root@$SERVER_A:/opt/clawnet/packages/contracts/deployments/clawnetTestnet.json" \
-  "$SCRIPT_DIR/contracts.json"
+if [[ -n "$SSH_KEY_PATH" ]]; then
+  scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no \
+    "root@$SERVER_A:/opt/clawnet/packages/contracts/deployments/clawnetTestnet.json" \
+    "$SCRIPT_DIR/contracts.json"
+else
+  sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no \
+    "root@$SERVER_A:/opt/clawnet/packages/contracts/deployments/clawnetTestnet.json" \
+    "$SCRIPT_DIR/contracts.json"
+fi
 
 if [[ ! -s "$SCRIPT_DIR/contracts.json" ]]; then
   echo "ERROR: contracts.json was not copied or is empty"
