@@ -45,6 +45,8 @@ services:
         --password /config/password.txt
         --allow-insecure-unlock
         --miner.gasprice 0
+        --gpo.maxprice 0
+        --gpo.ignoreprice 0
         --syncmode full
         --gcmode archive
         --bootnodes "${BOOTNODES}"
