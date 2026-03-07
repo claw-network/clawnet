@@ -48,6 +48,7 @@ services:
         --unlock ${VALIDATOR_ADDRESS}
         --password /config/password.txt
         --allow-insecure-unlock
+        --miner.gasprice 0
         --syncmode full
         --gcmode archive
         --bootnodes "enode://<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303"

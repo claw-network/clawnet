@@ -368,7 +368,7 @@ RESERVE_PRIVATE_KEY=0x...
 | clique.period | 2          | 每 2 秒出块           |
 | clique.epoch  | 30000      | checkpoint 间隔       |
 | gasLimit      | 0x1C9C380  | 30,000,000 Gas        |
-| baseFeePerGas | 0x3B9ACA00 | 1 Gwei（London 必需） |
+| baseFeePerGas | 0x0        | Zero-gas（无手续费）  |
 
 > ⚠️ **不要包含 `shanghaiTime`！** `shanghaiTime: 0` 会导致 Clique PoA 节点间同步失败，
 > 错误信息为 `"clique does not support shanghai fork"`。Genesis 最高支持到 London。

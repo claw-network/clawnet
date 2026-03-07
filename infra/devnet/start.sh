@@ -32,6 +32,7 @@ GETH_ARGS=(
   --dev
   --dev.period "${GETH_DEV_PERIOD:-0}"
   --dev.gaslimit "${GETH_DEV_GASLIMIT:-30000000}"
+  --miner.gasprice 0
   --datadir "$DATADIR"
   --http
   --http.addr 0.0.0.0

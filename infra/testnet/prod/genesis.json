@@ -35,5 +35,6 @@
     "6df40e8de57c7a38c1c1b6650ff99eb0564305d7": {
       "balance": "0x033B2E3C9FD0803CE8000000"
     }
-  }
+  },
+  "baseFeePerGas": "0x0"
 }

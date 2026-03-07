@@ -44,6 +44,7 @@ services:
         --unlock ${VALIDATOR_ADDRESS}
         --password /config/password.txt
         --allow-insecure-unlock
+        --miner.gasprice 0
         --syncmode full
         --gcmode archive
         --bootnodes "${BOOTNODES}"

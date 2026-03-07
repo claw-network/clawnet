@@ -48,5 +48,6 @@
       "balance": "0x033B2E3C9FD0803CE8000000",
       "comment": "1B wei for treasury"
     }
-  }
+  },
+  "baseFeePerGas": "0x0"
 }
