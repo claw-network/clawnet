@@ -9,6 +9,26 @@ import { TransferSchema } from '../schemas/wallet.js';
 import type { RuntimeContext } from '../types.js';
 import { resolveAddress, resolvePrivateKey, addressFromDid } from '../types.js';
 import { createWalletTransferEnvelope } from '@claw-network/protocol';
+import { deriveAddressForDid } from '../../services/identity-service.js';
+
+/**
+ * Resolve a DID or 0x address to an EVM address.
+ * On-chain registry first, then deterministic derivation.
+ */
+async function resolveEvmAddress(
+  ctx: RuntimeContext,
+  input: string,
+): Promise<string | null> {
+  if (/^0x[0-9a-fA-F]{40}$/.test(input)) return input;
+  if (input.startsWith('did:claw:')) {
+    if (ctx.walletService) {
+      const addr = await ctx.walletService.resolveDidToAddress(input);
+      if (addr) return addr;
+    }
+    return deriveAddressForDid(input);
+  }
+  return null;
+}
 
 export function transferRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -32,20 +52,16 @@ export function transferRoutes(ctx: RuntimeContext): Router {
     // On-chain path
     if (ctx.walletService) {
       try {
-        // Resolve sender & receiver DIDs → EVM addresses via identity registry
-        const evmFrom = body.did
-          ? await ctx.walletService.resolveDidToAddress(body.did)
-          : null;
-        const evmTo = body.to.startsWith('did:claw:')
-          ? await ctx.walletService.resolveDidToAddress(body.to)
-          : /^0x[0-9a-fA-F]{40}$/.test(to) ? to : null;
+        // Resolve sender & receiver DIDs → EVM addresses
+        const evmFrom = await resolveEvmAddress(ctx, body.did);
+        const evmTo = await resolveEvmAddress(ctx, body.to);
 
         if (!evmFrom) {
-          badRequest(res, 'Sender DID not registered on-chain', route.url.pathname);
+          badRequest(res, 'Sender DID could not be resolved to an EVM address', route.url.pathname);
           return;
         }
         if (!evmTo) {
-          badRequest(res, 'Recipient address not resolved on-chain', route.url.pathname);
+          badRequest(res, 'Recipient address could not be resolved to an EVM address', route.url.pathname);
           return;
         }
 

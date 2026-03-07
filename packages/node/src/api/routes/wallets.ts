@@ -8,13 +8,14 @@ import type { RuntimeContext } from '../types.js';
 import { resolveAddress } from '../types.js';
 import { buildWalletState } from '../legacy.js';
 import { getWalletBalance } from '@claw-network/protocol';
+import { deriveAddressForDid } from '../../services/identity-service.js';
 
 /**
  * For the on-chain path, resolve the user-supplied address/DID to an
  * EVM address that contract calls understand.
- * - DID → look up on-chain identity registry → controller (0x…)
+ * - DID → look up on-chain identity registry → controller (0x…),
+ *         fallback to deterministic derivation.
  * - 0x… → pass through
- * - claw1… → not valid for on-chain path (needs DID or 0x)
  */
 async function resolveEvmAddress(
   ctx: RuntimeContext,
@@ -23,9 +24,13 @@ async function resolveEvmAddress(
   // Already an EVM hex address
   if (/^0x[0-9a-fA-F]{40}$/.test(input)) return input;
 
-  // DID → resolve via on-chain identity registry
-  if (input.startsWith('did:claw:') && ctx.walletService) {
-    return ctx.walletService.resolveDidToAddress(input);
+  // DID → resolve via on-chain identity registry, fallback to derivation
+  if (input.startsWith('did:claw:')) {
+    if (ctx.walletService) {
+      const addr = await ctx.walletService.resolveDidToAddress(input);
+      if (addr) return addr;
+    }
+    return deriveAddressForDid(input);
   }
 
   return null;
