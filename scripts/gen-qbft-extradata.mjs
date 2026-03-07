@@ -5,8 +5,8 @@
 // Usage:
 //   node scripts/gen-qbft-extradata.mjs 0xAddr1 0xAddr2 0xAddr3 [...]
 //
-// QBFT extradata format:
-//   32 bytes vanity + RLP([sorted_validators, votes=[], round=0, seals=[]])
+// QBFT extradata format (entire value is RLP-encoded):
+//   RLP([32-byte vanity, [sorted validators], votes=[], round=0, seals=[]])
 // ==============================================================================
 
 const validators = process.argv.slice(2);
@@ -48,14 +48,15 @@ function rlpEncodeList(items) {
 // Encode each validator address as RLP bytes (20 bytes each)
 const rlpAddrs = addrs.map((a) => rlpEncodeBytes(a));
 
-// Build QBFT extradata: vanity + RLP([validators_list, votes=[], round=0, seals=[]])
-const vanity = '0'.repeat(64); // 32 bytes
+// Build QBFT extradata: RLP([vanity, [validators], votes=[], round=0, seals=[]])
+const vanity = '0'.repeat(64); // 32 bytes of zeros
+const rlpVanity = rlpEncodeBytes(vanity);
 const validatorsList = rlpEncodeList(rlpAddrs);
 const emptyList = 'c0'; // RLP for []
 const zeroInt = '80'; // RLP for integer 0
-const outer = rlpEncodeList([validatorsList, emptyList, zeroInt, emptyList]);
+const outer = rlpEncodeList([rlpVanity, validatorsList, emptyList, zeroInt, emptyList]);
 
-const extradata = '0x' + vanity + outer;
+const extradata = '0x' + outer;
 
 console.log(extradata);
 console.log();
