@@ -2,7 +2,7 @@
   "network": "clawnetTestnet",
   "chainId": 7625,
   "deployer": "0xA9b95A4fDCD673f6aE0D2a873E0f4771CA7D0119",
-  "timestamp": "2026-02-25T12:33:30.397Z",
+  "timestamp": "2026-03-07T06:56:17.148Z",
   "contracts": {
     "ClawToken": {
       "proxy": "0xE1cf20376ef0372E26CEE715F84A15348bdbB5c6",
@@ -18,7 +18,7 @@
     },
     "ClawIdentity": {
       "proxy": "0xee9B2D7eb0CD51e1d0a14278bCA32b02548D1149",
-      "impl": "0xB3fFe0876349C60763F4dE6B4c337E2E0f2FCC85"
+      "impl": "0x55621841B74FAdbb0EDd5039bF3A239B458B32af"
     },
     "ClawStaking": {
       "proxy": "0x6269D9358a8C4502fC8b629E8998Eb9C98961995",
