@@ -5,7 +5,7 @@ ClawNet node daemon — HTTP REST API, P2P networking, and on-chain service laye
 [![npm](https://img.shields.io/npm/v/@claw-network/node)](https://www.npmjs.com/package/@claw-network/node)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-> **The daemon that powers the network.** `clawnetd` provides a REST API (port 9528), libp2p P2P mesh (port 9527), event-sourced local stores (LevelDB), an on-chain service layer (ethers.js ↔ Geth PoA), and an SQLite indexer — all in one process.
+> **The daemon that powers the network.** `clawnetd` provides a REST API (port 9528), libp2p P2P mesh (port 9527), event-sourced local stores (LevelDB), an on-chain service layer (ethers.js ↔ Besu QBFT), and an SQLite indexer — all in one process.
 
 ## Installation
 
@@ -55,7 +55,7 @@ clawnetd [options]
 |----------|-------------|
 | `CLAW_PASSPHRASE` | **Required.** Passphrase to unlock the local key store |
 | `CLAW_NETWORK` | Network override (`mainnet` / `testnet` / `devnet`) |
-| `CLAW_CHAIN_RPC` | JSON-RPC endpoint for the PoA chain |
+| `CLAW_CHAIN_RPC` | JSON-RPC endpoint for the Besu QBFT chain |
 | `CLAW_CHAIN_PRIVATE_KEY` | Node signer private key (hex) |
 
 ### Programmatic Usage
@@ -106,7 +106,7 @@ await node.start();
 │  └────┬──────────────┬───────────────┬───────┘  │
 │       │              │               │          │
 │  ┌────▼────┐  ┌──────▼─────┐  ┌──────▼──────┐  │
-│  │ LevelDB │  │   SQLite   │  │  Geth PoA   │  │
+│  │ LevelDB │  │   SQLite   │  │ Besu QBFT   │  │
 │  │ Events  │  │  Indexer   │  │  Chain 7625  │  │
 │  └─────────┘  └────────────┘  └─────────────┘  │
 └─────────────────────────────────────────────────┘
