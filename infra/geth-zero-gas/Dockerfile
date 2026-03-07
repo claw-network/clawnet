@@ -23,27 +23,28 @@ RUN git clone --depth 1 --branch v1.13.15 \
 
 WORKDIR /go-ethereum
 
-# Patch 1: Allow miner.gasprice = 0
+# Patch 1: Allow miner.gasprice = 0 (eth/backend.go:116)
 #   Before: rejects gasPrice <= 0 → forces to 1 Gwei
 #   After:  rejects gasPrice < 0  → allows 0
-RUN sed -i 's/conf\.Miner\.GasPrice\.Cmp(common\.Big0) <= 0/conf.Miner.GasPrice.Cmp(common.Big0) < 0/' \
-    eth/ethconfig/config.go
+RUN sed -i 's/config\.Miner\.GasPrice\.Cmp(common\.Big0) <= 0/config.Miner.GasPrice.Cmp(common.Big0) < 0/' \
+    eth/backend.go
 
-# Patch 2: Allow gpo.maxprice = 0
-#   Before: rejects maxPrice <= 0 → forces to 500 Gwei
-#   After:  rejects maxPrice < 0  → allows 0
-RUN sed -i 's/conf\.GPO\.MaxPrice\.Cmp(common\.Big0) <= 0/conf.GPO.MaxPrice.Cmp(common.Big0) < 0/' \
-    eth/ethconfig/config.go
+# Patch 2: Allow gpo.maxprice = 0 (eth/gasprice/gasprice.go:98)
+#   Before: rejects maxPrice.Int64() <= 0 → forces to DefaultMaxPrice
+#   After:  rejects maxPrice.Int64() < 0  → allows 0
+RUN sed -i 's/maxPrice == nil || maxPrice\.Int64() <= 0/maxPrice == nil || maxPrice.Int64() < 0/' \
+    eth/gasprice/gasprice.go
 
-# Patch 3: Allow gpo.ignoreprice = 0
-#   Before: rejects ignorePrice <= 0 → forces to 2
-#   After:  rejects ignorePrice < 0  → allows 0
-RUN sed -i 's/conf\.GPO\.IgnorePrice\.Int64() <= 0/conf.GPO.IgnorePrice.Int64() < 0/' \
-    eth/ethconfig/config.go
+# Patch 3: Allow gpo.ignoreprice = 0 (eth/gasprice/gasprice.go:103)
+#   Before: rejects ignorePrice.Int64() <= 0 → forces to DefaultIgnorePrice
+#   After:  rejects ignorePrice.Int64() < 0  → allows 0
+RUN sed -i 's/ignorePrice == nil || ignorePrice\.Int64() <= 0/ignorePrice == nil || ignorePrice.Int64() < 0/' \
+    eth/gasprice/gasprice.go
 
 # Verify patches applied (fail build if not)
-RUN grep -q 'Cmp(common.Big0) < 0' eth/ethconfig/config.go \
-    && echo "✓ Patches applied successfully" \
+RUN grep -q 'Cmp(common.Big0) < 0' eth/backend.go \
+    && grep -q 'maxPrice.Int64() < 0' eth/gasprice/gasprice.go \
+    && echo "✓ All patches applied successfully" \
     || (echo "ERROR: Patches failed to apply" && exit 1)
 
 # Build geth
