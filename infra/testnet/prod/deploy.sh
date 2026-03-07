@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# ClawNet Testnet — Full Redeployment Script
+# ClawNet Testnet — Full Redeployment Script (Hyperledger Besu / QBFT)
 # ==============================================================================
 # This script performs a complete testnet redeployment on all 3 servers:
-#   1. Stop existing Geth on all servers
-#   2. Wipe chain data
-#   3. Upload genesis.json and re-initialize
-#   4. Import validator keys
-#   5. Create .env files + security hardening
-#   6. Start Server A (mining), wait for blocks
-#   7. Start Server B & C (sync then mine)
-#   8. Deploy contracts
-#   9. Run bootstrap mint
+#   1. Stop existing Besu on all servers
+#   2. Wipe chain data, upload genesis + validator key files
+#   3. Update code on all servers (git pull)
+#   4. Security hardening
+#   5. Start Server A, wait for blocks, get enode URL
+#   6. Start Server B & C with bootnodes
+#   7. Deploy contracts
+#   8. Run bootstrap mint, save deployment record
+#   9. Verify cluster health
+#  10. Deploy clawnetd (3 nodes) + docs site
 #
 # Prerequisites:
 #   - sshpass installed (brew install hudochenkov/sshpass/sshpass)
@@ -19,7 +20,7 @@
 #
 # Usage:
 #   cd infra/testnet/prod
-#   bash deploy.sh
+#   SSH_KEY_PATH=~/.ssh/id_ed25519_clawnet bash deploy.sh
 # ==============================================================================
 set -euo pipefail
 
@@ -63,7 +64,6 @@ require_env VALIDATOR_1_ADDRESS
 require_env VALIDATOR_2_ADDRESS
 require_env VALIDATOR_3_ADDRESS
 require_env DEPLOYER_ADDRESS
-require_env VALIDATOR_PASSWORD
 
 require_address TREASURY_ADDRESS
 require_address LIQUIDITY_ADDRESS
@@ -311,8 +311,12 @@ if [[ ! -f "$GENESIS_FILE" ]]; then
   echo "ERROR: genesis file not found: $GENESIS_FILE"
   exit 1
 fi
-if grep -q 'shanghaiTime' "$GENESIS_FILE"; then
-  echo "ERROR: genesis.json must not contain shanghaiTime (Clique incompatible)"
+if ! grep -q '"qbft"' "$GENESIS_FILE"; then
+  echo "ERROR: genesis.json must contain QBFT consensus config"
+  exit 1
+fi
+if ! grep -q '"zeroBaseFee"' "$GENESIS_FILE"; then
+  echo "ERROR: genesis.json must contain zeroBaseFee for zero-gas network"
   exit 1
 fi
 
@@ -347,20 +351,33 @@ echo "============================================================"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 1: Stop all Geth instances
+# Phase 1: Stop all Besu instances
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 1: Stopping Geth on all servers..."
+echo ">>> Phase 1: Stopping Besu on all servers..."
 for HOST in $SERVER_A $SERVER_B $SERVER_C; do
-  echo "  Stopping Geth on $HOST..."
-  run_remote "$HOST" 'cd /opt/clawnet && docker compose -f docker-compose.chain.yml down 2>/dev/null; docker stop clawnet-geth 2>/dev/null; docker rm clawnet-geth 2>/dev/null; echo "done"' || true
+  echo "  Stopping Besu on $HOST..."
+  run_remote "$HOST" 'cd /opt/clawnet && docker compose -f docker-compose.chain.yml down 2>/dev/null; docker stop clawnet-besu 2>/dev/null; docker rm clawnet-besu 2>/dev/null; echo "done"' || true
 done
-echo "  All Geth instances stopped."
+echo "  All Besu instances stopped."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 2: Wipe chain data and re-initialize on all servers
+# Phase 2: Wipe chain data and upload genesis + key files
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 2: Wiping chain data and re-initializing..."
+echo ">>> Phase 2: Wiping chain data and uploading config..."
+
+write_validator_key() {
+  local host="$1"
+  local privkey="$2"  # with 0x prefix
+  local label="$3"
+
+  # Strip 0x prefix — Besu expects raw hex in key file
+  local raw_key="${privkey#0x}"
+
+  echo "  [$host] Writing $label key file..."
+  run_remote "$host" "echo '$raw_key' > /opt/clawnet/config/key && chmod 600 /opt/clawnet/config/key"
+  echo "  [$host] $label key file written."
+}
 
 for HOST in $SERVER_A $SERVER_B $SERVER_C; do
   echo "  [$HOST] Wiping chain data..."
@@ -369,49 +386,13 @@ for HOST in $SERVER_A $SERVER_B $SERVER_C; do
   echo "  [$HOST] Uploading genesis.json..."
   run_remote "$HOST" 'mkdir -p /opt/clawnet/config'
   scp_to "$GENESIS_FILE" "$HOST" "/opt/clawnet/config/genesis.json"
-
-  echo "  [$HOST] Creating password.txt..."
-  run_remote "$HOST" "echo '$VALIDATOR_PASSWORD' > /opt/clawnet/config/password.txt && chmod 600 /opt/clawnet/config/password.txt"
-
-  echo "  [$HOST] Initializing Geth..."
-  run_remote "$HOST" 'docker run --rm \
-    -v /opt/clawnet/chain-data:/data \
-    -v /opt/clawnet/config:/config:ro \
-    ethereum/client-go:v1.13.15 \
-    init --datadir /data /config/genesis.json'
-
-  echo "  [$HOST] Geth initialized."
   echo ""
 done
 
-# ══════════════════════════════════════════════════════════════════
-# Phase 3: Import validator keys
-# ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 3: Importing validator keys..."
-
-import_validator_key() {
-  local host="$1"
-  local privkey="$2"  # with 0x prefix
-  local label="$3"
-
-  # Strip 0x prefix for the key file
-  local raw_key="${privkey#0x}"
-
-  echo "  [$host] Importing $label key..."
-  run_remote "$host" "echo '$raw_key' > /tmp/val.key && \
-    docker run --rm \
-      -v /opt/clawnet/chain-data:/data \
-      -v /opt/clawnet/config:/config:ro \
-      -v /tmp/val.key:/tmp/val.key:ro \
-      ethereum/client-go:v1.13.15 \
-      account import --datadir /data --password /config/password.txt /tmp/val.key && \
-    rm -f /tmp/val.key"
-  echo "  [$host] $label key imported."
-}
-
-import_validator_key "$SERVER_A" "$VALIDATOR_1_PRIVATE_KEY" "Validator 1"
-import_validator_key "$SERVER_B" "$VALIDATOR_2_PRIVATE_KEY" "Validator 2"
-import_validator_key "$SERVER_C" "$VALIDATOR_3_PRIVATE_KEY" "Validator 3"
+# Write validator key files (Besu reads private key directly, no keystore)
+write_validator_key "$SERVER_A" "$VALIDATOR_1_PRIVATE_KEY" "Validator 1"
+write_validator_key "$SERVER_B" "$VALIDATOR_2_PRIVATE_KEY" "Validator 2"
+write_validator_key "$SERVER_C" "$VALIDATOR_3_PRIVATE_KEY" "Validator 3"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
@@ -425,23 +406,9 @@ done
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 5: Create .env on each server
+# Phase 5: (Reserved — Besu derives validator address from key file)
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 5: Creating .env files..."
-
-run_remote "$SERVER_A" "cat > /opt/clawnet/.env << 'ENVEOF'
-VALIDATOR_ADDRESS=$VALIDATOR_1_ADDRESS
-ENVEOF"
-
-run_remote "$SERVER_B" "cat > /opt/clawnet/.env << 'ENVEOF'
-VALIDATOR_ADDRESS=$VALIDATOR_2_ADDRESS
-ENVEOF"
-
-run_remote "$SERVER_C" "cat > /opt/clawnet/.env << 'ENVEOF'
-VALIDATOR_ADDRESS=$VALIDATOR_3_ADDRESS
-ENVEOF"
-
-echo "  .env files created."
+echo ">>> Phase 5: Skipped (Besu uses --node-private-key-file, no .env needed)."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
@@ -481,13 +448,13 @@ echo "  Security hardening applied to all servers."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 6: Start Server A (mining)
+# Phase 6: Start Server A (QBFT validator)
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 6: Starting Geth on Server A (mining mode)..."
+echo ">>> Phase 6: Starting Besu on Server A..."
 run_remote "$SERVER_A" 'cd /opt/clawnet && cp infra/testnet/docker-compose.yml docker-compose.chain.yml && docker compose -f docker-compose.chain.yml up -d'
 
-echo "  Waiting 10s for Server A to start mining..."
-sleep 10
+echo "  Waiting 15s for Server A to start producing blocks..."
+sleep 15
 
 # Get block number
 BLOCK_NUM=$(run_remote "$SERVER_A" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"')
@@ -501,38 +468,27 @@ echo "  Server A enode: $ENODE_A"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 7: Start Server B (sync-first-then-mine)
+# Phase 7: Start Server B (QBFT validator with bootnode)
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 7: Starting Geth on Server B (sync → mine)..."
+echo ">>> Phase 7: Starting Besu on Server B..."
 
-# Create a sync compose with the correct enode
-run_remote "$SERVER_B" "cd /opt/clawnet && cp infra/testnet/docker-compose.sync.yml docker-compose.sync.yml && \
-  sed -i 's|enode://.*@66.94.125.242:30303|${ENODE_A}|g' docker-compose.sync.yml && \
-  sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${ENODE_A#enode://}|g' docker-compose.sync.yml && \
-  docker compose -f docker-compose.sync.yml up -d"
-
-echo "  Waiting 15s for Server B to sync..."
-sleep 15
-
-B_BLOCK=$(run_remote "$SERVER_B" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"')
-echo "  Server B block number: $B_BLOCK"
-
-# Switch to mining mode
-echo "  Switching Server B to mining mode..."
-run_remote "$SERVER_B" "cd /opt/clawnet && docker compose -f docker-compose.sync.yml down && \
-  cp infra/testnet/docker-compose.peer.yml docker-compose.chain.yml && \
+# Copy peer compose and inject Server A enode
+run_remote "$SERVER_B" "cd /opt/clawnet && cp infra/testnet/docker-compose.peer.yml docker-compose.chain.yml && \
   sed -i 's|enode://.*@66.94.125.242:30303|${ENODE_A}|g' docker-compose.chain.yml && \
   sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${ENODE_A#enode://}|g' docker-compose.chain.yml && \
   docker compose -f docker-compose.chain.yml up -d"
 
-sleep 5
-echo "  Server B mining."
+echo "  Waiting 10s for Server B to join consensus..."
+sleep 10
+
+B_BLOCK=$(run_remote "$SERVER_B" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"')
+echo "  Server B block number: $B_BLOCK"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 8: Start Server C (sync-first-then-mine)
+# Phase 8: Start Server C (QBFT validator with bootnodes)
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 8: Starting Geth on Server C (sync → mine)..."
+echo ">>> Phase 8: Starting Besu on Server C..."
 
 # Get enode for Server B
 ENODE_B_RAW=$(run_remote "$SERVER_B" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"admin_nodeInfo\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"result\"][\"enode\"])"')
@@ -540,26 +496,16 @@ ENODE_B=$(echo "$ENODE_B_RAW" | sed "s/127.0.0.1/$SERVER_B/")
 
 BOOTNODES_C="${ENODE_A},${ENODE_B}"
 
-run_remote "$SERVER_C" "cd /opt/clawnet && cp infra/testnet/docker-compose.sync.yml docker-compose.sync.yml && \
-  sed -i 's|enode://.*@66.94.125.242:30303|${BOOTNODES_C}|g' docker-compose.sync.yml && \
-  sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${BOOTNODES_C#enode://}|g' docker-compose.sync.yml && \
-  docker compose -f docker-compose.sync.yml up -d"
-
-echo "  Waiting 15s for Server C to sync..."
-sleep 15
-
-C_BLOCK=$(run_remote "$SERVER_C" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"')
-echo "  Server C block number: $C_BLOCK"
-
-echo "  Switching Server C to mining mode..."
-run_remote "$SERVER_C" "cd /opt/clawnet && docker compose -f docker-compose.sync.yml down && \
-  cp infra/testnet/docker-compose.peer.yml docker-compose.chain.yml && \
+run_remote "$SERVER_C" "cd /opt/clawnet && cp infra/testnet/docker-compose.peer.yml docker-compose.chain.yml && \
   sed -i 's|enode://.*@66.94.125.242:30303|${BOOTNODES_C}|g' docker-compose.chain.yml && \
   sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${BOOTNODES_C#enode://}|g' docker-compose.chain.yml && \
   docker compose -f docker-compose.chain.yml up -d"
 
-sleep 5
-echo "  Server C mining."
+echo "  Waiting 10s for Server C to join consensus..."
+sleep 10
+
+C_BLOCK=$(run_remote "$SERVER_C" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(int(json.load(sys.stdin)[\"result\"],16))"')
+echo "  Server C block number: $C_BLOCK"
 
 # Get enode for Server C
 ENODE_C_RAW=$(run_remote "$SERVER_C" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"admin_nodeInfo\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"result\"][\"enode\"])"')
@@ -682,6 +628,22 @@ if [[ ! -s "$SCRIPT_DIR/enodes.env" ]]; then
 fi
 
 echo "  Cluster health checks passed."
+
+# Verify QBFT validators
+QBFT_VALIDATORS=$(run_remote "$SERVER_A" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"qbft_getValidatorsByBlockNumber\",\"params\":[\"latest\"],\"id\":1}" | python3 -c "import sys,json; v=json.load(sys.stdin)[\"result\"]; print(len(v))"')
+echo "  QBFT validators: $QBFT_VALIDATORS"
+if [[ "$QBFT_VALIDATORS" -ne 3 ]]; then
+  echo "ERROR: expected 3 QBFT validators, got $QBFT_VALIDATORS"
+  exit 1
+fi
+
+# Verify zero gas price
+GAS_PRICE=$(run_remote "$SERVER_A" 'curl -sf http://127.0.0.1:8545 -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"eth_gasPrice\",\"params\":[],\"id\":1}" | python3 -c "import sys,json; print(json.load(sys.stdin)[\"result\"])"')
+echo "  eth_gasPrice: $GAS_PRICE"
+if [[ "$GAS_PRICE" != "0x0" ]]; then
+  echo "ERROR: expected eth_gasPrice=0x0, got $GAS_PRICE"
+  exit 1
+fi
 
 echo ""
 

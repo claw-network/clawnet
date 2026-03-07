@@ -1,24 +1,22 @@
 # ==============================================================================
-# ClawNet Chain — Sync-Only Mode (NO mining)
+# ClawNet Chain — Sync-Only / Read-Only Node (NO validator participation)
 # ==============================================================================
-# Use this compose file when adding a new validator node to an existing cluster.
+# Use this compose file for read-only nodes that do not participate in QBFT
+# consensus. Useful for additional RPC endpoints or monitoring.
 #
-# Strategy (sync-first-then-mine):
-#   1. Start with this file — node syncs chain data from peers without mining
-#   2. Wait until block number matches other validators
-#   3. Stop this compose, start docker-compose.chain.yml (with --mine)
-#
-# WHY: If a new validator starts mining immediately, it creates a competing
-#      block 1 fork, causing permanent "signed recently" deadlock.
+# For QBFT validators, use docker-compose.yml (primary) or
+# docker-compose.peer.yml (peers) — no sync-first step needed.
 # ==============================================================================
-# Geth v1.13.15 — DO NOT upgrade to v1.14+ (Clique PoA removed)
+# Hyperledger Besu — QBFT consensus
 # ==============================================================================
 
 services:
-  geth:
-    image: clawnet/geth:v1.13.15-zero-gas
-    container_name: clawnet-geth
+  besu:
+    image: hyperledger/besu:latest
+    container_name: clawnet-besu
     restart: unless-stopped
+    environment:
+      JAVA_OPTS: "-Xmx4g"
     ports:
       - "30303:30303/tcp"
       - "30303:30303/udp"
@@ -26,22 +24,20 @@ services:
     volumes:
       - /opt/clawnet/chain-data:/data
       - /opt/clawnet/config:/config:ro
-    entrypoint: >
-      geth
-        --datadir /data
-        --networkid 7625
-        --http
-        --http.addr 0.0.0.0
-        --http.port 8545
-        --http.api eth,net,web3,txpool,clique,admin
-        --http.corsdomain "*"
-        --http.vhosts "*"
-        --port 30303
-        --gpo.maxprice 0
-        --gpo.ignoreprice 0
-        --syncmode full
-        --gcmode archive
-        --bootnodes "enode://<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303"
+    entrypoint:
+      - besu
+      - --data-path=/data
+      - --genesis-file=/config/genesis.json
+      - --rpc-http-enabled
+      - --rpc-http-host=0.0.0.0
+      - --rpc-http-port=8545
+      - --rpc-http-api=ETH,NET,WEB3,TXPOOL,QBFT,ADMIN
+      - --rpc-http-cors-origins=*
+      - --host-allowlist=*
+      - --p2p-port=30303
+      - --min-gas-price=0
+      - --profile=ENTERPRISE
+      - --bootnodes=enode://<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303
     logging:
       driver: json-file
       options:

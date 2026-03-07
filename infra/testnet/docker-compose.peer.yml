@@ -4,27 +4,24 @@
 # Usage:
 #   cd /opt/clawnet
 #   cp infra/chain-testnet/docker-compose.peer.yml docker-compose.chain.yml
-#   # Edit VALIDATOR_ADDRESS in .env
-#   # Edit --bootnodes to point to Server A (and optionally B) enode URLs
+#   # Edit --bootnodes to point to Server A enode URL
 #   docker compose -f docker-compose.chain.yml up -d
-#
-# IMPORTANT: Do NOT start with --mine until the node has synced to the
-#            current chain height! Use docker-compose.sync.yml first.
-#            See README.md "sync-first-then-mine" strategy.
 # ==============================================================================
-# Geth v1.13.15 — DO NOT upgrade to v1.14+ (Clique PoA removed)
+# Hyperledger Besu — QBFT consensus
 # ==============================================================================
 
 services:
-  geth:
-    image: clawnet/geth:v1.13.15-zero-gas
-    container_name: clawnet-geth
+  besu:
+    image: hyperledger/besu:latest
+    container_name: clawnet-besu
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 6G
           cpus: '2.0'
+    environment:
+      JAVA_OPTS: "-Xmx4g"
     ports:
       - "30303:30303/tcp"           # P2P TCP
       - "30303:30303/udp"           # P2P Discovery
@@ -32,28 +29,21 @@ services:
     volumes:
       - /opt/clawnet/chain-data:/data
       - /opt/clawnet/config:/config:ro
-    entrypoint: >
-      geth
-        --datadir /data
-        --networkid 7625
-        --http
-        --http.addr 0.0.0.0
-        --http.port 8545
-        --http.api eth,net,web3,txpool,clique,admin
-        --http.corsdomain "*"
-        --http.vhosts "*"
-        --port 30303
-        --mine
-        --miner.etherbase ${VALIDATOR_ADDRESS}
-        --unlock ${VALIDATOR_ADDRESS}
-        --password /config/password.txt
-        --allow-insecure-unlock
-        --miner.gasprice 0
-        --gpo.maxprice 0
-        --gpo.ignoreprice 0
-        --syncmode full
-        --gcmode archive
-        --bootnodes "enode://<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303"
+    entrypoint:
+      - besu
+      - --data-path=/data
+      - --genesis-file=/config/genesis.json
+      - --node-private-key-file=/config/key
+      - --rpc-http-enabled
+      - --rpc-http-host=0.0.0.0
+      - --rpc-http-port=8545
+      - --rpc-http-api=ETH,NET,WEB3,TXPOOL,QBFT,ADMIN
+      - --rpc-http-cors-origins=*
+      - --host-allowlist=*
+      - --p2p-port=30303
+      - --min-gas-price=0
+      - --profile=ENTERPRISE
+      - --bootnodes=enode://<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303
     healthcheck:
       test: >
         wget -qO- --post-data='{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
