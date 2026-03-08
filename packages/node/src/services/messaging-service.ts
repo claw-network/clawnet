@@ -39,7 +39,7 @@ import {
 import { MessageStore } from './message-store.js';
 import { createLogger } from '../logger.js';
 import { gzipSync, gunzipSync } from 'node:zlib';
-import { mkdir, writeFile, readFile as fsReadFile, readdir, stat, unlink } from 'node:fs/promises';
+import { mkdir, writeFile, readFile as fsReadFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
 

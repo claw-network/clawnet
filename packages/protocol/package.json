@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/protocol",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Protocol definitions and event envelopes for the ClawNet network",
   "type": "module",
   "main": "dist/index.js",
