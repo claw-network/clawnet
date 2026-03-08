@@ -6,6 +6,7 @@
 
 import { Builder } from 'flatbuffers';
 import type {
+  AttachmentMessage,
   DeliveryReceipt,
   DidAnnounce,
   DidResolveRequest,
@@ -27,6 +28,8 @@ import {
   decodeDidResolveRequest,
   encodeDidResolveResponse,
   decodeDidResolveResponse,
+  encodeAttachmentMessage,
+  decodeAttachmentMessage,
 } from './flatbuffers.js';
 
 // ── DirectMessage ────────────────────────────────────────────
@@ -120,4 +123,17 @@ export function decodeE2EEnvelope(bytes: Uint8Array): E2EEnvelope {
     tag: bytes.subarray(44, 60),
     ciphertext: bytes.subarray(60),
   };
+}
+
+// ── AttachmentMessage ────────────────────────────────────────
+
+export function encodeAttachmentMessageBytes(msg: AttachmentMessage): Uint8Array {
+  const builder = new Builder(msg.data.length + 256);
+  const root = encodeAttachmentMessage(builder, msg);
+  return finishBytes(builder, root);
+}
+
+export function decodeAttachmentMessageBytes(bytes: Uint8Array): AttachmentMessage {
+  const reader = new FlatBufferReader(bytes);
+  return decodeAttachmentMessage(reader, reader.rootTable());
 }

@@ -14,8 +14,10 @@ import {
   encodeE2EEnvelope,
   decodeE2EEnvelope,
   E2E_HEADER_SIZE,
+  encodeAttachmentMessageBytes,
+  decodeAttachmentMessageBytes,
 } from '../src/messaging/index.js';
-import type { DirectMessage, DeliveryReceipt } from '../src/messaging/index.js';
+import type { DirectMessage, DeliveryReceipt, AttachmentMessage } from '../src/messaging/index.js';
 
 const sampleDm: DirectMessage = {
   sourceDid: 'did:claw:zAlice1234567890abcdefghijklmnop',
@@ -225,6 +227,63 @@ describe('messaging codec', () => {
       // Binary: 60 + 100 = 160 bytes
       // JSON: ~380+ bytes (hex doubles the byte size + JSON overhead)
       expect(binarySize).toBeLessThan(jsonSize * 0.6);
+    });
+  });
+
+  // ── AttachmentMessage ────────────────────────────────────
+
+  describe('AttachmentMessage', () => {
+    const sampleAttachment: AttachmentMessage = {
+      attachmentId: 'sha256:abc123def456',
+      sourceDid: 'did:claw:zAlice1234567890abcdefghijklmnop',
+      targetDid: 'did:claw:zBob1234567890abcdefghijklmnopqrs',
+      contentType: 'image/png',
+      fileName: 'photo.png',
+      data: new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+      totalSize: 8,
+      sentAtMs: BigInt(Date.now()),
+    };
+
+    it('round-trips all fields', () => {
+      const bytes = encodeAttachmentMessageBytes(sampleAttachment);
+      const decoded = decodeAttachmentMessageBytes(bytes);
+      expect(decoded.attachmentId).toBe(sampleAttachment.attachmentId);
+      expect(decoded.sourceDid).toBe(sampleAttachment.sourceDid);
+      expect(decoded.targetDid).toBe(sampleAttachment.targetDid);
+      expect(decoded.contentType).toBe(sampleAttachment.contentType);
+      expect(decoded.fileName).toBe(sampleAttachment.fileName);
+      expect(decoded.data).toEqual(sampleAttachment.data);
+      expect(decoded.totalSize).toBe(sampleAttachment.totalSize);
+      expect(decoded.sentAtMs).toBe(sampleAttachment.sentAtMs);
+    });
+
+    it('handles empty fileName', () => {
+      const msg: AttachmentMessage = { ...sampleAttachment, fileName: '' };
+      const decoded = decodeAttachmentMessageBytes(encodeAttachmentMessageBytes(msg));
+      expect(decoded.fileName).toBe('');
+    });
+
+    it('handles large binary data', () => {
+      const largeData = new Uint8Array(1024 * 1024); // 1 MB
+      largeData.fill(0xAB);
+      const msg: AttachmentMessage = {
+        ...sampleAttachment,
+        data: largeData,
+        totalSize: largeData.length,
+      };
+      const decoded = decodeAttachmentMessageBytes(encodeAttachmentMessageBytes(msg));
+      expect(decoded.data.length).toBe(1024 * 1024);
+      expect(decoded.data[0]).toBe(0xAB);
+      expect(decoded.data[1048575]).toBe(0xAB);
+      expect(decoded.totalSize).toBe(1024 * 1024);
+    });
+
+    it('handles various content types', () => {
+      for (const ct of ['image/jpeg', 'application/pdf', 'text/plain', 'application/octet-stream']) {
+        const msg: AttachmentMessage = { ...sampleAttachment, contentType: ct };
+        const decoded = decodeAttachmentMessageBytes(encodeAttachmentMessageBytes(msg));
+        expect(decoded.contentType).toBe(ct);
+      }
     });
   });
 });

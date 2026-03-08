@@ -280,7 +280,7 @@ export class ClawNetNode {
           const storagePaths3 = resolveStoragePaths(this.config.dataDir);
           const msgDbPath = join(storagePaths3.root, 'messages.sqlite');
           this.messageStore = new MessageStore(msgDbPath);
-          this.messagingService = new MessagingService(this.p2p, this.messageStore, this.cachedDid);
+          this.messagingService = new MessagingService(this.p2p, this.messageStore, this.cachedDid, storagePaths3.root);
           await this.messagingService.start();
 
           // Wire peer:connect to messaging announce + outbox flush

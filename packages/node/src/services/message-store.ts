@@ -114,6 +114,20 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rate_bucket_ts ON rate_limits(bucket, ts_ms);
+
+-- Attachment metadata: tracks received attachments stored on local disk
+CREATE TABLE IF NOT EXISTS attachments (
+  attachment_id   TEXT PRIMARY KEY,
+  source_did      TEXT NOT NULL,
+  content_type    TEXT NOT NULL,
+  file_name       TEXT NOT NULL DEFAULT '',
+  stored_file     TEXT NOT NULL,
+  total_size      INTEGER NOT NULL,
+  received_at_ms  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachments_received ON attachments(received_at_ms);
+CREATE INDEX IF NOT EXISTS idx_attachments_source ON attachments(source_did);
 `;
 
 /** Deduplication window: 24 hours */
@@ -379,5 +393,87 @@ export class MessageStore {
   /** Delete rate-limit events older than the given timestamp. */
   pruneRateEvents(beforeMs: number): number {
     return this.db.prepare('DELETE FROM rate_limits WHERE ts_ms <= ?').run(beforeMs).changes;
+  }
+
+  // ── Attachment Metadata ────────────────────────────────────
+
+  /** Store attachment metadata after receiving a file via P2P. */
+  saveAttachmentMeta(info: {
+    attachmentId: string;
+    sourceDid: string;
+    contentType: string;
+    fileName: string;
+    totalSize: number;
+    receivedAtMs: number;
+  }, storedFileName: string): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO attachments (attachment_id, source_did, content_type, file_name, stored_file, total_size, received_at_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(info.attachmentId, info.sourceDid, info.contentType, info.fileName, storedFileName, info.totalSize, info.receivedAtMs);
+  }
+
+  /** Get attachment metadata by ID. Returns null if not found. */
+  getAttachmentMeta(attachmentId: string): {
+    attachmentId: string;
+    sourceDid: string;
+    contentType: string;
+    fileName: string;
+    storedFileName: string;
+    totalSize: number;
+    receivedAtMs: number;
+  } | null {
+    const row = this.db.prepare(
+      'SELECT attachment_id, source_did, content_type, file_name, stored_file, total_size, received_at_ms FROM attachments WHERE attachment_id = ?',
+    ).get(attachmentId) as {
+      attachment_id: string; source_did: string; content_type: string;
+      file_name: string; stored_file: string; total_size: number; received_at_ms: number;
+    } | undefined;
+    if (!row) return null;
+    return {
+      attachmentId: row.attachment_id,
+      sourceDid: row.source_did,
+      contentType: row.content_type,
+      fileName: row.file_name,
+      storedFileName: row.stored_file,
+      totalSize: row.total_size,
+      receivedAtMs: row.received_at_ms,
+    };
+  }
+
+  /** List attachment metadata, ordered by received time descending. */
+  listAttachments(opts?: { limit?: number; since?: number }): Array<{
+    attachmentId: string;
+    sourceDid: string;
+    contentType: string;
+    fileName: string;
+    totalSize: number;
+    receivedAtMs: number;
+  }> {
+    const limit = Math.min(opts?.limit ?? 100, 500);
+    let sql = 'SELECT attachment_id, source_did, content_type, file_name, total_size, received_at_ms FROM attachments';
+    const params: unknown[] = [];
+    if (opts?.since) {
+      sql += ' WHERE received_at_ms > ?';
+      params.push(opts.since);
+    }
+    sql += ' ORDER BY received_at_ms DESC LIMIT ?';
+    params.push(limit);
+    const rows = this.db.prepare(sql).all(...params) as Array<{
+      attachment_id: string; source_did: string; content_type: string;
+      file_name: string; total_size: number; received_at_ms: number;
+    }>;
+    return rows.map((r) => ({
+      attachmentId: r.attachment_id,
+      sourceDid: r.source_did,
+      contentType: r.content_type,
+      fileName: r.file_name,
+      totalSize: r.total_size,
+      receivedAtMs: r.received_at_ms,
+    }));
+  }
+
+  /** Delete attachment metadata. Returns true if a row was deleted. */
+  deleteAttachment(attachmentId: string): boolean {
+    return this.db.prepare('DELETE FROM attachments WHERE attachment_id = ?').run(attachmentId).changes > 0;
   }
 }

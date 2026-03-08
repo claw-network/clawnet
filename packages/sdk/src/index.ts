@@ -33,6 +33,10 @@ export type {
   InboxMessage,
   InboxQueryParams,
   InboxResponse,
+  RelayAttachmentParams,
+  RelayAttachmentResult,
+  AttachmentInfo,
+  AttachmentListResponse,
 } from './messaging.js';
 
 // ── Shared types ─────────────────────────────────────────────────────────

@@ -87,6 +87,45 @@ export class HttpClient {
     return this.request<T>('DELETE', url, body, opts);
   }
 
+  /**
+   * GET a URL and return the raw binary response as ArrayBuffer.
+   * Used for downloading binary attachments.
+   */
+  async getRaw(path: string, opts?: RequestOptions): Promise<ArrayBuffer> {
+    const normalizedPath = this.normalizePath(path, 'GET', undefined);
+    const url = this.buildUrl(normalizedPath);
+
+    const headers: Record<string, string> = { ...opts?.headers };
+    if (this.apiKey) {
+      headers['x-api-key'] = this.apiKey;
+    }
+
+    const timeout = opts?.timeout ?? this.defaultTimeout;
+    let controller: AbortController | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (timeout > 0 && !opts?.signal) {
+      controller = new AbortController();
+      timeoutId = setTimeout(() => controller!.abort(), timeout);
+    }
+
+    try {
+      const res = await this._fetch(url, {
+        method: 'GET',
+        headers,
+        signal: opts?.signal ?? controller?.signal,
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new ClawNetError(res.status, 'UNKNOWN', text || res.statusText);
+      }
+
+      return res.arrayBuffer();
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------

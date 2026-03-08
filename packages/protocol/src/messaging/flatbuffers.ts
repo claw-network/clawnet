@@ -13,6 +13,7 @@ import type {
   DidResolveRequest,
   DidResolveResponse,
   DirectMessage,
+  AttachmentMessage,
 } from './types.js';
 import { ReceiptType } from './types.js';
 
@@ -130,5 +131,40 @@ export function decodeDidResolveResponse(reader: FlatBufferReader, table: number
     did: reader.readStringField(table, 0) ?? '',
     peerId: reader.readStringField(table, 1) ?? '',
     found: reader.readUint8Field(table, 2, 0) !== 0,
+  };
+}
+
+// ── AttachmentMessage (8 fields) ─────────────────────────────
+
+export function encodeAttachmentMessage(builder: Builder, msg: AttachmentMessage): number {
+  const attachmentId = builder.createString(msg.attachmentId);
+  const sourceDid = builder.createString(msg.sourceDid);
+  const targetDid = msg.targetDid ? builder.createString(msg.targetDid) : 0;
+  const contentType = builder.createString(msg.contentType);
+  const fileName = msg.fileName ? builder.createString(msg.fileName) : 0;
+  const data = builder.createByteVector(msg.data);
+
+  builder.startObject(8);
+  builder.addFieldOffset(0, attachmentId, 0);        // attachment_id
+  builder.addFieldOffset(1, sourceDid, 0);            // source_did
+  if (targetDid) builder.addFieldOffset(2, targetDid, 0); // target_did
+  builder.addFieldOffset(3, contentType, 0);          // content_type
+  if (fileName) builder.addFieldOffset(4, fileName, 0); // file_name
+  builder.addFieldOffset(5, data, 0);                 // data (byte vector)
+  builder.addFieldInt32(6, msg.totalSize, 0);         // total_size
+  builder.addFieldInt64(7, msg.sentAtMs, 0n);         // sent_at_ms
+  return builder.endObject();
+}
+
+export function decodeAttachmentMessage(reader: FlatBufferReader, table: number): AttachmentMessage {
+  return {
+    attachmentId: reader.readStringField(table, 0) ?? '',
+    sourceDid: reader.readStringField(table, 1) ?? '',
+    targetDid: reader.readStringField(table, 2) ?? '',
+    contentType: reader.readStringField(table, 3) ?? '',
+    fileName: reader.readStringField(table, 4) ?? '',
+    data: reader.readByteVectorField(table, 5) ?? new Uint8Array(),
+    totalSize: reader.readUint32Field(table, 6, 0),
+    sentAtMs: reader.readUint64Field(table, 7, 0n),
   };
 }

@@ -32,11 +32,16 @@ import {
   decodeDidResolveResponseBytes,
   encodeE2EEnvelope,
   decodeE2EEnvelope,
+  encodeAttachmentMessageBytes,
+  decodeAttachmentMessageBytes,
   ReceiptType,
 } from '@claw-network/protocol/messaging';
 import { MessageStore } from './message-store.js';
 import { createLogger } from '../logger.js';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import { mkdir, writeFile, readFile as fsReadFile, readdir, stat, unlink } from 'node:fs/promises';
+import { join } from 'node:path';
+import crypto from 'node:crypto';
 
 // ── Constants ────────────────────────────────────────────────────
 
@@ -44,6 +49,7 @@ const PROTO_DM = '/clawnet/1.0.0/dm';
 const PROTO_DID_ANNOUNCE = '/clawnet/1.0.0/did-announce';
 const PROTO_RECEIPT = '/clawnet/1.0.0/receipt';
 const PROTO_DID_RESOLVE = '/clawnet/1.0.0/did-resolve';
+const PROTO_ATTACHMENT = '/clawnet/1.0.0/attachment';
 
 /** Timeout for DID resolve queries (ms). */
 const DID_RESOLVE_TIMEOUT_MS = 5_000;
@@ -56,6 +62,12 @@ const DID_PEER_TTL_MS = 30 * 60_000;
 
 /** Maximum payload size in bytes (64 KB). */
 const MAX_PAYLOAD_BYTES = 65_536;
+
+/** Maximum attachment size in bytes (10 MB). */
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/** Attachment stream read timeout (30s — larger than DM for big files). */
+const ATTACHMENT_STREAM_TIMEOUT_MS = 30_000;
 
 /** Cleanup interval for expired messages (5 minutes). */
 const CLEANUP_INTERVAL_MS = 5 * 60_000;
@@ -153,6 +165,25 @@ export interface SendOptions {
 /** Callback for WebSocket subscribers — called when a new message arrives in the inbox. */
 export type InboxSubscriber = (message: InboxMessage) => void;
 
+/** Callback for attachment subscribers — called when a new attachment is received via P2P. */
+export type AttachmentSubscriber = (info: AttachmentInfo) => void;
+
+/** Metadata about a received attachment. */
+export interface AttachmentInfo {
+  attachmentId: string;
+  sourceDid: string;
+  contentType: string;
+  fileName: string;
+  totalSize: number;
+  receivedAtMs: number;
+}
+
+/** Result of relaying an attachment. */
+export interface RelayAttachmentResult {
+  attachmentId: string;
+  delivered: boolean;
+}
+
 type Logger = ReturnType<typeof createLogger>;
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -199,6 +230,7 @@ export class MessagingService {
   private readonly store: MessageStore;
   private readonly p2p: P2PNode;
   private readonly localDid: string;
+  private readonly attachmentsDir: string;
   private cleanupTimer?: NodeJS.Timeout;
 
   /**
@@ -213,16 +245,23 @@ export class MessagingService {
   /** WebSocket subscribers that receive real-time inbox pushes. */
   private readonly subscribers = new Set<InboxSubscriber>();
 
-  constructor(p2p: P2PNode, store: MessageStore, localDid: string) {
+  /** Subscribers for real-time attachment receive notifications. */
+  private readonly attachmentSubscribers = new Set<AttachmentSubscriber>();
+
+  constructor(p2p: P2PNode, store: MessageStore, localDid: string, dataDir?: string) {
     this.log = createLogger({ level: 'info' });
     this.p2p = p2p;
     this.store = store;
     this.localDid = localDid;
+    this.attachmentsDir = dataDir ? join(dataDir, 'attachments') : join(process.cwd(), 'data', 'attachments');
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────
 
   async start(): Promise<void> {
+    // Ensure attachments directory exists
+    await mkdir(this.attachmentsDir, { recursive: true });
+
     // Restore persisted DID→PeerId mappings from SQLite
     for (const { did, peerId, updatedAtMs } of this.store.getAllDidPeers()) {
       this.didToPeerId.set(did, peerId);
@@ -244,6 +283,9 @@ export class MessagingService {
     await this.p2p.handleProtocol(PROTO_DID_RESOLVE, (incoming) => {
       void this.handleDidResolve(incoming);
     }, { maxInboundStreams: 128 });
+    await this.p2p.handleProtocol(PROTO_ATTACHMENT, (incoming) => {
+      void this.handleInboundAttachment(incoming);
+    }, { maxInboundStreams: 32 });
 
     // When a new peer connects, exchange DID announcements
     this.p2p.onPeerDisconnect(() => {
@@ -284,7 +326,11 @@ export class MessagingService {
     try {
       await this.p2p.unhandleProtocol(PROTO_DID_RESOLVE);
     } catch { /* ignore */ }
+    try {
+      await this.p2p.unhandleProtocol(PROTO_ATTACHMENT);
+    } catch { /* ignore */ }
     this.subscribers.clear();
+    this.attachmentSubscribers.clear();
   }
 
   // ── Public API ─────────────────────────────────────────────────
@@ -486,6 +532,256 @@ export class MessagingService {
       queueMicrotask(() => {
         try { cb(msg); } catch { /* best-effort */ }
       });
+    }
+  }
+
+  // ── Attachment Subscriber Management ───────────────────────────
+
+  /** Register a subscriber for real-time attachment receive notifications. */
+  addAttachmentSubscriber(cb: AttachmentSubscriber): void {
+    this.attachmentSubscribers.add(cb);
+  }
+
+  /** Remove an attachment subscriber. */
+  removeAttachmentSubscriber(cb: AttachmentSubscriber): void {
+    this.attachmentSubscribers.delete(cb);
+  }
+
+  /** Notify all attachment subscribers (non-blocking). */
+  private notifyAttachmentSubscribers(info: AttachmentInfo): void {
+    for (const cb of this.attachmentSubscribers) {
+      queueMicrotask(() => {
+        try { cb(info); } catch { /* best-effort */ }
+      });
+    }
+  }
+
+  // ── Attachment Relay (P2P Binary Transfer) ─────────────────────
+
+  /**
+   * Relay a binary attachment to a target DID via P2P.
+   * The attachment is transferred directly via stream protocol and
+   * stored on the receiver's local filesystem.
+   */
+  async relayAttachment(params: {
+    targetDid: string;
+    data: Buffer;
+    contentType: string;
+    fileName?: string;
+    attachmentId?: string;
+  }): Promise<RelayAttachmentResult> {
+    const { targetDid, data, contentType, fileName } = params;
+
+    if (data.length > MAX_ATTACHMENT_BYTES) {
+      throw new Error(`Attachment too large: ${data.length} bytes (max ${MAX_ATTACHMENT_BYTES})`);
+    }
+
+    this.enforceRateLimit(this.localDid);
+
+    // Compute attachment ID from data hash if not provided
+    const attachmentId = params.attachmentId || crypto.createHash('sha256').update(data).digest('hex');
+
+    const peerId = this.didToPeerId.get(targetDid);
+    if (peerId) {
+      const delivered = await this.deliverAttachment(peerId, targetDid, attachmentId, data, contentType, fileName ?? '');
+      if (delivered) {
+        return { attachmentId, delivered: true };
+      }
+      // Try re-resolve if stale
+      if (this.isStalePeerMapping(targetDid)) {
+        const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
+        if (resolvedPeerId && resolvedPeerId !== peerId) {
+          this.registerDidPeer(targetDid, resolvedPeerId);
+          try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
+          const reDelivered = await this.deliverAttachment(resolvedPeerId, targetDid, attachmentId, data, contentType, fileName ?? '');
+          if (reDelivered) {
+            return { attachmentId, delivered: true };
+          }
+        }
+      }
+    }
+
+    // DID unknown — try resolve via connected peers
+    if (!peerId) {
+      const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
+      if (resolvedPeerId) {
+        this.registerDidPeer(targetDid, resolvedPeerId);
+        try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
+        const delivered = await this.deliverAttachment(resolvedPeerId, targetDid, attachmentId, data, contentType, fileName ?? '');
+        if (delivered) {
+          return { attachmentId, delivered: true };
+        }
+      }
+    }
+
+    // Attachment relay requires the peer to be online — no outbox queuing for large binary data
+    this.log.warn('attachment relay failed: peer offline', { targetDid, attachmentId });
+    return { attachmentId, delivered: false };
+  }
+
+  /**
+   * Get a locally stored attachment by ID.
+   * Returns the file data and content type, or null if not found.
+   */
+  async getAttachment(attachmentId: string): Promise<{ data: Buffer; contentType: string; fileName: string } | null> {
+    const meta = this.store.getAttachmentMeta(attachmentId);
+    if (!meta) return null;
+    try {
+      const filePath = join(this.attachmentsDir, meta.storedFileName);
+      const data = await fsReadFile(filePath);
+      return { data, contentType: meta.contentType, fileName: meta.fileName };
+    } catch {
+      return null;
+    }
+  }
+
+  /** List locally stored attachment metadata. */
+  listAttachments(opts?: { limit?: number; since?: number }): AttachmentInfo[] {
+    return this.store.listAttachments(opts);
+  }
+
+  /** Delete a locally stored attachment. */
+  async deleteAttachment(attachmentId: string): Promise<boolean> {
+    const meta = this.store.getAttachmentMeta(attachmentId);
+    if (!meta) return false;
+    try {
+      await unlink(join(this.attachmentsDir, meta.storedFileName));
+    } catch { /* file may already be gone */ }
+    return this.store.deleteAttachment(attachmentId);
+  }
+
+  // ── Private: Attachment Delivery ───────────────────────────────
+
+  private async deliverAttachment(
+    peerId: string,
+    targetDid: string,
+    attachmentId: string,
+    data: Buffer,
+    contentType: string,
+    fileName: string,
+  ): Promise<boolean> {
+    let stream: StreamDuplex | null = null;
+    try {
+      stream = await this.p2p.newStream(peerId, PROTO_ATTACHMENT);
+
+      const bytes = encodeAttachmentMessageBytes({
+        attachmentId,
+        sourceDid: this.localDid,
+        targetDid,
+        contentType,
+        fileName,
+        data: new Uint8Array(data),
+        totalSize: data.length,
+        sentAtMs: BigInt(Date.now()),
+      });
+
+      await writeBinaryStream(stream.sink, bytes);
+      await stream.close();
+      this.log.info('attachment delivered', { peerId, targetDid, attachmentId, size: data.length });
+      return true;
+    } catch (err) {
+      this.log.warn('attachment delivery failed', {
+        peerId,
+        targetDid,
+        attachmentId,
+        error: (err as Error).message,
+      });
+      if (stream) {
+        try { await stream.close(); } catch { /* ignore */ }
+      }
+      return false;
+    }
+  }
+
+  // ── Private: Inbound Attachment Handler ────────────────────────
+
+  private async handleInboundAttachment(incoming: {
+    stream: StreamDuplex;
+    connection: { remotePeer?: { toString: () => string } };
+  }): Promise<void> {
+    const { stream, connection } = incoming;
+    try {
+      const remotePeer = connection.remotePeer?.toString();
+      if (remotePeer) {
+        try {
+          this.enforceInboundRateLimit(remotePeer);
+          this.enforceGlobalInboundRateLimit();
+        } catch {
+          this.log.warn('inbound attachment rate limit exceeded', { peerId: remotePeer });
+          try { await stream.close(); } catch { /* ignore */ }
+          return;
+        }
+      }
+
+      const raw = await readStream(stream.source, MAX_ATTACHMENT_BYTES + 1024, ATTACHMENT_STREAM_TIMEOUT_MS);
+      await stream.close();
+
+      const msg = decodeAttachmentMessageBytes(new Uint8Array(raw));
+
+      if (!msg.attachmentId || !msg.sourceDid || msg.data.length === 0) {
+        this.log.warn('inbound attachment missing required fields');
+        return;
+      }
+
+      if (msg.data.length > MAX_ATTACHMENT_BYTES) {
+        this.log.warn('inbound attachment too large', { size: msg.data.length });
+        return;
+      }
+
+      // Determine stored file name: use attachmentId + extension from contentType
+      const ext = mimeToExtension(msg.contentType);
+      const storedFileName = `${msg.attachmentId}${ext}`;
+
+      // Store to disk
+      await mkdir(this.attachmentsDir, { recursive: true });
+      await writeFile(join(this.attachmentsDir, storedFileName), msg.data);
+
+      // Store metadata in SQLite
+      const info: AttachmentInfo = {
+        attachmentId: msg.attachmentId,
+        sourceDid: msg.sourceDid,
+        contentType: msg.contentType,
+        fileName: msg.fileName,
+        totalSize: msg.data.length,
+        receivedAtMs: Date.now(),
+      };
+      this.store.saveAttachmentMeta(info, storedFileName);
+
+      // Record DID → PeerId mapping
+      const remotePeerId = connection.remotePeer?.toString();
+      if (remotePeerId && msg.sourceDid) {
+        this.registerDidPeer(msg.sourceDid, remotePeerId);
+      }
+
+      this.log.info('attachment received', {
+        attachmentId: msg.attachmentId,
+        sourceDid: msg.sourceDid,
+        size: msg.data.length,
+        contentType: msg.contentType,
+      });
+
+      // Notify attachment subscribers
+      this.notifyAttachmentSubscribers(info);
+
+      // Also push to inbox subscribers with attachment metadata (so apps get notified)
+      const currentSeq = this.store.currentSeq();
+      this.notifySubscribers({
+        messageId: `att_${msg.attachmentId}`,
+        sourceDid: msg.sourceDid,
+        topic: '_attachment',
+        payload: JSON.stringify({
+          attachmentId: msg.attachmentId,
+          contentType: msg.contentType,
+          fileName: msg.fileName,
+          totalSize: msg.data.length,
+        }),
+        receivedAtMs: Date.now(),
+        priority: MessagePriority.NORMAL,
+        seq: currentSeq,
+      });
+    } catch (err) {
+      this.log.warn('failed to handle inbound attachment', { error: (err as Error).message });
+      try { await stream.close(); } catch { /* ignore */ }
     }
   }
 
@@ -1126,6 +1422,29 @@ export class MessagingService {
       try { await stream.close(); } catch { /* ignore */ }
     }
   }
+}
+
+// ── MIME → Extension Helper ──────────────────────────────────────
+
+const MIME_EXT_MAP: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/svg+xml': '.svg',
+  'application/pdf': '.pdf',
+  'application/json': '.json',
+  'text/plain': '.txt',
+  'text/html': '.html',
+  'audio/mpeg': '.mp3',
+  'audio/ogg': '.ogg',
+  'video/mp4': '.mp4',
+  'application/octet-stream': '.bin',
+};
+
+function mimeToExtension(contentType: string): string {
+  const base = contentType.split(';')[0].trim().toLowerCase();
+  return MIME_EXT_MAP[base] ?? '.bin';
 }
 
 // ── Rate Limit Error ─────────────────────────────────────────────

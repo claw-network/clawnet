@@ -86,6 +86,39 @@ export interface DidPeerMapResponse {
   didPeerMap: Record<string, string>;
 }
 
+// ── Attachment Types ─────────────────────────────────────────────
+
+export interface RelayAttachmentParams {
+  /** Target node's DID (did:claw:z...) */
+  targetDid: string;
+  /** Base64-encoded binary attachment data */
+  data: string;
+  /** MIME type (e.g. "image/png") */
+  contentType: string;
+  /** Original filename (optional) */
+  fileName?: string;
+  /** Deterministic attachment ID (optional — defaults to sha256 of data) */
+  attachmentId?: string;
+}
+
+export interface RelayAttachmentResult {
+  attachmentId: string;
+  delivered: boolean;
+}
+
+export interface AttachmentInfo {
+  attachmentId: string;
+  sourceDid: string;
+  contentType: string;
+  fileName: string;
+  totalSize: number;
+  receivedAtMs: number;
+}
+
+export interface AttachmentListResponse {
+  attachments: AttachmentInfo[];
+}
+
 // ── API Class ────────────────────────────────────────────────────
 
 export class MessagingApi {
@@ -141,5 +174,45 @@ export class MessagingApi {
    */
   async peers(opts?: RequestOptions): Promise<DidPeerMapResponse> {
     return this.http.get<DidPeerMapResponse>('/api/v1/messaging/peers', undefined, opts);
+  }
+
+  // ── Attachment Relay ─────────────────────────────────────────
+
+  /**
+   * Relay a binary attachment to a target DID via P2P.
+   *
+   * The attachment is transferred directly through the P2P network and
+   * stored on the receiver's local filesystem. The receiver can then
+   * access it via `getAttachment()` without needing cross-node HTTP.
+   *
+   * @param params.data — Base64-encoded binary data (max 10 MB)
+   */
+  async relayAttachment(params: RelayAttachmentParams, opts?: RequestOptions): Promise<RelayAttachmentResult> {
+    return this.http.post<RelayAttachmentResult>('/api/v1/messaging/relay-attachment', params, opts);
+  }
+
+  /**
+   * List attachments received via P2P relay.
+   */
+  async listAttachments(params?: { limit?: number; since?: number }, opts?: RequestOptions): Promise<AttachmentListResponse> {
+    const query: Record<string, string | number | boolean | undefined> = {};
+    if (params?.limit !== undefined) query.limit = params.limit;
+    if (params?.since !== undefined) query.since = params.since;
+    return this.http.get<AttachmentListResponse>('/api/v1/messaging/attachments', query, opts);
+  }
+
+  /**
+   * Download a received attachment by ID.
+   * Returns the raw binary data as an ArrayBuffer.
+   */
+  async getAttachment(attachmentId: string, opts?: RequestOptions): Promise<ArrayBuffer> {
+    return this.http.getRaw(`/api/v1/messaging/attachments/${encodeURIComponent(attachmentId)}`, opts);
+  }
+
+  /**
+   * Delete a received attachment by ID.
+   */
+  async deleteAttachment(attachmentId: string, opts?: RequestOptions): Promise<void> {
+    await this.http.delete(`/api/v1/messaging/attachments/${encodeURIComponent(attachmentId)}`, undefined, opts);
   }
 }

@@ -80,6 +80,21 @@ function createMockMessagingService() {
       for (const cb of subscribers) cb({ ...msg, priority: 1, seq: ++seqCounter });
     },
     get _subscriberCount() { return subscribers.size; },
+    // Attachment methods
+    relayAttachment: vi.fn(async (params: { targetDid: string; data: Buffer; contentType: string; fileName?: string; attachmentId?: string }) => {
+      if (rateLimitOn) throw new RateLimitError('did:claw:test', 600);
+      return { attachmentId: params.attachmentId || 'sha256_test_hash', delivered: true };
+    }),
+    listAttachments: vi.fn((_opts?: { limit?: number; since?: number }) => {
+      return [
+        { attachmentId: 'att_1', sourceDid: 'did:claw:zAlice', contentType: 'image/png', fileName: 'photo.png', totalSize: 1024, receivedAtMs: Date.now() },
+      ];
+    }),
+    getAttachment: vi.fn(async (id: string) => {
+      if (id === 'att_1') return { data: Buffer.from('fake-image'), contentType: 'image/png', fileName: 'photo.png' };
+      return null;
+    }),
+    deleteAttachment: vi.fn(async (id: string) => id === 'att_1'),
   };
 }
 
@@ -473,5 +488,116 @@ describe('messaging api', () => {
     expect(res.status).toBe(200);
     const data = await readData<{ messages: unknown[] }>(res);
     expect(data.messages).toHaveLength(1);
+  });
+
+  // ── POST /api/v1/messaging/relay-attachment ────────────────────
+
+  it('relays an attachment and returns attachmentId', async () => {
+    const testData = Buffer.from('hello-image').toString('base64');
+    const res = await fetch(`${baseUrl}/api/v1/messaging/relay-attachment`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDid: 'did:claw:zBobPeerId123',
+        data: testData,
+        contentType: 'image/png',
+        fileName: 'photo.png',
+      }),
+    });
+
+    expect(res.status).toBe(201);
+    const data = await readData<{ attachmentId: string; delivered: boolean }>(res);
+    expect(data.attachmentId).toBeDefined();
+    expect(data.delivered).toBe(true);
+    expect(mockService.relayAttachment).toHaveBeenCalled();
+  });
+
+  it('rejects relay-attachment without targetDid', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/relay-attachment`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        data: Buffer.from('test').toString('base64'),
+        contentType: 'image/png',
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects relay-attachment with invalid DID', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/relay-attachment`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDid: 'not-a-did',
+        data: Buffer.from('test').toString('base64'),
+        contentType: 'image/png',
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects relay-attachment without data', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/relay-attachment`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDid: 'did:claw:zBob123',
+        contentType: 'image/png',
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects relay-attachment without contentType', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/relay-attachment`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targetDid: 'did:claw:zBob123',
+        data: Buffer.from('test').toString('base64'),
+      }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // ── GET /api/v1/messaging/attachments ──────────────────────────
+
+  it('lists received attachments', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/attachments`);
+    expect(res.status).toBe(200);
+    const data = await readData<{ attachments: unknown[] }>(res);
+    expect(data.attachments).toHaveLength(1);
+  });
+
+  // ── GET /api/v1/messaging/attachments/:id ──────────────────────
+
+  it('downloads a received attachment', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/attachments/att_1`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('image/png');
+    const buf = await res.arrayBuffer();
+    expect(Buffer.from(buf).toString()).toBe('fake-image');
+  });
+
+  it('returns 404 for unknown attachment', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/attachments/att_nonexistent`);
+    expect(res.status).toBe(404);
+  });
+
+  // ── DELETE /api/v1/messaging/attachments/:id ───────────────────
+
+  it('deletes a received attachment', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/attachments/att_1`, {
+      method: 'DELETE',
+    });
+    expect(res.status).toBe(204);
+  });
+
+  it('returns 404 when deleting unknown attachment', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/attachments/att_nonexistent`, {
+      method: 'DELETE',
+    });
+    expect(res.status).toBe(404);
   });
 });

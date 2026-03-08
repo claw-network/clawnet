@@ -68,3 +68,23 @@ export interface E2EEnvelope {
   tag: Uint8Array;         // 16 bytes
   ciphertext: Uint8Array;
 }
+
+/**
+ * Wire format for `/clawnet/1.0.0/attachment`.
+ *
+ * Relays binary attachment data between nodes P2P.
+ * The receiver stores the data locally so it's always accessible
+ * without cross-node HTTP dependency.
+ *
+ * Field order matches the FlatBuffers schema.
+ */
+export interface AttachmentMessage {
+  attachmentId: string;    // SHA-256 hex of data, or caller-provided ID
+  sourceDid: string;
+  targetDid: string;
+  contentType: string;     // MIME type, e.g. "image/png"
+  fileName: string;        // Original filename (optional, may be empty)
+  data: Uint8Array;        // Raw binary attachment data
+  totalSize: number;       // Total size in bytes (for validation)
+  sentAtMs: bigint;
+}

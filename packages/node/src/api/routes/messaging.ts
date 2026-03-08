@@ -6,10 +6,14 @@
  * GET  /inbox             — List inbox messages (polling)
  * DELETE /inbox/:messageId — Acknowledge (consume) a message
  * GET  /peers             — Show DID → PeerId mapping (debug)
+ * POST /relay-attachment   — Relay a binary attachment to a target DID via P2P
+ * GET  /attachments        — List received attachments
+ * GET  /attachments/:id    — Download a received attachment
+ * DELETE /attachments/:id  — Delete a received attachment
  */
 
 import { Router } from '../router.js';
-import { ok, created, noContent, badRequest, internalError, tooManyRequests } from '../response.js';
+import { ok, created, noContent, badRequest, notFound, internalError, tooManyRequests } from '../response.js';
 import type { RuntimeContext } from '../types.js';
 import { RateLimitError } from '../../services/messaging-service.js';
 
@@ -205,6 +209,133 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
 
     const map = ctx.messagingService.getDidPeerMap();
     ok(res, { didPeerMap: map });
+  });
+
+  // ── POST /relay-attachment — relay binary attachment via P2P ───
+  r.post('/relay-attachment', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const body = route.body as Record<string, unknown> | undefined;
+    if (!body) {
+      badRequest(res, 'Request body required', route.url.pathname);
+      return;
+    }
+
+    const targetDid = body.targetDid as string | undefined;
+    const data = body.data as string | undefined; // base64-encoded binary
+    const contentType = body.contentType as string | undefined;
+    const fileName = typeof body.fileName === 'string' ? body.fileName : undefined;
+    const attachmentId = typeof body.attachmentId === 'string' ? body.attachmentId : undefined;
+
+    if (!targetDid || typeof targetDid !== 'string') {
+      badRequest(res, 'Missing or invalid "targetDid"', route.url.pathname);
+      return;
+    }
+    if (!targetDid.startsWith('did:claw:')) {
+      badRequest(res, 'targetDid must be a valid DID (did:claw:...)', route.url.pathname);
+      return;
+    }
+    if (!data || typeof data !== 'string') {
+      badRequest(res, 'Missing or invalid "data" (base64-encoded)', route.url.pathname);
+      return;
+    }
+    if (!contentType || typeof contentType !== 'string') {
+      badRequest(res, 'Missing or invalid "contentType"', route.url.pathname);
+      return;
+    }
+
+    let binaryData: Buffer;
+    try {
+      binaryData = Buffer.from(data, 'base64');
+    } catch {
+      badRequest(res, 'Invalid base64 data', route.url.pathname);
+      return;
+    }
+
+    if (binaryData.length === 0) {
+      badRequest(res, 'Attachment data is empty', route.url.pathname);
+      return;
+    }
+
+    try {
+      const result = await ctx.messagingService.relayAttachment({
+        targetDid,
+        data: binaryData,
+        contentType,
+        fileName,
+        attachmentId,
+      });
+      created(res, result, { self: '/api/v1/messaging/attachments' });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (err instanceof RateLimitError) {
+        tooManyRequests(res, message, route.url.pathname, 60);
+        return;
+      }
+      if (message.includes('too large')) {
+        badRequest(res, message, route.url.pathname);
+        return;
+      }
+      internalError(res, message);
+    }
+  });
+
+  // ── GET /attachments — list received attachments ──────────────
+  r.get('/attachments', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const limitStr = route.query.get('limit');
+    const sinceStr = route.query.get('since');
+    const limit = limitStr ? Math.min(Math.max(Number(limitStr), 1), 500) : undefined;
+    const since = sinceStr ? Number(sinceStr) : undefined;
+
+    const attachments = ctx.messagingService.listAttachments({ limit, since });
+    ok(res, { attachments }, { self: '/api/v1/messaging/attachments' });
+  });
+
+  // ── GET /attachments/:id — download a received attachment ─────
+  r.get('/attachments/:id', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const { id } = route.params;
+    const result = await ctx.messagingService.getAttachment(id);
+    if (!result) {
+      notFound(res, `Attachment not found: ${id}`, route.url.pathname);
+      return;
+    }
+
+    // Return raw binary data with correct Content-Type
+    res.writeHead(200, {
+      'Content-Type': result.contentType || 'application/octet-stream',
+      'Content-Length': String(result.data.length),
+      ...(result.fileName ? { 'Content-Disposition': `inline; filename="${result.fileName}"` } : {}),
+    });
+    res.end(result.data);
+  });
+
+  // ── DELETE /attachments/:id — delete a received attachment ────
+  r.delete('/attachments/:id', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const { id } = route.params;
+    const deleted = await ctx.messagingService.deleteAttachment(id);
+    if (!deleted) {
+      notFound(res, `Attachment not found: ${id}`, route.url.pathname);
+      return;
+    }
+    noContent(res);
   });
 
   return r;

@@ -6,4 +6,7 @@ export const TOPIC_RESPONSES = '/clawnet/1.0.0/responses';
 /** Point-to-point stream protocol for credential delivery (not a gossip topic). */
 export const PROTOCOL_DELIVERY_AUTH = '/clawnet/1.0.0/delivery-auth';
 
+/** Point-to-point stream protocol for binary attachment relay between nodes. */
+export const PROTOCOL_ATTACHMENT = '/clawnet/1.0.0/attachment';
+
 export const ALL_TOPICS = [TOPIC_EVENTS, TOPIC_MARKETS, TOPIC_REQUESTS, TOPIC_RESPONSES];
