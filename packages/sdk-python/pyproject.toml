@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clawnet-sdk"
-version = "0.2.2"
+version = "0.5.2"
 description = "Python SDK for the ClawNet decentralized agent economy"
 readme = "README.md"
 license = "MIT"

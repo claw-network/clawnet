@@ -90,6 +90,44 @@ type Libp2pNodeServices = {
   pubsub?: PubsubService;
 } & Record<string, unknown>;
 
+/**
+ * Adapt a libp2p v3 stream (AbstractMessageStream) to the StreamDuplex
+ * interface expected by MessagingService.
+ *
+ * libp2p v3 streams:
+ *   - read:  stream itself is AsyncIterable (implements [Symbol.asyncIterator])
+ *   - write: stream.send(data: Uint8Array)
+ *
+ * StreamDuplex expects:
+ *   - read:  stream.source is AsyncIterable
+ *   - write: stream.sink is (asyncIterable) => Promise<void>
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function adaptStream(raw: any): StreamDuplex {
+  // If it already has .source and .sink, assume it's compatible (forward compat)
+  if (raw.source && typeof raw.sink === 'function') {
+    return raw as StreamDuplex;
+  }
+
+  return {
+    source: raw[Symbol.asyncIterator]
+      ? raw                           // stream itself is the async iterable
+      : (async function* () {})(),    // fallback: empty iterable
+
+    sink: async (iterable: AsyncIterable<Uint8Array>) => {
+      for await (const chunk of iterable) {
+        raw.send(chunk instanceof Uint8Array ? chunk : new Uint8Array(chunk));
+      }
+      // Half-close write side after sending all data
+      if (typeof raw.closeWrite === 'function') {
+        await raw.closeWrite();
+      }
+    },
+
+    close: () => raw.close(),
+  };
+}
+
 type Libp2pNode = {
   peerId?: { toString: () => string };
   stop: () => Promise<void>;
@@ -484,7 +522,15 @@ export class P2PNode {
     if (!this.node?.handle) {
       throw new Error('node not started or does not support handle()');
     }
-    await this.node.handle(protocol, handler, options);
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    await this.node.handle(
+      protocol,
+      ((rawStream: any, connection: any) => {
+        handler({ stream: adaptStream(rawStream), connection });
+      }) as any,
+      options,
+    );
+    /* eslint-enable @typescript-eslint/no-explicit-any */
   }
 
   /**
@@ -509,7 +555,11 @@ export class P2PNode {
     if (!this.node?.dialProtocol) {
       throw new Error('node not started or does not support dialProtocol()');
     }
-    return this.node.dialProtocol(peerId, protocol);
+    const rawStream = await this.node.dialProtocol(
+      multiaddr('/p2p/' + peerId),
+      protocol,
+    );
+    return adaptStream(rawStream);
   }
 
   /**
