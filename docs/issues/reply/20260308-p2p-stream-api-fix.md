@@ -4,7 +4,9 @@
 > **接收方**: TelAgent 项目组  
 > **日期**: 2026-03-08  
 > **关联文档**: `docs/issues/clawnet-p2p-node-stream-api-fix.md`  
-> **修复文件**: `packages/core/src/p2p/node.ts`
+> **修复文件**: `packages/core/src/p2p/node.ts`  
+> **修复版本**: `@claw-network/core@0.5.2`（已发布至 npm）  
+> **Git commit**: `1d825ae`
 
 ---
 
@@ -88,16 +90,50 @@ return adaptStream(rawStream);
 
 ---
 
+## 版本与发布信息
+
+| 包 | 版本 | 状态 |
+|---|---|---|
+| `@claw-network/core` | 0.5.2 | ✅ 已发布至 npm |
+| `@claw-network/protocol` | 0.5.2 | ✅ 已发布至 npm |
+| `@claw-network/sdk` | 0.5.2 | ✅ 已发布至 npm |
+| `@claw-network/node` | 0.5.2 | ✅ 已发布至 npm |
+
+---
+
 ## TelAgent 侧建议操作
 
-1. **拉取最新代码**后重新构建：`pnpm build`
-2. **部署到至少 2 个节点**（如 bootstrap-1 + alex），重启 `clawnetd`
-3. **等待 30s** 后检查 DID 映射表：
+### 1. 升级依赖（必须）
+
+修复位于 `@claw-network/core@0.5.2`，需升级至该版本才能解决问题：
+
+```bash
+pnpm add @claw-network/core@0.5.2
+pnpm add @claw-network/node@0.5.2
+```
+
+或一次性升级所有 ClawNet 包：
+
+```bash
+pnpm add @claw-network/core@0.5.2 @claw-network/protocol@0.5.2 @claw-network/sdk@0.5.2 @claw-network/node@0.5.2
+```
+
+### 2. 重新构建
+
+```bash
+pnpm build
+```
+
+### 3. 部署并验证
+
+1. **部署到至少 2 个节点**（如 bootstrap-1 + alex），重启 `clawnetd`
+2. **等待 30s** 后检查 DID 映射表：
    ```bash
    curl -s http://localhost:9529/api/messaging/peers | jq .
    ```
-4. **检查日志**确认无 `FAILED` / `error`：
+   预期：`didPeerMap` 中应出现各已连接节点的 DID → PeerId 映射。
+3. **检查日志**确认无 `FAILED` / `error`：
    ```bash
    journalctl -u clawnetd --since "2 minutes ago" | grep -E "FAILED|failed|error"
    ```
-5. 如仍有问题，请附上完整的 `journalctl -u clawnetd --since "5 minutes ago"` 日志，我们协助排查
+4. 如仍有问题，请附上完整的 `journalctl -u clawnetd --since "5 minutes ago"` 日志，我们协助排查
