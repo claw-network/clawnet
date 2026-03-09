@@ -631,6 +631,80 @@ Record a reputation event (review, rating, etc.).
 
 ---
 
+## Messaging
+
+### POST /api/v1/messaging/subscription-delegations
+
+Create a subscription delegation. Target node authorizes a Gateway node to receive copies of inbound messages for specified topics.
+
+**Request:**
+
+```json
+{
+  "delegateDid": "did:claw:zGateway...",
+  "topics": ["telagent/envelope", "telagent/receipt"],
+  "expiresInSec": 3600,
+  "metadataOnly": true
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `delegateDid` | Yes | Gateway DID to authorize |
+| `topics` | Yes | Exact topic list (no wildcards) |
+| `expiresInSec` | Yes | TTL in seconds (60–86400) |
+| `metadataOnly` | No | Default `true` — only forward metadata |
+
+**Response:** `201 Created`
+
+```json
+{
+  "data": {
+    "delegationId": "dlg_a1b2c3d4e5f6a1b2c3d4e5f6",
+    "delegateDid": "did:claw:zGateway...",
+    "topics": ["telagent/envelope", "telagent/receipt"],
+    "metadataOnly": true,
+    "expiresAtMs": 1741568400000,
+    "createdAtMs": 1741564800000,
+    "revoked": false
+  }
+}
+```
+
+### GET /api/v1/messaging/subscription-delegations
+
+List all active delegations.
+
+**Response:** `200 OK` — `{ "data": [ ...DelegationRecord ] }`
+
+### GET /api/v1/messaging/subscription-delegations/{id}
+
+Get delegation details.
+
+**Response:** `200 OK` — `{ "data": DelegationRecord }`
+
+### DELETE /api/v1/messaging/subscription-delegations/{id}
+
+Revoke a delegation. Takes effect immediately.
+
+**Response:** `204 No Content`
+
+### WS /api/v1/messaging/subscribe-delegated
+
+WebSocket endpoint for Gateway nodes to receive delegated message notifications in real-time.
+
+**Query parameters:**
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `delegationId` | Yes | Delegation ID |
+| `sinceSeq` | No | Resume from seq (replay missed messages) |
+| `apiKey` | No | Auth (or use `X-Api-Key` header) |
+
+**Server frames:** `connected`, `delegated-message`, `replay_done`
+
+---
+
 ## Error Codes
 
 | HTTP | Code                   | Description                             |
@@ -638,6 +712,7 @@ Record a reputation event (review, rating, etc.).
 | 400  | `INVALID_REQUEST`      | Malformed request body or parameters    |
 | 400  | `INVALID_NONCE`        | Nonce mismatch (replay protection)      |
 | 400  | `INSUFFICIENT_BALANCE` | Not enough tokens                       |
+| 400  | `DELEGATION_LIMIT`     | Max 10 active delegations reached       |
 | 401  | `UNAUTHORIZED`         | Missing or invalid API key              |
 | 403  | `FORBIDDEN`            | Operation not permitted                 |
 | 404  | `NOT_FOUND`            | Resource not found                      |

@@ -2794,6 +2794,150 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  # --------------------------------------------------------------------------
+  # Messaging — Subscription Delegation
+  # --------------------------------------------------------------------------
+  /api/v1/messaging/subscription-delegations:
+    post:
+      tags: [Messaging]
+      summary: 创建订阅授权
+      description: Target 节点授权 Gateway 节点接收指定 topic 的消息副本
+      operationId: createSubscriptionDelegation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delegateDid, topics, expiresInSec]
+              properties:
+                delegateDid:
+                  type: string
+                  description: 被授权方 DID（did:claw:z...）
+                topics:
+                  type: array
+                  items:
+                    type: string
+                  description: 精确 topic 列表，不支持通配符
+                  minItems: 1
+                expiresInSec:
+                  type: integer
+                  description: 授权有效期秒数
+                  minimum: 60
+                  maximum: 86400
+                metadataOnly:
+                  type: boolean
+                  description: 仅转发元数据（默认 true）
+                  default: true
+            example:
+              delegateDid: 'did:claw:zGatewayNodeDid'
+              topics: ['telagent/envelope', 'telagent/receipt']
+              expiresInSec: 3600
+              metadataOnly: true
+      responses:
+        '201':
+          description: 授权创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DelegationRecord'
+                  links:
+                    type: object
+                    properties:
+                      self:
+                        type: string
+        '400':
+          description: 参数无效（缺字段 / DID 格式错误 / TTL 越界 / 超出配额）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      tags: [Messaging]
+      summary: 列出活跃订阅授权
+      operationId: listSubscriptionDelegations
+      responses:
+        '200':
+          description: 授权列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DelegationRecord'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/messaging/subscription-delegations/{delegationId}:
+    get:
+      tags: [Messaging]
+      summary: 查看授权详情
+      operationId: getSubscriptionDelegation
+      parameters:
+        - name: delegationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 授权详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DelegationRecord'
+        '404':
+          description: 授权不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      tags: [Messaging]
+      summary: 撤销订阅授权
+      description: 撤销后 Target 立即停止向该 Gateway 转发消息
+      operationId: revokeSubscriptionDelegation
+      parameters:
+        - name: delegationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 撤销成功
+        '404':
+          description: 授权不存在或已撤销
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 # ============================================================================
 # COMPONENTS
 # ============================================================================
@@ -2864,6 +3008,41 @@ components:
     # ------------------------------------------------------------------------
     # Node
     # ------------------------------------------------------------------------
+
+    # ------------------------------------------------------------------------
+    # Messaging — Subscription Delegation
+    # ------------------------------------------------------------------------
+    DelegationRecord:
+      type: object
+      description: 订阅授权记录
+      properties:
+        delegationId:
+          type: string
+          description: 授权 ID（dlg_ 前缀）
+          example: dlg_a1b2c3d4e5f6a1b2c3d4e5f6
+        delegateDid:
+          type: string
+          description: 被授权方 DID
+          example: 'did:claw:zGatewayNodeDid'
+        topics:
+          type: array
+          items:
+            type: string
+          description: 授权 topic 列表
+          example: ['telagent/envelope', 'telagent/receipt']
+        metadataOnly:
+          type: boolean
+          description: 是否仅转发元数据
+          default: true
+        expiresAtMs:
+          type: integer
+          description: 过期时间戳（毫秒）
+        createdAtMs:
+          type: integer
+          description: 创建时间戳（毫秒）
+        revoked:
+          type: boolean
+          description: 是否已撤销
     NodeStatus:
       type: object
       properties:

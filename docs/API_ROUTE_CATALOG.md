@@ -1695,3 +1695,7 @@ Exceeding policy limits returns `429 Too Many Requests` with `Retry-After`.
 | 83  | POST   | `/api/dao/timelock/:id/cancel`                   | Cancel timelock                          |
 | 84  | GET    | `/api/dao/params`                                | Get DAO params                           |
 | 85  | POST   | `/api/v1/dev/faucet`                             | Dev faucet (API key + anti-abuse limits) |
+| 86  | POST   | `/api/v1/messaging/subscription-delegations`     | Create subscription delegation           |
+| 87  | GET    | `/api/v1/messaging/subscription-delegations`     | List active delegations                  |
+| 88  | GET    | `/api/v1/messaging/subscription-delegations/:id` | Get delegation details                   |
+| 89  | DELETE | `/api/v1/messaging/subscription-delegations/:id` | Revoke delegation                        |

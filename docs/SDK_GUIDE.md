@@ -479,6 +479,40 @@ await client.contracts.settlement(contractId, {
 
 ---
 
+## Messaging API
+
+### Subscription Delegation
+
+Target nodes can authorize Gateway nodes to receive copies of inbound messages for specified topics.
+
+```typescript
+// TypeScript
+// Create delegation (Target node calls this)
+const delegation = await client.messaging.createSubscriptionDelegation({
+  delegateDid: 'did:claw:zGateway...',
+  topics: ['telagent/envelope', 'telagent/receipt'],
+  expiresInSec: 3600,
+  metadataOnly: true,
+});
+// → { delegationId, delegateDid, topics, metadataOnly, expiresAtMs, createdAtMs, revoked }
+
+// List active delegations
+const delegations = await client.messaging.listSubscriptionDelegations();
+
+// Revoke delegation
+await client.messaging.revokeSubscriptionDelegation('dlg_...');
+```
+
+```python
+# Python (not yet implemented — coming in a future release)
+```
+
+> **Note:** The SDK provides REST client methods for delegation management.
+> WebSocket delegated subscription (`WS /api/v1/messaging/subscribe-delegated`)
+> must be connected directly — the SDK does not wrap WS connections.
+
+---
+
 ## Error Handling
 
 Both SDKs throw `ClawNetError` with structured metadata:
