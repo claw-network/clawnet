@@ -30,7 +30,7 @@
 services:
   # ── Besu Dev Chain ─────────────────────────────────────────────────────
   besu-dev:
-    image: hyperledger/besu:latest
+    image: hyperledger/besu:24.12.2
     container_name: claw-besu-dev
     hostname: besu-dev
     ports:
@@ -41,6 +41,8 @@ services:
       - besu
       - --network=dev
       - --data-path=/data
+      - --miner-enabled
+      - --miner-coinbase=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
       - --rpc-http-enabled
       - --rpc-http-host=0.0.0.0
       - --rpc-http-port=8545
@@ -48,13 +50,8 @@ services:
       - --rpc-http-cors-origins=*
       - --host-allowlist=*
       - --min-gas-price=0
-      - --miner-enabled
-      - --miner-coinbase=0x0000000000000000000000000000000000000000
     healthcheck:
-      test: >
-        wget -qO- --post-data='{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
-        --header='Content-Type: application/json'
-        http://127.0.0.1:8545 || exit 1
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8545'"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -80,25 +77,23 @@ services:
     volumes:
       - bootstrap-data:/data
       - ./localdev/relay-test-config:/config:ro
+      - ./packages/contracts/artifacts:/app/packages/contracts/artifacts:ro
     environment:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
       - CLAW_PASSPHRASE=testnet-dev-passphrase
       - CLAW_RELAY_ENABLED=true
+      - DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
       - NODE_ENV=development
-    command: >
-      sh -c "
+    command:
+      - sh
+      - -c
+      - |
         if [ -f /config/config.yaml ]; then
           mkdir -p /data && cp /config/config.yaml /data/config.yaml;
-        fi;
-        node packages/node/dist/daemon.js
-          --data-dir /data
-          --api-host 0.0.0.0
-          --api-port 9528
-          --listen /ip4/0.0.0.0/tcp/9527
-          --health-interval-ms 10000
-      "
+        fi
+        exec node packages/node/dist/daemon.js --data-dir /data --api-host 0.0.0.0 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527 --health-interval-ms 10000
     depends_on:
       besu-dev:
         condition: service_healthy
@@ -123,26 +118,23 @@ services:
     volumes:
       - peer1-data:/data
       - ./localdev/relay-test-config:/config:ro
+      - ./packages/contracts/artifacts:/app/packages/contracts/artifacts:ro
     environment:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
       - CLAW_PASSPHRASE=testnet-dev-passphrase
       - CLAW_RELAY_ENABLED=true
+      - DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
       - NODE_ENV=development
-    command: >
-      sh -c "
+    command:
+      - sh
+      - -c
+      - |
         if [ -f /config/config.yaml ]; then
           mkdir -p /data && cp /config/config.yaml /data/config.yaml;
-        fi;
-        entrypoint-peer.sh
-          --bootstrap-api http://bootstrap:9528
-          --data-dir /data
-          --api-host 0.0.0.0
-          --api-port 9528
-          --listen /ip4/0.0.0.0/tcp/9527
-          --health-interval-ms 10000
-      "
+        fi
+        exec entrypoint-peer.sh --bootstrap-api http://bootstrap:9528 --data-dir /data --api-host 0.0.0.0 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527 --health-interval-ms 10000
     depends_on:
       bootstrap:
         condition: service_healthy
@@ -167,26 +159,23 @@ services:
     volumes:
       - peer2-data:/data
       - ./localdev/relay-test-config:/config:ro
+      - ./packages/contracts/artifacts:/app/packages/contracts/artifacts:ro
     environment:
       - CLAW_API_HOST=0.0.0.0
       - CLAW_API_PORT=9528
       - CLAW_DATA_DIR=/data
       - CLAW_PASSPHRASE=testnet-dev-passphrase
       - CLAW_RELAY_ENABLED=true
+      - DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
       - NODE_ENV=development
-    command: >
-      sh -c "
+    command:
+      - sh
+      - -c
+      - |
         if [ -f /config/config.yaml ]; then
           mkdir -p /data && cp /config/config.yaml /data/config.yaml;
-        fi;
-        entrypoint-peer.sh
-          --bootstrap-api http://bootstrap:9528
-          --data-dir /data
-          --api-host 0.0.0.0
-          --api-port 9528
-          --listen /ip4/0.0.0.0/tcp/9527
-          --health-interval-ms 10000
-      "
+        fi
+        exec entrypoint-peer.sh --bootstrap-api http://bootstrap:9528 --data-dir /data --api-host 0.0.0.0 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527 --health-interval-ms 10000
     depends_on:
       bootstrap:
         condition: service_healthy

@@ -58,6 +58,7 @@ import { DaoService } from './services/dao-service.js';
 import { MessagingService } from './services/messaging-service.js';
 import { MessageStore } from './services/message-store.js';
 import { RelayService } from './services/relay-service.js';
+import { RelayRewardService } from './services/relay-reward-service.js';
 import { RelayScorer } from '@claw-network/core';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 import { ApiKeyStore } from './api/api-key-store.js';
@@ -137,6 +138,7 @@ export class ClawNetNode {
   private messagingService?: MessagingService;
   private messageStore?: MessageStore;
   private relayService?: RelayService;
+  private relayRewardService?: RelayRewardService;
   private relayScorer?: RelayScorer;
   private apiKeyStore?: ApiKeyStore;
   private peerId?: PeerIdWithPrivateKey;
@@ -264,6 +266,9 @@ export class ClawNetNode {
           this.reputationService = new ReputationService(this.contractProvider, this.indexerQuery);
           this.contractsService = new ContractsService(this.contractProvider, this.indexerQuery);
           this.daoService = new DaoService(this.contractProvider, this.indexerQuery);
+
+          // RelayRewardService — needs chain + relay + DID
+          // Will be finalized after relayService is created below
           this.eventIndexer = new EventIndexer(
             this.contractProvider,
             this.indexerStore,
@@ -299,6 +304,15 @@ export class ClawNetNode {
           const relayConfig = this.config.p2p?.relay;
           this.relayService = new RelayService(relayConfig);
           this.relayService.start();
+
+          // Initialize RelayRewardService if chain is available
+          if (this.contractProvider && this.cachedDid) {
+            this.relayRewardService = new RelayRewardService({
+              contracts: this.contractProvider,
+              relayService: this.relayService,
+              relayDid: this.cachedDid,
+            });
+          }
 
           // F2: Advertise as relay in DHT if relay is enabled
           if (this.p2p && resolveRelayConfig({ ...DEFAULT_P2P_CONFIG, ...this.config.p2p }).enabled) {
@@ -355,6 +369,7 @@ export class ClawNetNode {
           apiKeyStore: this.apiKeyStore,
           messagingService: this.messagingService,
           relayService: this.relayService,
+          relayRewardService: this.relayRewardService,
           p2pNode: this.p2p,
           relayScorer: this.relayScorer,
         });

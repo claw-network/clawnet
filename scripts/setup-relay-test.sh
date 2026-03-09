@@ -31,6 +31,19 @@ CHAIN_ID=1337
 DEPLOYER_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 DEPLOYER_ADDRESS="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 
+# Emergency signers — 9 deterministic valid addresses (used only for DAO init)
+# Generated via: keccak256("clawnet-test-signer-N") last 20 bytes, EIP-55 checksummed
+EMERGENCY_SIGNERS=""
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0x92B31D0F96aAD0962Ebe382Be7fe096FfA36C503,"
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0x77477BB95b636E87452cbE6161F4F5084732C881,"
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0xC141d90fd860e20391F9bF93bEfeC6d1e071bf35,"
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0xFf3ca0cc6E7471769d20e789eF7aFCc496Ec2163,"
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0x9dF84D7E29ad0C50ab73156B5A2cB314c27fda0d,"
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0x5DEF6d4600823b32A1DD002c35dcD45886C76B67,"
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0x4D864E536a079a992447139C08A53Bbaa4F38611,"
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0x49290EAA1Fc6B39f619b231AD75254feB0eFA36d,"
+EMERGENCY_SIGNERS="${EMERGENCY_SIGNERS}0xe1e820DA4a02f734f8734Cb1f0d9d5C73983E12c"
+
 SKIP_DEPLOY=false
 if [[ "${1:-}" == "--skip-deploy" ]]; then
   SKIP_DEPLOY=true
@@ -73,6 +86,7 @@ else
   export CLAWNET_DEVNET_RPC_URL="$RPC_URL"
   export CLAWNET_DEVNET_CHAIN_ID="$CHAIN_ID"
   export DEPLOYER_PRIVATE_KEY
+  export EMERGENCY_SIGNERS
 
   cd "$CONTRACTS_DIR"
   npx hardhat run scripts/deploy-all.ts --network clawnetDevnet
@@ -98,6 +112,10 @@ export CLAWNET_DEVNET_RPC_URL="$RPC_URL"
 export CLAWNET_DEVNET_CHAIN_ID="$CHAIN_ID"
 export DEPLOYER_PRIVATE_KEY
 export RELAY_REWARD_POOL_AMOUNT="${RELAY_REWARD_POOL_AMOUNT:-100000}"
+# Use deterministic addresses for treasury/liquidity/reserve (must all be distinct)
+export TREASURY_ADDRESS="$DEPLOYER_ADDRESS"
+export LIQUIDITY_ADDRESS="0x92B31D0F96aAD0962Ebe382Be7fe096FfA36C503"
+export RESERVE_ADDRESS="0xC141d90fd860e20391F9bF93bEfeC6d1e071bf35"
 
 cd "$CONTRACTS_DIR"
 npx hardhat run scripts/bootstrap-mint.ts --network clawnetDevnet || {
@@ -117,7 +135,7 @@ extract_proxy() {
   local contract_name="$1"
   echo "$DEPLOYMENT" | node -e "
     const d = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
-    console.log(d.${contract_name}?.proxy || '');
+    console.log(d.contracts?.${contract_name}?.proxy || '');
   "
 }
 
