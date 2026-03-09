@@ -7,6 +7,27 @@
 > **实施计划**: `docs/implementation/relay-network-plan.md`
 > **验证计划**: `docs/implementation/relay-incentive-verification.md`
 > **涉及包**: `@claw-network/core`, `@claw-network/node`, `@claw-network/sdk`, `@claw-network/contracts`
+> **发布版本**: **v0.6.0**（已发布至 npm）
+
+---
+
+## ⚠️ 请升级依赖到 v0.6.0
+
+本次开放式 Relay 网络 + 激励机制所有功能已随 **v0.6.0** 一并发布到 npm，请尽快升级：
+
+```bash
+pnpm add @claw-network/sdk@0.6.0
+# 或
+npm install @claw-network/sdk@0.6.0
+```
+
+如果同时使用了 core / node 包：
+
+```bash
+pnpm add @claw-network/core@0.6.0 @claw-network/node@0.6.0 @claw-network/sdk@0.6.0
+```
+
+v0.6.0 新增的 `client.relay` 命名空间在旧版本中**不存在**，必须升级后才能使用本文档描述的所有 relay API。
 
 ---
 
@@ -693,10 +714,10 @@ await telagentContract.claimReward(
 ### 4. SDK 升级
 
 ```bash
-pnpm add @claw-network/sdk@latest
+pnpm add @claw-network/sdk@0.6.0
 ```
 
-新增 `client.relay` 命名空间下的所有方法立即可用。
+升级后 `client.relay` 命名空间下的所有方法立即可用。
 
 ---
 
