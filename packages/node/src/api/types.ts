@@ -21,6 +21,7 @@ import type { ReputationService } from '../services/reputation-service.js';
 import type { ContractsService } from '../services/contracts-service.js';
 import type { DaoService } from '../services/dao-service.js';
 import type { MessagingService } from '../services/messaging-service.js';
+import type { RelayService } from '../services/relay-service.js';
 import type { ApiKeyStore } from './api-key-store.js';
 
 export {
@@ -76,6 +77,7 @@ export interface RuntimeContext {
   getNodeConfig?: () => Promise<Record<string, unknown>>;
   apiKeyStore?: ApiKeyStore;
   messagingService?: MessagingService;
+  relayService?: RelayService;
 }
 
 // ─── Address & DID Helpers ──────────────────────────────────────

@@ -5,6 +5,7 @@ import { parse } from 'yaml';
 import { ClawNetNode } from './index.js';
 import { createLogger } from './logger.js';
 import { loadConfig, resolveStoragePaths } from '@claw-network/core';
+import type { RelayConfig } from '@claw-network/core';
 import { type ChainConfig, ChainConfigSchema } from './services/chain-config.js';
 import { validateLiquidityPolicyFromEnv } from './policy/liquidity-policy.js';
 
@@ -184,6 +185,31 @@ Example:
     // ENOENT is fine — no config file means no chain config
   }
 
+  /** Build relay config overrides from CLAW_RELAY_* environment variables. */
+  function relayConfigFromEnv(): Partial<RelayConfig> | undefined {
+    const overrides: Partial<RelayConfig> = {};
+    let hasAny = false;
+    const envEnabled = process.env.CLAW_RELAY_ENABLED;
+    if (envEnabled !== undefined) { overrides.enabled = envEnabled === 'true'; hasAny = true; }
+    const envMax = process.env.CLAW_RELAY_MAX_CIRCUITS;
+    if (envMax) { overrides.maxCircuits = Number.parseInt(envMax, 10); hasAny = true; }
+    const envBw = process.env.CLAW_RELAY_MAX_BANDWIDTH_BPS;
+    if (envBw) { overrides.maxBandwidthBps = Number.parseInt(envBw, 10); hasAny = true; }
+    const envTtl = process.env.CLAW_RELAY_RESERVATION_TTL_SEC;
+    if (envTtl) { overrides.reservationTtlSec = Number.parseInt(envTtl, 10); hasAny = true; }
+    const envBytes = process.env.CLAW_RELAY_MAX_CIRCUIT_BYTES;
+    if (envBytes) { overrides.maxCircuitBytes = Number.parseInt(envBytes, 10); hasAny = true; }
+    const envPerPeer = process.env.CLAW_RELAY_MAX_CIRCUITS_PER_PEER;
+    if (envPerPeer) { overrides.maxCircuitsPerPeer = Number.parseInt(envPerPeer, 10); hasAny = true; }
+    const envMode = process.env.CLAW_RELAY_ACCESS_MODE;
+    if (envMode === 'open' || envMode === 'whitelist' || envMode === 'blacklist') {
+      overrides.accessMode = envMode; hasAny = true;
+    }
+    return hasAny ? overrides : undefined;
+  }
+
+  const relayOverrides = relayConfigFromEnv();
+
   const node = new ClawNetNode({
     dataDir: args.dataDir,
     passphrase: args.passphrase,
@@ -197,6 +223,7 @@ Example:
     p2p: {
       listen: args.listen.length ? args.listen : config.p2p?.listen,
       bootstrap: args.bootstrap.length ? args.bootstrap : config.p2p?.bootstrap,
+      ...(relayOverrides ? { relay: relayOverrides } : {}),
     },
   });
 

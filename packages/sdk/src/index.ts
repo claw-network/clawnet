@@ -25,6 +25,14 @@ export { MarketsApi, InfoMarketApi, TaskMarketApi, CapabilityMarketApi, MarketDi
 export { ContractsApi } from './contracts.js';
 export { DaoApi } from './dao.js';
 export { MessagingApi, RECEIPT_TOPIC } from './messaging.js';
+export { RelayApi } from './relay.js';
+export type {
+  RelayStats,
+  RelayPeriodStats,
+  RelayHealthInfo,
+  RelayAccessInfo,
+  RelayAccessUpdateParams,
+} from './relay.js';
 export type {
   SendMessageParams,
   SendMessageResult,
@@ -51,6 +59,7 @@ import { MarketsApi } from './markets.js';
 import { ContractsApi } from './contracts.js';
 import { DaoApi } from './dao.js';
 import { MessagingApi } from './messaging.js';
+import { RelayApi } from './relay.js';
 
 /** Configuration for the top-level client. */
 export type ClientConfig = HttpClientConfig;
@@ -74,6 +83,7 @@ export class ClawNetClient {
   readonly contracts: ContractsApi;
   readonly dao: DaoApi;
   readonly messaging: MessagingApi;
+  readonly relay: RelayApi;
 
   constructor(config?: Partial<ClientConfig>) {
     this.http = new HttpClient({
@@ -88,5 +98,6 @@ export class ClawNetClient {
     this.contracts = new ContractsApi(this.http);
     this.dao = new DaoApi(this.http);
     this.messaging = new MessagingApi(this.http);
+    this.relay = new RelayApi(this.http);
   }
 }

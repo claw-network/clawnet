@@ -15,7 +15,7 @@ import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay
 import { multiaddr } from '@multiformats/multiaddr';
 import type { Libp2pOptions } from 'libp2p';
 import { sha256Bytes } from '../crypto/hash.js';
-import { P2PConfig, DEFAULT_P2P_CONFIG } from './config.js';
+import { P2PConfig, DEFAULT_P2P_CONFIG, resolveRelayConfig } from './config.js';
 
 export interface PubsubMessage {
   topic: string;
@@ -215,8 +215,15 @@ export class P2PNode {
       services.dcutr = dcutr();
     }
 
-    if (this.config.enableCircuitRelay) {
-      services.circuitRelay = circuitRelayServer();
+    const relayConfig = resolveRelayConfig(this.config);
+    if (relayConfig.enabled) {
+      services.circuitRelay = circuitRelayServer({
+        reservations: {
+          maxReservations: relayConfig.maxCircuits,
+          defaultDurationLimit: relayConfig.reservationTtlSec,
+          defaultDataLimit: BigInt(relayConfig.maxCircuitBytes),
+        },
+      });
     }
 
     const options: Record<string, unknown> = {
@@ -232,7 +239,7 @@ export class P2PNode {
       },
       transports: [
         tcp(),
-        ...(this.config.enableCircuitRelay ? [circuitRelayTransport()] : []),
+        ...(relayConfig.enabled ? [circuitRelayTransport()] : []),
       ],
       streamMuxers: [yamux({
         maxInboundStreams: this.config.yamuxMaxInboundStreams ?? 256,

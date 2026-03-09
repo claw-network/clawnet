@@ -56,6 +56,7 @@ import { ContractsService } from './services/contracts-service.js';
 import { DaoService } from './services/dao-service.js';
 import { MessagingService } from './services/messaging-service.js';
 import { MessageStore } from './services/message-store.js';
+import { RelayService } from './services/relay-service.js';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 import { ApiKeyStore } from './api/api-key-store.js';
 
@@ -133,6 +134,7 @@ export class ClawNetNode {
   private daoService?: DaoService;
   private messagingService?: MessagingService;
   private messageStore?: MessageStore;
+  private relayService?: RelayService;
   private apiKeyStore?: ApiKeyStore;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
@@ -289,6 +291,13 @@ export class ClawNetNode {
           });
         }
 
+        // ── Relay service (circuit-relay statistics & access control) ──
+        {
+          const relayConfig = this.config.p2p?.relay;
+          this.relayService = new RelayService(relayConfig);
+          this.relayService.start();
+        }
+
         const apiConfig: ApiServerConfig = {
           host: this.config.api?.host ?? '127.0.0.1',
           port: this.config.api?.port ?? 9528,
@@ -319,6 +328,7 @@ export class ClawNetNode {
           getNodeConfig: () => this.buildNodeConfig(),
           apiKeyStore: this.apiKeyStore,
           messagingService: this.messagingService,
+          relayService: this.relayService,
         });
         await this.apiServer.start();
       }
@@ -345,6 +355,7 @@ export class ClawNetNode {
     this.stopMeshAmplifier();
 
     const tasks: Array<() => Promise<void>> = [
+      async () => this.relayService?.stop(),
       async () => this.messagingService?.stop(),
       async () => this.apiServer?.stop(),
       async () => this.eventIndexer?.stop(),

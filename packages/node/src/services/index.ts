@@ -83,3 +83,11 @@ export type {
   ProposalListResult,
   VoteListResult,
 } from './dao-service.js';
+
+export { RelayService } from './relay-service.js';
+export type {
+  RelayStats,
+  RelayPeriodStats,
+  RelayHealthInfo,
+  RelayAccessInfo,
+} from './relay-service.js';

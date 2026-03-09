@@ -31,6 +31,7 @@ import { devRoutes } from './routes/dev.js';
 import { adminRoutes } from './routes/admin.js';
 import { nonceRoutes } from './routes/nonce.js';
 import { messagingRoutes } from './routes/messaging.js';
+import { relayRoutes } from './routes/relay.js';
 import { authRoutes } from './routes/auth.js';
 
 export { ApiServerConfig } from './types.js';
@@ -60,6 +61,7 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/markets/search', marketsSearchRoutes(ctx));
   api.mount('/api/v1/nonce', nonceRoutes(ctx));
   api.mount('/api/v1/messaging', messagingRoutes(ctx));
+  api.mount('/api/v1/relay', relayRoutes(ctx));
   api.mount('/api/v1/auth', authRoutes(ctx));
 
   // Dev routes (faucet, etc.) are NOT available on mainnet — prevents unauthorized minting.
@@ -101,6 +103,7 @@ export class ApiServer {
       getNodeConfig?: () => Promise<Record<string, unknown>>;
       apiKeyStore?: ApiKeyStore;
       messagingService?: import('../services/messaging-service.js').MessagingService;
+      relayService?: import('../services/relay-service.js').RelayService;
     },
   ) {
     // Build the RuntimeContext from constructor args
@@ -124,6 +127,7 @@ export class ApiServer {
       getNodeConfig: this.runtime.getNodeConfig,
       apiKeyStore: this.runtime.apiKeyStore,
       messagingService: this.runtime.messagingService,
+      relayService: this.runtime.relayService,
     };
 
     this.router = buildRouter(ctx);
