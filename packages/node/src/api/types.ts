@@ -23,6 +23,7 @@ import type { ContractsService } from '../services/contracts-service.js';
 import type { DaoService } from '../services/dao-service.js';
 import type { MessagingService } from '../services/messaging-service.js';
 import type { RelayService } from '../services/relay-service.js';
+import type { RelayRewardService } from '../services/relay-reward-service.js';
 import type { ApiKeyStore } from './api-key-store.js';
 
 export {
@@ -79,6 +80,7 @@ export interface RuntimeContext {
   apiKeyStore?: ApiKeyStore;
   messagingService?: MessagingService;
   relayService?: RelayService;
+  relayRewardService?: RelayRewardService;
   p2pNode?: P2PNode;
   relayScorer?: RelayScorer;
   /** Sign relay period proof data (returns base58 signature). F4. */

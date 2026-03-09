@@ -12,10 +12,13 @@
  * GET  /period-proof      — Get current or last period proof (F4)
  * POST /period-proof      — Generate a new period proof (F4)
  * POST /confirm-contribution — Confirm relay contribution (F10)
+ * GET  /reward/status     — On-chain relay reward status
+ * POST /reward/claim      — Claim reward for current period proof
+ * GET  /reward/preview    — Preview reward without claiming
  */
 
 import { Router } from '../router.js';
-import { ok, badRequest, internalError } from '../response.js';
+import { ok, badRequest, internalError, notFound } from '../response.js';
 import type { RuntimeContext } from '../types.js';
 
 export function relayRoutes(ctx: RuntimeContext): Router {
@@ -254,6 +257,67 @@ export function relayRoutes(ctx: RuntimeContext): Router {
       bytesConfirmed,
       circuitsConfirmed,
     }, { self: '/api/v1/relay/confirm-contribution' });
+  });
+
+  // GET /reward/status — on-chain relay reward contract status
+  r.get('/reward/status', async (_req, res) => {
+    if (!ctx.relayRewardService) {
+      internalError(res, 'Relay reward service unavailable');
+      return;
+    }
+    try {
+      const status = await ctx.relayRewardService.getStatus();
+      ok(res, status, { self: '/api/v1/relay/reward/status' });
+    } catch (err) {
+      internalError(res, err instanceof Error ? err.message : 'Failed to read reward status');
+    }
+  });
+
+  // POST /reward/claim — claim reward for the last period proof
+  r.post('/reward/claim', async (_req, res) => {
+    if (!ctx.relayRewardService || !ctx.relayService) {
+      internalError(res, 'Relay reward service unavailable');
+      return;
+    }
+
+    const proof = ctx.relayService.getLastProof();
+    if (!proof) {
+      notFound(res, 'No period proof available. Generate one first via POST /period-proof');
+      return;
+    }
+
+    try {
+      const result = await ctx.relayRewardService.claimReward(proof);
+      ok(res, result, { self: '/api/v1/relay/reward/claim' });
+    } catch (err) {
+      internalError(res, err instanceof Error ? err.message : 'Failed to claim reward');
+    }
+  });
+
+  // GET /reward/preview — preview reward computation without claiming
+  r.get('/reward/preview', async (_req, res) => {
+    if (!ctx.relayRewardService || !ctx.relayService) {
+      internalError(res, 'Relay reward service unavailable');
+      return;
+    }
+
+    const proof = ctx.relayService.getLastProof();
+    if (!proof) {
+      notFound(res, 'No period proof available');
+      return;
+    }
+
+    try {
+      const preview = ctx.relayRewardService.previewReward(proof);
+      ok(res, {
+        periodId: proof.periodId,
+        eligible: preview.eligible,
+        rewardAmount: preview.rewardAmount,
+        breakdown: preview.breakdown,
+      }, { self: '/api/v1/relay/reward/preview' });
+    } catch (err) {
+      internalError(res, err instanceof Error ? err.message : 'Failed to preview reward');
+    }
   });
 
   return r;

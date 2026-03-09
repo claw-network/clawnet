@@ -24,6 +24,7 @@ export const ContractAddressesSchema = z.object({
   dao: EthAddressSchema,
   staking: EthAddressSchema,
   paramRegistry: EthAddressSchema,
+  relayReward: EthAddressSchema.optional(),
 });
 
 export const SignerConfigSchema = z.discriminatedUnion('type', [
@@ -87,6 +88,7 @@ export const CONTRACT_NAMES = {
   dao: 'ClawDAO',
   staking: 'ClawStaking',
   paramRegistry: 'ParamRegistry',
+  relayReward: 'ClawRelayReward',
 } as const;
 
 export type ContractKey = keyof typeof CONTRACT_NAMES;

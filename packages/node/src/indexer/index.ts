@@ -11,6 +11,7 @@ export type {
   IndexedVote,
   IndexedReview,
   EscrowRecord,
+  RelayRewardRecord,
 } from './store.js';
 
 export { EventIndexer } from './indexer.js';
@@ -35,4 +36,6 @@ export type {
   DidCacheRow,
   EventRow,
   EventFilter,
+  RelayRewardRow,
+  RelayRewardFilter,
 } from './query.js';

@@ -112,6 +112,11 @@ export class ContractProvider {
     return this.get('paramRegistry');
   }
 
+  /** ClawRelayReward (relay incentive pool). May be undefined if not deployed. */
+  get relayReward(): Contract | undefined {
+    return this.instances.get('relayReward');
+  }
+
   // ── Utility ─────────────────────────────────────────────────────────────
 
   /** Retrieve a contract by config key. Throws if not initialised. */

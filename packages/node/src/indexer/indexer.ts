@@ -261,6 +261,9 @@ export class EventIndexer {
       case 'reputation':
         this.materializeReputation(eventName, args, log, timestamp);
         break;
+      case 'relayReward':
+        this.materializeRelayReward(eventName, args, timestamp);
+        break;
       // staking / paramRegistry — Phase 3+
       default:
         break;
@@ -516,6 +519,26 @@ export class EventIndexer {
       });
     }
     // ReputationAnchored — informational; stored in generic events only.
+  }
+
+  // ── Relay Reward ────────────────────────────────────────────────────────
+
+  private materializeRelayReward(
+    eventName: string,
+    args: Record<string, string>,
+    timestamp: number,
+  ): void {
+    if (eventName === 'RewardClaimed') {
+      this.store.insertRelayReward({
+        relayDidHash: args['relayDidHash'] ?? '',
+        periodId: Number(args['periodId'] ?? 0),
+        rewardAmount: args['rewardAmount'] ?? '0',
+        confirmedBytes: args['confirmedBytes'] ?? '0',
+        confirmedPeers: Number(args['confirmedPeers'] ?? 0),
+        timestamp,
+      });
+    }
+    // RewardParamsUpdated — informational; stored in generic events only.
   }
 
   // ── Internal helpers ────────────────────────────────────────────────────

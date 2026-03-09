@@ -3,7 +3,7 @@
 > **状态**: 规划文档  
 > **日期**: 2026-03-09  
 > **来源**: TelagentNode 团队协作请求 + ClawNet 内部补充  
-> **关联**: [economics.md](economics.md), [scaling-plan.md](scaling-plan.md), [p2p-spec.md](p2p-spec.md), [on-chain-plan.md](on-chain-plan.md)  
+> **关联**: [economics.md](economics.md), [scaling-plan.md](scaling-plan.md), [p2p-spec.md](p2p-spec.md), [on-chain-plan.md](on-chain-plan.md), [relay-incentive-verification.md](relay-incentive-verification.md)  
 > **原始需求**: [clawnetd-open-relay-incentive.md](../issues/clawnetd-open-relay-incentive.md)
 
 ---

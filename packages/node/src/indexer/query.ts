@@ -158,6 +158,22 @@ export interface EventFilter extends PaginationOpts {
   toBlock?: number;
 }
 
+// -- Relay reward queries ---------------------------------------------------
+
+export interface RelayRewardRow {
+  id: number;
+  relayDidHash: string;
+  periodId: number;
+  rewardAmount: string;
+  confirmedBytes: string;
+  confirmedPeers: number;
+  timestamp: number;
+}
+
+export interface RelayRewardFilter extends PaginationOpts {
+  relayDidHash?: string;
+}
+
 // ---------------------------------------------------------------------------
 // IndexerQuery
 // ---------------------------------------------------------------------------
@@ -419,6 +435,35 @@ export class IndexerQuery {
          LIMIT ? OFFSET ?`,
       )
       .all(...params, limit, offset) as EventRow[];
+
+    return { items: rows, total, limit, offset };
+  }
+
+  // ── Relay Rewards ───────────────────────────────────────────────────────
+
+  getRelayRewards(filter: RelayRewardFilter = {}): PaginatedResult<RelayRewardRow> {
+    const { limit, offset } = normalisePagination(filter);
+    const where: string[] = [];
+    const params: unknown[] = [];
+
+    if (filter.relayDidHash) {
+      where.push('relay_did_hash = ?');
+      params.push(filter.relayDidHash);
+    }
+
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+    const total = this.count('relay_rewards', whereClause, params);
+
+    const rows = this.db
+      .prepare(
+        `SELECT id, relay_did_hash AS relayDidHash, period_id AS periodId,
+                reward_amount AS rewardAmount, confirmed_bytes AS confirmedBytes,
+                confirmed_peers AS confirmedPeers, timestamp
+         FROM relay_rewards ${whereClause}
+         ORDER BY timestamp DESC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(...params, limit, offset) as RelayRewardRow[];
 
     return { items: rows, total, limit, offset };
   }

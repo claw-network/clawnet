@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Unified deployment script for ALL 9 ClawNet contracts.
+ * Unified deployment script for ALL 10 ClawNet contracts.
  *
  * Deployment order (respects dependencies):
  *   1. ClawToken        — no deps
@@ -15,9 +15,11 @@ import * as path from 'path';
  *   7. ClawDAO          — depends on ClawToken + ParamRegistry
  *   8. ClawContracts    — depends on ClawToken
  *   9. ClawRouter       — no deps (post-deploy registers all contracts)
+ *  10. ClawRelayReward  — depends on ClawToken
  *
  * Post-deploy role grants:
  *   - ClawToken.MINTER_ROLE  → ClawStaking (reward minting)
+ *   - ClawToken.MINTER_ROLE  → ClawRelayReward (relay incentive pool top-up)
  *   - ParamRegistry.GOVERNOR_ROLE → ClawDAO (DAO-driven param changes)
  *   - ClawReputation.ANCHOR_ROLE  → (optional) ANCHOR_ADDRESS
  *   - ClawContracts.ARBITER_ROLE  → (optional) ARBITER_ADDRESS
@@ -44,6 +46,11 @@ import * as path from 'path';
  *   EMERGENCY_SIGNERS   — comma-separated 9 addresses (defaults to first 9 signers)
  *   ANCHOR_ADDRESS      — optional: grant ANCHOR_ROLE on Reputation
  *   ARBITER_ADDRESS     — optional: grant ARBITER_ROLE on Contracts
+ *   RELAY_REWARD_BASE_RATE          — Token per period, default 100
+ *   RELAY_REWARD_MAX_PER_PERIOD     — Token cap/period, default 1000
+ *   RELAY_REWARD_MIN_BYTES          — bytes, default 1048576 (1 MB)
+ *   RELAY_REWARD_MIN_PEERS          — default 1
+ *   RELAY_REWARD_ATTACHMENT_WEIGHT  — bps, default 3000 (0.3×)
  *
  * Usage:
  *   npx hardhat run scripts/deploy-all.ts --network clawnetTestnet
@@ -74,9 +81,11 @@ interface DeploymentRecord {
     ClawDAO: ContractEntry;
     ClawContracts: ContractEntry;
     ClawRouter: ContractEntry;
+    ClawRelayReward: ContractEntry;
   };
   roles: {
     minterToStaking: string;
+    minterToRelayReward: string;
     governorToDao: string;
     anchorAddress: string | null;
     arbiterAddress: string | null;
@@ -121,7 +130,7 @@ async function main() {
   const network = await ethers.provider.getNetwork();
 
   console.log('='.repeat(60));
-  console.log('ClawNet — Full Deployment (9 Contracts)');
+  console.log('ClawNet — Full Deployment (10 Contracts)');
   console.log('='.repeat(60));
   console.log(`Network   : ${network.name} (chainId ${network.chainId})`);
   console.log(`Deployer  : ${deployer.address}`);
@@ -148,6 +157,13 @@ async function main() {
   const anchorAddress = process.env.ANCHOR_ADDRESS ?? null;
   const arbiterAddress = process.env.ARBITER_ADDRESS ?? null;
 
+  // Relay reward parameters
+  const relayRewardBaseRate = envInt('RELAY_REWARD_BASE_RATE', 100);
+  const relayRewardMaxPerPeriod = envInt('RELAY_REWARD_MAX_PER_PERIOD', 1000);
+  const relayRewardMinBytes = envInt('RELAY_REWARD_MIN_BYTES', 1_048_576);
+  const relayRewardMinPeers = envInt('RELAY_REWARD_MIN_PEERS', 1);
+  const relayRewardAttachmentWeight = envInt('RELAY_REWARD_ATTACHMENT_WEIGHT', 3000);
+
   // Emergency signers — 9 addresses (defaults to first 9 available signers)
   const signersRaw = process.env.EMERGENCY_SIGNERS ?? '';
   let signersList = signersRaw
@@ -165,7 +181,7 @@ async function main() {
 
   // ── 1. ClawToken ────────────────────────────────────────────────
 
-  const tokenDeploy = await deployOne('ClawToken', '1/9', [
+  const tokenDeploy = await deployOne('ClawToken', '1/10', [
     'ClawNet Token',
     'TOKEN',
     deployer.address,
@@ -173,11 +189,11 @@ async function main() {
 
   // ── 2. ParamRegistry ───────────────────────────────────────────
 
-  const paramDeploy = await deployOne('ParamRegistry', '2/9', [deployer.address]);
+  const paramDeploy = await deployOne('ParamRegistry', '2/10', [deployer.address]);
 
   // ── 3. ClawEscrow ──────────────────────────────────────────────
 
-  const escrowDeploy = await deployOne('ClawEscrow', '3/9', [
+  const escrowDeploy = await deployOne('ClawEscrow', '3/10', [
     tokenDeploy.proxy,
     treasury,
     escrowBaseRate,
@@ -187,11 +203,11 @@ async function main() {
 
   // ── 4. ClawIdentity ────────────────────────────────────────────
 
-  const identityDeploy = await deployOne('ClawIdentity', '4/9', [deployer.address]);
+  const identityDeploy = await deployOne('ClawIdentity', '4/10', [deployer.address]);
 
   // ── 5. ClawStaking ─────────────────────────────────────────────
 
-  const stakingDeploy = await deployOne('ClawStaking', '5/9', [
+  const stakingDeploy = await deployOne('ClawStaking', '5/10', [
     tokenDeploy.proxy,
     minStake,
     unstakeCooldown,
@@ -201,14 +217,14 @@ async function main() {
 
   // ── 6. ClawReputation ──────────────────────────────────────────
 
-  const reputationDeploy = await deployOne('ClawReputation', '6/9', [
+  const reputationDeploy = await deployOne('ClawReputation', '6/10', [
     deployer.address,
     epochDuration,
   ]);
 
   // ── 7. ClawDAO ─────────────────────────────────────────────────
 
-  const daoDeploy = await deployOne('ClawDAO', '7/9', [
+  const daoDeploy = await deployOne('ClawDAO', '7/10', [
     tokenDeploy.proxy,
     paramDeploy.proxy,
     proposalThreshold,
@@ -221,7 +237,7 @@ async function main() {
 
   // ── 8. ClawContracts ───────────────────────────────────────────
 
-  const contractsDeploy = await deployOne('ClawContracts', '8/9', [
+  const contractsDeploy = await deployOne('ClawContracts', '8/10', [
     tokenDeploy.proxy,
     treasury,
     platformFeeBps,
@@ -230,7 +246,18 @@ async function main() {
 
   // ── 9. ClawRouter ─────────────────────────────────────────────
 
-  const routerDeploy = await deployOne('ClawRouter', '9/9', [deployer.address]);
+  const routerDeploy = await deployOne('ClawRouter', '9/10', [deployer.address]);
+
+  // ── 10. ClawRelayReward ────────────────────────────────────────
+
+  const relayRewardDeploy = await deployOne('ClawRelayReward', '10/10', [
+    tokenDeploy.proxy,
+    relayRewardBaseRate,
+    relayRewardMaxPerPeriod,
+    relayRewardMinBytes,
+    relayRewardMinPeers,
+    relayRewardAttachmentWeight,
+  ]);
 
   // ── Cross-contract Role Grants ─────────────────────────────────
 
@@ -281,6 +308,10 @@ async function main() {
   const MINTER_ROLE = keccak(toUtf8('MINTER_ROLE'));
   await (await tokenContract.grantRole(MINTER_ROLE, stakingDeploy.proxy)).wait();
   console.log(`  ✓ ClawToken.MINTER_ROLE → ClawStaking`);
+
+  // 1b. ClawToken MINTER_ROLE → ClawRelayReward (for future pool top-up)
+  await (await tokenContract.grantRole(MINTER_ROLE, relayRewardDeploy.proxy)).wait();
+  console.log(`  ✓ ClawToken.MINTER_ROLE → ClawRelayReward`);
 
   // 2. ParamRegistry GOVERNOR_ROLE → ClawDAO
   const paramContract = (await ethers.getContractFactory('ParamRegistry')).attach(
@@ -391,9 +422,11 @@ async function main() {
       ClawDAO: daoDeploy,
       ClawContracts: contractsDeploy,
       ClawRouter: routerDeploy,
+      ClawRelayReward: relayRewardDeploy,
     },
     roles: {
       minterToStaking: `${stakingDeploy.proxy}`,
+      minterToRelayReward: `${relayRewardDeploy.proxy}`,
       governorToDao: `${daoDeploy.proxy}`,
       anchorAddress,
       arbiterAddress,
@@ -414,6 +447,11 @@ async function main() {
       timelockDelay,
       quorumBps,
       platformFeeBps,
+      relayRewardBaseRate,
+      relayRewardMaxPerPeriod,
+      relayRewardMinBytes,
+      relayRewardMinPeers,
+      relayRewardAttachmentWeight,
     },
   };
 
@@ -429,7 +467,7 @@ async function main() {
   // ── Summary ────────────────────────────────────────────────────
 
   console.log('\n' + '='.repeat(60));
-  console.log('Deployment complete! All 9 contracts deployed.');
+  console.log('Deployment complete! All 10 contracts deployed.');
   console.log('='.repeat(60));
   console.log(`Record saved to: ${outPath}`);
   console.log('\nContract addresses:');
@@ -442,8 +480,10 @@ async function main() {
   console.log(`  ClawDAO         : ${daoDeploy.proxy}`);
   console.log(`  ClawContracts   : ${contractsDeploy.proxy}`);
   console.log(`  ClawRouter      : ${routerDeploy.proxy}`);
+  console.log(`  ClawRelayReward : ${relayRewardDeploy.proxy}`);
   console.log('\nRole grants:');
-  console.log(`  Token.MINTER  → Staking : ${stakingDeploy.proxy}`);
+  console.log(`  Token.MINTER  → Staking       : ${stakingDeploy.proxy}`);
+  console.log(`  Token.MINTER  → RelayReward   : ${relayRewardDeploy.proxy}`);
   console.log(`  Param.GOVERNOR → DAO    : ${daoDeploy.proxy}`);
   console.log(`  DAO.reputation           : ${reputationDeploy.proxy}`);
   console.log(`  DAO.staking              : ${stakingDeploy.proxy}`);

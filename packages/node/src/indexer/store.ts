@@ -80,6 +80,15 @@ export interface EscrowRecord {
   updatedAt: number;
 }
 
+export interface RelayRewardRecord {
+  relayDidHash: string;
+  periodId: number;
+  rewardAmount: string;
+  confirmedBytes: string;
+  confirmedPeers: number;
+  timestamp: number;
+}
+
 // ---------------------------------------------------------------------------
 // Schema DDL
 // ---------------------------------------------------------------------------
@@ -181,6 +190,19 @@ CREATE TABLE IF NOT EXISTS did_cache (
   is_active   INTEGER NOT NULL DEFAULT 1,
   updated_at  INTEGER NOT NULL
 );
+
+-- Relay reward claims
+CREATE TABLE IF NOT EXISTS relay_rewards (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  relay_did_hash    TEXT    NOT NULL,
+  period_id         INTEGER NOT NULL,
+  reward_amount     TEXT    NOT NULL,
+  confirmed_bytes   TEXT    NOT NULL,
+  confirmed_peers   INTEGER NOT NULL,
+  timestamp         INTEGER NOT NULL,
+  UNIQUE(relay_did_hash, period_id)
+);
+CREATE INDEX IF NOT EXISTS idx_relay_rewards_did ON relay_rewards(relay_did_hash);
 `;
 
 // ---------------------------------------------------------------------------
@@ -396,6 +418,24 @@ export class IndexerStore {
            updated_at = excluded.updated_at`,
       )
       .run(didHash, controller, activeKey, isActive ? 1 : 0, updatedAt);
+  }
+
+  // ── Relay rewards ───────────────────────────────────────────────────────
+
+  insertRelayReward(r: RelayRewardRecord): void {
+    this._db
+      .prepare(
+        `INSERT OR IGNORE INTO relay_rewards (relay_did_hash, period_id, reward_amount, confirmed_bytes, confirmed_peers, timestamp)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        r.relayDidHash,
+        r.periodId,
+        r.rewardAmount,
+        r.confirmedBytes,
+        r.confirmedPeers,
+        r.timestamp,
+      );
   }
 
   // ── Transaction helper ──────────────────────────────────────────────────

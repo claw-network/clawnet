@@ -104,6 +104,7 @@ export class ApiServer {
       apiKeyStore?: ApiKeyStore;
       messagingService?: import('../services/messaging-service.js').MessagingService;
       relayService?: import('../services/relay-service.js').RelayService;
+      relayRewardService?: import('../services/relay-reward-service.js').RelayRewardService;
       p2pNode?: import('@claw-network/core').P2PNode;
       relayScorer?: import('@claw-network/core').RelayScorer;
       signProof?: (data: Uint8Array) => Promise<string>;
@@ -131,6 +132,7 @@ export class ApiServer {
       apiKeyStore: this.runtime.apiKeyStore,
       messagingService: this.runtime.messagingService,
       relayService: this.runtime.relayService,
+      relayRewardService: this.runtime.relayRewardService,
       p2pNode: this.runtime.p2pNode,
       relayScorer: this.runtime.relayScorer,
       signProof: this.runtime.signProof,

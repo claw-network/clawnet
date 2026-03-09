@@ -26,6 +26,7 @@ import * as path from 'path';
  *   FAUCET_ADDRESS          — Faucet vault address (defaults to deployer)
  *   LIQUIDITY_ADDRESS       — Liquidity wallet address (required)
  *   RESERVE_ADDRESS         — Risk reserve address (required)
+ *   RELAY_REWARD_POOL_AMOUNT — Token to seed in ClawRelayReward pool (default: 100000, 0 to skip)
  *
  * Usage:
  *   npx hardhat run scripts/bootstrap-mint.ts --network clawnetTestnet
@@ -98,6 +99,7 @@ async function main() {
 
   const tokenAddress = process.env.TOKEN_ADDRESS ?? contracts.ClawToken?.proxy;
   const daoAddress = process.env.DAO_ADDRESS ?? contracts.ClawDAO?.proxy;
+  const relayRewardAddress = process.env.RELAY_REWARD_ADDRESS ?? contracts.ClawRelayReward?.proxy;
   const treasuryAddress = parseAddress(
     process.env.TREASURY_ADDRESS ?? deploymentParams.treasury ?? deployer.address,
     'TREASURY_ADDRESS',
@@ -279,6 +281,23 @@ async function main() {
   console.log(`  Minted               : ${totalSupply.toLocaleString()}`);
   console.log(`  New totalSupply      : ${newSupply}`);
   console.log('='.repeat(60));
+
+  // ── Relay Reward Pool ─────────────────────────────────────────
+
+  const relayRewardPoolAmount = Number(process.env.RELAY_REWARD_POOL_AMOUNT ?? 100_000);
+  if (relayRewardPoolAmount > 0 && relayRewardAddress) {
+    console.log(`\n[RelayReward] Minting ${relayRewardPoolAmount.toLocaleString()} Token to relay incentive pool...`);
+    const rrTx = await token.mint(relayRewardAddress, relayRewardPoolAmount);
+    const rrReceipt = await rrTx.wait();
+    console.log(
+      `  ✓ Relay Reward Pool: ${relayRewardPoolAmount.toLocaleString()} Token → ${relayRewardAddress} (tx: ${rrReceipt.hash.slice(0, 18)}...)`,
+    );
+    const rrBalance = await token.balanceOf(relayRewardAddress);
+    console.log(`  Pool balance: ${rrBalance} Token`);
+  } else if (relayRewardPoolAmount > 0) {
+    console.log('\n⚠  ClawRelayReward address not found — skipping relay pool mint.');
+    console.log('   Set RELAY_REWARD_ADDRESS or deploy ClawRelayReward first.');
+  }
 
   // ── Verify balances for key addresses ─────────────────────────
 
