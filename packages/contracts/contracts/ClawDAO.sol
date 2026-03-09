@@ -76,6 +76,9 @@ contract ClawDAO is
         uint256 forVotes;
         uint256 againstVotes;
         uint256 abstainVotes;
+        /// @notice #5 fix: total supply snapshotted at proposal creation so that
+        ///         later mints/burns cannot flip quorum without any voter changing vote.
+        uint256 snapshotSupply;
     }
 
     /// @notice Convenience struct returned by getProposal() view.
@@ -235,6 +238,8 @@ contract ClawDAO is
         });
 
         // _votes defaults to zeros
+        // #5 fix: capture total supply at proposal creation; used in hasQuorum()
+        _votes[proposalId].snapshotSupply = token.totalSupply();
         _callDatas[proposalId] = callData;
 
         emit ProposalCreated(proposalId, msg.sender, pType, target, descriptionHash);
@@ -440,7 +445,9 @@ contract ClawDAO is
     function hasQuorum(uint256 proposalId) public view returns (bool) {
         ProposalVotes storage v = _votes[proposalId];
         uint256 totalVotes = v.forVotes + v.againstVotes + v.abstainVotes;
-        uint256 supply = token.totalSupply();
+        // #5 fix: use snapshotted supply instead of live totalSupply() to prevent
+        // later mints/burns from silently flipping quorum.
+        uint256 supply = v.snapshotSupply;
         if (supply == 0) return false;
         return totalVotes * 10000 >= supply * _getQuorumBps();
     }

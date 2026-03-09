@@ -33,10 +33,16 @@ describe("ClawIdentity", function () {
     didHash: string,
     controller: string,
   ): Promise<string> {
+    const { chainId } = await ethers.provider.getNetwork();
+    const contractAddr = await identity.getAddress();
+    const message = ethers.solidityPacked(
+      ["string", "bytes32", "address"],
+      ["clawnet:register:v1:", didHash, controller],
+    );
     const digest = ethers.keccak256(
       ethers.solidityPacked(
-        ["string", "bytes32", "address"],
-        ["clawnet:register:v1:", didHash, controller],
+        ["uint256", "address", "bytes"],
+        [chainId, contractAddr, ethers.getBytes(message)],
       ),
     );
     return signer.signMessage(ethers.getBytes(digest));
@@ -48,10 +54,16 @@ describe("ClawIdentity", function () {
     oldKeyHash: string,
     newKeyHash: string,
   ): Promise<string> {
+    const { chainId } = await ethers.provider.getNetwork();
+    const contractAddr = await identity.getAddress();
+    const message = ethers.solidityPacked(
+      ["string", "bytes32", "bytes32", "bytes32"],
+      ["clawnet:rotate:v1:", didHash, oldKeyHash, newKeyHash],
+    );
     const digest = ethers.keccak256(
       ethers.solidityPacked(
-        ["string", "bytes32", "bytes32", "bytes32"],
-        ["clawnet:rotate:v1:", didHash, oldKeyHash, newKeyHash],
+        ["uint256", "address", "bytes"],
+        [chainId, contractAddr, ethers.getBytes(message)],
       ),
     );
     return signer.signMessage(ethers.getBytes(digest));

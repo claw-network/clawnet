@@ -279,6 +279,9 @@ contract ClawEscrow is
     function dispute(bytes32 escrowId) external whenNotPaused {
         EscrowRecord storage e = _getEscrow(escrowId);
         if (e.status != EscrowStatus.Active) revert InvalidStatus(e.status, EscrowStatus.Active);
+        // #8 fix: disallow disputes after the escrow has already expired to preserve
+        // the depositor's right to an immediate refund via expire().
+        if (block.timestamp >= e.expiresAt) revert NotExpiredYet(e.expiresAt, block.timestamp);
         if (msg.sender != e.depositor && msg.sender != e.beneficiary) revert NotAuthorized();
 
         e.status = EscrowStatus.Disputed;

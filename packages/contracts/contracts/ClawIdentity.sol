@@ -393,6 +393,8 @@ contract ClawIdentity is
 
     /**
      * @dev Verify ECDSA signature from the expected controller.
+     * @dev #9 fix: bind digest to block.chainid and address(this) to prevent
+     *      cross-deployment and cross-chain signature replay attacks.
      * @param message  Raw message bytes to hash.
      * @param sig      ECDSA signature (65 bytes).
      * @param expected Expected signer address.
@@ -401,8 +403,10 @@ contract ClawIdentity is
         bytes memory message,
         bytes calldata sig,
         address expected
-    ) internal pure {
-        bytes32 digest = keccak256(message);
+    ) internal view {
+        // Include chain ID and contract address in the digest to domain-separate
+        // signatures from other deployments and forks.
+        bytes32 digest = keccak256(abi.encodePacked(block.chainid, address(this), message));
         bytes32 ethHash = MessageHashUtils.toEthSignedMessageHash(digest);
         address recovered = ECDSA.recover(ethHash, sig);
         if (recovered != expected) revert InvalidSignature();

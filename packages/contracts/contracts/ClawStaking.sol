@@ -79,6 +79,11 @@ contract ClawStaking is
     /// @notice Index+1 in _activeValidators for O(1) remove. 0 = not in list.
     mapping(address => uint256) internal _activeIndex;
 
+    /// @notice Sum of all principal staked amounts (for reserve accounting).
+    uint256 public totalStaked;
+    /// @notice Sum of all credited but unclaimed reward amounts (for reserve accounting).
+    uint256 public totalPendingRewards;
+
     // ─── Events ──────────────────────────────────────────────────────
 
     event Staked(address indexed node, uint256 amount, NodeType nodeType);
@@ -152,7 +157,11 @@ contract ClawStaking is
      * @param nodeType The role of this node.
      */
     function stake(uint256 amount, NodeType nodeType) external whenNotPaused nonReentrant {
-        if (stakes[msg.sender].active) revert AlreadyStaked();
+        StakeInfo storage existing = stakes[msg.sender];
+        if (existing.active) revert AlreadyStaked();
+        // #3 fix: block restaking while an unstake is still pending to prevent
+        // overwriting the pending withdrawal and permanently stranding funds.
+        if (existing.unstakeRequestAt != 0) revert("Unstake pending: complete unstake first");
         uint256 _minStake = _getMinStake();
         if (amount < _minStake) revert InsufficientStake(amount, _minStake);
 
@@ -171,6 +180,9 @@ contract ClawStaking is
         // Add to active list
         _activeValidators.push(msg.sender);
         _activeIndex[msg.sender] = _activeValidators.length; // 1-indexed
+
+        // #4 fix: track total staked principal for reserve accounting
+        totalStaked += amount;
 
         emit Staked(msg.sender, amount, nodeType);
     }
@@ -208,7 +220,15 @@ contract ClawStaking is
         }
 
         // Calculate return: amount - slashed
-        uint256 returned = s.slashed >= s.amount ? 0 : s.amount - s.slashed;
+        uint256 principal = s.amount;
+        uint256 pendingRewards = s.rewards;
+        uint256 returned = s.slashed >= principal ? 0 : principal - s.slashed;
+
+        // #4 fix: update reserve accounting before clearing stake.
+        // Deduct only the effective (un-slashed) portion — the slashed portion
+        // was already deducted from totalStaked inside slash().
+        totalStaked -= returned;
+        totalPendingRewards -= pendingRewards;
 
         // Clear stake
         delete stakes[msg.sender];
@@ -230,6 +250,8 @@ contract ClawStaking is
 
         uint256 amount = s.rewards;
         s.rewards = 0;
+        // #4 fix: reduce pending rewards reserve when rewards are claimed
+        totalPendingRewards -= amount;
 
         token.safeTransfer(msg.sender, amount);
 
@@ -256,6 +278,16 @@ contract ClawStaking is
         uint256 actualSlash = amount > remaining ? remaining : amount;
 
         s.slashed += actualSlash;
+        // #4 fix: reduce total staked principal by the slashed amount
+        totalStaked -= actualSlash;
+
+        // #7 fix: if the node is now fully slashed (zero effective stake),
+        // deactivate it immediately rather than waiting for voluntary unstake.
+        uint256 effectiveStake = s.amount > s.slashed ? s.amount - s.slashed : 0;
+        if (effectiveStake == 0 && s.active) {
+            s.active = false;
+            _removeFromActiveList(node);
+        }
 
         // Transfer slashed tokens to treasury (the contract holds them; admin can recover)
         // For MVP, slashed tokens stay in the contract. Phase 2 sends to DAO treasury.
@@ -283,6 +315,15 @@ contract ClawStaking is
                 total += amounts[i];
             }
         }
+
+        // #4 fix: ensure the contract holds enough liquid balance to cover
+        // the newly credited rewards (liquid = balance - staked principal - already-pending rewards).
+        uint256 newPendingRewards = totalPendingRewards + total;
+        require(
+            token.balanceOf(address(this)) >= totalStaked + newPendingRewards,
+            "Insufficient liquid balance for rewards"
+        );
+        totalPendingRewards = newPendingRewards;
 
         emit RewardsDistributed(total, validators.length);
     }

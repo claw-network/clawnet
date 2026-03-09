@@ -345,7 +345,12 @@ contract ClawReputation is
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newDuration == 0) revert InvalidEpochDuration();
         uint64 oldDuration = epochDuration;
+        uint64 currentEpoch = getCurrentEpoch();
         epochDuration = newDuration;
+        // #6 fix: rebase epochStart so getCurrentEpoch() still returns currentEpoch
+        // after the duration change, preventing past snapshots from being overwritten.
+        // New epochStart satisfies: (block.timestamp - newEpochStart) / newDuration == currentEpoch
+        epochStart = uint64(block.timestamp) - currentEpoch * newDuration;
         emit EpochDurationUpdated(oldDuration, newDuration);
     }
 

@@ -10,18 +10,26 @@ describe("ClawRelayReward", function () {
   let relay: HardhatEthersSigner;
   let outsider: HardhatEthersSigner;
 
-  // Default reward params
-  const BASE_RATE = 100n;
-  const MAX_PER_PERIOD = 1000n;
-  const MIN_BYTES = 1_000_000n; // 1 MB
+  // Reward params chosen so that a 100 GiB claim with 10 peers is capped at MAX_PER_PERIOD.
+  // With 2MB + 1 peer (byteFactor=18, peerFactor=1000, confirmRatio=10000):
+  //   raw = 6000 * 18 * 1000 * 10000 / 10^12 = 1,080,000,000,000 / 10^12 = 1  > 0 ✓
+  // With 100 GiB + 10 peers (byteFactor≈65781, peerFactor=10000, confirmRatio=10000):
+  //   raw ≈ 6000 * 65781 * 10000 * 10000 / 10^12 ≈ 39,469 > 6000 = MAX_PER_PERIOD ✓
+  const BASE_RATE = 6000n;
+  const MAX_PER_PERIOD = 6000n;   // must be >= BASE_RATE ✓
+  const MIN_BYTES = 1_000_000n;   // 1 MB
   const MIN_PEERS = 1n;
   const ATTACHMENT_WEIGHT_BPS = 3000n; // 0.3x
+
+  // 100 GiB of relay traffic — large enough to exercise cap
+  const LARGE_BYTES = 100n * (1n << 30n);   // 100 * 2^30 = 107,374,182,400
 
   const RELAY_DID_HASH = ethers.keccak256(ethers.toUtf8Bytes("did:claw:zRelay1"));
   const PEER_A_HASH = ethers.keccak256(ethers.toUtf8Bytes("did:claw:zPeerA"));
   const PEER_B_HASH = ethers.keccak256(ethers.toUtf8Bytes("did:claw:zPeerB"));
 
-  const POOL_AMOUNT = 100_000n;
+  // 100 × MAX_PER_PERIOD — enough to drain via 100 capped claims in the drain test
+  const POOL_AMOUNT = 100n * MAX_PER_PERIOD; // = 600,000
 
   async function deployFixture() {
     [admin, relay, outsider] = await ethers.getSigners();
@@ -50,6 +58,9 @@ describe("ClawRelayReward", function () {
     const MINTER_ROLE = ethers.keccak256(ethers.toUtf8Bytes("MINTER_ROLE"));
     await token.connect(admin).grantRole(MINTER_ROLE, admin.address);
     await token.connect(admin).mint(await reward.getAddress(), POOL_AMOUNT);
+
+    // P0 fix: register relay as the authorised operator for RELAY_DID_HASH
+    await reward.connect(relay).registerRelayOperator(RELAY_DID_HASH);
 
     return { token, reward, admin, relay, outsider };
   }
@@ -96,36 +107,50 @@ describe("ClawRelayReward", function () {
   // ─── claimReward ─────────────────────────────────────────────────
 
   describe("claimReward", function () {
-    it("succeeds with valid claim", async function () {
-      const confirmations = [peerConfirmation(PEER_A_HASH, 2_000_000n)];
+    it("succeeds with valid claim (capped at MAX_PER_PERIOD)", async function () {
+      // Use 100 GiB + 10 confirmers to guarantee the raw reward exceeds MAX_PER_PERIOD.
+      const confirmations = [];
+      for (let i = 0; i < 10; i++) {
+        confirmations.push(peerConfirmation(
+          ethers.keccak256(ethers.toUtf8Bytes(`peer${i}`)),
+          LARGE_BYTES / 10n,
+        ));
+      }
 
+      // The on-chain formula with these params yields raw >> MAX_PER_PERIOD;
+      // the emitted rewardAmount must equal the cap.
       await expect(
         reward.connect(relay).claimReward(
           RELAY_DID_HASH, 1n,    // periodId
-          2_000_000n, 0n,        // messaging, attachment
-          5n,                    // circuits
-          200n,                  // rewardAmount
+          LARGE_BYTES, 0n,       // messaging, attachment
+          10n,                   // circuits
           confirmations,
         ),
       ).to.emit(reward, "RewardClaimed")
-        .withArgs(RELAY_DID_HASH, 1n, 200n, 2_000_000n, 1n);
+        .withArgs(RELAY_DID_HASH, 1n, MAX_PER_PERIOD, LARGE_BYTES, 10n);
 
       expect(await reward.lastClaimedPeriod(RELAY_DID_HASH)).to.equal(1n);
-      expect(await reward.totalRewardsDistributed()).to.equal(200n);
+      expect(await reward.totalRewardsDistributed()).to.equal(MAX_PER_PERIOD);
       expect(await reward.getClaimCount(RELAY_DID_HASH)).to.equal(1n);
     });
 
     it("caps reward at maxRewardPerPeriod", async function () {
-      const confirmations = [peerConfirmation(PEER_A_HASH, 5_000_000n)];
+      // Use large data so raw computed reward >> MAX_PER_PERIOD
+      const confirmations = [];
+      for (let i = 0; i < 10; i++) {
+        confirmations.push(peerConfirmation(
+          ethers.keccak256(ethers.toUtf8Bytes(`peer${i}`)),
+          LARGE_BYTES / 10n,
+        ));
+      }
 
       await reward.connect(relay).claimReward(
         RELAY_DID_HASH, 1n,
-        5_000_000n, 0n, 10n,
-        9999n,  // exceeds MAX_PER_PERIOD
+        LARGE_BYTES, 0n, 10n,
         confirmations,
       );
 
-      // Should be capped to 1000
+      // Raw reward >> MAX_PER_PERIOD; cap is applied.
       expect(await reward.totalRewardsDistributed()).to.equal(MAX_PER_PERIOD);
 
       const history = await reward.getClaimHistory(RELAY_DID_HASH);
@@ -136,12 +161,12 @@ describe("ClawRelayReward", function () {
       const confirmations = [peerConfirmation(PEER_A_HASH, 2_000_000n)];
 
       await reward.connect(relay).claimReward(
-        RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, 100n, confirmations,
+        RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, confirmations,
       );
 
       await expect(
         reward.connect(relay).claimReward(
-          RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, 100n, confirmations,
+          RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, confirmations,
         ),
       ).to.be.revertedWith("Period already claimed or invalid");
     });
@@ -150,13 +175,13 @@ describe("ClawRelayReward", function () {
       const confirmations = [peerConfirmation(PEER_A_HASH, 2_000_000n)];
 
       await reward.connect(relay).claimReward(
-        RELAY_DID_HASH, 5n, 2_000_000n, 0n, 1n, 100n, confirmations,
+        RELAY_DID_HASH, 5n, 2_000_000n, 0n, 1n, confirmations,
       );
 
       // Try period 3 (< 5) → should fail
       await expect(
         reward.connect(relay).claimReward(
-          RELAY_DID_HASH, 3n, 2_000_000n, 0n, 1n, 100n, confirmations,
+          RELAY_DID_HASH, 3n, 2_000_000n, 0n, 1n, confirmations,
         ),
       ).to.be.revertedWith("Period already claimed or invalid");
     });
@@ -166,7 +191,7 @@ describe("ClawRelayReward", function () {
 
       await expect(
         reward.connect(relay).claimReward(
-          RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, 100n, selfConfirmation,
+          RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, selfConfirmation,
         ),
       ).to.be.revertedWith("Self-relay not allowed");
     });
@@ -179,7 +204,7 @@ describe("ClawRelayReward", function () {
 
       await expect(
         reward.connect(relay).claimReward(
-          RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, 100n, duplicates,
+          RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, duplicates,
         ),
       ).to.be.revertedWith("Duplicate peer confirmation");
     });
@@ -190,7 +215,7 @@ describe("ClawRelayReward", function () {
 
       await expect(
         reward.connect(relay).claimReward(
-          RELAY_DID_HASH, 1n, 500n, 0n, 1n, 100n, confirmations,
+          RELAY_DID_HASH, 1n, 500n, 0n, 1n, confirmations,
         ),
       ).to.be.revertedWith("Below minimum bytes threshold");
     });
@@ -199,7 +224,7 @@ describe("ClawRelayReward", function () {
       // 0 peer confirmations < 1 min peers
       await expect(
         reward.connect(relay).claimReward(
-          RELAY_DID_HASH, 1n, 5_000_000n, 0n, 1n, 100n, [],
+          RELAY_DID_HASH, 1n, 5_000_000n, 0n, 1n, [],
         ),
       ).to.be.revertedWith("Not enough peer confirmations");
     });
@@ -211,7 +236,7 @@ describe("ClawRelayReward", function () {
       ];
 
       await reward.connect(relay).claimReward(
-        RELAY_DID_HASH, 1n, 2_000_000n, 0n, 5n, 300n, confirmations,
+        RELAY_DID_HASH, 1n, 2_000_000n, 0n, 5n, confirmations,
       );
 
       const history = await reward.getClaimHistory(RELAY_DID_HASH);
@@ -220,12 +245,19 @@ describe("ClawRelayReward", function () {
     });
 
     it("rejects when pool balance is insufficient", async function () {
-      // Drain the pool first by claiming max repeatedly
-      const confirmations = [peerConfirmation(PEER_A_HASH, 5_000_000n)];
+      // Each call with LARGE_BYTES + 10 peers gets capped at MAX_PER_PERIOD (1000).
+      // POOL_AMOUNT = 100 × MAX_PER_PERIOD, so 100 claims drain it to 0.
+      const confirmations = [];
+      for (let i = 0; i < 10; i++) {
+        confirmations.push(peerConfirmation(
+          ethers.keccak256(ethers.toUtf8Bytes(`drainpeer${i}`)),
+          LARGE_BYTES / 10n,
+        ));
+      }
 
       for (let i = 1n; i <= 100n; i++) {
         await reward.connect(relay).claimReward(
-          RELAY_DID_HASH, i, 5_000_000n, 0n, 1n, MAX_PER_PERIOD, confirmations,
+          RELAY_DID_HASH, i, LARGE_BYTES, 0n, 10n, confirmations,
         );
       }
 
@@ -234,7 +266,7 @@ describe("ClawRelayReward", function () {
 
       await expect(
         reward.connect(relay).claimReward(
-          RELAY_DID_HASH, 101n, 5_000_000n, 0n, 1n, 100n, confirmations,
+          RELAY_DID_HASH, 101n, LARGE_BYTES, 0n, 10n, confirmations,
         ),
       ).to.be.revertedWith("Insufficient reward pool balance");
     });
@@ -273,7 +305,7 @@ describe("ClawRelayReward", function () {
       const confirmations = [peerConfirmation(PEER_A_HASH, 2_000_000n)];
       await expect(
         reward.connect(relay).claimReward(
-          RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, 100n, confirmations,
+          RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, confirmations,
         ),
       ).to.be.reverted;
 
@@ -281,9 +313,10 @@ describe("ClawRelayReward", function () {
 
       // Should succeed after unpause
       await reward.connect(relay).claimReward(
-        RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, 100n, confirmations,
+        RELAY_DID_HASH, 1n, 2_000_000n, 0n, 1n, confirmations,
       );
       expect(await reward.getClaimCount(RELAY_DID_HASH)).to.equal(1n);
     });
   });
 });
+

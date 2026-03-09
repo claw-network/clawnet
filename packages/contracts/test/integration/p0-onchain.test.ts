@@ -17,18 +17,25 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 
 describe("P0 Integration: Full On-Chain Flow", function () {
-  // Helper: generate ECDSA signature for registerDID
+  // Helper: generate domain-separated ECDSA signature for registerDID
   async function signRegisterDID(
     signer: HardhatEthersSigner,
     didHash: string,
     controller: string,
   ): Promise<string> {
     const ctrl = controller === ethers.ZeroAddress ? signer.address : controller;
+    const { chainId } = await ethers.provider.getNetwork();
+    const contractAddr = await identity.getAddress();
     const message = ethers.solidityPacked(
       ["string", "bytes32", "address"],
       ["clawnet:register:v1:", didHash, ctrl],
     );
-    const digest = ethers.keccak256(message);
+    const digest = ethers.keccak256(
+      ethers.solidityPacked(
+        ["uint256", "address", "bytes"],
+        [chainId, contractAddr, ethers.getBytes(message)],
+      ),
+    );
     return signer.signMessage(ethers.getBytes(digest));
   }
   // Contracts
