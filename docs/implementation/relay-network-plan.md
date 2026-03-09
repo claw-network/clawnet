@@ -702,21 +702,21 @@ interface IRelayRewardPool {
 
 ### Phase 1
 
-- [ ] clawnetd 支持 `relay.*` 配置项（yaml + 环境变量），可配置 maxCircuits / maxBandwidth / reservationTtl 等
-- [ ] `GET /api/v1/relay/stats` 返回准确的流量统计（含 attachment 分类）
-- [ ] `GET /api/v1/relay/health` 返回节点 NAT 状态、公网地址、relay 负载
-- [ ] per-peer 连接限流正常工作，超限 peer 被拒绝并记录日志
-- [ ] relay 黑名单/白名单可通过 API 管理，重启后持久化
-- [ ] NAT 后节点可通过非 bootstrap 的 relay 节点完成通信
-- [ ] SDK 新增 `relay.getStats()` 方法
+- [x] clawnetd 支持 `relay.*` 配置项（yaml + 环境变量），可配置 maxCircuits / maxBandwidth / reservationTtl 等
+- [x] `GET /api/v1/relay/stats` 返回准确的流量统计（含 attachment 分类）
+- [x] `GET /api/v1/relay/health` 返回节点 NAT 状态、公网地址、relay 负载
+- [x] per-peer 连接限流正常工作，超限 peer 被拒绝并记录日志
+- [x] relay 黑名单/白名单可通过 API 管理，重启后持久化
+- [x] NAT 后节点可通过非 bootstrap 的 relay 节点完成通信
+- [x] SDK 新增 `relay.getStats()` 方法
 
 ### Phase 2
 
-- [ ] relay 节点通过 DHT 广播自身为 relay provider
-- [ ] NAT 后节点能通过 DHT 发现 relay 节点列表
-- [ ] 质量评分器根据延迟/负载/成功率选择最优 relay
-- [ ] relay 节点 graceful shutdown 时通知使用者迁移，无突断
-- [ ] DHT 查找失败时自动降级到 bootstrap relay
+- [x] relay 节点通过 DHT 广播自身为 relay provider
+- [x] NAT 后节点能通过 DHT 发现 relay 节点列表
+- [x] 质量评分器根据延迟/负载/成功率选择最优 relay
+- [x] relay 节点 graceful shutdown 时通知使用者迁移，无突断
+- [x] DHT 查找失败时自动降级到 bootstrap relay
 
 ### Phase 3
 

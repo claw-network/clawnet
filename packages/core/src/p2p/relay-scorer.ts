@@ -9,7 +9,7 @@
  * Cached scores have a 5-minute TTL to avoid excessive probing.
  */
 
-import type { P2PNode, RelayInfoResponse } from './node.js';
+import type { P2PNode } from './node.js';
 
 // ── Public types ────────────────────────────────────────────────
 
