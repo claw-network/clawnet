@@ -7,6 +7,7 @@
 
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
+import type { DelegationRecord } from '@claw-network/protocol/messaging';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -128,10 +129,66 @@ CREATE TABLE IF NOT EXISTS attachments (
 
 CREATE INDEX IF NOT EXISTS idx_attachments_received ON attachments(received_at_ms);
 CREATE INDEX IF NOT EXISTS idx_attachments_source ON attachments(source_did);
+
+-- ── Subscription Delegations (Target side) ───────────────────────
+CREATE TABLE IF NOT EXISTS delegations (
+  delegation_id  TEXT PRIMARY KEY,
+  delegate_did   TEXT NOT NULL,
+  topics         TEXT NOT NULL,
+  metadata_only  INTEGER NOT NULL DEFAULT 1,
+  expires_at_ms  INTEGER NOT NULL,
+  created_at_ms  INTEGER NOT NULL,
+  revoked        INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_delegations_delegate ON delegations(delegate_did, revoked);
+CREATE INDEX IF NOT EXISTS idx_delegations_expires ON delegations(expires_at_ms);
+
+-- ── Delegated Inbox (Gateway side) ──────────────────────────────
+CREATE TABLE IF NOT EXISTS delegated_inbox (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  delegation_id       TEXT NOT NULL,
+  source_did          TEXT NOT NULL,
+  original_target_did TEXT NOT NULL,
+  topic               TEXT NOT NULL,
+  message_id          TEXT,
+  payload_size        INTEGER,
+  received_at_ms      INTEGER NOT NULL,
+  seq                 INTEGER NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_delegated_inbox_dedup ON delegated_inbox(delegation_id, message_id);
+CREATE INDEX IF NOT EXISTS idx_delegated_inbox_seq ON delegated_inbox(delegation_id, seq);
+
+INSERT OR IGNORE INTO meta (key, value) VALUES ('delegated_inbox_seq', '0');
 `;
 
 /** Deduplication window: 24 hours */
 const DEDUP_TTL_MS = 24 * 60 * 60 * 1000;
+
+// ── Delegation Row Helpers ───────────────────────────────────────
+
+interface DelegationRow {
+  delegation_id: string;
+  delegate_did: string;
+  topics: string;
+  metadata_only: number;
+  expires_at_ms: number;
+  created_at_ms: number;
+  revoked: number;
+}
+
+function toDelegationRecord(row: DelegationRow): DelegationRecord {
+  return {
+    delegationId: row.delegation_id,
+    delegateDid: row.delegate_did,
+    topics: JSON.parse(row.topics) as string[],
+    metadataOnly: row.metadata_only === 1,
+    expiresAtMs: row.expires_at_ms,
+    createdAtMs: row.created_at_ms,
+    revoked: row.revoked === 1,
+  };
+}
 
 // ── Store ────────────────────────────────────────────────────────
 
@@ -475,5 +532,204 @@ export class MessageStore {
   /** Delete attachment metadata. Returns true if a row was deleted. */
   deleteAttachment(attachmentId: string): boolean {
     return this.db.prepare('DELETE FROM attachments WHERE attachment_id = ?').run(attachmentId).changes > 0;
+  }
+
+  // ── Delegated Inbox Seq ────────────────────────────────────────
+
+  private nextDelegatedSeq(): number {
+    this.db
+      .prepare(
+        "UPDATE meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'delegated_inbox_seq'",
+      )
+      .run();
+    const row = this.db
+      .prepare("SELECT value FROM meta WHERE key = 'delegated_inbox_seq'")
+      .get() as { value: string };
+    return parseInt(row.value, 10);
+  }
+
+  currentDelegatedSeq(): number {
+    const row = this.db
+      .prepare("SELECT value FROM meta WHERE key = 'delegated_inbox_seq'")
+      .get() as { value: string } | undefined;
+    return row ? parseInt(row.value, 10) : 0;
+  }
+
+  // ── Delegation Management (Target side) ────────────────────────
+
+  createDelegation(opts: {
+    delegateDid: string;
+    topics: string[];
+    metadataOnly: boolean;
+    expiresAtMs: number;
+  }): DelegationRecord {
+    const delegationId = `dlg_${crypto.randomBytes(12).toString('hex')}`;
+    const now = Date.now();
+    this.db
+      .prepare(
+        `INSERT INTO delegations (delegation_id, delegate_did, topics, metadata_only, expires_at_ms, created_at_ms, revoked)
+         VALUES (?, ?, ?, ?, ?, ?, 0)`,
+      )
+      .run(
+        delegationId,
+        opts.delegateDid,
+        JSON.stringify(opts.topics),
+        opts.metadataOnly ? 1 : 0,
+        opts.expiresAtMs,
+        now,
+      );
+    return {
+      delegationId,
+      delegateDid: opts.delegateDid,
+      topics: opts.topics,
+      metadataOnly: opts.metadataOnly,
+      expiresAtMs: opts.expiresAtMs,
+      createdAtMs: now,
+      revoked: false,
+    };
+  }
+
+  revokeDelegation(delegationId: string): boolean {
+    const result = this.db
+      .prepare('UPDATE delegations SET revoked = 1 WHERE delegation_id = ? AND revoked = 0')
+      .run(delegationId);
+    return result.changes > 0;
+  }
+
+  getDelegation(delegationId: string): DelegationRecord | null {
+    const row = this.db
+      .prepare('SELECT * FROM delegations WHERE delegation_id = ?')
+      .get(delegationId) as DelegationRow | undefined;
+    return row ? toDelegationRecord(row) : null;
+  }
+
+  listDelegations(opts?: { activeOnly?: boolean }): DelegationRecord[] {
+    let sql = 'SELECT * FROM delegations';
+    const params: unknown[] = [];
+    if (opts?.activeOnly) {
+      sql += ' WHERE revoked = 0 AND expires_at_ms > ?';
+      params.push(Date.now());
+    }
+    sql += ' ORDER BY created_at_ms DESC';
+    const rows = this.db.prepare(sql).all(...params) as DelegationRow[];
+    return rows.map(toDelegationRecord);
+  }
+
+  getActiveDelegationsForTopic(topic: string): DelegationRecord[] {
+    const now = Date.now();
+    const rows = this.db
+      .prepare(
+        'SELECT * FROM delegations WHERE revoked = 0 AND expires_at_ms > ?',
+      )
+      .all(now) as DelegationRow[];
+
+    return rows
+      .map(toDelegationRecord)
+      .filter((d) => d.topics.includes(topic));
+  }
+
+  activeDelegationCount(): number {
+    const row = this.db
+      .prepare(
+        'SELECT COUNT(*) as cnt FROM delegations WHERE revoked = 0 AND expires_at_ms > ?',
+      )
+      .get(Date.now()) as { cnt: number };
+    return row.cnt;
+  }
+
+  cleanupExpiredDelegations(): number {
+    const result = this.db
+      .prepare('DELETE FROM delegations WHERE expires_at_ms <= ?')
+      .run(Date.now());
+    return result.changes;
+  }
+
+  // ── Delegated Inbox (Gateway side) ─────────────────────────────
+
+  addToDelegatedInbox(msg: {
+    delegationId: string;
+    sourceDid: string;
+    originalTargetDid: string;
+    topic: string;
+    messageId?: string;
+    payloadSize?: number;
+  }): number | null {
+    const seq = this.nextDelegatedSeq();
+    try {
+      this.db
+        .prepare(
+          `INSERT INTO delegated_inbox
+             (delegation_id, source_did, original_target_did, topic, message_id, payload_size, received_at_ms, seq)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          msg.delegationId,
+          msg.sourceDid,
+          msg.originalTargetDid,
+          msg.topic,
+          msg.messageId ?? null,
+          msg.payloadSize ?? null,
+          Date.now(),
+          seq,
+        );
+      return seq;
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  getDelegatedInbox(opts: {
+    delegationId: string;
+    sinceSeq?: number;
+    limit?: number;
+  }): Array<{
+    delegationId: string;
+    sourceDid: string;
+    originalTargetDid: string;
+    topic: string;
+    messageId: string | null;
+    payloadSize: number | null;
+    receivedAtMs: number;
+    seq: number;
+  }> {
+    let sql = 'SELECT * FROM delegated_inbox WHERE delegation_id = ?';
+    const params: unknown[] = [opts.delegationId];
+    if (opts.sinceSeq !== undefined) {
+      sql += ' AND seq > ?';
+      params.push(opts.sinceSeq);
+    }
+    sql += ' ORDER BY seq ASC LIMIT ?';
+    params.push(opts.limit ?? 500);
+    const rows = this.db.prepare(sql).all(...params) as Array<{
+      delegation_id: string;
+      source_did: string;
+      original_target_did: string;
+      topic: string;
+      message_id: string | null;
+      payload_size: number | null;
+      received_at_ms: number;
+      seq: number;
+    }>;
+    return rows.map((r) => ({
+      delegationId: r.delegation_id,
+      sourceDid: r.source_did,
+      originalTargetDid: r.original_target_did,
+      topic: r.topic,
+      messageId: r.message_id,
+      payloadSize: r.payload_size,
+      receivedAtMs: r.received_at_ms,
+      seq: r.seq,
+    }));
+  }
+
+  cleanupDelegatedInbox(maxAgeMs: number = 86_400_000): number {
+    const cutoff = Date.now() - maxAgeMs;
+    const result = this.db
+      .prepare('DELETE FROM delegated_inbox WHERE received_at_ms < ?')
+      .run(cutoff);
+    return result.changes;
   }
 }

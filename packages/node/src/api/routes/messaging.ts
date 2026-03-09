@@ -338,5 +338,94 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
     noContent(res);
   });
 
+  // ── Subscription Delegations ─────────────────────────────────
+
+  r.post('/subscription-delegations', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const body = route.body as Record<string, unknown> | undefined;
+    if (!body) {
+      badRequest(res, 'Request body required', route.url.pathname);
+      return;
+    }
+
+    const delegateDid = body.delegateDid as string | undefined;
+    const topics = body.topics as string[] | undefined;
+    const expiresInSec = typeof body.expiresInSec === 'number' ? body.expiresInSec : undefined;
+    const metadataOnly = typeof body.metadataOnly === 'boolean' ? body.metadataOnly : undefined;
+
+    if (!delegateDid || typeof delegateDid !== 'string') {
+      badRequest(res, 'Missing or invalid "delegateDid"', route.url.pathname);
+      return;
+    }
+    if (!Array.isArray(topics) || topics.length === 0) {
+      badRequest(res, 'Missing or invalid "topics": must be a non-empty array', route.url.pathname);
+      return;
+    }
+    if (expiresInSec === undefined || expiresInSec <= 0) {
+      badRequest(res, 'Missing or invalid "expiresInSec": must be a positive number', route.url.pathname);
+      return;
+    }
+
+    try {
+      const record = ctx.messagingService.createSubscriptionDelegation({
+        delegateDid,
+        topics,
+        expiresInSec,
+        metadataOnly,
+      });
+      created(res, record, {
+        self: `/api/v1/messaging/subscription-delegations/${record.delegationId}`,
+      });
+    } catch (err) {
+      badRequest(res, (err as Error).message, route.url.pathname);
+    }
+  });
+
+  r.get('/subscription-delegations', async (_req, res, _route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const delegations = ctx.messagingService.listSubscriptionDelegations({
+      activeOnly: true,
+    });
+    ok(res, delegations);
+  });
+
+  r.get('/subscription-delegations/:id', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const id = route.params.id;
+    const record = ctx.messagingService.getSubscriptionDelegation(id);
+    if (!record) {
+      notFound(res, `Delegation not found: ${id}`, route.url.pathname);
+      return;
+    }
+    ok(res, record);
+  });
+
+  r.delete('/subscription-delegations/:id', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const id = route.params.id;
+    const revoked = ctx.messagingService.revokeSubscriptionDelegation(id);
+    if (!revoked) {
+      notFound(res, `Delegation not found or already revoked: ${id}`, route.url.pathname);
+      return;
+    }
+    noContent(res);
+  });
+
   return r;
 }

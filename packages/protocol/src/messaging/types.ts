@@ -88,3 +88,39 @@ export interface AttachmentMessage {
   totalSize: number;       // Total size in bytes (for validation)
   sentAtMs: bigint;
 }
+
+// ── Subscription Delegation ──────────────────────────────────────
+
+export interface DelegationRecord {
+  delegationId: string;
+  delegateDid: string;
+  topics: string[];
+  metadataOnly: boolean;
+  expiresAtMs: number;
+  createdAtMs: number;
+  revoked: boolean;
+}
+
+export interface DelegatedMessage {
+  type: 'delegated-message';
+  delegationId: string;
+  originalTargetDid: string;
+  sourceDid: string;
+  topic: string;
+  seq: number;
+  receivedAtMs: number;
+  /** Full payload (only when metadataOnly=false) */
+  payload?: string;
+  /** Message metadata (only when metadataOnly=true) */
+  metadata?: {
+    messageId: string;
+    payloadSizeBytes: number;
+  };
+}
+
+export interface CreateDelegationParams {
+  delegateDid: string;
+  topics: string[];
+  expiresInSec: number;
+  metadataOnly?: boolean;
+}

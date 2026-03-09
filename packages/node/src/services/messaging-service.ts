@@ -36,6 +36,7 @@ import {
   decodeAttachmentMessageBytes,
   ReceiptType,
 } from '@claw-network/protocol/messaging';
+import type { DelegationRecord, DelegatedMessage } from '@claw-network/protocol/messaging';
 import { MessageStore } from './message-store.js';
 import { createLogger } from '../logger.js';
 import { gzipSync, gunzipSync } from 'node:zlib';
@@ -50,6 +51,14 @@ const PROTO_DID_ANNOUNCE = '/clawnet/1.0.0/did-announce';
 const PROTO_RECEIPT = '/clawnet/1.0.0/receipt';
 const PROTO_DID_RESOLVE = '/clawnet/1.0.0/did-resolve';
 const PROTO_ATTACHMENT = '/clawnet/1.0.0/attachment';
+const PROTO_DELEGATED_MSG = '/clawnet/1.0.0/delegated-msg';
+
+const MAX_ACTIVE_DELEGATIONS = 10;
+const MIN_DELEGATION_TTL_SEC = 60;
+const MAX_DELEGATION_TTL_SEC = 86_400;
+const DELEGATION_CLEANUP_INTERVAL_MS = 5 * 60_000;
+const DELEGATION_FORWARD_CONCURRENCY = 5;
+const DELEGATION_FORWARD_QUEUE_DEPTH = 200;
 
 /** Timeout for DID resolve queries (ms). */
 const DID_RESOLVE_TIMEOUT_MS = 5_000;
@@ -165,6 +174,9 @@ export interface SendOptions {
 /** Callback for WebSocket subscribers — called when a new message arrives in the inbox. */
 export type InboxSubscriber = (message: InboxMessage) => void;
 
+/** Callback for delegated message subscribers — called when a delegated message arrives. */
+export type DelegatedMsgSubscriber = (msg: DelegatedMessage) => void;
+
 /** Callback for attachment subscribers — called when a new attachment is received via P2P. */
 export type AttachmentSubscriber = (info: AttachmentInfo) => void;
 
@@ -223,6 +235,50 @@ async function writeBinaryStream(sink: StreamDuplex['sink'], data: Uint8Array): 
   );
 }
 
+// ── Delegation Forwarder ─────────────────────────────────────────
+
+class DelegationForwarder {
+  private queue: Array<{ delegateDid: string; peerId: string; data: Uint8Array }> = [];
+  private active = 0;
+
+  constructor(
+    private readonly maxConcurrency: number,
+    private readonly maxQueueDepth: number,
+    private readonly sendFn: (peerId: string, data: Uint8Array) => Promise<boolean>,
+    private readonly log: Logger,
+  ) {}
+
+  enqueue(delegateDid: string, peerId: string, data: Uint8Array): void {
+    if (this.queue.length >= this.maxQueueDepth) {
+      this.log.warn('delegation forward queue full, dropping oldest', {
+        delegateDid,
+        queueLen: this.queue.length,
+      });
+      this.queue.shift();
+    }
+    this.queue.push({ delegateDid, peerId, data });
+    this.drain();
+  }
+
+  private drain(): void {
+    while (this.active < this.maxConcurrency && this.queue.length > 0) {
+      const item = this.queue.shift()!;
+      this.active++;
+      this.sendFn(item.peerId, item.data)
+        .catch((err) => {
+          this.log.warn('delegation forward failed', {
+            delegateDid: item.delegateDid,
+            error: (err as Error).message,
+          });
+        })
+        .finally(() => {
+          this.active--;
+          this.drain();
+        });
+    }
+  }
+}
+
 // ── Service ──────────────────────────────────────────────────────
 
 export class MessagingService {
@@ -247,6 +303,11 @@ export class MessagingService {
 
   /** Subscribers for real-time attachment receive notifications. */
   private readonly attachmentSubscribers = new Set<AttachmentSubscriber>();
+
+  /** Delegation forwarding infrastructure. */
+  private delegationForwarder!: DelegationForwarder;
+  private delegationCleanupTimer?: ReturnType<typeof setInterval>;
+  private readonly delegatedMsgSubscribers = new Set<DelegatedMsgSubscriber>();
 
   constructor(p2p: P2PNode, store: MessageStore, localDid: string, dataDir?: string) {
     this.log = createLogger({ level: 'info' });
@@ -286,6 +347,30 @@ export class MessagingService {
     await this.p2p.handleProtocol(PROTO_ATTACHMENT, (incoming) => {
       void this.handleInboundAttachment(incoming);
     }, { maxInboundStreams: 32 });
+
+    // ── Delegation forwarding infrastructure ─────────────────────
+    this.delegationForwarder = new DelegationForwarder(
+      DELEGATION_FORWARD_CONCURRENCY,
+      DELEGATION_FORWARD_QUEUE_DEPTH,
+      async (peerId, data) => this.sendDelegatedMsg(peerId, data),
+      this.log,
+    );
+
+    await this.p2p.handleProtocol(PROTO_DELEGATED_MSG, (incoming) => {
+      void this.handleInboundDelegatedMsg(incoming);
+    }, { maxInboundStreams: 64 });
+
+    this.delegationCleanupTimer = setInterval(() => {
+      try {
+        const cleaned = this.store.cleanupExpiredDelegations();
+        const inboxCleaned = this.store.cleanupDelegatedInbox();
+        if (cleaned > 0 || inboxCleaned > 0) {
+          this.log.info('delegation cleanup', { delegations: cleaned, inbox: inboxCleaned });
+        }
+      } catch (err) {
+        this.log.warn('delegation cleanup failed', { error: (err as Error).message });
+      }
+    }, DELEGATION_CLEANUP_INTERVAL_MS);
 
     // When a new peer connects, exchange DID announcements
     this.p2p.onPeerDisconnect(() => {
@@ -329,8 +414,15 @@ export class MessagingService {
     try {
       await this.p2p.unhandleProtocol(PROTO_ATTACHMENT);
     } catch { /* ignore */ }
+    try {
+      await this.p2p.unhandleProtocol(PROTO_DELEGATED_MSG);
+    } catch { /* ignore */ }
+    if (this.delegationCleanupTimer) {
+      clearInterval(this.delegationCleanupTimer);
+    }
     this.subscribers.clear();
     this.attachmentSubscribers.clear();
+    this.delegatedMsgSubscribers.clear();
   }
 
   // ── Public API ─────────────────────────────────────────────────
@@ -554,6 +646,95 @@ export class MessagingService {
         try { cb(info); } catch { /* best-effort */ }
       });
     }
+  }
+
+  // ── Subscription Delegation Management ─────────────────────────
+
+  createSubscriptionDelegation(params: {
+    delegateDid: string;
+    topics: string[];
+    expiresInSec: number;
+    metadataOnly?: boolean;
+  }): DelegationRecord {
+    if (!params.delegateDid || !params.delegateDid.startsWith('did:claw:z')) {
+      throw new Error('Invalid delegateDid: must be a valid did:claw: identifier');
+    }
+
+    if (!Array.isArray(params.topics) || params.topics.length === 0) {
+      throw new Error('topics must be a non-empty array');
+    }
+    for (const t of params.topics) {
+      if (typeof t !== 'string' || t.length === 0 || t.length > 256) {
+        throw new Error(`Invalid topic: must be 1-256 characters, got "${t}"`);
+      }
+      if (t.includes('*')) {
+        throw new Error(`Wildcard topics not allowed in delegation: "${t}"`);
+      }
+    }
+
+    if (
+      params.expiresInSec < MIN_DELEGATION_TTL_SEC ||
+      params.expiresInSec > MAX_DELEGATION_TTL_SEC
+    ) {
+      throw new Error(
+        `expiresInSec must be between ${MIN_DELEGATION_TTL_SEC} and ${MAX_DELEGATION_TTL_SEC}`,
+      );
+    }
+
+    const activeCount = this.store.activeDelegationCount();
+    if (activeCount >= MAX_ACTIVE_DELEGATIONS) {
+      throw new Error(
+        `Maximum active delegations (${MAX_ACTIVE_DELEGATIONS}) reached`,
+      );
+    }
+
+    const expiresAtMs = Date.now() + params.expiresInSec * 1000;
+    return this.store.createDelegation({
+      delegateDid: params.delegateDid,
+      topics: params.topics,
+      metadataOnly: params.metadataOnly ?? true,
+      expiresAtMs,
+    });
+  }
+
+  revokeSubscriptionDelegation(delegationId: string): boolean {
+    return this.store.revokeDelegation(delegationId);
+  }
+
+  listSubscriptionDelegations(opts?: { activeOnly?: boolean }): DelegationRecord[] {
+    return this.store.listDelegations(opts);
+  }
+
+  getSubscriptionDelegation(delegationId: string): DelegationRecord | null {
+    return this.store.getDelegation(delegationId);
+  }
+
+  // ── Delegated Message Subscriber Management ────────────────────
+
+  addDelegatedMsgSubscriber(cb: DelegatedMsgSubscriber): void {
+    this.delegatedMsgSubscribers.add(cb);
+  }
+
+  removeDelegatedMsgSubscriber(cb: DelegatedMsgSubscriber): void {
+    this.delegatedMsgSubscribers.delete(cb);
+  }
+
+  private notifyDelegatedMsgSubscribers(msg: DelegatedMessage): void {
+    for (const cb of this.delegatedMsgSubscribers) {
+      queueMicrotask(() => {
+        try { cb(msg); } catch { /* ignore */ }
+      });
+    }
+  }
+
+  /** Get the current delegated inbox sequence number (for WS replay). */
+  getCurrentDelegatedSeq(): number {
+    return this.store.currentDelegatedSeq();
+  }
+
+  /** Get delegated inbox entries for replay. */
+  getDelegatedInbox(opts: { delegationId: string; sinceSeq?: number; limit?: number }) {
+    return this.store.getDelegatedInbox(opts);
   }
 
   // ── Attachment Relay (P2P Binary Transfer) ─────────────────────
@@ -1060,12 +1241,137 @@ export class MessagingService {
         seq: currentSeq,
       });
 
+      // Delegation forwarding
+      this.forwardToDelegates(msg.topic, {
+        messageId,
+        sourceDid: msg.sourceDid,
+        payload: storagePayload,
+        payloadSize: msg.payload.length,
+        seq: currentSeq,
+        receivedAtMs: Date.now(),
+      });
+
       // Send delivery receipt back to sender
       if (remotePeerId) {
         void this.sendDeliveryReceipt(remotePeerId, messageId, msg.sourceDid);
       }
     } catch (err) {
       this.log.warn('failed to handle inbound message', { error: (err as Error).message });
+      try { await stream.close(); } catch { /* ignore */ }
+    }
+  }
+
+  // ── Private: Delegation Forwarding ─────────────────────────────
+
+  private forwardToDelegates(
+    topic: string,
+    msg: {
+      messageId: string;
+      sourceDid: string;
+      payload: string;
+      payloadSize: number;
+      seq: number;
+      receivedAtMs: number;
+    },
+  ): void {
+    let delegations: DelegationRecord[];
+    try {
+      delegations = this.store.getActiveDelegationsForTopic(topic);
+    } catch {
+      return;
+    }
+
+    if (delegations.length === 0) return;
+
+    for (const dlg of delegations) {
+      const delegatedMsg: DelegatedMessage = {
+        type: 'delegated-message',
+        delegationId: dlg.delegationId,
+        originalTargetDid: this.localDid,
+        sourceDid: msg.sourceDid,
+        topic,
+        seq: msg.seq,
+        receivedAtMs: msg.receivedAtMs,
+      };
+
+      if (dlg.metadataOnly) {
+        delegatedMsg.metadata = {
+          messageId: msg.messageId,
+          payloadSizeBytes: msg.payloadSize,
+        };
+      } else {
+        delegatedMsg.payload = msg.payload;
+      }
+
+      const peerId = this.didToPeerId.get(dlg.delegateDid);
+      if (!peerId) {
+        this.log.debug('delegation forward skipped: unknown peerId', {
+          delegationId: dlg.delegationId,
+          delegateDid: dlg.delegateDid,
+        });
+        continue;
+      }
+
+      const data = Buffer.from(JSON.stringify(delegatedMsg), 'utf-8');
+      this.delegationForwarder.enqueue(dlg.delegateDid, peerId, data);
+    }
+  }
+
+  private async sendDelegatedMsg(peerId: string, data: Uint8Array): Promise<boolean> {
+    let stream: StreamDuplex | null = null;
+    try {
+      stream = await this.p2p.newStream(peerId, PROTO_DELEGATED_MSG);
+      await writeBinaryStream(stream.sink, data);
+      await stream.close();
+      return true;
+    } catch (err) {
+      this.log.warn('delegated-msg send failed', { peerId, error: (err as Error).message });
+      if (stream) {
+        try { await stream.close(); } catch { /* ignore */ }
+      }
+      return false;
+    }
+  }
+
+  private async handleInboundDelegatedMsg(incoming: {
+    stream: StreamDuplex;
+    connection: { remotePeer?: { toString: () => string } };
+  }): Promise<void> {
+    const { stream } = incoming;
+    try {
+      const raw = await readStream(stream.source, 64 * 1024, 10_000);
+      await stream.close();
+
+      const msg = JSON.parse(raw.toString('utf-8')) as DelegatedMessage;
+
+      if (msg.type !== 'delegated-message' || !msg.delegationId || !msg.topic) {
+        this.log.warn('invalid delegated message received');
+        return;
+      }
+
+      const messageId = msg.metadata?.messageId ?? msg.delegationId + ':' + msg.seq;
+      const seq = this.store.addToDelegatedInbox({
+        delegationId: msg.delegationId,
+        sourceDid: msg.sourceDid,
+        originalTargetDid: msg.originalTargetDid,
+        topic: msg.topic,
+        messageId,
+        payloadSize: msg.metadata?.payloadSizeBytes ?? (msg.payload ? Buffer.byteLength(msg.payload) : 0),
+      });
+
+      if (seq === null) {
+        return;
+      }
+
+      this.log.info('delegated message received', {
+        delegationId: msg.delegationId,
+        topic: msg.topic,
+        seq,
+      });
+
+      this.notifyDelegatedMsgSubscribers({ ...msg, seq });
+    } catch (err) {
+      this.log.warn('failed to handle delegated message', { error: (err as Error).message });
       try { await stream.close(); } catch { /* ignore */ }
     }
   }

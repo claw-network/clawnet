@@ -119,6 +119,25 @@ export interface AttachmentListResponse {
   attachments: AttachmentInfo[];
 }
 
+// ── Subscription Delegation ──────────────────────────────────────
+
+export interface CreateDelegationParams {
+  delegateDid: string;
+  topics: string[];
+  expiresInSec: number;
+  metadataOnly?: boolean;
+}
+
+export interface DelegationRecord {
+  delegationId: string;
+  delegateDid: string;
+  topics: string[];
+  metadataOnly: boolean;
+  expiresAtMs: number;
+  createdAtMs: number;
+  revoked: boolean;
+}
+
 // ── API Class ────────────────────────────────────────────────────
 
 export class MessagingApi {
@@ -214,5 +233,35 @@ export class MessagingApi {
    */
   async deleteAttachment(attachmentId: string, opts?: RequestOptions): Promise<void> {
     await this.http.delete(`/api/v1/messaging/attachments/${encodeURIComponent(attachmentId)}`, undefined, opts);
+  }
+
+  // ── Subscription Delegations ─────────────────────────────────
+
+  async createSubscriptionDelegation(
+    params: CreateDelegationParams,
+    opts?: RequestOptions,
+  ): Promise<DelegationRecord> {
+    return this.http.post<DelegationRecord>(
+      '/api/v1/messaging/subscription-delegations',
+      params,
+      opts,
+    );
+  }
+
+  async revokeSubscriptionDelegation(
+    delegationId: string,
+    opts?: RequestOptions,
+  ): Promise<void> {
+    await this.http.delete(`/api/v1/messaging/subscription-delegations/${encodeURIComponent(delegationId)}`, undefined, opts);
+  }
+
+  async listSubscriptionDelegations(
+    opts?: RequestOptions,
+  ): Promise<DelegationRecord[]> {
+    return this.http.get<DelegationRecord[]>(
+      '/api/v1/messaging/subscription-delegations',
+      undefined,
+      opts,
+    );
   }
 }

@@ -18,11 +18,13 @@
 
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { Server, IncomingMessage } from 'node:http';
-import type { MessagingService, InboxMessage } from '../services/messaging-service.js';
+import type { MessagingService, InboxMessage, DelegatedMsgSubscriber } from '../services/messaging-service.js';
 import { RECEIPT_TOPIC } from '../services/messaging-service.js';
+import type { DelegatedMessage } from '@claw-network/protocol/messaging';
 import type { ApiKeyStore } from './api-key-store.js';
 
 const WS_PATH = '/api/v1/messaging/subscribe';
+const WS_DELEGATED_PATH = '/api/v1/messaging/subscribe-delegated';
 const HEARTBEAT_INTERVAL_MS = 30_000;
 /** Validates a single topic segment (allows trailing `*` for prefix matching). */
 const TOPIC_PATTERN = /^[a-zA-Z0-9._\-:/]{1,127}\*?$/;
@@ -90,6 +92,35 @@ export function attachWebSocketHandler(
 
   server.on('upgrade', (req: IncomingMessage, socket, head) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+
+    // ── Delegated subscription endpoint ────────────────────────────
+    if (url.pathname === WS_DELEGATED_PATH) {
+      if (apiKeyStore && apiKeyStore.activeCount() > 0) {
+        const apiKey =
+          url.searchParams.get('apiKey') ??
+          (req.headers['x-api-key'] as string | undefined) ??
+          extractBearerToken(req.headers.authorization);
+
+        if (!apiKey || !apiKeyStore.validate(apiKey)) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+      }
+
+      const delegationId = url.searchParams.get('delegationId');
+      if (!delegationId) {
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        handleDelegatedConnection(ws, delegationId, url, getMessagingService());
+      });
+      return;
+    }
+
     if (url.pathname !== WS_PATH) {
       // Not our path — destroy socket so other upgrade handlers can work
       socket.destroy();
@@ -181,6 +212,83 @@ export function attachWebSocketHandler(
   });
 
   return wss;
+}
+
+function handleDelegatedConnection(
+  ws: WebSocket,
+  delegationId: string,
+  url: URL,
+  svc: MessagingService | undefined,
+): void {
+  if (!svc) {
+    ws.close(4000, 'Messaging service unavailable');
+    return;
+  }
+
+  const sinceSeqParam = url.searchParams.get('sinceSeq');
+
+  const subscriber: DelegatedMsgSubscriber = (msg: DelegatedMessage) => {
+    if (msg.delegationId !== delegationId) return;
+    if (ws.readyState !== ws.OPEN) return;
+    ws.send(JSON.stringify({ type: 'delegated-message', data: msg }));
+  };
+
+  svc.addDelegatedMsgSubscriber(subscriber);
+
+  const currentSeq = svc.getCurrentDelegatedSeq();
+  ws.send(JSON.stringify({
+    type: 'connected',
+    delegationId,
+    seq: currentSeq,
+  }));
+
+  if (sinceSeqParam != null) {
+    const sinceSeq = parseInt(sinceSeqParam, 10);
+    if (!isNaN(sinceSeq) && sinceSeq >= 0) {
+      const missed = svc.getDelegatedInbox({
+        delegationId,
+        sinceSeq,
+        limit: 500,
+      });
+      for (const row of missed) {
+        if (ws.readyState !== ws.OPEN) break;
+        ws.send(JSON.stringify({
+          type: 'delegated-message',
+          data: {
+            type: 'delegated-message',
+            delegationId: row.delegationId,
+            originalTargetDid: row.originalTargetDid,
+            sourceDid: row.sourceDid,
+            topic: row.topic,
+            seq: row.seq,
+            receivedAtMs: row.receivedAtMs,
+            metadata: row.messageId
+              ? { messageId: row.messageId, payloadSizeBytes: row.payloadSize ?? 0 }
+              : undefined,
+          },
+        }));
+      }
+      ws.send(JSON.stringify({
+        type: 'replay_done',
+        lastSeq: svc.getCurrentDelegatedSeq(),
+      }));
+    }
+  }
+
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === ws.OPEN) {
+      ws.ping();
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+
+  ws.on('close', () => {
+    clearInterval(pingInterval);
+    svc.removeDelegatedMsgSubscriber(subscriber);
+  });
+
+  ws.on('pong', () => {
+    // client still alive
+  });
 }
 
 function extractBearerToken(header: string | undefined): string | undefined {
