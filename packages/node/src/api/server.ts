@@ -106,6 +106,7 @@ export class ApiServer {
       relayService?: import('../services/relay-service.js').RelayService;
       p2pNode?: import('@claw-network/core').P2PNode;
       relayScorer?: import('@claw-network/core').RelayScorer;
+      signProof?: (data: Uint8Array) => Promise<string>;
     },
   ) {
     // Build the RuntimeContext from constructor args
@@ -132,6 +133,7 @@ export class ApiServer {
       relayService: this.runtime.relayService,
       p2pNode: this.runtime.p2pNode,
       relayScorer: this.runtime.relayScorer,
+      signProof: this.runtime.signProof,
     };
 
     this.router = buildRouter(ctx);

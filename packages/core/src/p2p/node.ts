@@ -153,9 +153,10 @@ const RELAY_ADVERTISE_INTERVAL_MS = 30 * 60_000; // 30 minutes
 const RELAY_DISCOVER_TIMEOUT_MS = 15_000;
 const RELAY_DISCOVER_MAX = 10;
 
-// ── F5 / F12: Protocol IDs ────────────────────────────────────
+// ── F5 / F12 / F10: Protocol IDs ──────────────────────────────
 export const RELAY_INFO_PROTOCOL = '/clawnet/1.0.0/relay-info';
 export const RELAY_MIGRATION_PROTOCOL = '/clawnet/1.0.0/relay-migration';
+export const RELAY_CONFIRM_PROTOCOL = '/clawnet/1.0.0/relay-confirm';
 
 /** Information returned by a relay node in response to a relay-info probe. */
 export interface RelayInfoResponse {
@@ -173,6 +174,32 @@ export interface RelayMigrationNotice {
 
 /** Callback invoked when a relay migration notice is received (F12). */
 export type RelayMigrationHandler = (notice: RelayMigrationNotice, fromPeer: string) => void;
+
+/** Request sent by relay node to ask a served peer to confirm traffic (F10). */
+export interface RelayConfirmRequest {
+  relayDid: string;
+  periodId: number;
+  bytesRelayed: number;
+  circuitsServed: number;
+}
+
+/** Response from served peer confirming (or rejecting) the relay traffic (F10). */
+export interface RelayConfirmResponse {
+  peerDid: string;
+  bytesConfirmed: number;
+  circuitsConfirmed: number;
+  /** base58-encoded Ed25519 signature over the canonical confirmation payload. */
+  signature: string;
+  /** true if the peer accepted the claim, false if the deviation was too large. */
+  accepted: boolean;
+}
+
+/**
+ * Callback invoked when a relay asks this node to confirm traffic (F10).
+ * Implementations should verify the claimed bytes against local records
+ * and return a signed confirmation or rejection.
+ */
+export type RelayConfirmHandler = (request: RelayConfirmRequest, fromPeer: string) => Promise<RelayConfirmResponse>;
 
 export class P2PNode {
   private node: Libp2pNode | null = null;
@@ -193,6 +220,8 @@ export class P2PNode {
   private relayDraining = false;
   /** Externally-registered relay migration handler (F12). */
   private migrationHandler?: RelayMigrationHandler;
+  /** Externally-registered relay confirm handler (F10). */
+  private confirmHandler?: RelayConfirmHandler;
 
   constructor(config: Partial<P2PConfig> = {}, privateKey?: PrivateKeyLike, peerId?: PeerIdLike) {
     this.config = { ...DEFAULT_P2P_CONFIG, ...config };
@@ -880,6 +909,92 @@ export class P2PNode {
 
     // Wait for grace period
     await new Promise((resolve) => setTimeout(resolve, gracePeriodMs));
+  }
+
+  // ── F10: Relay Contribution Confirmation ─────────────────────
+
+  /**
+   * Register a handler for incoming relay-confirm requests (F10).
+   * NAT-behind nodes use this to respond when a relay asks them to confirm traffic.
+   */
+  onRelayConfirm(handler: RelayConfirmHandler): void {
+    this.confirmHandler = handler;
+  }
+
+  /**
+   * Register the `/clawnet/1.0.0/relay-confirm` protocol handler.
+   * Called during node initialization to listen for co-sign requests.
+   */
+  async registerRelayConfirmProtocol(): Promise<void> {
+    await this.handleProtocol(RELAY_CONFIRM_PROTOCOL, ({ stream, connection }) => {
+      const fromPeer = connection.remotePeer?.toString() ?? 'unknown';
+      void (async () => {
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of stream.source) {
+          chunks.push(chunk instanceof Uint8Array ? chunk : chunk.subarray());
+        }
+        if (chunks.length === 0) return;
+        const merged = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+        let offset = 0;
+        for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+        try {
+          const request = JSON.parse(new TextDecoder().decode(merged)) as RelayConfirmRequest;
+          if (!this.confirmHandler) {
+            // No handler registered — send rejection
+            const resp: RelayConfirmResponse = {
+              peerDid: '',
+              bytesConfirmed: 0,
+              circuitsConfirmed: 0,
+              signature: '',
+              accepted: false,
+            };
+            const data = new TextEncoder().encode(JSON.stringify(resp));
+            await stream.sink((async function* () { yield data; })());
+            return;
+          }
+          const response = await this.confirmHandler(request, fromPeer);
+          const data = new TextEncoder().encode(JSON.stringify(response));
+          await stream.sink((async function* () { yield data; })());
+        } catch { /* malformed request — ignore */ }
+      })();
+    });
+  }
+
+  /**
+   * Request a served peer to confirm relay traffic (F10).
+   * Used by relay nodes during period proof collection.
+   * Returns null if the peer is unreachable or rejects.
+   */
+  async requestRelayConfirmation(
+    peerId: string,
+    request: RelayConfirmRequest,
+    timeoutMs = 10_000,
+  ): Promise<RelayConfirmResponse | null> {
+    try {
+      const stream = await this.newStream(peerId, RELAY_CONFIRM_PROTOCOL);
+      const data = new TextEncoder().encode(JSON.stringify(request));
+      await stream.sink((async function* () { yield data; })());
+
+      const chunks: Uint8Array[] = [];
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        for await (const chunk of stream.source) {
+          if (controller.signal.aborted) break;
+          chunks.push(chunk instanceof Uint8Array ? chunk : chunk.subarray());
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+      if (chunks.length === 0) return null;
+      const merged = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+      let offset = 0;
+      for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+      const response = JSON.parse(new TextDecoder().decode(merged)) as RelayConfirmResponse;
+      return response.accepted ? response : null;
+    } catch {
+      return null;
+    }
   }
 
   private getPubsub(): PubsubService {

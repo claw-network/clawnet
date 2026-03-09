@@ -91,4 +91,6 @@ export type {
   RelayHealthInfo,
   RelayAccessInfo,
   RelayDiscoveryResult,
+  PeerConfirmation,
+  RelayPeriodProof,
 } from './relay-service.js';

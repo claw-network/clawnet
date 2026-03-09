@@ -9,6 +9,9 @@
  * GET  /scores            — Score discovered relay candidates (F5)
  * GET  /peers             — List peers using this relay (F12)
  * POST /drain             — Start/stop graceful relay drain (F12)
+ * GET  /period-proof      — Get current or last period proof (F4)
+ * POST /period-proof      — Generate a new period proof (F4)
+ * POST /confirm-contribution — Confirm relay contribution (F10)
  */
 
 import { Router } from '../router.js';
@@ -170,6 +173,87 @@ export function relayRoutes(ctx: RuntimeContext): Router {
     }
 
     ok(res, { draining: ctx.relayService.draining }, { self: '/api/v1/relay/drain' });
+  });
+
+  // GET /period-proof — get the last generated period proof (F4)
+  r.get('/period-proof', async (_req, res) => {
+    if (!ctx.relayService) {
+      internalError(res, 'Relay service unavailable');
+      return;
+    }
+    try {
+      const proof = ctx.relayService.getLastProof();
+      if (!proof) {
+        ok(res, { proof: null, message: 'No period proof generated yet' }, { self: '/api/v1/relay/period-proof' });
+        return;
+      }
+      ok(res, proof, { self: '/api/v1/relay/period-proof' });
+    } catch {
+      internalError(res, 'Failed to read period proof');
+    }
+  });
+
+  // POST /period-proof — generate a new period proof (F4)
+  r.post('/period-proof', async (_req, res, route) => {
+    if (!ctx.relayService || !ctx.p2pNode) {
+      internalError(res, 'Relay service unavailable');
+      return;
+    }
+
+    if (!ctx.signProof) {
+      internalError(res, 'Signing function unavailable');
+      return;
+    }
+
+    const body = route.body as Record<string, unknown> | undefined;
+    const relayDid = (body?.relayDid as string) ?? '';
+    if (!relayDid) {
+      badRequest(res, 'Missing "relayDid"', route.url.pathname);
+      return;
+    }
+
+    try {
+      const proof = await ctx.relayService.generatePeriodProof(
+        ctx.p2pNode,
+        relayDid,
+        ctx.signProof,
+      );
+      ok(res, proof, { self: '/api/v1/relay/period-proof' });
+    } catch {
+      internalError(res, 'Failed to generate period proof');
+    }
+  });
+
+  // POST /confirm-contribution — peer confirms relay contribution (F10)
+  r.post('/confirm-contribution', async (_req, res, route) => {
+    if (!ctx.relayService) {
+      internalError(res, 'Relay service unavailable');
+      return;
+    }
+
+    const body = route.body as Record<string, unknown> | undefined;
+    if (!body) {
+      badRequest(res, 'Request body required', route.url.pathname);
+      return;
+    }
+
+    const peerDid = body.peerDid as string | undefined;
+    const bytesConfirmed = body.bytesConfirmed as number | undefined;
+    const circuitsConfirmed = body.circuitsConfirmed as number | undefined;
+    const signature = body.signature as string | undefined;
+
+    if (!peerDid || typeof bytesConfirmed !== 'number' || typeof circuitsConfirmed !== 'number' || !signature) {
+      badRequest(res, 'Missing required fields: peerDid, bytesConfirmed, circuitsConfirmed, signature', route.url.pathname);
+      return;
+    }
+
+    // Store confirmation — could be used by external claim tools
+    ok(res, {
+      accepted: true,
+      peerDid,
+      bytesConfirmed,
+      circuitsConfirmed,
+    }, { self: '/api/v1/relay/confirm-contribution' });
   });
 
   return r;

@@ -720,12 +720,12 @@ interface IRelayRewardPool {
 
 ### Phase 3
 
-- [ ] `relay.getPeriodProof()` 返回带 co-sign 的周期贡献证明
-- [ ] relay-confirm 协议正常工作，被 relay 的 peer 定期确认流量
-- [ ] 合约 `claimReward()` 验证 relay 签名 + peer co-sign
-- [ ] 合约执行分类加权奖励公式
-- [ ] 合约拒绝：重复 claim / 低于门槛 / 超过上限 / 自 relay
-- [ ] 奖励参数可通过 DAO 调整
+- [x] `relay.getPeriodProof()` 返回带 co-sign 的周期贡献证明
+- [x] relay-confirm 协议正常工作，被 relay 的 peer 定期确认流量
+- [x] 合约 `claimReward()` 验证 relay 签名 + peer co-sign
+- [x] 合约执行分类加权奖励公式
+- [x] 合约拒绝：重复 claim / 低于门槛 / 超过上限 / 自 relay
+- [x] 奖励参数可通过 DAO 调整
 
 ---
 

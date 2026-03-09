@@ -1,5 +1,6 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { RelayService } from '../src/services/relay-service.js';
+import type { P2PNode, RelayConfirmResponse } from '@claw-network/core';
 
 describe('RelayService', () => {
   let service: RelayService;
@@ -293,6 +294,157 @@ describe('RelayService', () => {
       const active = service.getActivePeers();
       expect(active).not.toContain('peer-A');
       expect(active).toContain('peer-B');
+    });
+  });
+
+  // ── Phase 3: Per-peer traffic tracking (F10) ─────────────────
+
+  describe('per-peer traffic tracking (F10)', () => {
+    it('tracks per-peer bytes via recordBytesRelayed', () => {
+      service.recordBytesRelayed(1000, false, 'peer-A');
+      service.recordBytesRelayed(500, true, 'peer-A');
+      service.recordBytesRelayed(2000, false, 'peer-B');
+
+      const trafficA = service.getPeerTraffic('peer-A');
+      expect(trafficA).toBeDefined();
+      expect(trafficA!.bytesRelayed).toBe(1500);
+      expect(trafficA!.attachmentBytesRelayed).toBe(500);
+
+      const trafficB = service.getPeerTraffic('peer-B');
+      expect(trafficB).toBeDefined();
+      expect(trafficB!.bytesRelayed).toBe(2000);
+      expect(trafficB!.attachmentBytesRelayed).toBe(0);
+    });
+
+    it('tracks per-peer circuits via onCircuitOpen', () => {
+      service.onCircuitOpen('peer-A');
+      service.onCircuitOpen('peer-A');
+      service.onCircuitOpen('peer-B');
+
+      const trafficA = service.getPeerTraffic('peer-A');
+      expect(trafficA!.circuitsServed).toBe(2);
+
+      const trafficB = service.getPeerTraffic('peer-B');
+      expect(trafficB!.circuitsServed).toBe(1);
+    });
+
+    it('getPeerPeriodTraffic returns all peers', () => {
+      service.onCircuitOpen('peer-A');
+      service.recordBytesRelayed(100, false, 'peer-B');
+
+      const all = service.getPeerPeriodTraffic();
+      expect(all.size).toBe(2);
+      expect(all.has('peer-A')).toBe(true);
+      expect(all.has('peer-B')).toBe(true);
+    });
+
+    it('returns undefined for unknown peer', () => {
+      expect(service.getPeerTraffic('unknown')).toBeUndefined();
+    });
+  });
+
+  // ── Phase 3: Period proof generation (F4) ─────────────────────
+
+  describe('period proof (F4)', () => {
+    function mockP2PNode(responses?: Map<string, RelayConfirmResponse | null>): P2PNode {
+      return {
+        requestRelayConfirmation: vi.fn(async (peerId: string, _request: unknown) => {
+          if (responses) return responses.get(peerId) ?? null;
+          return null;
+        }),
+      } as unknown as P2PNode;
+    }
+
+    it('returns null for getLastProof initially', () => {
+      expect(service.getLastProof()).toBeNull();
+    });
+
+    it('periodId starts at 0', () => {
+      expect(service.periodId).toBe(0);
+    });
+
+    it('generates a period proof with correct structure', async () => {
+      service.onCircuitOpen('peer-A');
+      service.recordBytesRelayed(1000, false, 'peer-A');
+      service.recordBytesRelayed(200, true, 'peer-A');
+
+      const signFn = vi.fn(async () => 'mock-sig-base58');
+      const p2p = mockP2PNode();
+
+      const proof = await service.generatePeriodProof(p2p, 'did:claw:zRelay', signFn);
+
+      expect(proof.relayDid).toBe('did:claw:zRelay');
+      expect(proof.periodId).toBe(0);
+      expect(proof.bytesRelayed).toBe(1200);
+      expect(proof.attachmentBytesRelayed).toBe(200);
+      expect(proof.circuitsServed).toBe(1);
+      expect(proof.uniquePeersServed).toBe(1);
+      expect(proof.relaySignature).toBe('mock-sig-base58');
+      expect(proof.peerConfirmations).toEqual([]);
+      expect(signFn).toHaveBeenCalledOnce();
+    });
+
+    it('increments periodId after proof generation', async () => {
+      const signFn = vi.fn(async () => 'sig');
+      const p2p = mockP2PNode();
+
+      await service.generatePeriodProof(p2p, 'did:claw:zRelay', signFn);
+      expect(service.periodId).toBe(1);
+
+      await service.generatePeriodProof(p2p, 'did:claw:zRelay', signFn);
+      expect(service.periodId).toBe(2);
+    });
+
+    it('clears per-peer traffic after proof generation', async () => {
+      service.recordBytesRelayed(1000, false, 'peer-A');
+      const signFn = vi.fn(async () => 'sig');
+      const p2p = mockP2PNode();
+
+      await service.generatePeriodProof(p2p, 'did:claw:zRelay', signFn);
+
+      expect(service.getPeerPeriodTraffic().size).toBe(0);
+      expect(service.getPeerTraffic('peer-A')).toBeUndefined();
+    });
+
+    it('caches last proof', async () => {
+      service.recordBytesRelayed(500, false, 'peer-A');
+      const signFn = vi.fn(async () => 'cached-sig');
+      const p2p = mockP2PNode();
+
+      const proof = await service.generatePeriodProof(p2p, 'did:claw:zRelay', signFn);
+      expect(service.getLastProof()).toEqual(proof);
+    });
+
+    it('includes peer confirmations from responding peers', async () => {
+      service.recordBytesRelayed(1000, false, 'peer-A');
+      service.recordBytesRelayed(500, false, 'peer-B');
+
+      const responses = new Map<string, RelayConfirmResponse>([
+        ['peer-A', { peerDid: 'did:claw:zA', bytesConfirmed: 1000, circuitsConfirmed: 0, signature: 'sig-a', accepted: true }],
+        ['peer-B', { peerDid: 'did:claw:zB', bytesConfirmed: 500, circuitsConfirmed: 0, signature: 'sig-b', accepted: true }],
+      ]);
+      const p2p = mockP2PNode(responses);
+      const signFn = vi.fn(async () => 'relay-sig');
+
+      const proof = await service.generatePeriodProof(p2p, 'did:claw:zRelay', signFn);
+      expect(proof.peerConfirmations).toHaveLength(2);
+      expect(proof.peerConfirmations.map(c => c.peerDid).sort()).toEqual(['did:claw:zA', 'did:claw:zB']);
+    });
+
+    it('handles unreachable peers gracefully', async () => {
+      service.recordBytesRelayed(1000, false, 'peer-A');
+      service.recordBytesRelayed(500, false, 'peer-unreachable');
+
+      const responses = new Map<string, RelayConfirmResponse>([
+        ['peer-A', { peerDid: 'did:claw:zA', bytesConfirmed: 1000, circuitsConfirmed: 0, signature: 'sig-a', accepted: true }],
+      ]);
+      // peer-unreachable returns null (unreachable)
+      const p2p = mockP2PNode(responses);
+      const signFn = vi.fn(async () => 'relay-sig');
+
+      const proof = await service.generatePeriodProof(p2p, 'did:claw:zRelay', signFn);
+      expect(proof.peerConfirmations).toHaveLength(1);
+      expect(proof.peerConfirmations[0].peerDid).toBe('did:claw:zA');
     });
   });
 });

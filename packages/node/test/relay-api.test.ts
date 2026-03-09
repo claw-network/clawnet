@@ -14,6 +14,7 @@ function mockP2PNode(): P2PNode {
   return {
     discoverRelayNodes: async () => ['relay-peer-1', 'relay-peer-2'],
     drainRelay: async () => {},
+    requestRelayConfirmation: async () => null,
   } as unknown as P2PNode;
 }
 
@@ -47,6 +48,7 @@ describe('relay api', () => {
         }),
         relayService,
         p2pNode: mockP2PNode(),
+        signProof: async () => 'mock-sig-base58',
       },
     );
     await api.start();
@@ -240,6 +242,80 @@ describe('relay api', () => {
       expect(res.status).toBe(200);
       const data = await readData<{ draining: boolean }>(res);
       expect(data.draining).toBe(false);
+    });
+  });
+
+  // ── Phase 3: GET /api/v1/relay/period-proof (F4) ─────────────
+
+  describe('GET /api/v1/relay/period-proof (F4)', () => {
+    it('returns null when no proof generated yet', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/relay/period-proof`);
+      expect(res.status).toBe(200);
+      const data = await readData<{ proof: null; message: string }>(res);
+      expect(data.proof).toBeNull();
+      expect(data.message).toContain('No period proof');
+    });
+  });
+
+  // ── Phase 3: POST /api/v1/relay/period-proof (F4) ────────────
+
+  describe('POST /api/v1/relay/period-proof (F4)', () => {
+    it('requires relayDid', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/relay/period-proof`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('generates proof with relayDid', async () => {
+      relayService.recordBytesRelayed(1000, false, 'peer-A');
+
+      const res = await fetch(`${baseUrl}/api/v1/relay/period-proof`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ relayDid: 'did:claw:zTestRelay' }),
+      });
+      expect(res.status).toBe(200);
+      const proof = await readData<{
+        relayDid: string;
+        relaySignature: string;
+        bytesRelayed: number;
+      }>(res);
+      expect(proof.relayDid).toBe('did:claw:zTestRelay');
+      expect(proof.relaySignature).toBe('mock-sig-base58');
+      expect(proof.bytesRelayed).toBe(1000);
+    });
+  });
+
+  // ── Phase 3: POST /api/v1/relay/confirm-contribution (F10) ───
+
+  describe('POST /api/v1/relay/confirm-contribution (F10)', () => {
+    it('rejects missing fields', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/relay/confirm-contribution`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ peerDid: 'did:claw:zPeer' }),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('confirms contribution with valid fields', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/relay/confirm-contribution`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          peerDid: 'did:claw:zPeer',
+          bytesConfirmed: 5000,
+          circuitsConfirmed: 2,
+          signature: 'base58-sig',
+        }),
+      });
+      expect(res.status).toBe(200);
+      const data = await readData<{ accepted: boolean; peerDid: string }>(res);
+      expect(data.accepted).toBe(true);
+      expect(data.peerDid).toBe('did:claw:zPeer');
     });
   });
 });

@@ -85,6 +85,44 @@ export interface RelayDrainResult {
   draining: boolean;
 }
 
+/** A single peer's co-signed confirmation of relay traffic (F10). */
+export interface PeerConfirmation {
+  peerDid: string;
+  bytesConfirmed: number;
+  circuitsConfirmed: number;
+  signature: string;
+}
+
+/** Period contribution proof with co-signatures (F4). */
+export interface RelayPeriodProof {
+  relayDid: string;
+  periodId: number;
+  periodStart: number;
+  periodEnd: number;
+  bytesRelayed: number;
+  attachmentBytesRelayed: number;
+  circuitsServed: number;
+  uniquePeersServed: number;
+  peerConfirmations: PeerConfirmation[];
+  relaySignature: string;
+}
+
+/** Params for confirming relay contribution (F10). */
+export interface ConfirmContributionParams {
+  peerDid: string;
+  bytesConfirmed: number;
+  circuitsConfirmed: number;
+  signature: string;
+}
+
+/** Result of confirm-contribution (F10). */
+export interface ConfirmContributionResult {
+  accepted: boolean;
+  peerDid: string;
+  bytesConfirmed: number;
+  circuitsConfirmed: number;
+}
+
 // ── API class ───────────────────────────────────────────────────
 
 export class RelayApi {
@@ -128,5 +166,24 @@ export class RelayApi {
   /** Start or stop graceful relay drain (F12). */
   async setDrain(enable = true, opts?: RequestOptions): Promise<RelayDrainResult> {
     return this.http.post<RelayDrainResult>('/api/v1/relay/drain', { enable }, opts);
+  }
+
+  /** Get the last generated period proof (F4). */
+  async getPeriodProof(opts?: RequestOptions): Promise<RelayPeriodProof | null> {
+    const result = await this.http.get<RelayPeriodProof & { proof?: null; message?: string }>(
+      '/api/v1/relay/period-proof', undefined, opts,
+    );
+    if ('proof' in result && result.proof === null) return null;
+    return result as RelayPeriodProof;
+  }
+
+  /** Generate a new period proof (F4). */
+  async generatePeriodProof(relayDid: string, opts?: RequestOptions): Promise<RelayPeriodProof> {
+    return this.http.post<RelayPeriodProof>('/api/v1/relay/period-proof', { relayDid }, opts);
+  }
+
+  /** Confirm relay contribution as a served peer (F10). */
+  async confirmContribution(params: ConfirmContributionParams, opts?: RequestOptions): Promise<ConfirmContributionResult> {
+    return this.http.post<ConfirmContributionResult>('/api/v1/relay/confirm-contribution', params, opts);
   }
 }

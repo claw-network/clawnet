@@ -1,13 +1,14 @@
 /**
  * Relay service — circuit-relay-v2 statistics, per-peer rate limiting,
- * access control (blacklist / whitelist), self-diagnosis, and relay
- * discovery integration.
+ * access control (blacklist / whitelist), self-diagnosis, relay
+ * discovery integration, period proof generation, and co-sign collection.
  *
  * Phase 1: F3, F6, F7, F8, F9.
  * Phase 2: F2 (discovery support), F5 (scorer integration), F12 (drain).
+ * Phase 3: F4 (period proof), F10 (co-sign collection), F11 (reward formula).
  */
 
-import type { RelayConfig } from '@claw-network/core';
+import type { RelayConfig, P2PNode, RelayConfirmRequest, RelayConfirmResponse } from '@claw-network/core';
 import { DEFAULT_RELAY_CONFIG } from '@claw-network/core';
 import type { RelayScore } from '@claw-network/core';
 
@@ -61,6 +62,30 @@ export interface RelayDiscoveryResult {
   discoveredAt: number;
 }
 
+/** A single peer's co-signed confirmation of relay traffic (F10). */
+export interface PeerConfirmation {
+  peerDid: string;
+  bytesConfirmed: number;
+  circuitsConfirmed: number;
+  /** base58-encoded Ed25519 signature. */
+  signature: string;
+}
+
+/** Period contribution proof with co-signatures (F4). */
+export interface RelayPeriodProof {
+  relayDid: string;
+  periodId: number;
+  periodStart: number;
+  periodEnd: number;
+  bytesRelayed: number;
+  attachmentBytesRelayed: number;
+  circuitsServed: number;
+  uniquePeersServed: number;
+  peerConfirmations: PeerConfirmation[];
+  /** base58-encoded Ed25519 signature from the relay node itself. */
+  relaySignature: string;
+}
+
 // ── Internal per-peer state ─────────────────────────────────────
 
 interface PeerCircuitState {
@@ -68,7 +93,12 @@ interface PeerCircuitState {
   recentReservations: number[];
   bannedUntil: number;
 }
-
+/** Tracks per-peer bytes relayed during the current period (F10). */
+interface PeerPeriodTraffic {
+  bytesRelayed: number;
+  attachmentBytesRelayed: number;
+  circuitsServed: number;
+}
 // ── Service Implementation ──────────────────────────────────────
 
 const PERIOD_DURATION_SEC = 3600; // 1-hour periods
@@ -105,7 +135,12 @@ export class RelayService {
 
   // ── Draining mode (F12) ───────────────────────────────────
   private _draining = false;
+  // ── Per-peer traffic tracking (F10) ───────────────────
+  private _peerPeriodTraffic = new Map<string, PeerPeriodTraffic>();
 
+  // ── Period proof state (F4) ────────────────────────────
+  private _periodId = 0;
+  private _lastProof: RelayPeriodProof | null = null;
   constructor(config?: Partial<RelayConfig>) {
     this.config = { ...DEFAULT_RELAY_CONFIG, ...config };
     this._accessMode = this.config.accessMode;
@@ -193,6 +228,10 @@ export class RelayService {
     const now = Date.now();
     state.recentReservations.push(now);
 
+    // Track per-peer circuits for co-sign (F10)
+    const traffic = this.getOrCreatePeerTraffic(peerId);
+    traffic.circuitsServed++;
+
     return true;
   }
 
@@ -208,13 +247,22 @@ export class RelayService {
   /**
    * Record bytes relayed through a circuit.
    * @param isAttachment Whether this is attachment protocol traffic (F8).
+   * @param peerId The peer this traffic belongs to (for F10 co-sign tracking).
    */
-  recordBytesRelayed(bytes: number, isAttachment = false): void {
+  recordBytesRelayed(bytes: number, isAttachment = false, peerId?: string): void {
     this._totalBytesRelayed += bytes;
     this._periodBytesRelayed += bytes;
     if (isAttachment) {
       this._totalAttachmentBytesRelayed += bytes;
       this._periodAttachmentBytesRelayed += bytes;
+    }
+    // Track per-peer traffic for co-sign (F10)
+    if (peerId) {
+      const traffic = this.getOrCreatePeerTraffic(peerId);
+      traffic.bytesRelayed += bytes;
+      if (isAttachment) {
+        traffic.attachmentBytesRelayed += bytes;
+      }
     }
   }
 
@@ -384,5 +432,128 @@ export class RelayService {
   /** Set draining mode — stops accepting new circuits. */
   setDraining(draining: boolean): void {
     this._draining = draining;
+  }
+
+  // ── F4/F10: Period Proof & Co-sign Collection ─────────────
+
+  /** Get per-peer traffic for the current period (F10). */
+  getPeerPeriodTraffic(): Map<string, PeerPeriodTraffic> {
+    return new Map(this._peerPeriodTraffic);
+  }
+
+  /** Get per-peer traffic for a specific peer. */
+  getPeerTraffic(peerId: string): PeerPeriodTraffic | undefined {
+    return this._peerPeriodTraffic.get(peerId);
+  }
+
+  /**
+   * Collect co-sign confirmations from served peers (F10).
+   * Sends relay-confirm requests to each peer that has traffic in the current period.
+   * @param p2pNode The P2P node used to send protocol messages.
+   * @param relayDid The relay node's DID (for the confirmation request).
+   * @returns Array of valid peer confirmations.
+   */
+  async collectConfirmations(
+    p2pNode: P2PNode,
+    relayDid: string,
+  ): Promise<PeerConfirmation[]> {
+    const confirmations: PeerConfirmation[] = [];
+    const periodId = this._periodId;
+
+    const requests: Promise<void>[] = [];
+    for (const [peerId, traffic] of this._peerPeriodTraffic) {
+      if (traffic.bytesRelayed === 0) continue;
+
+      const request: RelayConfirmRequest = {
+        relayDid,
+        periodId,
+        bytesRelayed: traffic.bytesRelayed,
+        circuitsServed: traffic.circuitsServed,
+      };
+
+      requests.push(
+        p2pNode.requestRelayConfirmation(peerId, request).then((resp) => {
+          if (resp) {
+            confirmations.push({
+              peerDid: resp.peerDid,
+              bytesConfirmed: resp.bytesConfirmed,
+              circuitsConfirmed: resp.circuitsConfirmed,
+              signature: resp.signature,
+            });
+          }
+        }),
+      );
+    }
+
+    await Promise.allSettled(requests);
+    return confirmations;
+  }
+
+  /**
+   * Generate a period contribution proof (F4).
+   * Rotates the period, collects co-sign confirmations, and produces the proof.
+   * @param p2pNode The P2P node for co-sign requests.
+   * @param relayDid The relay node's DID.
+   * @param signFn Function to sign the proof payload (returns base58 signature).
+   * @returns The period proof (also cached as `lastProof`).
+   */
+  async generatePeriodProof(
+    p2pNode: P2PNode,
+    relayDid: string,
+    signFn: (data: Uint8Array) => Promise<string>,
+  ): Promise<RelayPeriodProof> {
+    // Collect co-sign confirmations before rotating
+    const confirmations = await this.collectConfirmations(p2pNode, relayDid);
+
+    // Snapshot and rotate the period
+    const snapshot = this.rotatePeriod();
+    this._periodId++;
+
+    // Build the proof data (without relay signature)
+    const proofData = {
+      relayDid,
+      periodId: this._periodId - 1,
+      periodStart: snapshot.periodStart,
+      periodEnd: snapshot.periodEnd,
+      bytesRelayed: snapshot.bytesRelayed,
+      attachmentBytesRelayed: snapshot.attachmentBytesRelayed,
+      circuitsServed: snapshot.circuitsServed,
+      uniquePeersServed: snapshot.uniquePeersServed,
+      peerConfirmations: confirmations,
+    };
+
+    // Sign the canonical proof payload
+    const signingPayload = new TextEncoder().encode(JSON.stringify(proofData));
+    const relaySignature = await signFn(signingPayload);
+
+    const proof: RelayPeriodProof = {
+      ...proofData,
+      relaySignature,
+    };
+
+    // Clear per-peer traffic for the new period
+    this._peerPeriodTraffic.clear();
+
+    this._lastProof = proof;
+    return proof;
+  }
+
+  /** Get the most recently generated period proof (F4). */
+  getLastProof(): RelayPeriodProof | null {
+    return this._lastProof;
+  }
+
+  /** Current period ID (monotonically increasing). */
+  get periodId(): number {
+    return this._periodId;
+  }
+
+  private getOrCreatePeerTraffic(peerId: string): PeerPeriodTraffic {
+    let t = this._peerPeriodTraffic.get(peerId);
+    if (!t) {
+      t = { bytesRelayed: 0, attachmentBytesRelayed: 0, circuitsServed: 0 };
+      this._peerPeriodTraffic.set(peerId, t);
+    }
+    return t;
   }
 }

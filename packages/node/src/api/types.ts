@@ -81,6 +81,8 @@ export interface RuntimeContext {
   relayService?: RelayService;
   p2pNode?: P2PNode;
   relayScorer?: RelayScorer;
+  /** Sign relay period proof data (returns base58 signature). F4. */
+  signProof?: (data: Uint8Array) => Promise<string>;
 }
 
 // ─── Address & DID Helpers ──────────────────────────────────────
