@@ -32,7 +32,6 @@ import {
   getTimelockEntry,
   listTimelockEntries,
   getTreasury,
-  checkProposalResult,
   // Store
   MemoryDaoStore,
   // Types

@@ -115,7 +115,7 @@ describe('NodeApi', () => {
       }
       // Forward to original handler
       for (const listener of origListeners) {
-        (listener as Function)(req, res);
+        (listener as (...args: unknown[]) => void)(req, res);
       }
     });
 

@@ -49,7 +49,7 @@ describe('WalletService', () => {
       },
     });
     indexer = createMockIndexer();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     service = new WalletService(provider as any, indexer as any);
   });
 
@@ -102,7 +102,7 @@ describe('WalletService', () => {
 
   describe('getHistory', () => {
     it('returns empty when no indexer', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const noIndexer = new WalletService(provider as any);
       const result = noIndexer.getHistory(ALICE);
       expect(result.transactions).toEqual([]);

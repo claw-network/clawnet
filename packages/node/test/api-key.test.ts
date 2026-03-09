@@ -72,7 +72,7 @@ describe('ApiKeyStore', () => {
   });
 
   it('lists including revoked when requested', () => {
-    const k1 = store.create('keep');
+    const _k1 = store.create('keep');
     const k2 = store.create('drop');
     store.revoke(k2.id);
 

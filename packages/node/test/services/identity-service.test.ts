@@ -45,7 +45,7 @@ describe('IdentityService', () => {
       },
     });
     indexer = createMockIndexer();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     service = new IdentityService(provider as any, indexer as any);
   });
 

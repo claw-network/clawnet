@@ -75,7 +75,7 @@ describe('ContractsService', () => {
       },
     });
     indexer = createMockIndexer();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     service = new ContractsService(provider as any, indexer as any);
   });
 
@@ -108,7 +108,7 @@ describe('ContractsService', () => {
 
   describe('listContracts', () => {
     it('returns null when no indexer', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const noIndexer = new ContractsService(provider as any);
       const result = noIndexer.listContracts();
       expect(result).toBeNull();

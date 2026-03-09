@@ -39,9 +39,9 @@ export function mockTxResponse(receiptOverrides: Record<string, unknown> = {}) {
 
 export function mockContract(
   stubs: Record<string, unknown> = {},
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
 ): Record<string, any> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const contract: any = new Proxy(stubs, {
     get(target, prop: string) {
       if (prop in target) return target[prop];
@@ -57,7 +57,7 @@ export function mockContract(
 // Mock ContractProvider
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 type MockContract = Record<string, any>;
 
 export interface MockProviderContracts {

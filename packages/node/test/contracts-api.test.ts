@@ -30,7 +30,6 @@ describe('contracts api', () => {
   let clientDid: string;
   let providerDid: string;
   let clientKey: Uint8Array;
-  let providerKey: Uint8Array;
   let passphrase: string;
   let published: Record<string, unknown>[];
   let eventStore: EventStore;
@@ -94,7 +93,6 @@ describe('contracts api', () => {
     clientDid = didFromPublicKey(client.publicKey);
     providerDid = didFromPublicKey(provider.publicKey);
     clientKey = client.privateKey;
-    providerKey = provider.privateKey;
 
     const paths = resolveStoragePaths(tempDir);
     const clientRecord = createKeyRecord(client.publicKey, client.privateKey, passphrase, {

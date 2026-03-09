@@ -3,7 +3,6 @@ import {
   DELIVERABLE_TYPES,
   isDeliverableType,
   resolveDeliverableType,
-  LEGACY_TYPE_ALIASES,
 } from '../src/deliverables/types.js';
 import {
   buildUnsignedEnvelope,
@@ -54,7 +53,7 @@ describe('deliverable types', () => {
 });
 
 describe('envelope builder', () => {
-  const mockComputeId = (ctx: string, prod: string, nonce: string, ts: string) =>
+  const mockComputeId = (ctx: string, _prod: string, _nonce: string, _ts: string) =>
     `mock-id-${ctx}`;
 
   it('builds an unsigned envelope with all required fields', () => {
@@ -206,9 +205,9 @@ describe('composite hash', () => {
 });
 
 describe('legacy wrapper', () => {
-  const mockComputeId = (ctx: string, prod: string, nonce: string, ts: string) =>
+  const mockComputeId = (ctx: string, _prod: string, _nonce: string, _ts: string) =>
     `mock-id-${ctx}`;
-  const mockContentHash = (data: Uint8Array) => 'fakehash'.repeat(8);
+  const mockContentHash = (_data: Uint8Array) => 'fakehash'.repeat(8);
   const mockUtf8 = (s: string) => new TextEncoder().encode(s);
 
   it('wraps a legacy record into an envelope', () => {
