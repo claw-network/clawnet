@@ -5,15 +5,21 @@
 > **日期**: 2026-03-09
 > **关联文档**: `docs/issues/clawnet-p2p-event-subscription-proxy.md`
 > **实施文档**: `docs/implementation/subscription-delegation.md`
-> **涉及包**: `@claw-network/protocol`, `@claw-network/node`, `@claw-network/sdk`
+> **涉及包**: `@claw-network/protocol`, `@claw-network/node`, `@claw-network/sdk`（均已发布 **v0.6.1**）
 
 ---
 
-## 状态：方案 B 已实现 ✅
+## 状态：方案 B 已实现并发布 ✅
 
 采纳需求文档推荐的 **方案 B（ClawNet 协议层事件订阅代理）**，已完成全链路实现：协议类型 → SQLite 存储 → 服务层（自动转发 + 反压控制） → REST API → WebSocket 代理订阅端点 → SDK 方法。
 
 编译通过，lint 零错误，全部 304 个测试通过（含新增 20 个 delegation 测试）。
+
+**npm 已发布**：`@claw-network/core@0.6.1`、`@claw-network/protocol@0.6.1`、`@claw-network/sdk@0.6.1`、`@claw-network/node@0.6.1`。
+
+```bash
+npm install @claw-network/sdk@0.6.1
+```
 
 ---
 
@@ -387,6 +393,11 @@ ws.on('close', () => {
 | `packages/node/src/api/ws-messaging.ts` | 新增 WS 端点 | `/subscribe-delegated` 含回放 + 心跳 |
 | `packages/sdk/src/messaging.ts` | 新增 SDK 方法 | 3 个类型安全的 REST 客户端方法 |
 | `packages/node/test/delegation.test.ts` | 新增测试 | 20 个测试用例覆盖存储、API、去重、回放 |
+| `CHANGELOG.md` | 更新 | v0.6.1 变更日志 |
+| `docs/api/openapi.yaml` | 更新 | 4 个 REST 端点 + `DelegationRecord` schema |
+| `docs/API_REFERENCE.md` | 更新 | Messaging 章节 + `DELEGATION_LIMIT` 错误码 |
+| `docs/API_ROUTE_CATALOG.md` | 更新 | 路由总表 #86–#89 |
+| `docs/SDK_GUIDE.md` | 更新 | Messaging API 章节（delegation CRUD + WS 说明） |
 
 ---
 
