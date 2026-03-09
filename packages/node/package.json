@@ -34,7 +34,7 @@
     "test": "vitest run --passWithNoTests",
     "test:services": "vitest run --passWithNoTests test/services/",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "lint": "eslint src --max-warnings=0"
+    "lint": "eslint src test --max-warnings=0"
   },
   "pkg": {
     "scripts": [

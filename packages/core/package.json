@@ -62,7 +62,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.json",
     "test": "vitest run",
-    "lint": "eslint src --max-warnings=0"
+    "lint": "eslint src test --max-warnings=0"
   },
   "dependencies": {
     "@chainsafe/libp2p-gossipsub": "^14.1.2",

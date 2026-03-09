@@ -28,7 +28,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "lint": "eslint src --max-warnings=0"
+    "lint": "eslint src test --max-warnings=0"
   },
   "publishConfig": {
     "access": "public"
