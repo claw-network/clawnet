@@ -242,4 +242,57 @@ describe('RelayService', () => {
       service.cleanupPeerState();
     });
   });
+
+  // ── F12: Draining mode ──────────────────────────────────────
+
+  describe('draining mode (F12)', () => {
+    it('defaults to not draining', () => {
+      expect(service.draining).toBe(false);
+    });
+
+    it('setDraining enables draining mode', () => {
+      service.setDraining(true);
+      expect(service.draining).toBe(true);
+    });
+
+    it('rejects new circuits when draining', () => {
+      service.setDraining(true);
+      const accepted = service.onCircuitOpen('peer-new');
+      expect(accepted).toBe(false);
+      expect(service.getStats().activeCircuits).toBe(0);
+    });
+
+    it('setDraining(false) re-enables accepting circuits', () => {
+      service.setDraining(true);
+      service.setDraining(false);
+      const accepted = service.onCircuitOpen('peer-1');
+      expect(accepted).toBe(true);
+    });
+  });
+
+  // ── Phase 2: Active peers tracking ──────────────────────────
+
+  describe('getActivePeers (F12)', () => {
+    it('returns empty list initially', () => {
+      expect(service.getActivePeers()).toEqual([]);
+    });
+
+    it('returns peers with active circuits', () => {
+      service.onCircuitOpen('peer-A');
+      service.onCircuitOpen('peer-B');
+      const active = service.getActivePeers();
+      expect(active).toContain('peer-A');
+      expect(active).toContain('peer-B');
+      expect(active).toHaveLength(2);
+    });
+
+    it('excludes peers after circuit close', () => {
+      service.onCircuitOpen('peer-A');
+      service.onCircuitOpen('peer-B');
+      service.onCircuitClose('peer-A');
+      const active = service.getActivePeers();
+      expect(active).not.toContain('peer-A');
+      expect(active).toContain('peer-B');
+    });
+  });
 });

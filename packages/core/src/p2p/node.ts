@@ -13,6 +13,8 @@ import { dcutr } from '@libp2p/dcutr';
 import { ping } from '@libp2p/ping';
 import { circuitRelayTransport, circuitRelayServer } from '@libp2p/circuit-relay-v2';
 import { multiaddr } from '@multiformats/multiaddr';
+import { CID } from 'multiformats/cid';
+import { sha256 } from 'multiformats/hashes/sha2';
 import type { Libp2pOptions } from 'libp2p';
 import { sha256Bytes } from '../crypto/hash.js';
 import { P2PConfig, DEFAULT_P2P_CONFIG, resolveRelayConfig } from './config.js';
@@ -145,6 +147,33 @@ type Libp2pNode = {
 export type PeerDisconnectHandler = (peerId: string) => void;
 export type PeerConnectHandler = (peerId: string) => void;
 
+// ── F2: Relay discovery constants ──────────────────────────────
+const RELAY_PROVIDER_KEY = '/clawnet/relay-providers/v1';
+const RELAY_ADVERTISE_INTERVAL_MS = 30 * 60_000; // 30 minutes
+const RELAY_DISCOVER_TIMEOUT_MS = 15_000;
+const RELAY_DISCOVER_MAX = 10;
+
+// ── F5 / F12: Protocol IDs ────────────────────────────────────
+export const RELAY_INFO_PROTOCOL = '/clawnet/1.0.0/relay-info';
+export const RELAY_MIGRATION_PROTOCOL = '/clawnet/1.0.0/relay-migration';
+
+/** Information returned by a relay node in response to a relay-info probe. */
+export interface RelayInfoResponse {
+  activeCircuits: number;
+  maxCircuits: number;
+  uptimeSeconds: number;
+}
+
+/** Notification sent by a relay node when it is about to go offline (F12). */
+export interface RelayMigrationNotice {
+  reason: 'shutdown' | 'overload' | 'maintenance';
+  suggestedRelays: string[];
+  gracePeriodSec: number;
+}
+
+/** Callback invoked when a relay migration notice is received (F12). */
+export type RelayMigrationHandler = (notice: RelayMigrationNotice, fromPeer: string) => void;
+
 export class P2PNode {
   private node: Libp2pNode | null = null;
   private readonly config: P2PConfig;
@@ -156,6 +185,14 @@ export class P2PNode {
   private connectHandlers: PeerConnectHandler[] = [];
   /** Set of peer IDs that we have ever successfully connected to. */
   private knownPeers = new Set<string>();
+  /** Timer for periodic relay advertisement (F2). */
+  private relayAdvertiseTimer?: ReturnType<typeof setInterval>;
+  /** Cached relay provider CID (F2). */
+  private relayProviderCid?: CID;
+  /** Whether this node is draining relay connections (F12). */
+  private relayDraining = false;
+  /** Externally-registered relay migration handler (F12). */
+  private migrationHandler?: RelayMigrationHandler;
 
   constructor(config: Partial<P2PConfig> = {}, privateKey?: PrivateKeyLike, peerId?: PeerIdLike) {
     this.config = { ...DEFAULT_P2P_CONFIG, ...config };
@@ -305,6 +342,8 @@ export class P2PNode {
     if (!this.node) {
       return;
     }
+    this.stopRelayAdvertise();
+    this.relayDraining = false;
     await this.node.stop();
     this.node = null;
   }
@@ -594,6 +633,253 @@ export class P2PNode {
       }
     }
     return connected;
+  }
+
+  // ── F2: Relay DHT Discovery ─────────────────────────────────
+
+  /** Get or lazily create the relay provider CID. */
+  private async getRelayProviderCid(): Promise<CID> {
+    if (!this.relayProviderCid) {
+      const hash = await sha256.digest(new TextEncoder().encode(RELAY_PROVIDER_KEY));
+      this.relayProviderCid = CID.create(1, 0x55 /* raw codec */, hash);
+    }
+    return this.relayProviderCid;
+  }
+
+  /**
+   * Advertise this node as a relay provider in the DHT (F2).
+   * Should be called once after `start()` on public relay nodes.
+   * Automatically re-provides every 30 minutes.
+   */
+  async advertiseAsRelay(): Promise<void> {
+    await this.provideRelayOnce();
+    this.relayAdvertiseTimer = setInterval(
+      () => void this.provideRelayOnce(),
+      RELAY_ADVERTISE_INTERVAL_MS,
+    );
+  }
+
+  /** Stop periodic relay advertisement. */
+  stopRelayAdvertise(): void {
+    if (this.relayAdvertiseTimer) {
+      clearInterval(this.relayAdvertiseTimer);
+      this.relayAdvertiseTimer = undefined;
+    }
+  }
+
+  private async provideRelayOnce(): Promise<void> {
+    if (!this.node) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const nodeAny = this.node as any;
+      const routing = nodeAny.contentRouting ?? nodeAny.services?.dht;
+      if (!routing?.provide) return;
+      const cid = await this.getRelayProviderCid();
+      await routing.provide(cid);
+    } catch {
+      // DHT provide can fail during early bootstrap — non-fatal
+    }
+  }
+
+  /**
+   * Discover relay nodes via DHT content routing (F2).
+   * Returns up to `max` peer IDs of nodes that advertised as relays.
+   * Falls back to bootstrap nodes if DHT discovery yields nothing within timeout.
+   */
+  async discoverRelayNodes(max = RELAY_DISCOVER_MAX): Promise<string[]> {
+    const relayPeers: string[] = [];
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const nodeAny = this.node as any;
+      const routing = nodeAny.contentRouting ?? nodeAny.services?.dht;
+      if (routing?.findProviders) {
+        const cid = await this.getRelayProviderCid();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), RELAY_DISCOVER_TIMEOUT_MS);
+        try {
+          for await (const provider of routing.findProviders(cid, { signal: controller.signal })) {
+            const pid = provider?.id?.toString?.() ?? provider?.toString?.() ?? '';
+            if (pid && pid !== this.getPeerId()) {
+              relayPeers.push(pid);
+              if (relayPeers.length >= max) break;
+            }
+          }
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+    } catch {
+      // DHT lookup timeout or failure — fall through to bootstrap fallback
+    }
+
+    // Fallback: extract peer IDs from bootstrap multiaddrs
+    if (relayPeers.length === 0) {
+      for (const addr of this.config.bootstrap) {
+        const match = addr.match(/\/p2p\/([^/]+)$/);
+        if (match?.[1]) {
+          relayPeers.push(match[1]);
+          if (relayPeers.length >= max) break;
+        }
+      }
+    }
+
+    return relayPeers;
+  }
+
+  // ── F5: Relay Info Protocol ─────────────────────────────────
+
+  /**
+   * Register the `/clawnet/1.0.0/relay-info` protocol handler (F5).
+   * Called on relay nodes to respond to health probes.
+   * @param infoProvider Callback that returns current relay load info.
+   */
+  async registerRelayInfoProtocol(
+    infoProvider: () => RelayInfoResponse,
+  ): Promise<void> {
+    await this.handleProtocol(RELAY_INFO_PROTOCOL, ({ stream }) => {
+      const data = new TextEncoder().encode(JSON.stringify(infoProvider()));
+      void stream.sink((async function* () { yield data; })());
+    });
+  }
+
+  /** Unregister the relay-info protocol handler. */
+  async unregisterRelayInfoProtocol(): Promise<void> {
+    try {
+      await this.unhandleProtocol(RELAY_INFO_PROTOCOL);
+    } catch { /* may not be registered */ }
+  }
+
+  /**
+   * Probe a remote relay node for its current load info (F5).
+   * Returns null if the probe fails or times out.
+   */
+  async probeRelayInfo(peerId: string, timeoutMs = 5000): Promise<RelayInfoResponse | null> {
+    try {
+      const stream = await this.newStream(peerId, RELAY_INFO_PROTOCOL);
+      // Send empty request (protocol open is the trigger)
+      void stream.sink((async function* () { yield new Uint8Array(0); })());
+
+      const chunks: Uint8Array[] = [];
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        for await (const chunk of stream.source) {
+          if (controller.signal.aborted) break;
+          chunks.push(chunk instanceof Uint8Array ? chunk : chunk.subarray());
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+      if (chunks.length === 0) return null;
+      const merged = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+      let offset = 0;
+      for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+      return JSON.parse(new TextDecoder().decode(merged)) as RelayInfoResponse;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Ping a remote peer and return RTT in milliseconds (F5).
+   * Returns -1 if the ping fails.
+   */
+  async pingPeer(peerId: string): Promise<number> {
+    if (!this.node) return -1;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const nodeAny = this.node as any;
+      const pingService = nodeAny.services?.ping;
+      if (pingService?.ping) {
+        const ma = multiaddr('/p2p/' + peerId);
+        const latency: number = await pingService.ping(ma);
+        return latency;
+      }
+      return -1;
+    } catch {
+      return -1;
+    }
+  }
+
+  // ── F12: Graceful Relay Migration ───────────────────────────
+
+  /** Whether this relay node is in draining mode (not accepting new circuits). */
+  isRelayDraining(): boolean {
+    return this.relayDraining;
+  }
+
+  /**
+   * Register a handler for incoming relay migration notices (F12).
+   * NAT-behind nodes use this to react when their relay is going offline.
+   */
+  onRelayMigration(handler: RelayMigrationHandler): void {
+    this.migrationHandler = handler;
+  }
+
+  /**
+   * Register the `/clawnet/1.0.0/relay-migration` protocol handler.
+   * Called during node initialization to listen for migration notices.
+   */
+  async registerRelayMigrationProtocol(): Promise<void> {
+    await this.handleProtocol(RELAY_MIGRATION_PROTOCOL, ({ stream, connection }) => {
+      const fromPeer = connection.remotePeer?.toString() ?? 'unknown';
+      const chunks: Uint8Array[] = [];
+      void (async () => {
+        for await (const chunk of stream.source) {
+          chunks.push(chunk instanceof Uint8Array ? chunk : chunk.subarray());
+        }
+        if (chunks.length === 0) return;
+        const merged = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+        let offset = 0;
+        for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+        try {
+          const notice = JSON.parse(new TextDecoder().decode(merged)) as RelayMigrationNotice;
+          this.migrationHandler?.(notice, fromPeer);
+        } catch { /* malformed notice — ignore */ }
+      })();
+    });
+  }
+
+  /**
+   * Notify a specific peer about relay migration (F12).
+   * Used by relay nodes during graceful shutdown.
+   */
+  async notifyRelayMigration(peerId: string, notice: RelayMigrationNotice): Promise<boolean> {
+    try {
+      const stream = await this.newStream(peerId, RELAY_MIGRATION_PROTOCOL);
+      const data = new TextEncoder().encode(JSON.stringify(notice));
+      await stream.sink((async function* () { yield data; })());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Gracefully drain relay connections and notify peers (F12).
+   * @param connectedPeers List of peer IDs currently using this node as relay.
+   * @param gracePeriodMs Grace period before forcefully closing (default: 30s).
+   */
+  async drainRelay(connectedPeers: string[], gracePeriodMs = 30_000): Promise<void> {
+    this.relayDraining = true;
+
+    // Discover alternative relays to suggest
+    const suggestedRelays = await this.discoverRelayNodes(5);
+
+    const notice: RelayMigrationNotice = {
+      reason: 'shutdown',
+      suggestedRelays,
+      gracePeriodSec: Math.ceil(gracePeriodMs / 1000),
+    };
+
+    // Notify all connected relay users in parallel
+    await Promise.allSettled(
+      connectedPeers.map((peerId) => this.notifyRelayMigration(peerId, notice)),
+    );
+
+    // Wait for grace period
+    await new Promise((resolve) => setTimeout(resolve, gracePeriodMs));
   }
 
   private getPubsub(): PubsubService {

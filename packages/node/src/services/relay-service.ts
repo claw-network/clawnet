@@ -1,12 +1,15 @@
 /**
  * Relay service — circuit-relay-v2 statistics, per-peer rate limiting,
- * access control (blacklist / whitelist), and self-diagnosis.
+ * access control (blacklist / whitelist), self-diagnosis, and relay
+ * discovery integration.
  *
- * Covers Phase 1 features: F3, F6, F7, F8, F9.
+ * Phase 1: F3, F6, F7, F8, F9.
+ * Phase 2: F2 (discovery support), F5 (scorer integration), F12 (drain).
  */
 
 import type { RelayConfig } from '@claw-network/core';
 import { DEFAULT_RELAY_CONFIG } from '@claw-network/core';
+import type { RelayScore } from '@claw-network/core';
 
 // ── Public types ────────────────────────────────────────────────
 
@@ -47,6 +50,15 @@ export interface RelayHealthInfo {
 export interface RelayAccessInfo {
   mode: 'open' | 'whitelist' | 'blacklist';
   list: string[];
+}
+
+/** Result of relay discovery + scoring (F2 + F5). */
+export interface RelayDiscoveryResult {
+  /** Relay candidates with scores, sorted best-first. */
+  relays: RelayScore[];
+  /** Where the candidates came from. */
+  source: 'dht' | 'bootstrap' | 'cache';
+  discoveredAt: number;
 }
 
 // ── Internal per-peer state ─────────────────────────────────────
@@ -90,6 +102,9 @@ export class RelayService {
   // ── NAT status cache (F9) ──────────────────────────────────
   private _natStatus: 'public' | 'private' | 'unknown' = 'unknown';
   private _publicAddresses: string[] = [];
+
+  // ── Draining mode (F12) ───────────────────────────────────
+  private _draining = false;
 
   constructor(config?: Partial<RelayConfig>) {
     this.config = { ...DEFAULT_RELAY_CONFIG, ...config };
@@ -154,9 +169,12 @@ export class RelayService {
 
   /**
    * Record a circuit being opened.
-   * Returns false if the circuit should be rejected (rate-limit or access denied).
+   * Returns false if the circuit should be rejected (draining, rate-limit, or access denied).
    */
   onCircuitOpen(peerId: string): boolean {
+    if (this._draining) {
+      return false;
+    }
     if (!this.checkAccess(peerId)) {
       return false;
     }
@@ -340,5 +358,31 @@ export class RelayService {
         this.peerState.delete(peerId);
       }
     }
+  }
+
+  // ── F2/F5/F12: Phase 2 — Discovery & Migration ─────────────
+
+  /**
+   * Get the list of peer IDs that currently have active circuits
+   * through this relay node (used by F12 graceful drain).
+   */
+  getActivePeers(): string[] {
+    const peers: string[] = [];
+    for (const [peerId, state] of this.peerState) {
+      if (state.activeCircuits > 0) {
+        peers.push(peerId);
+      }
+    }
+    return peers;
+  }
+
+  /** Whether the relay is in draining mode (F12). */
+  get draining(): boolean {
+    return this._draining;
+  }
+
+  /** Set draining mode — stops accepting new circuits. */
+  setDraining(draining: boolean): void {
+    this._draining = draining;
   }
 }

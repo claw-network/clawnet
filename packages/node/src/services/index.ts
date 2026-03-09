@@ -90,4 +90,5 @@ export type {
   RelayPeriodStats,
   RelayHealthInfo,
   RelayAccessInfo,
+  RelayDiscoveryResult,
 } from './relay-service.js';

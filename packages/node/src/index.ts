@@ -24,6 +24,7 @@ import {
   NodeConfig,
   P2PConfig,
   P2PNode,
+  resolveRelayConfig,
   resolveStoragePaths,
   saveKeyRecord,
   signSnapshot,
@@ -57,6 +58,7 @@ import { DaoService } from './services/dao-service.js';
 import { MessagingService } from './services/messaging-service.js';
 import { MessageStore } from './services/message-store.js';
 import { RelayService } from './services/relay-service.js';
+import { RelayScorer } from '@claw-network/core';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 import { ApiKeyStore } from './api/api-key-store.js';
 
@@ -135,6 +137,7 @@ export class ClawNetNode {
   private messagingService?: MessagingService;
   private messageStore?: MessageStore;
   private relayService?: RelayService;
+  private relayScorer?: RelayScorer;
   private apiKeyStore?: ApiKeyStore;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
@@ -296,6 +299,29 @@ export class ClawNetNode {
           const relayConfig = this.config.p2p?.relay;
           this.relayService = new RelayService(relayConfig);
           this.relayService.start();
+
+          // F2: Advertise as relay in DHT if relay is enabled
+          if (this.p2p && resolveRelayConfig({ ...DEFAULT_P2P_CONFIG, ...this.config.p2p }).enabled) {
+            void this.p2p.advertiseAsRelay();
+
+            // F5: Register relay-info protocol so probes can query our load
+            const effectiveMaxCircuits = this.config.p2p?.relay?.maxCircuits ?? 64;
+            void this.p2p.registerRelayInfoProtocol(() => {
+              const stats = this.relayService!.getStats();
+              return {
+                activeCircuits: stats.activeCircuits,
+                maxCircuits: effectiveMaxCircuits,
+                uptimeSeconds: stats.uptimeSeconds,
+              };
+            });
+          }
+
+          // F12: Register relay-migration protocol to handle incoming notices
+          if (this.p2p) {
+            void this.p2p.registerRelayMigrationProtocol();
+            // F5: Create relay scorer for quality assessment
+            this.relayScorer = new RelayScorer(this.p2p);
+          }
         }
 
         const apiConfig: ApiServerConfig = {
@@ -329,6 +355,8 @@ export class ClawNetNode {
           apiKeyStore: this.apiKeyStore,
           messagingService: this.messagingService,
           relayService: this.relayService,
+          p2pNode: this.p2p,
+          relayScorer: this.relayScorer,
         });
         await this.apiServer.start();
       }

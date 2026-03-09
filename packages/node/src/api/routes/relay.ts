@@ -5,6 +5,10 @@
  * GET  /health            — Relay self-diagnosis (F9)
  * GET  /access            — Current access control list (F7)
  * POST /access            — Modify access control list (F7)
+ * GET  /discover          — Discover relay nodes via DHT (F2)
+ * GET  /scores            — Score discovered relay candidates (F5)
+ * GET  /peers             — List peers using this relay (F12)
+ * POST /drain             — Start/stop graceful relay drain (F12)
  */
 
 import { Router } from '../router.js';
@@ -101,6 +105,71 @@ export function relayRoutes(ctx: RuntimeContext): Router {
     }
 
     ok(res, ctx.relayService.getAccessInfo(), { self: '/api/v1/relay/access' });
+  });
+
+  // GET /discover — discover relay nodes via DHT (F2)
+  r.get('/discover', async (_req, res) => {
+    if (!ctx.p2pNode) {
+      internalError(res, 'P2P node unavailable');
+      return;
+    }
+    try {
+      const peerIds = await ctx.p2pNode.discoverRelayNodes();
+      ok(res, { relays: peerIds, count: peerIds.length }, { self: '/api/v1/relay/discover' });
+    } catch {
+      internalError(res, 'Failed to discover relay nodes');
+    }
+  });
+
+  // GET /scores — score discovered relay candidates (F5)
+  r.get('/scores', async (_req, res) => {
+    if (!ctx.p2pNode || !ctx.relayScorer) {
+      internalError(res, 'Relay scorer unavailable');
+      return;
+    }
+    try {
+      const candidates = await ctx.p2pNode.discoverRelayNodes();
+      const scores = await ctx.relayScorer.scoreRelays(candidates);
+      ok(res, { scores, count: scores.length }, { self: '/api/v1/relay/scores' });
+    } catch {
+      internalError(res, 'Failed to score relay nodes');
+    }
+  });
+
+  // GET /peers — list peers currently using this relay (F12)
+  r.get('/peers', async (_req, res) => {
+    if (!ctx.relayService) {
+      internalError(res, 'Relay service unavailable');
+      return;
+    }
+    try {
+      const peers = ctx.relayService.getActivePeers();
+      ok(res, { peers, count: peers.length, draining: ctx.relayService.draining }, { self: '/api/v1/relay/peers' });
+    } catch {
+      internalError(res, 'Failed to list relay peers');
+    }
+  });
+
+  // POST /drain — start or stop graceful relay drain (F12)
+  r.post('/drain', async (_req, res, route) => {
+    if (!ctx.relayService || !ctx.p2pNode) {
+      internalError(res, 'Relay service unavailable');
+      return;
+    }
+
+    const body = route.body as Record<string, unknown> | undefined;
+    const enable = body?.enable !== false; // default true
+
+    if (enable && !ctx.relayService.draining) {
+      ctx.relayService.setDraining(true);
+      // Notify connected peers in the background
+      const activePeers = ctx.relayService.getActivePeers();
+      void ctx.p2pNode.drainRelay(activePeers);
+    } else if (!enable) {
+      ctx.relayService.setDraining(false);
+    }
+
+    ok(res, { draining: ctx.relayService.draining }, { self: '/api/v1/relay/drain' });
   });
 
   return r;

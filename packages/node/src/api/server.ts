@@ -104,6 +104,8 @@ export class ApiServer {
       apiKeyStore?: ApiKeyStore;
       messagingService?: import('../services/messaging-service.js').MessagingService;
       relayService?: import('../services/relay-service.js').RelayService;
+      p2pNode?: import('@claw-network/core').P2PNode;
+      relayScorer?: import('@claw-network/core').RelayScorer;
     },
   ) {
     // Build the RuntimeContext from constructor args
@@ -128,6 +130,8 @@ export class ApiServer {
       apiKeyStore: this.runtime.apiKeyStore,
       messagingService: this.runtime.messagingService,
       relayService: this.runtime.relayService,
+      p2pNode: this.runtime.p2pNode,
+      relayScorer: this.runtime.relayScorer,
     };
 
     this.router = buildRouter(ctx);

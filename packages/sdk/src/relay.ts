@@ -1,5 +1,6 @@
 /**
- * Relay API — relay statistics, health diagnosis, and access control.
+ * Relay API — relay statistics, health diagnosis, access control,
+ * relay discovery, quality scoring, and drain management.
  */
 import type { HttpClient, RequestOptions } from './http.js';
 
@@ -49,6 +50,41 @@ export interface RelayAccessUpdateParams {
   mode?: 'open' | 'whitelist' | 'blacklist';
 }
 
+/** Relay discovery result (F2). */
+export interface RelayDiscoveryInfo {
+  relays: string[];
+  count: number;
+}
+
+/** Relay quality score (F5). */
+export interface RelayScore {
+  peerId: string;
+  latencyMs: number;
+  availableCapacity: number;
+  maxCapacity: number;
+  successRate: number;
+  uptimeSeconds: number;
+  score: number;
+}
+
+/** Relay scoring result (F5). */
+export interface RelayScoresInfo {
+  scores: RelayScore[];
+  count: number;
+}
+
+/** Relay peers info (F12). */
+export interface RelayPeersInfo {
+  peers: string[];
+  count: number;
+  draining: boolean;
+}
+
+/** Relay drain result (F12). */
+export interface RelayDrainResult {
+  draining: boolean;
+}
+
 // ── API class ───────────────────────────────────────────────────
 
 export class RelayApi {
@@ -72,5 +108,25 @@ export class RelayApi {
   /** Update relay access control settings (add/remove DID, or change mode). */
   async updateAccess(params: RelayAccessUpdateParams, opts?: RequestOptions): Promise<RelayAccessInfo> {
     return this.http.post<RelayAccessInfo>('/api/v1/relay/access', params, opts);
+  }
+
+  /** Discover relay nodes via DHT (F2). */
+  async discover(opts?: RequestOptions): Promise<RelayDiscoveryInfo> {
+    return this.http.get<RelayDiscoveryInfo>('/api/v1/relay/discover', undefined, opts);
+  }
+
+  /** Get scored relay candidates (F5). Discovers + probes + scores. */
+  async getScores(opts?: RequestOptions): Promise<RelayScoresInfo> {
+    return this.http.get<RelayScoresInfo>('/api/v1/relay/scores', undefined, opts);
+  }
+
+  /** Get peers using this node as relay (F12). */
+  async getPeers(opts?: RequestOptions): Promise<RelayPeersInfo> {
+    return this.http.get<RelayPeersInfo>('/api/v1/relay/peers', undefined, opts);
+  }
+
+  /** Start or stop graceful relay drain (F12). */
+  async setDrain(enable = true, opts?: RequestOptions): Promise<RelayDrainResult> {
+    return this.http.post<RelayDrainResult>('/api/v1/relay/drain', { enable }, opts);
   }
 }

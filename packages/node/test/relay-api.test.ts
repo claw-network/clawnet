@@ -2,10 +2,19 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { ApiServer } from '../src/api/server.js';
 import { RelayService } from '../src/services/relay-service.js';
+import type { P2PNode } from '@claw-network/core';
 
 async function readData<T>(res: Response): Promise<T> {
   const payload = (await res.json()) as { data?: T };
   return (payload.data ?? payload) as T;
+}
+
+/** Minimal mock P2PNode for relay API tests. */
+function mockP2PNode(): P2PNode {
+  return {
+    discoverRelayNodes: async () => ['relay-peer-1', 'relay-peer-2'],
+    drainRelay: async () => {},
+  } as unknown as P2PNode;
 }
 
 describe('relay api', () => {
@@ -37,6 +46,7 @@ describe('relay api', () => {
           uptime: 10,
         }),
         relayService,
+        p2pNode: mockP2PNode(),
       },
     );
     await api.start();
@@ -178,6 +188,58 @@ describe('relay api', () => {
         body: JSON.stringify({ did: 'did:claw:zTest' }),
       });
       expect(res.status).toBe(400);
+    });
+  });
+
+  // ── Phase 2: GET /api/v1/relay/peers ─────────────────────────
+
+  describe('GET /api/v1/relay/peers (F12)', () => {
+    it('returns empty peer list initially', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/relay/peers`);
+      expect(res.status).toBe(200);
+      const data = await readData<{ peers: string[]; count: number; draining: boolean }>(res);
+      expect(data.peers).toEqual([]);
+      expect(data.count).toBe(0);
+      expect(data.draining).toBe(false);
+    });
+
+    it('returns active relay peers', async () => {
+      relayService.onCircuitOpen('peer-X');
+      relayService.onCircuitOpen('peer-Y');
+
+      const res = await fetch(`${baseUrl}/api/v1/relay/peers`);
+      const data = await readData<{ peers: string[]; count: number }>(res);
+      expect(data.count).toBe(2);
+      expect(data.peers).toContain('peer-X');
+      expect(data.peers).toContain('peer-Y');
+    });
+  });
+
+  // ── Phase 2: POST /api/v1/relay/drain ────────────────────────
+
+  describe('POST /api/v1/relay/drain (F12)', () => {
+    it('enables drain mode', async () => {
+      const res = await fetch(`${baseUrl}/api/v1/relay/drain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enable: true }),
+      });
+      expect(res.status).toBe(200);
+      const data = await readData<{ draining: boolean }>(res);
+      expect(data.draining).toBe(true);
+    });
+
+    it('disables drain mode', async () => {
+      relayService.setDraining(true);
+
+      const res = await fetch(`${baseUrl}/api/v1/relay/drain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enable: false }),
+      });
+      expect(res.status).toBe(200);
+      const data = await readData<{ draining: boolean }>(res);
+      expect(data.draining).toBe(false);
     });
   });
 });

@@ -3,6 +3,7 @@
  */
 
 import type { EventStore } from '@claw-network/core';
+import type { P2PNode, RelayScorer } from '@claw-network/core';
 import type {
   ContractStore,
   MarketSearchStore,
@@ -78,6 +79,8 @@ export interface RuntimeContext {
   apiKeyStore?: ApiKeyStore;
   messagingService?: MessagingService;
   relayService?: RelayService;
+  p2pNode?: P2PNode;
+  relayScorer?: RelayScorer;
 }
 
 // ─── Address & DID Helpers ──────────────────────────────────────
