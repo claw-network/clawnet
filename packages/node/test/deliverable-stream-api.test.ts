@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import WebSocket from 'ws';
-import { attachDeliveryStreamHandler } from '../../src/api/ws-delivery-stream.js';
+import { attachDeliveryStreamHandler } from '../src/api/ws-delivery-stream.js';
 import { blake3Hex, utf8ToBytes, bytesToBase64 } from '@claw-network/core';
 
 // ── Test server setup ──────────────────────────────────────────
@@ -120,12 +120,13 @@ describe('delivery stream WS', () => {
     expect(errors[0]!.detail).toContain('Invalid JSON');
   });
 
-  it('returns error on invalid base64 chunk data', async () => {
+  it('returns error when chunk data is not a string', async () => {
     const ws = new WebSocket(wsUrl('test-deliverable-3'));
     const collecting = collectMessages(ws);
     await waitOpen(ws);
 
-    ws.send(JSON.stringify({ type: 'chunk', data: '!!!not-base64!!!' }));
+    // Send chunk with non-string data
+    ws.send(JSON.stringify({ type: 'chunk', data: 12345 }));
     await new Promise((r) => setTimeout(r, 50));
     ws.close();
 
