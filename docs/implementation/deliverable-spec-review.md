@@ -31,7 +31,12 @@
 - ✅ DS-002 RESOLVED: `contracts-service.ts` 已修复，`envelopeDigest` 直接透传不二次哈希；route 支持 `delivery.envelope` 自动计算 BLAKE3 digest。
 - ✅ DS-003 RESOLVED: `deliverable-hash.ts` 使用 domain prefix `clawnet:deliverable:v1:`，与 event 签名域分离。
 - ✅ DS-004 RESOLVED: 采用扩展 `market.submission.submit` payload 方案，不新增 `delivery.*` 事件类型。
-- ⚠️ DS-005~DS-009: Medium 级别，计划 Phase 2 处理。
+- ✅ DS-005~DS-009 RESOLVED: v0.2.0~v0.4.0 已依次解决——Motivation 区分加密能力与完整验证闭环（DS-005）、inline 阈值改为 750 KB（DS-006）、InfoKeyEnvelope 兼容映射已补充（DS-007）、replay key 固化为 `SHA-256(contextId + producer + nonce + createdAt)`（DS-008）、composite 按 parts 声明顺序（DS-009）。
+
+**Round 2（v0.2.0）& Round 3（v0.3.0）复审状态**（2026-03 更新）：
+
+- ✅ DS2-001~DS2-006 RESOLVED: spec v0.4.0 已全部解决——`id` 使用泛化 `contextId`（DS2-001）、签名节无 `signatureInput` 冲突（DS2-002）、标题与表格统一为 750 KB（DS2-003）、Phase 1 过渡期明确同时携带 legacy + envelope（DS2-004）、§8.1 legacy 受控例外 + §12.5 签名策略完整（DS2-005）、§15 已注明 delivery-auth 需登记（DS2-006）。
+- ✅ DS3-001~DS3-003 RESOLVED: spec v0.4.0 已全部解决——§6.2 示例包含 parser 必需字段（DS3-001）、§6.4 示例包含 orderId/resourcePrev/status（DS3-002）、§8.1 明确 legacy 受控例外（DS3-003）。
 
 ## 3. Findings（按严重级别）
 
@@ -112,7 +117,7 @@
 
 ### Medium
 
-#### DS-005 “信息市场已完整实现完整性+E2E”描述过于乐观
+#### DS-005 ✅ RESOLVED —— “信息市场已完整实现完整性+E2E”描述过于乐观
 
 - 现象：
   - 文档把信息市场描述为唯一完整实现。
@@ -126,7 +131,7 @@
 - 建议：
   - 在 Motivation 中区分“已有加密能力”与“端到端交付验证流程”。
 
-#### DS-006 Inline 阈值 `<= 1 MB` 与网络封包上限冲突
+#### DS-006 ✅ RESOLVED —— Inline 阈值 `<= 1 MB` 与网络封包上限冲突
 
 - 现象：
   - 文档把 `<=1MB` 定义为 inline。
@@ -140,7 +145,7 @@
 - 建议：
   - 以“序列化后字节数”定义阈值，并下调 raw 内容上限（需压测定值）。
 
-#### DS-007 加密元数据结构与现有 `InfoKeyEnvelope` 不兼容
+#### DS-007 ✅ RESOLVED —— 加密元数据结构与现有 `InfoKeyEnvelope` 不兼容
 
 - 现象：
   - 文档使用 `algorithm: 'x25519-aes256gcm'` 与 `keyEnvelopes: Record<DID,string>`。
@@ -155,7 +160,7 @@
 - 建议：
   - 明确“v1 兼容编码”和“v2 目标编码”，提供双向映射规则。
 
-#### DS-008 防重放语义前后不一致
+#### DS-008 ✅ RESOLVED —— 防重放语义前后不一致
 
 - 现象：
   - 文档允许 `id` 为 UUIDv7 或 `contentHash+producer`。
@@ -168,7 +173,7 @@
 - 建议：
   - 固化 replay key（如 `orderId + producer + nonce + createdAt`），并给出验证伪代码。
 
-#### DS-009 `composite` 哈希规则与“顺序语义”冲突
+#### DS-009 ✅ RESOLVED —— `composite` 哈希规则与“顺序语义”冲突
 
 - 现象：
   - 正文使用 `sort(part_hashes)`，语义上顺序无关。
@@ -210,9 +215,9 @@
 
 ### P1（进入 Phase 1 代码改造前）
 
-- 给出 `InfoKeyEnvelope` 迁移兼容表。
-- 重新定义 inline 大小阈值为“序列化后字节数”。
-- 明确 replay key 和 `composite` 顺序语义。
+- ✅ 给出 `InfoKeyEnvelope` 迁移兼容表——spec v0.2.0 §5.2 已补充。
+- ✅ 重新定义 inline 大小阈值为“序列化后字节数”——spec v0.2.0 改为 750 KB。
+- ✅ 明确 replay key 和 `composite` 顺序语义——spec v0.4.0 `id = SHA-256(contextId + producer + nonce + createdAt)`，composite 按 parts 声明顺序。
 
 ### P2（实现中同步）
 
@@ -220,6 +225,8 @@
 - ✅ REST schema 已支持 `delivery.envelope` 字段。
 - ⬜ 更新 OpenAPI / SDK-Python 统一模型。
 - ⬜ 增加跨版本兼容策略（legacy 自动包装、告警、淘汰窗口）。
+
+> **全部规范层阵断项已清零。** 剩余 P2 项为工程同步任务，不影响规范基线。
 
 ## 6. 审阅边界与说明
 
@@ -251,7 +258,7 @@
 
 #### High
 
-##### DS2-001 `id` 规则依赖 `orderId`，但 envelope 未定义 `orderId` 字段
+##### DS2-001 ✅ RESOLVED —— `id` 规则依赖 `orderId`，但 envelope 未定义 `orderId` 字段
 
 - 现象：
   - `id` 被定义为 `SHA-256(orderId + producer + nonce + createdAt)`。
@@ -268,7 +275,7 @@
   - 在 envelope 显式增加 `orderId` 字段并声明适用范围。
   - 改为不依赖外部业务上下文的 ID 公式，并把幂等键单独定义。
 
-##### DS2-002 签名章节仍存在内部表述冲突
+##### DS2-002 ✅ RESOLVED —— 签名章节仍存在内部表述冲突
 
 - 现象：
   - 同一节同时出现 `signatureInput = SHA-256(signingBytes)` 与 `Ed25519.sign(signingBytes)`。
@@ -287,7 +294,7 @@
 
 #### Medium
 
-##### DS2-003 尺寸分层与小节标题不一致
+##### DS2-003 ✅ RESOLVED —— 尺寸分层与小节标题不一致
 
 - 现象：
   - 分层表已改为 `<= 750 KB` / `750 KB - 1 GB`。
@@ -301,7 +308,7 @@
 - 建议：
   - 统一标题与分层表，全部以 750 KB 边界为准。
 
-##### DS2-004 “旧节点 graceful degradation”前提未写完整
+##### DS2-004 ✅ RESOLVED —— “旧节点 graceful degradation”前提未写完整
 
 - 现象：
   - 文档声明新增 `payload.delivery.envelope` 可向后兼容。
@@ -317,7 +324,7 @@
 - 建议：
   - 在规范中明确：Phase 1 过渡期必须同时携带 legacy `deliverables` + 新 `delivery.envelope`。
 
-##### DS2-005 `legacy envelope` 无签名策略与 Layer 1 强制验签冲突
+##### DS2-005 ✅ RESOLVED —— `legacy envelope` 无签名策略与 Layer 1 强制验签冲突
 
 - 现象：
   - REST 迁移策略写明旧格式自动包装为 `legacy envelope` 且“不签名”。
@@ -335,7 +342,7 @@
 
 #### Low
 
-##### DS2-006 新增 `/clawnet/1.0.0/delivery-auth` 协议与冻结文档关系描述偏弱
+##### DS2-006 ✅ RESOLVED —— 新增 `/clawnet/1.0.0/delivery-auth` 协议与冻结文档关系描述偏弱
 
 - 现象：
   - 文档新增点对点协议流用于下发令牌。
@@ -350,8 +357,8 @@
 ### 7.3 复审结论
 
 - v0.2.0 相比 v0.1.0 已显著收敛，前一轮 P0 高风险项大部分已被正确处理。
-- 当前主要剩余问题是“规范内部一致性”和“过渡兼容条件”。
-- 建议先修复 DS2-001 到 DS2-005，再启动大规模实现，以减少返工与跨版本互操作风险。
+- **更新（2026-03）：** spec v0.4.0 已解决本轮全部 6 项 findings（DS2-001~DS2-006）——`id` 改用泛化 `contextId`、签名节清理 `signatureInput` 冲突、尺寸标题统一 750 KB、Phase 1 双携带明确、legacy 降级策略完整、delivery-auth 登记已注明。
+- ✅ 本轮无待解决项。
 
 ---
 
@@ -367,14 +374,14 @@
 ### 8.1 总体结论
 
 - v0.3.0 已解决前两轮大部分核心问题（安全、签名、事件命名、二次哈希、兼容策略）。
-- 当前剩余问题主要是示例与约束的同步，属于可快速修复项。
-- 结论：**可进入开发评审阶段，但建议先修复下列 3 个问题再开始大规模编码**。
+- **更新（2026-03）：** v0.4.0 已解决本轮剩余 3 项（DS3-001~DS3-003），示例与约束已完全同步。
+- ✅ 结论：**规范已可作为 Phase 1 实施基线，三轮审阅全部 findings 均已关闭。**
 
 ### 8.2 Findings（最终轮）
 
 #### Medium
 
-##### DS3-001 `market.submission.submit` 示例 payload 与事件约束不一致
+##### DS3-001 ✅ RESOLVED —— `market.submission.submit` 示例 payload 与事件约束不一致
 
 - 现象：
   - §6.2 示例写为 `payload: { orderId, envelope }`。
@@ -396,7 +403,7 @@
   - `delivery: { envelope }`（new）；
   - 并明确 `resourcePrev`/`prev` 规则。
 
-##### DS3-002 `market.order.update` 流式示例缺少必需字段说明
+##### DS3-002 ✅ RESOLVED —— `market.order.update` 流式示例缺少必需字段说明
 
 - 现象：
   - §6.4 仅展示了 `market.order.update + delivery`。
@@ -413,7 +420,7 @@
 - 建议：
   - 在 §6.4 增补完整示例（含 `orderId`、`resourcePrev`、`status` + `delivery` 扩展字段）。
 
-##### DS3-003 Layer 1 自动拒绝规则与 legacy 降级流程仍有表述冲突
+##### DS3-003 ✅ RESOLVED —— Layer 1 自动拒绝规则与 legacy 降级流程仍有表述冲突
 
 - 现象：
   - §8.1 写“来源验证失败 → 自动拒绝”。
@@ -431,5 +438,5 @@
 
 ### 8.3 最终建议
 
-- 先修 DS3-001 到 DS3-003（文档层改动，低成本）。
-- 修复后即可把该规范作为 Phase 1 实施基线发给开发团队。
+- **更新（2026-03）：** spec v0.4.0 已解决本轮全部 3 项 findings（DS3-001~DS3-003）——§6.2 示例包含 parser 必需字段（submissionId / worker / deliverables + delivery.envelope）、§6.4 示例包含 orderId / resourcePrev / status、§8.1 legacy 受控例外注释已明确。
+- ✅ 本轮无待解决项。规范可作为 Phase 1 实施基线。
