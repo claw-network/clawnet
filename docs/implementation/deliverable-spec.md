@@ -861,9 +861,14 @@ interface AcceptanceTest {
   - 订阅 `CapabilityUsageRecord` 写入事件。
   - 按 lease 维度聚合：调用次数、成功率、P99 延迟。
   - 对比 `lease.sla` 中声明的阈值（`maxLatencyMs`, `minSuccessRate`, `maxMonthlyDowntimeSec`）。
-- [x] **P3-4-2**: SLA 违约时自动发出 `capability.sla.violation` 事件（新增），写入 indexer。
-  - ⚠️ 事件类型定义推迟；违约时直接调用 `autoOpenDispute()` 触发争议。
-  - 文件：`packages/protocol/src/markets/events.ts`（需走冻结规范变更流程，或类似 delivery 采用 payload 扩展方式）
+- [x] **P3-4-2**: SLA 违约处理。
+  - **设计决策（2026-03-10）：不引入独立 `capability.sla.violation` 事件类型。**
+    理由：①SLA 违约是本地节点监控判断，非跨节点传播事实，不同节点可能得出不同结论；
+    ②违约已通过 `autoOpenDispute()` 产生 `market.dispute.open` 事件，独立事件会造成重复；
+    ③SPEC_FREEZE 要求新事件类型走 RFC 流程，MVP 阶段不值得；
+    ④可观测性已由结构化日志 + dispute reason `'sla_violation'` 覆盖。
+    如未来需跨节点传播（第三方仲裁 / DAO 投票），可作为 post-MVP RFC 引入。
+  - 当前实现：`SlaMonitor.handleViolation()` → 结构化日志 + `DisputeService.autoOpenDispute(leaseId, leaseId, 'sla_violation', evidence)`。
 - [x] **P3-4-3**: SLA 违约触发 `autoOpenDispute()`（同 P3-3-1）。
 - [x] **P3-4-4**: REST API `GET /api/v1/markets/capability/leases/:leaseId/sla` 返回当前 SLA 指标。
   - 文件：`packages/node/src/api/routes/markets-capabilities.ts`
