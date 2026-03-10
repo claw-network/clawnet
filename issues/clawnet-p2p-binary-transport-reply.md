@@ -3,19 +3,21 @@
 > **来自**: ClawNet 项目组  
 > **日期**: 2026-03-10  
 > **回复**: "P2P proxy 传输层只能传文本，不能传原始二进制"  
-> **当前版本**: `@claw-network/core@0.6.2`, `@claw-network/protocol@0.6.2`, `@claw-network/node@0.6.2`, `@claw-network/sdk@0.6.2`  
-> **npm 状态**: ✅ 已发布  
-> **修复**: SDK `messaging.send()` 的 `payload` 参数已支持 `string | Uint8Array`（0.6.3 即将发布）
+> **当前版本**: `@claw-network/core@0.6.5`, `@claw-network/protocol@0.6.5`, `@claw-network/node@0.6.5`, `@claw-network/sdk@0.6.5`  
+> **npm 状态**: ✅ 已发布
 
 ---
 
 ## 结论
 
-**ClawNet P2P 传输层完全支持原始二进制数据**，不存在"只能传文本"的限制。
+**ClawNet 全栈支持原始二进制数据**，不存在"只能传文本"的限制。
 
-整个传输栈设计为 **binary-first**：底层基于 libp2p 双向字节流，消息序列化采用 FlatBuffers 二进制格式，所有 payload 字段均为 `Uint8Array`。文本从未作为传输层的限制条件。
+整个系统设计为 **binary-first**：
 
-> **已确认问题**: 0.6.2 版本中 SDK 的 `messaging.send()` 接口 `payload` 参数类型确实仅为 `string`，这是 SDK REST 接口层的类型限制（底层 P2P 支持二进制）。我们已在代码中修复，`payload` 现在接受 `string | Uint8Array`。传入 `Uint8Array` 时，SDK 自动将其 base64 编码后通过 JSON 传输，Node 端自动解码为原始二进制再通过 FlatBuffers P2P 发送。
+- **P2P 传输层**: libp2p 双向字节流 + FlatBuffers 二进制序列化，所有 payload 均为 `Uint8Array`
+- **存储层**: SQLite BLOB 列，直接存储原始二进制，无任何编码
+- **REST API 层**: 文本消息通过 JSON 接口 (`POST /send`)，二进制消息通过独立的 octet-stream 接口 (`POST /send-binary`)
+- **SDK 层**: `send()` 发送文本，`sendBinary()` 发送二进制，**全链路无 base64**
 
 ---
 
@@ -34,6 +36,7 @@ libp2p 双向字节流 (TCP / WebSocket / WebRTC)
 - **底层传输**: libp2p stream（`StreamDuplex`），天然支持任意字节流
 - **序列化格式**: FlatBuffers — 零拷贝二进制格式，非 JSON/文本
 - **加密层**: X25519 + AES-256-GCM，60 字节固定二进制头，无文本编码开销
+- **存储层**: SQLite BLOB 列 + `compressed`/`encrypted` 标志位
 
 ---
 
@@ -155,9 +158,17 @@ function decodeE2EEnvelope(bytes: Uint8Array): E2EEnvelope
 
 ---
 
-## 五、关于 Base64 的使用场景
+## 五、全链路零 Base64
 
-Base64 编码 **仅** 出现在 WebSocket JSON 文本帧中（HTTP API 层面），与 P2P 传输层无关：
+**整个消息链路不使用 base64**。文本和二进制通过独立接口分离：
+
+| 层级 | 文本消息 | 二进制消息 |
+|------|----------|------------|
+| **SDK** | `send()` — JSON body, string payload | `sendBinary()` — octet-stream body, Uint8Array payload |
+| **REST API** | `POST /send` — JSON body | `POST /send-binary` — raw body + 元数据 headers |
+| **Node 服务层** | `Buffer.from(payload, 'utf-8')` | `new Uint8Array(rawBody)` — 直传 |
+| **SQLite 存储** | BLOB 列 | BLOB 列 |
+| **P2P 传输** | FlatBuffers `Uint8Array` | FlatBuffers `Uint8Array` |
 
 | 场景 | 是否使用 Base64 | 说明 |
 |------|:---:|------|
@@ -165,59 +176,46 @@ Base64 编码 **仅** 出现在 WebSocket JSON 文本帧中（HTTP API 层面）
 | GossipSub pub/sub | ❌ | 原始 `Uint8Array` |
 | delivery-external（大文件） | ❌ | 长度前缀 + 原始字节流 |
 | E2E 加密信封 | ❌ | 60 字节固定二进制头 + 密文 |
-| WS delivery-stream（HTTP API） | ✅ | JSON 文本帧需要 Base64 编码二进制块 |
-
-WS delivery-stream 使用 Base64 是因为 WebSocket 的 JSON 文本帧无法直接携带二进制，这是 HTTP API 层的限制，**不是 P2P 传输层的限制**。
+| REST API 发送 | ❌ | 文本用 JSON，二进制用 octet-stream |
+| REST API 收件箱 | ❌ | 文本内联，二进制通过独立端点下载原始字节 |
+| SQLite 存储 | ❌ | BLOB 列直存原始字节 |
+| SDK | ❌ | `send()` 和 `sendBinary()` 分离 |
 
 ---
 
-## 六、SDK `messaging.send()` 二进制支持（已修复）
+## 六、REST API 接口设计
 
-### 问题确认
+### 发送消息
 
-0.6.2 版本中，SDK `SendMessageParams.payload` 的类型确实是 `string`，调用方必须自行 base64 编码二进制数据。这是 SDK REST 接口层的类型限制，并非底层 P2P 传输层的限制。
+**文本消息** — `POST /api/v1/messaging/send`
 
-### 修复内容
-
-`messaging.send()` 和 `messaging.sendBatch()` 的 `payload` 参数类型已改为 `string | Uint8Array`：
-
-```typescript
-// 旧 API (0.6.2) — 仅支持字符串
-await client.messaging.send({
-  targetDid: 'did:claw:zBob...',
-  topic: 'my-app/data',
-  payload: btoa(String.fromCharCode(...binaryData)),  // 手动 base64
-});
-
-// 新 API — 直接传 Uint8Array
-await client.messaging.send({
-  targetDid: 'did:claw:zBob...',
-  topic: 'my-app/data',
-  payload: new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]),  // 原始二进制
-});
-
-// 文本载荷仍然兼容（string 类型不变）
-await client.messaging.send({
-  targetDid: 'did:claw:zBob...',
-  topic: 'my-app/text',
-  payload: 'Hello, World!',
-});
+```bash
+curl -X POST http://localhost:9528/api/v1/messaging/send \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: YOUR_KEY" \
+  -d '{"targetDid":"did:claw:zBob...","topic":"my-app/text","payload":"Hello, World!"}'
 ```
 
-### 工作原理
+**二进制消息** — `POST /api/v1/messaging/send-binary`
 
+元数据通过 HTTP headers 传递，body 是原始二进制：
+
+```bash
+curl -X POST http://localhost:9528/api/v1/messaging/send-binary \
+  -H "Content-Type: application/octet-stream" \
+  -H "X-Api-Key: YOUR_KEY" \
+  -H "X-Target-Did: did:claw:zBob..." \
+  -H "X-Topic: my-app/binary-data" \
+  -H "X-Compress: true" \
+  --data-binary @my-file.bin
 ```
-SDK (Uint8Array)
-  → 自动 base64 编码 + payloadEncoding: 'base64' 标记
-  → JSON HTTP POST (REST API)
-  → Node 路由层解码为 Uint8Array
-  → MessagingService 直接传入 FlatBuffers 编码
-  → libp2p 流发送原始二进制
-```
 
-### 收件箱 (Inbox) 侧
+**批量文本** — `POST /api/v1/messaging/send/batch`  
+**批量二进制** — `POST /api/v1/messaging/send-binary/batch`（DIDs 在 `X-Target-Dids` header）
 
-接收到的二进制消息在 inbox API 中会包含 `payloadEncoding: 'base64'` 字段：
+### 收件箱
+
+**查询消息列表** — `GET /api/v1/messaging/inbox`
 
 ```json
 {
@@ -225,8 +223,10 @@ SDK (Uint8Array)
     "messageId": "msg_abc123",
     "sourceDid": "did:claw:zAlice...",
     "topic": "my-app/data",
-    "payload": "3q2+7w==",
-    "payloadEncoding": "base64",
+    "payload": "Hello, World!",
+    "payloadSize": 13,
+    "compressed": false,
+    "encrypted": false,
     "receivedAtMs": 1710000000000,
     "priority": 1,
     "seq": 42
@@ -234,26 +234,59 @@ SDK (Uint8Array)
 }
 ```
 
-- `payloadEncoding` 缺失或为 `'utf8'` → `payload` 是 UTF-8 文本（向后兼容）
-- `payloadEncoding: 'base64'` → `payload` 是 base64 编码的二进制数据
+- 未压缩 + 未加密的消息：`payload` 字段包含 UTF-8 文本
+- 已压缩或已加密的消息：`payload` 字段不存在，仅有 `payloadSize`
+
+**下载原始 payload** — `GET /api/v1/messaging/inbox/:messageId/payload`
+
+返回 `application/octet-stream` 原始字节，响应头包含：
+- `Content-Length` — 字节数
+- `X-Compressed: 1` — 如果已 gzip 压缩
+- `X-Encrypted: 1` — 如果已 E2E 加密
 
 ---
 
-## 七、升级建议
+## 七、SDK 接口
 
-如果对方遇到了"只能传文本"的问题，可能是使用了旧版本。建议升级到 0.6.2：
+```typescript
+import { ClawNetClient } from '@claw-network/sdk';
 
-```bash
-pnpm add @claw-network/node@0.6.2 @claw-network/sdk@0.6.2
-```
+const client = new ClawNetClient({ baseUrl: 'http://localhost:9528', apiKey: 'YOUR_KEY' });
 
-或逐包升级：
+// 发送文本消息
+await client.messaging.send({
+  targetDid: 'did:claw:zBob...',
+  topic: 'my-app/text',
+  payload: 'Hello, World!',
+});
 
-```bash
-npm install @claw-network/core@0.6.2
-npm install @claw-network/protocol@0.6.2
-npm install @claw-network/node@0.6.2
-npm install @claw-network/sdk@0.6.2
+// 发送二进制消息（原始字节，无 base64）
+await client.messaging.sendBinary({
+  targetDid: 'did:claw:zBob...',
+  topic: 'my-app/binary-data',
+  payload: new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]),
+  compress: true,
+});
+
+// 批量发送文本
+await client.messaging.sendBatch({
+  targetDids: ['did:claw:zBob...', 'did:claw:zCharlie...'],
+  topic: 'broadcast',
+  payload: 'Hello everyone!',
+});
+
+// 批量发送二进制
+await client.messaging.sendBinaryBatch({
+  targetDids: ['did:claw:zBob...', 'did:claw:zCharlie...'],
+  topic: 'binary-broadcast',
+  payload: new Uint8Array([0x01, 0x02, 0x03]),
+});
+
+// 查询收件箱
+const { messages } = await client.messaging.inbox({ topic: 'my-app/*' });
+
+// 下载二进制 payload（返回 ArrayBuffer）
+const rawBytes = await client.messaging.downloadPayload('msg_abc123');
 ```
 
 ---
@@ -271,12 +304,12 @@ ClawNet P2P 层注册了 11 个 libp2p 点对点流协议和 4 个 GossipSub top
 | `/clawnet/1.0.0/receipt` | 交付回执 | FlatBuffers binary |
 | `/clawnet/1.0.0/did-announce` | DID 上线通知 | FlatBuffers binary |
 | `/clawnet/1.0.0/did-resolve` | DID 解析查询 | FlatBuffers binary |
-| `/clawnet/1.0.0/delegated-msg` | 委托消息转发 | FlatBuffers binary |
-| `/clawnet/1.0.0/delivery-auth` | 加密凭证交换 | X25519 + AES-256-GCM binary |
+| `/clawnet/1.0.0/delegated-msg` | 委托消息转发 | JSON over stream |
+| `/clawnet/1.0.0/delivery-auth` | 加密凭证交换 | X25519 + AES-256-GCM |
 | `/clawnet/1.0.0/delivery-external` | 大文件拉取 | 长度前缀二进制帧 |
-| `/clawnet/1.0.0/relay-info` | Relay 能力查询 | binary |
-| `/clawnet/1.0.0/relay-migration` | Relay 迁移 | binary |
-| `/clawnet/1.0.0/relay-confirm` | Relay 迁移确认 | binary |
+| `/clawnet/1.0.0/relay-info` | Relay 能力查询 | JSON over stream |
+| `/clawnet/1.0.0/relay-migration` | Relay 迁移 | JSON over stream |
+| `/clawnet/1.0.0/relay-confirm` | Relay 迁移确认 | JSON over stream |
 
 ### GossipSub Topics
 
@@ -289,6 +322,25 @@ ClawNet P2P 层注册了 11 个 libp2p 点对点流协议和 4 个 GossipSub top
 
 ---
 
-## 九、后续沟通
+## 九、升级建议
+
+```bash
+pnpm add @claw-network/node@0.6.5 @claw-network/sdk@0.6.5
+```
+
+或逐包升级：
+
+```bash
+npm install @claw-network/core@0.6.5
+npm install @claw-network/protocol@0.6.5
+npm install @claw-network/node@0.6.5
+npm install @claw-network/sdk@0.6.5
+```
+
+> **注意**: 0.6.5 是破坏性变更。存储层从 TEXT 改为 BLOB，REST API 移除了 `payloadEncoding` 字段，新增了独立的二进制发送/下载端点。旧版数据库不兼容，需要重新初始化。
+
+---
+
+## 十、后续沟通
 
 如有任何关于二进制传输的具体问题，或在升级后仍遇到问题，请随时联系我们。我们可以提供代码示例或联调支持。
