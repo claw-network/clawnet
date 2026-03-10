@@ -4,6 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MessageStore } from '../src/services/message-store.js';
 
+/** Shorthand: string → Buffer for test payloads. */
+const b = (s: string) => Buffer.from(s, 'utf-8');
+
 describe('MessageStore', () => {
   let tmpDir: string;
   let store: MessageStore;
@@ -26,7 +29,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'telagent/envelope',
-        payload: 'base64data',
+        payload: b('base64data'),
       });
 
       expect(id).toMatch(/^msg_/);
@@ -36,7 +39,7 @@ describe('MessageStore', () => {
       expect(messages[0].messageId).toBe(id);
       expect(messages[0].sourceDid).toBe('did:claw:alice');
       expect(messages[0].topic).toBe('telagent/envelope');
-      expect(messages[0].payload).toBe('base64data');
+      expect(messages[0].payload.toString('utf-8')).toBe('base64data');
       expect(messages[0].receivedAtMs).toBeGreaterThan(0);
     });
 
@@ -45,13 +48,13 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'telagent/envelope',
-        payload: 'data1',
+        payload: b('data1'),
       });
       store.addToInbox({
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'other/topic',
-        payload: 'data2',
+        payload: b('data2'),
       });
 
       const filtered = store.getInbox({ topic: 'telagent/envelope' });
@@ -65,7 +68,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'old',
+        payload: b('old'),
       });
 
       const messages = store.getInbox({ sinceMs: before - 1 });
@@ -81,7 +84,7 @@ describe('MessageStore', () => {
           sourceDid: 'did:claw:alice',
           targetDid: 'did:claw:bob',
           topic: 'test',
-          payload: `msg${i}`,
+          payload: b(`msg${i}`),
         });
       }
 
@@ -94,7 +97,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data',
+        payload: b('data'),
       });
 
       const consumed = store.consumeMessage(id);
@@ -113,7 +116,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data',
+        payload: b('data'),
       });
 
       store.consumeMessage(id);
@@ -126,13 +129,13 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data1',
+        payload: b('data1'),
       });
       store.addToInbox({
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data2',
+        payload: b('data2'),
       });
 
       expect(store.inboxCount('did:claw:bob')).toBe(2);
@@ -147,7 +150,7 @@ describe('MessageStore', () => {
       const id = store.addToOutbox({
         targetDid: 'did:claw:bob',
         topic: 'telagent/envelope',
-        payload: 'pending-data',
+        payload: b('pending-data'),
       });
 
       expect(id).toMatch(/^msg_/);
@@ -157,7 +160,7 @@ describe('MessageStore', () => {
       expect(entries[0].id).toBe(id);
       expect(entries[0].targetDid).toBe('did:claw:bob');
       expect(entries[0].topic).toBe('telagent/envelope');
-      expect(entries[0].payload).toBe('pending-data');
+      expect(entries[0].payload.toString('utf-8')).toBe('pending-data');
       expect(entries[0].attempts).toBe(0);
     });
 
@@ -165,7 +168,7 @@ describe('MessageStore', () => {
       const id = store.addToOutbox({
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data',
+        payload: b('data'),
       });
 
       store.recordAttempt(id);
@@ -179,7 +182,7 @@ describe('MessageStore', () => {
       const id = store.addToOutbox({
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data',
+        payload: b('data'),
       });
 
       const removed = store.removeFromOutbox(id);
@@ -194,7 +197,7 @@ describe('MessageStore', () => {
       store.addToOutbox({
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data',
+        payload: b('data'),
         ttlSec: 0,
       });
 
@@ -206,7 +209,7 @@ describe('MessageStore', () => {
       store.addToOutbox({
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data',
+        payload: b('data'),
         ttlSec: 0,
       });
 
@@ -223,7 +226,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data1',
+        payload: b('data1'),
         idempotencyKey: 'dedup-key-1',
       });
 
@@ -231,7 +234,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'data1-duplicate',
+        payload: b('data1-duplicate'),
         idempotencyKey: 'dedup-key-1',
       });
 
@@ -241,7 +244,7 @@ describe('MessageStore', () => {
       // Only one message in inbox
       const messages = store.getInbox();
       expect(messages).toHaveLength(1);
-      expect(messages[0].payload).toBe('data1');
+      expect(messages[0].payload.toString('utf-8')).toBe('data1');
     });
 
     it('allows different idempotency keys', () => {
@@ -249,7 +252,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'msg-a',
+        payload: b('msg-a'),
         idempotencyKey: 'key-a',
       });
 
@@ -257,7 +260,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'msg-b',
+        payload: b('msg-b'),
         idempotencyKey: 'key-b',
       });
 
@@ -270,13 +273,13 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'same',
+        payload: b('same'),
       });
       store.addToInbox({
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'same',
+        payload: b('same'),
       });
 
       expect(store.getInbox()).toHaveLength(2);
@@ -291,30 +294,30 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'low',
+        payload: b('low'),
         priority: 0,
       });
       store.addToInbox({
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'urgent',
+        payload: b('urgent'),
         priority: 3,
       });
       store.addToInbox({
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'normal',
+        payload: b('normal'),
         priority: 1,
       });
 
       const messages = store.getInbox();
       expect(messages).toHaveLength(3);
-      expect(messages[0].payload).toBe('urgent');
+      expect(messages[0].payload.toString('utf-8')).toBe('urgent');
       expect(messages[0].priority).toBe(3);
-      expect(messages[1].payload).toBe('normal');
-      expect(messages[2].payload).toBe('low');
+      expect(messages[1].payload.toString('utf-8')).toBe('normal');
+      expect(messages[2].payload.toString('utf-8')).toBe('low');
     });
   });
 
@@ -326,13 +329,13 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'msg1',
+        payload: b('msg1'),
       });
       store.addToInbox({
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'msg2',
+        payload: b('msg2'),
       });
 
       // With priority 0 (same), ordering is by received_at_ms ASC
@@ -348,7 +351,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'msg1',
+        payload: b('msg1'),
       });
 
       expect(store.currentSeq()).toBe(1);
@@ -359,7 +362,7 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'old',
+        payload: b('old'),
       });
 
       const seqAfterFirst = store.currentSeq();
@@ -368,12 +371,12 @@ describe('MessageStore', () => {
         sourceDid: 'did:claw:alice',
         targetDid: 'did:claw:bob',
         topic: 'test',
-        payload: 'new',
+        payload: b('new'),
       });
 
       const missed = store.getInbox({ sinceSeq: seqAfterFirst });
       expect(missed).toHaveLength(1);
-      expect(missed[0].payload).toBe('new');
+      expect(missed[0].payload.toString('utf-8')).toBe('new');
     });
   });
 

@@ -126,6 +126,78 @@ export class HttpClient {
     }
   }
 
+  /**
+   * POST raw binary data and return the JSON response.
+   * Used for binary message sending (application/octet-stream).
+   */
+  async postBinary<T = unknown>(
+    path: string,
+    body: Uint8Array,
+    extraHeaders?: Record<string, string>,
+    opts?: RequestOptions,
+  ): Promise<T> {
+    const normalizedPath = this.normalizePath(path, 'POST', undefined);
+    const url = this.buildUrl(normalizedPath);
+
+    const headers: Record<string, string> = {
+      'content-type': 'application/octet-stream',
+      accept: 'application/json',
+      ...extraHeaders,
+      ...opts?.headers,
+    };
+    if (this.apiKey) {
+      headers['x-api-key'] = this.apiKey;
+    }
+
+    const timeout = opts?.timeout ?? this.defaultTimeout;
+    let controller: AbortController | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    if (timeout > 0 && !opts?.signal) {
+      controller = new AbortController();
+      timeoutId = setTimeout(() => controller!.abort(), timeout);
+    }
+
+    try {
+      const res = await this._fetch(url, {
+        method: 'POST',
+        headers,
+        body: body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer,
+        signal: opts?.signal ?? controller?.signal,
+      });
+
+      if (res.status === 204) return undefined as T;
+
+      const text = await res.text();
+      let json: unknown;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        if (!res.ok) {
+          throw new ClawNetError(res.status, 'UNKNOWN', text || res.statusText);
+        }
+        return text as T;
+      }
+
+      if (!res.ok) {
+        const problem = json as { title?: string; detail?: string; status?: number };
+        const err = (json as { error?: { code?: string; message?: string } })?.error;
+        throw new ClawNetError(
+          res.status,
+          err?.code ?? String(problem.status ?? 'UNKNOWN'),
+          err?.message ?? problem.detail ?? problem.title ?? res.statusText,
+        );
+      }
+
+      const envelope = json as { data?: unknown };
+      if (Object.prototype.hasOwnProperty.call(envelope, 'data')) {
+        return envelope.data as T;
+      }
+      return json as T;
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------

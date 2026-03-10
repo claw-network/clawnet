@@ -1,15 +1,18 @@
 /**
  * Messaging routes — /api/v1/messaging
  *
- * POST /send              — Send a message to a target DID
- * POST /send/batch        — Multicast: send a message to multiple DIDs
- * GET  /inbox             — List inbox messages (polling)
+ * POST /send               — Send a text message (JSON body, string payload → UTF-8 bytes)
+ * POST /send-binary        — Send a binary message (octet-stream body, metadata in headers)
+ * POST /send/batch         — Multicast text to multiple DIDs (JSON body)
+ * POST /send-binary/batch  — Multicast binary to multiple DIDs (octet-stream + headers)
+ * GET  /inbox              — List inbox messages (metadata + text payload inline)
+ * GET  /inbox/:messageId/payload — Download raw message payload (binary)
  * DELETE /inbox/:messageId — Acknowledge (consume) a message
- * GET  /peers             — Show DID → PeerId mapping (debug)
- * POST /relay-attachment   — Relay a binary attachment to a target DID via P2P
- * GET  /attachments        — List received attachments
- * GET  /attachments/:id    — Download a received attachment
- * DELETE /attachments/:id  — Delete a received attachment
+ * GET  /peers              — Show DID → PeerId mapping (debug)
+ * POST /relay-attachment    — Relay a binary attachment to a target DID via P2P
+ * GET  /attachments         — List received attachments
+ * GET  /attachments/:id     — Download a received attachment
+ * DELETE /attachments/:id   — Delete a received attachment
  */
 
 import { Router } from '../router.js';
@@ -72,8 +75,12 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
       return;
     }
 
+    // Text-only: encode string payload as UTF-8 bytes.
+    // For binary payloads, use POST /send-binary instead.
+    const resolvedPayload = new Uint8Array(Buffer.from(payload, 'utf-8'));
+
     try {
-      const result = await ctx.messagingService.send(targetDid, topic, payload, {
+      const result = await ctx.messagingService.send(targetDid, topic, resolvedPayload, {
         ttlSec, priority, compress, encryptForKeyHex, idempotencyKey,
       });
       created(res, result, { self: '/api/v1/messaging/inbox' });
@@ -140,10 +147,148 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
       return;
     }
 
+    // Text-only: encode string payload as UTF-8 bytes.
+    // For binary payloads, use POST /send-binary/batch instead.
+    const resolvedPayload = new Uint8Array(Buffer.from(payload, 'utf-8'));
+
     try {
-      const result = await ctx.messagingService.sendMulticast(targetDids, topic, payload, {
+      const result = await ctx.messagingService.sendMulticast(targetDids, topic, resolvedPayload, {
         ttlSec, priority, compress, idempotencyKey, recipientKeys,
       });
+      created(res, result, { self: '/api/v1/messaging/inbox' });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (err instanceof RateLimitError) {
+        tooManyRequests(res, message, route.url.pathname, 60);
+        return;
+      }
+      if (message.includes('too large')) {
+        badRequest(res, message, route.url.pathname);
+        return;
+      }
+      internalError(res, message);
+    }
+  });
+
+  // ── POST /send-binary — send a binary message to a target DID ──
+  // Payload is the raw request body (application/octet-stream).
+  // Metadata is passed via headers: X-Target-Did, X-Topic, etc.
+  r.post('/send-binary', async (req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const rawBody = route.rawBody;
+    if (!rawBody || rawBody.length === 0) {
+      badRequest(res, 'Binary body required (Content-Type: application/octet-stream)', route.url.pathname);
+      return;
+    }
+
+    const targetDid = req.headers['x-target-did'] as string | undefined;
+    const topic = req.headers['x-topic'] as string | undefined;
+    const ttlSecStr = req.headers['x-ttl-sec'] as string | undefined;
+    const priorityStr = req.headers['x-priority'] as string | undefined;
+    const compressStr = req.headers['x-compress'] as string | undefined;
+    const encryptForKeyHex = req.headers['x-encrypt-for-key'] as string | undefined;
+    const idempotencyKey = req.headers['x-idempotency-key'] as string | undefined;
+
+    if (!targetDid || !targetDid.startsWith('did:claw:')) {
+      badRequest(res, 'Missing or invalid X-Target-Did header', route.url.pathname);
+      return;
+    }
+    if (!topic) {
+      badRequest(res, 'Missing X-Topic header', route.url.pathname);
+      return;
+    }
+    if (topic.length > 256) {
+      badRequest(res, 'Topic too long (max 256 characters)', route.url.pathname);
+      return;
+    }
+
+    const ttlSec = ttlSecStr ? Number(ttlSecStr) : undefined;
+    const priority = priorityStr ? Number(priorityStr) : undefined;
+    const compress = compressStr === 'true' || compressStr === '1' ? true
+      : compressStr === 'false' || compressStr === '0' ? false : undefined;
+
+    try {
+      const result = await ctx.messagingService.send(
+        targetDid, topic, new Uint8Array(rawBody),
+        { ttlSec, priority, compress, encryptForKeyHex, idempotencyKey },
+      );
+      created(res, result, { self: '/api/v1/messaging/inbox' });
+    } catch (err) {
+      const message = (err as Error).message;
+      if (err instanceof RateLimitError) {
+        tooManyRequests(res, message, route.url.pathname, 60);
+        return;
+      }
+      if (message.includes('too large')) {
+        badRequest(res, message, route.url.pathname);
+        return;
+      }
+      internalError(res, message);
+    }
+  });
+
+  // ── POST /send-binary/batch — multicast binary to multiple DIDs ──
+  r.post('/send-binary/batch', async (req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const rawBody = route.rawBody;
+    if (!rawBody || rawBody.length === 0) {
+      badRequest(res, 'Binary body required (Content-Type: application/octet-stream)', route.url.pathname);
+      return;
+    }
+
+    const targetDidsHeader = req.headers['x-target-dids'] as string | undefined;
+    const topic = req.headers['x-topic'] as string | undefined;
+    const ttlSecStr = req.headers['x-ttl-sec'] as string | undefined;
+    const priorityStr = req.headers['x-priority'] as string | undefined;
+    const compressStr = req.headers['x-compress'] as string | undefined;
+    const idempotencyKey = req.headers['x-idempotency-key'] as string | undefined;
+
+    if (!targetDidsHeader) {
+      badRequest(res, 'Missing X-Target-Dids header (comma-separated DIDs)', route.url.pathname);
+      return;
+    }
+    const targetDids = targetDidsHeader.split(',').map((s) => s.trim()).filter(Boolean);
+    if (targetDids.length === 0) {
+      badRequest(res, 'Empty X-Target-Dids header', route.url.pathname);
+      return;
+    }
+    if (targetDids.length > 100) {
+      badRequest(res, 'Too many targets (max 100)', route.url.pathname);
+      return;
+    }
+    for (const did of targetDids) {
+      if (!did.startsWith('did:claw:')) {
+        badRequest(res, `Invalid DID in X-Target-Dids: ${did}`, route.url.pathname);
+        return;
+      }
+    }
+    if (!topic) {
+      badRequest(res, 'Missing X-Topic header', route.url.pathname);
+      return;
+    }
+    if (topic.length > 256) {
+      badRequest(res, 'Topic too long (max 256 characters)', route.url.pathname);
+      return;
+    }
+
+    const ttlSec = ttlSecStr ? Number(ttlSecStr) : undefined;
+    const priority = priorityStr ? Number(priorityStr) : undefined;
+    const compress = compressStr === 'true' || compressStr === '1' ? true
+      : compressStr === 'false' || compressStr === '0' ? false : undefined;
+
+    try {
+      const result = await ctx.messagingService.sendMulticast(
+        targetDids, topic, new Uint8Array(rawBody),
+        { ttlSec, priority, compress, idempotencyKey },
+      );
       created(res, result, { self: '/api/v1/messaging/inbox' });
     } catch (err) {
       const message = (err as Error).message;
@@ -180,8 +325,49 @@ export function messagingRoutes(ctx: RuntimeContext): Router {
       return;
     }
 
-    const messages = ctx.messagingService.getInbox({ topic, sinceMs, sinceSeq, limit });
+    const messages = ctx.messagingService.getInbox({ topic, sinceMs, sinceSeq, limit })
+      .map((msg) => ({
+        messageId: msg.messageId,
+        sourceDid: msg.sourceDid,
+        topic: msg.topic,
+        receivedAtMs: msg.receivedAtMs,
+        priority: msg.priority,
+        seq: msg.seq,
+        payloadSize: msg.payload.length,
+        compressed: msg.compressed,
+        encrypted: msg.encrypted,
+        // Include inline text payload only for uncompressed+unencrypted messages.
+        // Use GET /inbox/:messageId/payload to download raw bytes for any message.
+        ...(!msg.compressed && !msg.encrypted
+          ? { payload: msg.payload.toString('utf-8') }
+          : {}),
+      }));
     ok(res, { messages }, { self: '/api/v1/messaging/inbox' });
+  });
+
+  // ── GET /inbox/:messageId/payload — download raw message payload ──
+  r.get('/inbox/:messageId/payload', async (_req, res, route) => {
+    if (!ctx.messagingService) {
+      internalError(res, 'Messaging service unavailable');
+      return;
+    }
+
+    const { messageId } = route.params;
+    const msg = ctx.messagingService.getInboxMessage(messageId);
+    if (!msg) {
+      notFound(res, `Message not found: ${messageId}`, route.url.pathname);
+      return;
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(msg.payload.length),
+    };
+    if (msg.compressed) headers['X-Compressed'] = '1';
+    if (msg.encrypted) headers['X-Encrypted'] = '1';
+
+    res.writeHead(200, headers);
+    res.end(msg.payload);
   });
 
   // ── DELETE /inbox/:messageId — acknowledge a message ──────────

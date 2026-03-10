@@ -16,7 +16,7 @@ export interface StoredMessage {
   sourceDid: string;
   targetDid: string;
   topic: string;
-  payload: string;        // base64-encoded
+  payload: Buffer;
   ttlSec: number;
   sentAtMs: number;
   receivedAtMs: number;
@@ -27,21 +27,25 @@ export interface InboxMessage {
   messageId: string;
   sourceDid: string;
   topic: string;
-  payload: string;
+  payload: Buffer;
   receivedAtMs: number;
   priority: number;
   seq: number;
+  compressed: boolean;
+  encrypted: boolean;
 }
 
 export interface OutboxEntry {
   id: string;
   targetDid: string;
   topic: string;
-  payload: string;
+  payload: Buffer;
   ttlSec: number;
   sentAtMs: number;
   attempts: number;
   lastAttempt: number;
+  compressed: boolean;
+  encrypted: boolean;
 }
 
 // ── Schema ───────────────────────────────────────────────────────
@@ -52,13 +56,15 @@ CREATE TABLE IF NOT EXISTS inbox (
   source_did    TEXT NOT NULL,
   target_did    TEXT NOT NULL,
   topic         TEXT NOT NULL,
-  payload       TEXT NOT NULL,
+  payload       BLOB NOT NULL,
   ttl_sec       INTEGER NOT NULL DEFAULT 86400,
   sent_at_ms    INTEGER NOT NULL,
   received_at_ms INTEGER NOT NULL,
   consumed      INTEGER NOT NULL DEFAULT 0,
   priority      INTEGER NOT NULL DEFAULT 0,
-  seq           INTEGER NOT NULL DEFAULT 0
+  seq           INTEGER NOT NULL DEFAULT 0,
+  compressed    INTEGER NOT NULL DEFAULT 0,
+  encrypted     INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_inbox_topic ON inbox(topic, consumed);
@@ -70,12 +76,14 @@ CREATE TABLE IF NOT EXISTS outbox (
   id            TEXT PRIMARY KEY,
   target_did    TEXT NOT NULL,
   topic         TEXT NOT NULL,
-  payload       TEXT NOT NULL,
+  payload       BLOB NOT NULL,
   ttl_sec       INTEGER NOT NULL DEFAULT 86400,
   sent_at_ms    INTEGER NOT NULL,
   attempts      INTEGER NOT NULL DEFAULT 0,
   last_attempt  INTEGER,
-  priority      INTEGER NOT NULL DEFAULT 0
+  priority      INTEGER NOT NULL DEFAULT 0,
+  compressed    INTEGER NOT NULL DEFAULT 0,
+  encrypted     INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_outbox_target ON outbox(target_did);
@@ -211,11 +219,13 @@ export class MessageStore {
     sourceDid: string;
     targetDid: string;
     topic: string;
-    payload: string;
+    payload: Buffer;
     ttlSec?: number;
     sentAtMs?: number;
     priority?: number;
     idempotencyKey?: string;
+    compressed?: boolean;
+    encrypted?: boolean;
   }): string {
     // Deduplication check
     if (msg.idempotencyKey) {
@@ -229,9 +239,9 @@ export class MessageStore {
     const now = Date.now();
     const seq = this.nextSeq();
     this.db.prepare(`
-      INSERT INTO inbox (id, source_did, target_did, topic, payload, ttl_sec, sent_at_ms, received_at_ms, priority, seq)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, msg.sourceDid, msg.targetDid, msg.topic, msg.payload, msg.ttlSec ?? 86400, msg.sentAtMs ?? now, now, msg.priority ?? 0, seq);
+      INSERT INTO inbox (id, source_did, target_did, topic, payload, ttl_sec, sent_at_ms, received_at_ms, priority, seq, compressed, encrypted)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, msg.sourceDid, msg.targetDid, msg.topic, msg.payload, msg.ttlSec ?? 86400, msg.sentAtMs ?? now, now, msg.priority ?? 0, seq, msg.compressed ? 1 : 0, msg.encrypted ? 1 : 0);
 
     // Record dedup key
     if (msg.idempotencyKey) {
@@ -263,7 +273,7 @@ export class MessageStore {
     limit?: number;
   } = {}): InboxMessage[] {
     const limit = Math.min(opts.limit ?? 100, 500);
-    let sql = 'SELECT id, source_did, topic, payload, received_at_ms, priority, seq FROM inbox WHERE consumed = 0';
+    let sql = 'SELECT id, source_did, topic, payload, received_at_ms, priority, seq, compressed, encrypted FROM inbox WHERE consumed = 0';
     const params: unknown[] = [];
 
     if (opts.topic) {
@@ -284,19 +294,45 @@ export class MessageStore {
     params.push(limit);
 
     const rows = this.db.prepare(sql).all(...params) as Array<{
-      id: string; source_did: string; topic: string; payload: string;
+      id: string; source_did: string; topic: string; payload: Buffer;
       received_at_ms: number; priority: number; seq: number;
+      compressed: number; encrypted: number;
     }>;
 
     return rows.map((r) => ({
       messageId: r.id,
       sourceDid: r.source_did,
       topic: r.topic,
-      payload: r.payload,
+      payload: Buffer.isBuffer(r.payload) ? r.payload : Buffer.from(r.payload),
       receivedAtMs: r.received_at_ms,
       priority: r.priority,
       seq: r.seq,
+      compressed: r.compressed === 1,
+      encrypted: r.encrypted === 1,
     }));
+  }
+
+  /** Fetch a single inbox message by ID (for payload download). */
+  getInboxMessage(messageId: string): InboxMessage | null {
+    const r = this.db.prepare(
+      'SELECT id, source_did, topic, payload, received_at_ms, priority, seq, compressed, encrypted FROM inbox WHERE id = ? AND consumed = 0',
+    ).get(messageId) as {
+      id: string; source_did: string; topic: string; payload: Buffer;
+      received_at_ms: number; priority: number; seq: number;
+      compressed: number; encrypted: number;
+    } | undefined;
+    if (!r) return null;
+    return {
+      messageId: r.id,
+      sourceDid: r.source_did,
+      topic: r.topic,
+      payload: Buffer.isBuffer(r.payload) ? r.payload : Buffer.from(r.payload),
+      receivedAtMs: r.received_at_ms,
+      priority: r.priority,
+      seq: r.seq,
+      compressed: r.compressed === 1,
+      encrypted: r.encrypted === 1,
+    };
   }
 
   /** Mark a message as consumed (acknowledged). */
@@ -334,16 +370,18 @@ export class MessageStore {
   addToOutbox(msg: {
     targetDid: string;
     topic: string;
-    payload: string;
+    payload: Buffer;
     ttlSec?: number;
     priority?: number;
+    compressed?: boolean;
+    encrypted?: boolean;
   }): string {
     const id = `msg_${crypto.randomBytes(12).toString('hex')}`;
     const now = Date.now();
     this.db.prepare(`
-      INSERT INTO outbox (id, target_did, topic, payload, ttl_sec, sent_at_ms, priority)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, msg.targetDid, msg.topic, msg.payload, msg.ttlSec ?? 86400, now, msg.priority ?? 0);
+      INSERT INTO outbox (id, target_did, topic, payload, ttl_sec, sent_at_ms, priority, compressed, encrypted)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, msg.targetDid, msg.topic, msg.payload, msg.ttlSec ?? 86400, now, msg.priority ?? 0, msg.compressed ? 1 : 0, msg.encrypted ? 1 : 0);
     return id;
   }
 
@@ -351,24 +389,27 @@ export class MessageStore {
   getOutboxForTarget(targetDid: string, limit = 100): OutboxEntry[] {
     const now = Date.now();
     const rows = this.db.prepare(`
-      SELECT id, target_did, topic, payload, ttl_sec, sent_at_ms, attempts, last_attempt
+      SELECT id, target_did, topic, payload, ttl_sec, sent_at_ms, attempts, last_attempt, compressed, encrypted
       FROM outbox
       WHERE target_did = ? AND (sent_at_ms + ttl_sec * 1000) > ?
       ORDER BY priority DESC, sent_at_ms ASC LIMIT ?
     `).all(targetDid, now, limit) as Array<{
-      id: string; target_did: string; topic: string; payload: string;
+      id: string; target_did: string; topic: string; payload: Buffer;
       ttl_sec: number; sent_at_ms: number; attempts: number; last_attempt: number | null;
+      compressed: number; encrypted: number;
     }>;
 
     return rows.map((r) => ({
       id: r.id,
       targetDid: r.target_did,
       topic: r.topic,
-      payload: r.payload,
+      payload: Buffer.isBuffer(r.payload) ? r.payload : Buffer.from(r.payload),
       ttlSec: r.ttl_sec,
       sentAtMs: r.sent_at_ms,
       attempts: r.attempts,
       lastAttempt: r.last_attempt ?? 0,
+      compressed: r.compressed === 1,
+      encrypted: r.encrypted === 1,
     }));
   }
 

@@ -36,7 +36,9 @@ export type {
 export type {
   SendMessageParams,
   SendMessageResult,
+  SendBinaryParams,
   SendBatchParams,
+  SendBinaryBatchParams,
   SendBatchResult,
   InboxMessage,
   InboxQueryParams,

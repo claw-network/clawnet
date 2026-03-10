@@ -174,10 +174,12 @@ export interface InboxMessage {
   messageId: string;
   sourceDid: string;
   topic: string;
-  payload: string;
+  payload: Buffer;
   receivedAtMs: number;
   priority: number;
   seq: number;
+  compressed: boolean;
+  encrypted: boolean;
 }
 
 export interface SendOptions {
@@ -470,7 +472,7 @@ export class MessagingService {
    * If the target peer is online and reachable, delivers directly.
    * Otherwise queues in outbox for later delivery.
    */
-  async send(targetDid: string, topic: string, payload: string, opts: SendOptions = {}): Promise<SendResult> {
+  async send(targetDid: string, topic: string, payload: Uint8Array, opts: SendOptions = {}): Promise<SendResult> {
     const ttlSec = opts.ttlSec ?? 86400;
     const priority = opts.priority ?? MessagePriority.NORMAL;
 
@@ -478,7 +480,7 @@ export class MessagingService {
     this.enforceRateLimit(this.localDid);
 
     // Apply compression + encryption to payload
-    const { payloadBytes, storagePayload, compressed, encrypted } = this.encodePayload(payload, opts);
+    const { payloadBytes, compressed, encrypted } = this.encodePayload(payload, opts);
 
     // Validate payload size after encoding
     if (payloadBytes.length > MAX_PAYLOAD_BYTES) {
@@ -521,8 +523,8 @@ export class MessagingService {
       }
     }
 
-    // Queue in outbox for later delivery (uses string storage format)
-    const messageId = this.store.addToOutbox({ targetDid, topic, payload: storagePayload, ttlSec, priority });
+    // Queue in outbox for later delivery (raw bytes stored as BLOB)
+    const messageId = this.store.addToOutbox({ targetDid, topic, payload: Buffer.from(payloadBytes), ttlSec, priority, compressed, encrypted });
     this.log.info('message queued in outbox', { messageId, targetDid, topic });
     return { messageId, delivered: false, compressed, encrypted };
   }
@@ -534,7 +536,7 @@ export class MessagingService {
   async sendMulticast(
     targetDids: string[],
     topic: string,
-    payload: string,
+    payload: Uint8Array,
     opts: SendOptions = {},
   ): Promise<MulticastResult> {
     const ttlSec = opts.ttlSec ?? 86400;
@@ -544,7 +546,7 @@ export class MessagingService {
     this.enforceRateLimit(this.localDid);
 
     // Pre-encode a shared payload (without per-recipient encryption)
-    const { payloadBytes: sharedPayloadBytes, storagePayload: sharedStoragePayload, compressed } = this.encodePayload(payload, { ...opts, encryptForKeyHex: undefined });
+    const { payloadBytes: sharedPayloadBytes, compressed } = this.encodePayload(payload, { ...opts, encryptForKeyHex: undefined });
 
     if (sharedPayloadBytes.length > MAX_PAYLOAD_BYTES) {
       throw new Error(`Payload too large: ${sharedPayloadBytes.length} bytes (max ${MAX_PAYLOAD_BYTES})`);
@@ -553,7 +555,7 @@ export class MessagingService {
     // Deliver to all targets concurrently with bounded concurrency
     // Per-recipient E2E encryption is applied inside deliverMulticast when recipientKeys are provided
     const results = await this.deliverMulticast(
-      targetDids, topic, sharedPayloadBytes, sharedStoragePayload, ttlSec, priority, compressed,
+      targetDids, topic, sharedPayloadBytes, ttlSec, priority, compressed,
       opts.recipientKeys, opts.idempotencyKey,
     );
     return { results };
@@ -562,6 +564,11 @@ export class MessagingService {
   /** Query the local inbox. */
   getInbox(opts?: InboxQueryOptions): InboxMessage[] {
     return this.store.getInbox(opts);
+  }
+
+  /** Fetch a single inbox message by ID (for payload download). */
+  getInboxMessage(messageId: string): InboxMessage | null {
+    return this.store.getInboxMessage(messageId);
   }
 
   /** Acknowledge (consume) a message from inbox. */
@@ -599,8 +606,8 @@ export class MessagingService {
       const settled = await Promise.allSettled(
         batch.map(async (entry) => {
           this.store.recordAttempt(entry.id);
-          // Outbox stores storagePayload (string); convert to bytes for wire delivery
-          const ok = await this.deliverDirect(peerId, targetDid, entry.topic, Buffer.from(entry.payload, 'utf-8'), entry.ttlSec);
+          // Outbox payload is raw BLOB bytes; flags come from columns
+          const ok = await this.deliverDirect(peerId, targetDid, entry.topic, new Uint8Array(entry.payload), entry.ttlSec, undefined, entry.compressed, entry.encrypted);
           if (ok) {
             this.store.removeFromOutbox(entry.id);
             return true;
@@ -988,15 +995,17 @@ export class MessagingService {
         messageId: `att_${msg.attachmentId}`,
         sourceDid: msg.sourceDid,
         topic: '_attachment',
-        payload: JSON.stringify({
+        payload: Buffer.from(JSON.stringify({
           attachmentId: msg.attachmentId,
           contentType: msg.contentType,
           fileName: msg.fileName,
           totalSize: msg.data.length,
-        }),
+        }), 'utf-8'),
         receivedAtMs: Date.now(),
         priority: MessagePriority.NORMAL,
         seq: currentSeq,
+        compressed: false,
+        encrypted: false,
       });
     } catch (err) {
       this.log.warn('failed to handle inbound attachment', { error: (err as Error).message });
@@ -1054,25 +1063,20 @@ export class MessagingService {
   /**
    * Encode a payload: optionally compress (gzip) then optionally encrypt (X25519+AES-256-GCM).
    *
-   * Returns:
-   * - `payloadBytes`: raw binary payload for FlatBuffers wire format (Uint8Array)
-   * - `storagePayload`: string representation for SQLite TEXT storage (backward compat)
-   * - `compressed` / `encrypted` flags
+   * Returns raw binary bytes — stored directly as BLOB in SQLite.
+   * No JSON wrappers, no base64. Flags indicate compression/encryption state.
    */
   private encodePayload(
-    payload: string,
+    payload: Uint8Array,
     opts: Pick<SendOptions, 'compress' | 'encryptForKeyHex'>,
-  ): { payloadBytes: Uint8Array; storagePayload: string; compressed: boolean; encrypted: boolean } {
-    let data = Buffer.from(payload, 'utf-8');
-    let storagePayload = payload;
+  ): { payloadBytes: Uint8Array; compressed: boolean; encrypted: boolean } {
+    let data = Buffer.from(payload);
     let compressed = false;
     let encrypted = false;
 
     // Compression: gzip if enabled and payload > threshold
     if (opts.compress !== false && data.length > COMPRESSION_THRESHOLD_BYTES) {
       data = gzipSync(data);
-      // Storage format: base64-encoded gzip wrapped in JSON object (backward compat with REST API)
-      storagePayload = JSON.stringify({ _compressed: 1, data: data.toString('base64') });
       compressed = true;
     }
 
@@ -1091,53 +1095,38 @@ export class MessagingService {
         tag: hexToBytes(enc.tagHex),
         ciphertext: hexToBytes(enc.ciphertextHex),
       }));
-
-      // Storage format: JSON E2E envelope (backward compat with static decryptPayload)
-      storagePayload = JSON.stringify({
-        _e2e: 1,
-        pk: bytesToHex(ephemeral.publicKey),
-        n: enc.nonceHex,
-        c: enc.ciphertextHex,
-        t: enc.tagHex,
-      });
       encrypted = true;
     }
 
-    return { payloadBytes: new Uint8Array(data), storagePayload, compressed, encrypted };
+    return { payloadBytes: new Uint8Array(data), compressed, encrypted };
   }
 
   /**
    * Decrypt an E2E-encrypted payload using the local node's X25519 private key.
-   * Returns the decrypted payload string or null if not encrypted / decryption fails.
+   * Accepts raw binary E2E envelope bytes. Returns decrypted bytes or null.
    */
-  static decryptPayload(payload: string, recipientPrivateKey: Uint8Array): string | null {
+  static decryptPayload(payload: Uint8Array, recipientPrivateKey: Uint8Array): Uint8Array | null {
     try {
-      const envelope = JSON.parse(payload) as { _e2e?: number; pk?: string; n?: string; c?: string; t?: string };
-      if (envelope._e2e !== 1 || !envelope.pk || !envelope.n || !envelope.c || !envelope.t) return null;
-
-      const senderPub = hexToBytes(envelope.pk);
-      const shared = x25519SharedSecret(recipientPrivateKey, senderPub);
+      const envelope = decodeE2EEnvelope(payload);
+      const shared = x25519SharedSecret(recipientPrivateKey, envelope.ephemeralPk);
       const derived = hkdfSha256(shared, undefined, new Uint8Array(E2E_MSG_INFO), 32);
       const decrypted = decryptAes256Gcm(derived, {
-        nonceHex: envelope.n,
-        ciphertextHex: envelope.c,
-        tagHex: envelope.t,
+        nonceHex: bytesToHex(envelope.nonce),
+        ciphertextHex: bytesToHex(envelope.ciphertext),
+        tagHex: bytesToHex(envelope.tag),
       });
-      return Buffer.from(decrypted).toString('utf-8');
+      return new Uint8Array(decrypted);
     } catch {
       return null;
     }
   }
 
   /**
-   * Decompress a gzip-compressed payload (base64-encoded gzip → utf-8 string).
-   * Returns the decompressed string, or null if decompression fails.
+   * Decompress a gzip-compressed payload (raw gzip bytes → decompressed bytes).
    */
-  static decompressPayload(payload: string): string | null {
+  static decompressPayload(payload: Uint8Array): Uint8Array | null {
     try {
-      const buf = Buffer.from(payload, 'base64');
-      const decompressed = gunzipSync(buf);
-      return decompressed.toString('utf-8');
+      return new Uint8Array(gunzipSync(Buffer.from(payload)));
     } catch {
       return null;
     }
@@ -1266,14 +1255,14 @@ export class MessagingService {
       }
 
       // Store as a special inbox message with topic _delivery-auth
-      const deliveryPayload = JSON.stringify({
+      const deliveryPayload = Buffer.from(JSON.stringify({
         deliverableId: payload.deliverableId,
         orderId: payload.orderId,
         providerDid: payload.providerDid,
         token: payload.token,
         expiresAt: payload.expiresAt,
         receivedAt: Date.now(),
-      });
+      }), 'utf-8');
 
       const messageId = this.store.addToInbox({
         sourceDid: payload.providerDid,
@@ -1310,6 +1299,8 @@ export class MessagingService {
         receivedAtMs: Date.now(),
         priority: MessagePriority.HIGH,
         seq: currentSeq,
+        compressed: false,
+        encrypted: false,
       });
 
       // Send acceptance response
@@ -1603,36 +1594,23 @@ export class MessagingService {
         return;
       }
 
-      // Reconstruct string payload for SQLite TEXT storage (backward compat with REST API / SDK)
-      let storagePayload: string;
-      if (msg.encrypted) {
-        // Binary E2E → JSON E2E envelope (for static decryptPayload backward compat)
-        const e2e = decodeE2EEnvelope(msg.payload);
-        storagePayload = JSON.stringify({
-          _e2e: 1,
-          pk: bytesToHex(e2e.ephemeralPk),
-          n: bytesToHex(e2e.nonce),
-          c: bytesToHex(e2e.ciphertext),
-          t: bytesToHex(e2e.tag),
-        });
-      } else if (msg.compressed) {
-        // Raw gzip bytes → base64-encoded gzip wrapped in JSON (for static decompressPayload)
-        storagePayload = JSON.stringify({ _compressed: 1, data: Buffer.from(msg.payload).toString('base64') });
-      } else {
-        // Plain UTF-8 text
-        storagePayload = Buffer.from(msg.payload).toString('utf-8');
-      }
+      // Store raw payload bytes directly as BLOB — no JSON wrappers, no base64
+      const payloadBuffer = Buffer.from(msg.payload);
+      const compressed = !!msg.compressed;
+      const encrypted = !!msg.encrypted;
 
       // Store in inbox (deduplication handled by store if idempotencyKey is present)
       const messageId = this.store.addToInbox({
         sourceDid: msg.sourceDid,
         targetDid: msg.targetDid || this.localDid,
         topic: msg.topic,
-        payload: storagePayload,
+        payload: payloadBuffer,
         ttlSec: msg.ttlSec || undefined,
         sentAtMs: msg.sentAtMs ? Number(msg.sentAtMs) : undefined,
         priority: msg.priority ?? MessagePriority.NORMAL,
         idempotencyKey: msg.idempotencyKey || undefined,
+        compressed,
+        encrypted,
       });
 
       // Record DID → PeerId mapping from the sender (persisted to SQLite)
@@ -1649,17 +1627,19 @@ export class MessagingService {
         messageId,
         sourceDid: msg.sourceDid,
         topic: msg.topic,
-        payload: storagePayload,
+        payload: payloadBuffer,
         receivedAtMs: Date.now(),
         priority: msg.priority ?? MessagePriority.NORMAL,
         seq: currentSeq,
+        compressed,
+        encrypted,
       });
 
       // Delegation forwarding
       this.forwardToDelegates(msg.topic, {
         messageId,
         sourceDid: msg.sourceDid,
-        payload: storagePayload,
+        payloadBytes: payloadBuffer,
         payloadSize: msg.payload.length,
         seq: currentSeq,
         receivedAtMs: Date.now(),
@@ -1682,7 +1662,7 @@ export class MessagingService {
     msg: {
       messageId: string;
       sourceDid: string;
-      payload: string;
+      payloadBytes: Buffer;
       payloadSize: number;
       seq: number;
       receivedAtMs: number;
@@ -1714,7 +1694,8 @@ export class MessagingService {
           payloadSizeBytes: msg.payloadSize,
         };
       } else {
-        delegatedMsg.payload = msg.payload;
+        // Delegation forwarding uses JSON — decode raw bytes as UTF-8 for the wire
+        delegatedMsg.payload = msg.payloadBytes.toString('utf-8');
       }
 
       const peerId = this.didToPeerId.get(dlg.delegateDid);
@@ -1961,7 +1942,6 @@ export class MessagingService {
     targetDids: string[],
     topic: string,
     sharedPayloadBytes: Uint8Array,
-    sharedStoragePayload: string,
     ttlSec: number,
     priority: number = MessagePriority.NORMAL,
     compressed = false,
@@ -1976,16 +1956,14 @@ export class MessagingService {
         batch.map(async (targetDid) => {
           // Per-recipient E2E encryption if a key is provided for this target
           let payloadBytes = sharedPayloadBytes;
-          let storagePayload = sharedStoragePayload;
           let encrypted = false;
           const recipientKeyHex = recipientKeys?.[targetDid];
           if (recipientKeyHex) {
             const perRecipient = this.encodePayload(
-              Buffer.from(sharedPayloadBytes).toString('utf-8'),
+              new Uint8Array(sharedPayloadBytes),
               { encryptForKeyHex: recipientKeyHex, compress: false },
             );
             payloadBytes = perRecipient.payloadBytes;
-            storagePayload = perRecipient.storagePayload;
             encrypted = perRecipient.encrypted;
           }
 
@@ -2022,7 +2000,7 @@ export class MessagingService {
             }
           }
 
-          const messageId = this.store.addToOutbox({ targetDid, topic, payload: storagePayload, ttlSec, priority });
+          const messageId = this.store.addToOutbox({ targetDid, topic, payload: Buffer.from(payloadBytes), ttlSec, priority, compressed, encrypted });
           return { targetDid, messageId, delivered: false, compressed, encrypted };
         }),
       );
@@ -2119,14 +2097,14 @@ export class MessagingService {
           recipientDid: receipt.recipientDid,
         });
 
-        // Notify subscribers about the receipt (convert to JSON string for backward compat)
-        const receiptPayload = JSON.stringify({
+        // Notify subscribers about the receipt
+        const receiptPayload = Buffer.from(JSON.stringify({
           type: 'delivered',
           messageId: receipt.messageId,
           recipientDid: receipt.recipientDid,
           senderDid: receipt.senderDid,
           deliveredAtMs: Number(receipt.deliveredAtMs),
-        });
+        }), 'utf-8');
 
         this.notifySubscribers({
           messageId: receipt.messageId,
@@ -2136,6 +2114,8 @@ export class MessagingService {
           receivedAtMs: Number(receipt.deliveredAtMs) || Date.now(),
           priority: MessagePriority.NORMAL,
           seq: 0, // Receipts don't have inbox seq
+          compressed: false,
+          encrypted: false,
         });
       }
     } catch {

@@ -23,6 +23,8 @@ export interface RouteContext {
   query: URLSearchParams;
   /** Parsed JSON body (only for methods with body) */
   body: unknown;
+  /** Raw binary body (available when Content-Type is not application/json) */
+  rawBody?: Buffer;
 }
 
 export type RouteHandler = (
@@ -128,12 +130,13 @@ export class Router {
     }
 
     // Build context
-    const body = await this.parseBody(req);
+    const { body, rawBody } = await this.parseBody(req);
     const ctx: RouteContext = {
       url,
       params: match.params,
       query: url.searchParams,
       body,
+      rawBody,
     };
 
     // Run middleware chain then handler
@@ -190,10 +193,10 @@ export class Router {
     return [...methods];
   }
 
-  private async parseBody(req: IncomingMessage): Promise<unknown> {
+  private async parseBody(req: IncomingMessage): Promise<{ body: unknown; rawBody?: Buffer }> {
     const method = req.method ?? 'GET';
     if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS' || method === 'DELETE') {
-      return undefined;
+      return { body: undefined };
     }
 
     return new Promise((resolve, reject) => {
@@ -212,14 +215,21 @@ export class Router {
 
       req.on('end', () => {
         if (chunks.length === 0) {
-          resolve(undefined);
+          resolve({ body: undefined });
+          return;
+        }
+        const raw = Buffer.concat(chunks);
+        const contentType = req.headers['content-type'] ?? '';
+        // For non-JSON content types, return raw binary body
+        if (!contentType.includes('application/json')) {
+          resolve({ body: undefined, rawBody: raw });
           return;
         }
         try {
-          const text = Buffer.concat(chunks).toString('utf-8');
-          resolve(JSON.parse(text));
+          const text = raw.toString('utf-8');
+          resolve({ body: JSON.parse(text) });
         } catch {
-          resolve(undefined);
+          resolve({ body: undefined });
         }
       });
 

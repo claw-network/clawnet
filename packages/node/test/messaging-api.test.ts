@@ -18,22 +18,24 @@ function createMockMessagingService() {
     messageId: string;
     sourceDid: string;
     topic: string;
-    payload: string;
+    payload: Buffer;
     receivedAtMs: number;
     priority: number;
     seq: number;
+    compressed: boolean;
+    encrypted: boolean;
   }> = [];
   let consumed = new Set<string>();
-  const subscribers = new Set<(msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number; priority: number; seq: number }) => void>();
+  const subscribers = new Set<(msg: { messageId: string; sourceDid: string; topic: string; payload: Buffer; receivedAtMs: number; priority: number; seq: number; compressed: boolean; encrypted: boolean }) => void>();
   let rateLimitOn = false;
   let seqCounter = 0;
 
   return {
-    send: vi.fn(async (_target: string, _topic: string, _payload: string) => {
+    send: vi.fn(async (_target: string, _topic: string, _payload: Uint8Array) => {
       if (rateLimitOn) throw new RateLimitError('did:claw:test', 600);
       return { messageId: 'msg_test123', delivered: true };
     }),
-    sendMulticast: vi.fn(async (targets: string[], _topic: string, _payload: string) => {
+    sendMulticast: vi.fn(async (targets: string[], _topic: string, _payload: Uint8Array) => {
       if (rateLimitOn) throw new RateLimitError('did:claw:test', 600);
       return {
         results: targets.map((t) => ({ targetDid: t, messageId: `msg_${t.slice(-4)}`, delivered: true })),
@@ -47,6 +49,10 @@ function createMockMessagingService() {
       if (opts?.limit) result = result.slice(0, opts.limit);
       return result;
     }),
+    getInboxMessage: vi.fn((messageId: string) => {
+      const msg = inbox.find((m) => m.messageId === messageId && !consumed.has(m.messageId));
+      return msg ?? null;
+    }),
     ackMessage: vi.fn((messageId: string) => {
       const found = inbox.some((m) => m.messageId === messageId) && !consumed.has(messageId);
       if (found) consumed.add(messageId);
@@ -54,14 +60,30 @@ function createMockMessagingService() {
     }),
     getDidPeerMap: vi.fn(() => ({ 'did:claw:alice': '12D3KooW...' })),
     getCurrentSeq: vi.fn(() => seqCounter),
-    addSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number; priority: number; seq: number }) => void) => {
+    addSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: Buffer; receivedAtMs: number; priority: number; seq: number; compressed: boolean; encrypted: boolean }) => void) => {
       subscribers.add(cb);
     }),
-    removeSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number; priority: number; seq: number }) => void) => {
+    removeSubscriber: vi.fn((cb: (msg: { messageId: string; sourceDid: string; topic: string; payload: Buffer; receivedAtMs: number; priority: number; seq: number; compressed: boolean; encrypted: boolean }) => void) => {
       subscribers.delete(cb);
     }),
     // Helpers for test control
-    _addToInbox(msg: { sourceDid: string; topic: string; payload: string }) {
+    _addToInbox(msg: { sourceDid: string; topic: string; payload: string; compressed?: boolean; encrypted?: boolean }) {
+      const id = `msg_${inbox.length}`;
+      seqCounter++;
+      inbox.push({
+        messageId: id,
+        sourceDid: msg.sourceDid,
+        topic: msg.topic,
+        payload: Buffer.from(msg.payload, 'utf-8'),
+        receivedAtMs: Date.now(),
+        priority: 1,
+        seq: seqCounter,
+        compressed: msg.compressed ?? false,
+        encrypted: msg.encrypted ?? false,
+      });
+      return id;
+    },
+    _addBinaryToInbox(msg: { sourceDid: string; topic: string; payload: Buffer; compressed?: boolean; encrypted?: boolean }) {
       const id = `msg_${inbox.length}`;
       seqCounter++;
       inbox.push({
@@ -72,12 +94,14 @@ function createMockMessagingService() {
         receivedAtMs: Date.now(),
         priority: 1,
         seq: seqCounter,
+        compressed: msg.compressed ?? false,
+        encrypted: msg.encrypted ?? false,
       });
       return id;
     },
     _setRateLimit(on: boolean) { rateLimitOn = on; },
     _notifySubscribers(msg: { messageId: string; sourceDid: string; topic: string; payload: string; receivedAtMs: number }) {
-      for (const cb of subscribers) cb({ ...msg, priority: 1, seq: ++seqCounter });
+      for (const cb of subscribers) cb({ ...msg, payload: Buffer.from(msg.payload, 'utf-8'), priority: 1, seq: ++seqCounter, compressed: false, encrypted: false });
     },
     get _subscriberCount() { return subscribers.size; },
     // Attachment methods
@@ -131,7 +155,7 @@ describe('messaging api', () => {
       body: JSON.stringify({
         targetDid: 'did:claw:zBobPeerId123',
         topic: 'telagent/envelope',
-        payload: 'dGVzdA==',
+        payload: 'hello world',
         ttlSec: 3600,
       }),
     });
@@ -140,10 +164,11 @@ describe('messaging api', () => {
     const data = await readData<{ messageId: string; delivered: boolean }>(res);
     expect(data.messageId).toBe('msg_test123');
     expect(data.delivered).toBe(true);
+    // Text-only: payload is encoded as UTF-8 bytes at the API boundary
     expect(mockService.send).toHaveBeenCalledWith(
       'did:claw:zBobPeerId123',
       'telagent/envelope',
-      'dGVzdA==',
+      new Uint8Array(Buffer.from('hello world', 'utf-8')),
       { ttlSec: 3600, priority: undefined, compress: undefined, encryptForKeyHex: undefined, idempotencyKey: undefined },
     );
   });
@@ -258,7 +283,7 @@ describe('messaging api', () => {
     expect(mockService.sendMulticast).toHaveBeenCalledWith(
       ['did:claw:zAlice', 'did:claw:zBob'],
       'test/batch',
-      'hello-all',
+      new Uint8Array(Buffer.from('hello-all', 'utf-8')),
       { ttlSec: undefined, priority: undefined, compress: undefined, idempotencyKey: undefined },
     );
   });
@@ -473,7 +498,7 @@ describe('messaging api', () => {
     expect(mockService.send).toHaveBeenCalledWith(
       'did:claw:zBobPeerId123',
       'urgent/alert',
-      'important-data',
+      new Uint8Array(Buffer.from('important-data', 'utf-8')),
       expect.objectContaining({ priority: 3, idempotencyKey: 'idem-123' }),
     );
   });
@@ -599,5 +624,184 @@ describe('messaging api', () => {
       method: 'DELETE',
     });
     expect(res.status).toBe(404);
+  });
+
+  // ── Binary payload (POST /send-binary) ─────────────────────────
+
+  it('sends binary payload via /send-binary endpoint', async () => {
+    const binaryData = new Uint8Array([0x00, 0xff, 0x80, 0x7f, 0xde, 0xad]);
+
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send-binary`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-target-did': 'did:claw:zBobPeerId123',
+        'x-topic': 'binary/test',
+      },
+      body: binaryData,
+    });
+
+    expect(res.status).toBe(201);
+    const callArgs = mockService.send.mock.calls.at(-1)!;
+    expect(callArgs[0]).toBe('did:claw:zBobPeerId123');
+    expect(callArgs[1]).toBe('binary/test');
+    expect(callArgs[2]).toBeInstanceOf(Uint8Array);
+    expect(Buffer.from(callArgs[2] as Uint8Array)).toEqual(Buffer.from(binaryData));
+  });
+
+  it('rejects /send-binary without X-Target-Did header', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send-binary`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-topic': 'test',
+      },
+      body: new Uint8Array([1, 2, 3]),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects /send-binary without body', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send-binary`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-target-did': 'did:claw:zBob',
+        'x-topic': 'test',
+      },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('passes optional headers to /send-binary', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send-binary`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-target-did': 'did:claw:zBobPeerId123',
+        'x-topic': 'test/priority',
+        'x-ttl-sec': '7200',
+        'x-priority': '3',
+        'x-compress': 'true',
+        'x-idempotency-key': 'idem-bin-1',
+      },
+      body: new Uint8Array([42]),
+    });
+
+    expect(res.status).toBe(201);
+    const callArgs = mockService.send.mock.calls.at(-1)!;
+    expect(callArgs[3]).toEqual(expect.objectContaining({
+      ttlSec: 7200,
+      priority: 3,
+      compress: true,
+      idempotencyKey: 'idem-bin-1',
+    }));
+  });
+
+  // ── Binary batch (POST /send-binary/batch) ────────────────────
+
+  it('sends binary batch via /send-binary/batch', async () => {
+    const binaryData = new Uint8Array([0xca, 0xfe]);
+
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send-binary/batch`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-target-dids': 'did:claw:zAlice,did:claw:zBob',
+        'x-topic': 'binary/batch',
+      },
+      body: binaryData,
+    });
+
+    expect(res.status).toBe(201);
+    expect(mockService.sendMulticast).toHaveBeenCalledWith(
+      ['did:claw:zAlice', 'did:claw:zBob'],
+      'binary/batch',
+      new Uint8Array(Buffer.from(binaryData)),
+      expect.objectContaining({}),
+    );
+  });
+
+  it('rejects /send-binary/batch without X-Target-Dids', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/send-binary/batch`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-topic': 'test',
+      },
+      body: new Uint8Array([1]),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  // ── GET /inbox/:messageId/payload — raw payload download ──────
+
+  it('downloads raw message payload', async () => {
+    const id = mockService._addBinaryToInbox({
+      sourceDid: 'did:claw:zAlice',
+      topic: 'binary/test',
+      payload: Buffer.from([0xde, 0xad, 0xbe, 0xef]),
+    });
+
+    const res = await fetch(`${baseUrl}/api/v1/messaging/inbox/${id}/payload`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/octet-stream');
+    const buf = await res.arrayBuffer();
+    expect(Buffer.from(buf)).toEqual(Buffer.from([0xde, 0xad, 0xbe, 0xef]));
+  });
+
+  it('returns compressed/encrypted headers on payload download', async () => {
+    const id = mockService._addBinaryToInbox({
+      sourceDid: 'did:claw:zAlice',
+      topic: 'binary/enc',
+      payload: Buffer.from([0x01, 0x02]),
+      compressed: true,
+      encrypted: true,
+    });
+
+    const res = await fetch(`${baseUrl}/api/v1/messaging/inbox/${id}/payload`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-compressed')).toBe('1');
+    expect(res.headers.get('x-encrypted')).toBe('1');
+  });
+
+  it('returns 404 for unknown message payload download', async () => {
+    const res = await fetch(`${baseUrl}/api/v1/messaging/inbox/msg_nonexistent/payload`);
+    expect(res.status).toBe(404);
+  });
+
+  // ── Inbox returns payloadSize and flags ────────────────────────
+
+  it('inbox returns payloadSize, compressed, encrypted fields', async () => {
+    mockService._addToInbox({
+      sourceDid: 'did:claw:alice',
+      topic: 'test',
+      payload: 'hello',
+    });
+
+    const res = await fetch(`${baseUrl}/api/v1/messaging/inbox`);
+    expect(res.status).toBe(200);
+    const data = await readData<{ messages: Array<{ payload?: string; payloadSize: number; compressed: boolean; encrypted: boolean }> }>(res);
+    expect(data.messages).toHaveLength(1);
+    expect(data.messages[0]!.payload).toBe('hello');
+    expect(data.messages[0]!.payloadSize).toBe(Buffer.from('hello', 'utf-8').length);
+    expect(data.messages[0]!.compressed).toBe(false);
+    expect(data.messages[0]!.encrypted).toBe(false);
+  });
+
+  it('inbox omits payload for compressed messages', async () => {
+    mockService._addToInbox({
+      sourceDid: 'did:claw:alice',
+      topic: 'test',
+      payload: 'compressed-data',
+      compressed: true,
+    });
+
+    const res = await fetch(`${baseUrl}/api/v1/messaging/inbox`);
+    expect(res.status).toBe(200);
+    const data = await readData<{ messages: Array<{ payload?: string; compressed: boolean }> }>(res);
+    expect(data.messages).toHaveLength(1);
+    expect(data.messages[0]!.payload).toBeUndefined();
+    expect(data.messages[0]!.compressed).toBe(true);
   });
 });

@@ -1,5 +1,9 @@
 /**
  * Messaging API — send/receive P2P direct messages via the ClawNet node.
+ *
+ * Text messages: use send() with JSON body (string payload).
+ * Binary messages: use sendBinary() with raw octet-stream body.
+ * No base64 encoding anywhere in the pipeline.
  */
 import type { HttpClient, RequestOptions } from './http.js';
 
@@ -13,8 +17,27 @@ export interface SendMessageParams {
   targetDid: string;
   /** Topic / channel name (e.g. "telagent/envelope") */
   topic: string;
-  /** Opaque payload — typically base64-encoded */
+  /** Text payload (UTF-8 string). For binary payloads, use sendBinary(). */
   payload: string;
+  /** Time-to-live in seconds (default: 86400 = 24h) */
+  ttlSec?: number;
+  /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
+  priority?: number;
+  /** Enable gzip compression for payloads > 1KB */
+  compress?: boolean;
+  /** Recipient's X25519 public key hex for E2E encryption */
+  encryptForKeyHex?: string;
+  /** Idempotency key for deduplication (unique per message) */
+  idempotencyKey?: string;
+}
+
+export interface SendBinaryParams {
+  /** Target node's DID (did:claw:z...) */
+  targetDid: string;
+  /** Topic / channel name (e.g. "telagent/envelope") */
+  topic: string;
+  /** Binary payload (raw bytes). Sent as application/octet-stream. */
+  payload: Uint8Array;
   /** Time-to-live in seconds (default: 86400 = 24h) */
   ttlSec?: number;
   /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
@@ -32,7 +55,7 @@ export interface SendBatchParams {
   targetDids: string[];
   /** Topic / channel name */
   topic: string;
-  /** Opaque payload */
+  /** Text payload (UTF-8 string). For binary payloads, use sendBinaryBatch(). */
   payload: string;
   /** Time-to-live in seconds (default: 86400 = 24h) */
   ttlSec?: number;
@@ -44,6 +67,23 @@ export interface SendBatchParams {
   idempotencyKey?: string;
   /** Per-recipient X25519 public key hex for E2E encryption (DID → key hex) */
   recipientKeys?: Record<string, string>;
+}
+
+export interface SendBinaryBatchParams {
+  /** Target DIDs (max 100, comma-separated in header) */
+  targetDids: string[];
+  /** Topic / channel name */
+  topic: string;
+  /** Binary payload (raw bytes). Sent as application/octet-stream. */
+  payload: Uint8Array;
+  /** Time-to-live in seconds (default: 86400 = 24h) */
+  ttlSec?: number;
+  /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
+  priority?: number;
+  /** Enable gzip compression for payloads > 1KB */
+  compress?: boolean;
+  /** Idempotency key for deduplication */
+  idempotencyKey?: string;
 }
 
 export interface SendMessageResult {
@@ -61,7 +101,14 @@ export interface InboxMessage {
   messageId: string;
   sourceDid: string;
   topic: string;
-  payload: string;
+  /** Text payload (only present for uncompressed+unencrypted messages). */
+  payload?: string;
+  /** Payload size in bytes (always present). */
+  payloadSize: number;
+  /** Whether the payload is compressed (gzip). */
+  compressed: boolean;
+  /** Whether the payload is E2E encrypted. */
+  encrypted: boolean;
   receivedAtMs: number;
   priority: number;
   seq: number;
@@ -144,23 +191,67 @@ export class MessagingApi {
   constructor(private readonly http: HttpClient) {}
 
   /**
-   * Send a message to a target DID via P2P.
+   * Send a text message to a target DID via P2P.
    *
    * If the target peer is online and reachable, the message is delivered
    * directly. Otherwise it is queued for delivery when the peer reconnects.
+   * For binary payloads, use `sendBinary()`.
    */
   async send(params: SendMessageParams, opts?: RequestOptions): Promise<SendMessageResult> {
     return this.http.post<SendMessageResult>('/api/v1/messaging/send', params, opts);
   }
 
   /**
-   * Multicast: send a message to multiple target DIDs.
+   * Send a binary message to a target DID via P2P.
+   *
+   * The payload is sent as raw bytes (application/octet-stream).
+   * Metadata (targetDid, topic, etc.) is passed in HTTP headers.
+   */
+  async sendBinary(params: SendBinaryParams, opts?: RequestOptions): Promise<SendMessageResult> {
+    const headers: Record<string, string> = {
+      'x-target-did': params.targetDid,
+      'x-topic': params.topic,
+    };
+    if (params.ttlSec !== undefined) headers['x-ttl-sec'] = String(params.ttlSec);
+    if (params.priority !== undefined) headers['x-priority'] = String(params.priority);
+    if (params.compress !== undefined) headers['x-compress'] = String(params.compress);
+    if (params.encryptForKeyHex) headers['x-encrypt-for-key'] = params.encryptForKeyHex;
+    if (params.idempotencyKey) headers['x-idempotency-key'] = params.idempotencyKey;
+
+    return this.http.postBinary<SendMessageResult>(
+      '/api/v1/messaging/send-binary', params.payload, headers, opts,
+    );
+  }
+
+  /**
+   * Multicast: send a text message to multiple target DIDs.
    *
    * Each target is attempted independently — partial success is possible.
-   * Maximum 100 targets per call.
+   * Maximum 100 targets per call. For binary payloads, use `sendBinaryBatch()`.
    */
   async sendBatch(params: SendBatchParams, opts?: RequestOptions): Promise<SendBatchResult> {
     return this.http.post<SendBatchResult>('/api/v1/messaging/send/batch', params, opts);
+  }
+
+  /**
+   * Multicast: send a binary message to multiple target DIDs.
+   *
+   * The payload is sent as raw bytes (application/octet-stream).
+   * Target DIDs are comma-separated in the X-Target-Dids header.
+   */
+  async sendBinaryBatch(params: SendBinaryBatchParams, opts?: RequestOptions): Promise<SendBatchResult> {
+    const headers: Record<string, string> = {
+      'x-target-dids': params.targetDids.join(','),
+      'x-topic': params.topic,
+    };
+    if (params.ttlSec !== undefined) headers['x-ttl-sec'] = String(params.ttlSec);
+    if (params.priority !== undefined) headers['x-priority'] = String(params.priority);
+    if (params.compress !== undefined) headers['x-compress'] = String(params.compress);
+    if (params.idempotencyKey) headers['x-idempotency-key'] = params.idempotencyKey;
+
+    return this.http.postBinary<SendBatchResult>(
+      '/api/v1/messaging/send-binary/batch', params.payload, headers, opts,
+    );
   }
 
   /**
@@ -186,6 +277,18 @@ export class MessagingApi {
    */
   async ack(messageId: string, opts?: RequestOptions): Promise<void> {
     await this.http.delete(`/api/v1/messaging/inbox/${encodeURIComponent(messageId)}`, undefined, opts);
+  }
+
+  /**
+   * Download the raw payload of an inbox message as binary.
+   *
+   * Use this for compressed, encrypted, or binary payloads that aren't
+   * included inline in the inbox listing. Response includes headers:
+   * - X-Compressed: "1" if the payload is gzip-compressed
+   * - X-Encrypted: "1" if the payload is E2E-encrypted
+   */
+  async downloadPayload(messageId: string, opts?: RequestOptions): Promise<ArrayBuffer> {
+    return this.http.getRaw(`/api/v1/messaging/inbox/${encodeURIComponent(messageId)}/payload`, opts);
   }
 
   /**

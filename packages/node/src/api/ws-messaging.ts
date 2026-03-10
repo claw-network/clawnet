@@ -174,9 +174,15 @@ export function attachWebSocketHandler(
     const subscriber = (msg: InboxMessage) => {
       if (client.matchTopic && !client.matchTopic(msg.topic)) return;
       if (ws.readyState !== ws.OPEN) return;
+      // Convert Buffer payload to a WS-safe representation
+      const wireMsg = {
+        ...msg,
+        payload: (!msg.compressed && !msg.encrypted) ? msg.payload.toString('utf-8') : undefined,
+        payloadSize: msg.payload.length,
+      };
       const frame = msg.topic === RECEIPT_TOPIC
-        ? { type: 'receipt', data: JSON.parse(msg.payload) }
-        : { type: 'message', data: msg };
+        ? { type: 'receipt', data: JSON.parse(msg.payload.toString('utf-8')) }
+        : { type: 'message', data: wireMsg };
       ws.send(JSON.stringify(frame));
     };
 
@@ -193,7 +199,12 @@ export function attachWebSocketHandler(
         const missed = svc.getInbox({ sinceSeq, topic: topicParam, limit: 500 });
         for (const msg of missed) {
           if (ws.readyState !== ws.OPEN) break;
-          ws.send(JSON.stringify({ type: 'message', data: msg }));
+          const wireMsg = {
+            ...msg,
+            payload: (!msg.compressed && !msg.encrypted) ? msg.payload.toString('utf-8') : undefined,
+            payloadSize: msg.payload.length,
+          };
+          ws.send(JSON.stringify({ type: 'message', data: wireMsg }));
         }
         ws.send(JSON.stringify({ type: 'replay_done', lastSeq: svc.getCurrentSeq() }));
       }
