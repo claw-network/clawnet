@@ -19,6 +19,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { Server, IncomingMessage } from 'node:http';
 import { createBlake3Hasher, base64ToBytes } from '@claw-network/core';
 import type { ApiKeyStore } from './api-key-store.js';
+import { createBlobWriter, type BlobWriter } from '../services/blob-stage.js';
 
 const WS_PATH_PREFIX = '/api/v1/deliverables/stream/';
 const MAX_STREAM_BYTES = 50 * 1024 * 1024; // 50 MB
@@ -32,6 +33,7 @@ interface StreamSession {
   seq: number;
   alive: boolean;
   done: boolean;
+  blobWriter?: BlobWriter;
 }
 
 function sendJson(ws: WebSocket, data: unknown): void {
@@ -40,10 +42,23 @@ function sendJson(ws: WebSocket, data: unknown): void {
   }
 }
 
+export interface DeliveryStreamOptions {
+  apiKeyStore?: ApiKeyStore;
+  /** When set, stream chunks are persisted to disk under this directory. */
+  blobDir?: string;
+}
+
 export function attachDeliveryStreamHandler(
   server: Server,
-  apiKeyStore?: ApiKeyStore,
+  apiKeyStoreOrOpts?: ApiKeyStore | DeliveryStreamOptions,
 ): WebSocketServer {
+  // Backward compat: accept bare ApiKeyStore or options object
+  const opts: DeliveryStreamOptions =
+    apiKeyStoreOrOpts && 'blobDir' in apiKeyStoreOrOpts
+      ? apiKeyStoreOrOpts
+      : { apiKeyStore: apiKeyStoreOrOpts as ApiKeyStore | undefined };
+
+  const { apiKeyStore, blobDir } = opts;
   const wss = new WebSocketServer({ noServer: true });
   const sessions = new Set<StreamSession>();
 
@@ -92,7 +107,7 @@ export function attachDeliveryStreamHandler(
     }
 
     wss.handleUpgrade(req, socket, head, (ws) => {
-      handleStreamConnection(ws, deliverableId, sessions);
+      handleStreamConnection(ws, deliverableId, sessions, blobDir);
     });
   });
 
@@ -103,6 +118,7 @@ function handleStreamConnection(
   ws: WebSocket,
   deliverableId: string,
   sessions: Set<StreamSession>,
+  blobDir?: string,
 ): void {
   const session: StreamSession = {
     ws,
@@ -115,11 +131,21 @@ function handleStreamConnection(
   };
   sessions.add(session);
 
+  // Initialize blob writer (async, non-blocking — first chunk waits if needed)
+  let blobReady: Promise<void> | undefined;
+  if (blobDir) {
+    blobReady = createBlobWriter(deliverableId, { blobDir }).then((w) => {
+      session.blobWriter = w;
+    });
+  }
+
   ws.on('pong', () => {
     session.alive = true;
   });
 
   ws.on('message', (raw) => {
+    // Wrap in async IIFE for blob write await
+    void (async () => {
     session.alive = true;
     if (session.done) {
       sendJson(ws, { type: 'error', detail: 'Stream already finalized' });
@@ -152,29 +178,46 @@ function handleStreamConnection(
       if (session.totalBytes > MAX_STREAM_BYTES) {
         sendJson(ws, { type: 'error', detail: `Stream exceeds size limit (${MAX_STREAM_BYTES} bytes)` });
         ws.close(1009, 'Message too big');
+        session.blobWriter?.abort().catch(() => {});
         sessions.delete(session);
         return;
       }
 
       session.hasher.update(bytes);
+      // Persist chunk to disk if blob staging is enabled
+      if (blobReady) {
+        await blobReady;
+        await session.blobWriter!.append(bytes);
+      }
       session.seq += 1;
       sendJson(ws, { type: 'ack', seq: session.seq, totalBytes: session.totalBytes });
     } else if (msg.type === 'done') {
       session.done = true;
       const contentHash = session.hasher.hexDigest();
+      // Finalize blob file
+      if (session.blobWriter) {
+        await session.blobWriter.finalize();
+      }
       sendJson(ws, { type: 'finalHash', contentHash, totalBytes: session.totalBytes });
       ws.close(1000, 'Stream complete');
       sessions.delete(session);
     } else {
       sendJson(ws, { type: 'error', detail: `Unknown frame type: ${msg.type}` });
     }
+    })();
   });
 
   ws.on('close', () => {
+    if (!session.done) {
+      session.blobWriter?.abort().catch(() => {});
+    }
     sessions.delete(session);
   });
 
   ws.on('error', () => {
+    if (!session.done) {
+      session.blobWriter?.abort().catch(() => {});
+    }
     sessions.delete(session);
   });
 }

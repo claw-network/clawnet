@@ -15,6 +15,7 @@ import {
 } from '@claw-network/core';
 import type { DeliverableEnvelope } from '@claw-network/protocol';
 import { SchemaValidator } from './schema-validator.js';
+import { ssrfSafeFetch } from './ssrf-guard.js';
 
 // ── Result types ─────────────────────────────────────────────────
 
@@ -182,16 +183,11 @@ export class DeliverableVerifier {
     } catch {
       return { name: 'endpointSmoke', passed: false, detail: `Invalid base URL: ${baseUrl}` };
     }
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      return { name: 'endpointSmoke', passed: false, detail: `Unsupported scheme: ${parsed.protocol}` };
-    }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const resp = await fetch(parsed.href, {
-        method: 'HEAD',
-        signal: controller.signal,
+      const resp = await ssrfSafeFetch(parsed.href, {
+        timeoutMs,
+        init: { method: 'HEAD' },
       });
       const ok = resp.status >= 200 && resp.status < 400;
       return {
@@ -205,8 +201,6 @@ export class DeliverableVerifier {
         passed: false,
         detail: (err as Error).message ?? 'Unknown error',
       };
-    } finally {
-      clearTimeout(timer);
     }
   }
 }

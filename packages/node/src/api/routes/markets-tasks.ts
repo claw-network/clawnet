@@ -45,6 +45,9 @@ import {
 import type { DeliverableEnvelope } from '@claw-network/protocol';
 import { envelopeDigest as computeEnvelopeDigest, base64ToBytes, bytesToUtf8 } from '@claw-network/core';
 import { DeliverableVerifier } from '../../services/deliverable-verifier.js';
+import { createLogger } from '../../logger.js';
+
+const tasksLog = createLogger({ level: 'info' });
 
 /** Shared verifier (stateless). */
 const verifier = new DeliverableVerifier();
@@ -490,9 +493,15 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
         }
       }
 
-      // Emit deprecation warning when legacy deliverables field is used without delivery.envelope
-      if (body.deliverables !== undefined && !body.delivery?.envelope && !body.delivery?.envelopes) {
-        console.warn('[deprecated] POST /:id/actions/deliver: "deliverables" field is deprecated — use "delivery.envelope" instead (Phase 2+)');
+      // Phase 3: reject submissions without delivery.envelope
+      if (!body.delivery?.envelope && !body.delivery?.envelopes) {
+        badRequest(res, 'delivery.envelope (or delivery.envelopes) is required — the legacy "deliverables" field is no longer accepted alone', route.url.pathname);
+        return;
+      }
+
+      // Log when legacy deliverables field is still sent alongside delivery
+      if (body.deliverables !== undefined) {
+        tasksLog.warn('[deprecated] POST /:id/actions/deliver: "deliverables" field is deprecated and will be removed — use "delivery.envelope" only');
       }
 
       const submissionId =

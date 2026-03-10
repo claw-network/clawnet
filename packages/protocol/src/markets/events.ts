@@ -1088,9 +1088,12 @@ export function parseMarketSubmissionSubmitPayload(
   }
 
   const hasLegacy = payload.deliverables !== undefined && payload.deliverables !== null;
-  if (!delivery && !hasLegacy) {
-    throw new Error('either deliverables or delivery.envelope is required');
+
+  // Phase 3: delivery.envelope is mandatory — reject legacy-only submissions
+  if (!delivery) {
+    throw new Error('delivery.envelope (or delivery.envelopes) is required — the legacy "deliverables" field is no longer accepted without a delivery envelope');
   }
+
   const deliverables = hasLegacy ? parseSubmissionDeliverables(payload.deliverables) : undefined;
 
   return {

@@ -25,38 +25,12 @@ async function getAjv(): Promise<AjvInstance> {
 }
 
 import type { DeliverableEnvelope } from '@claw-network/protocol';
+import { ssrfSafeFetch } from './ssrf-guard.js';
 
-// ── RFC1918 / loopback guard ──────────────────────────────────────
-
-const PRIVATE_HOST_RE = [
-  /^10\.\d+\.\d+\.\d+$/,
-  /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
-  /^192\.168\.\d+\.\d+$/,
-  /^127\.\d+\.\d+\.\d+$/,
-  /^169\.254\.\d+\.\d+$/,
-  /^\[?::1\]?$/,
-  /^\[?fc[0-9a-f]{2}:/i,
-];
-
-function isPrivateHost(host: string): boolean {
-  const h = host.toLowerCase().replace(/^\[|\]$/g, '');
-  return h === 'localhost' || PRIVATE_HOST_RE.some((re) => re.test(h));
-}
+// ── SSRF-safe schema fetcher (delegates to shared guard) ──────────
 
 async function safeFetchSchema(uri: string): Promise<Record<string, unknown>> {
-  let parsed: URL;
-  try {
-    parsed = new URL(uri);
-  } catch {
-    throw new Error(`Invalid schema URI: ${uri}`);
-  }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new Error(`Unsupported schema URI scheme: ${parsed.protocol}`);
-  }
-  if (isPrivateHost(parsed.hostname)) {
-    throw new Error(`SSRF blocked: private/loopback schema host "${parsed.hostname}"`);
-  }
-  const resp = await fetch(uri);
+  const resp = await ssrfSafeFetch(uri, { allowedSchemes: ['https:', 'http:'] });
   if (!resp.ok) throw new Error(`Schema fetch failed: HTTP ${resp.status}`);
   const json = await resp.json() as Record<string, unknown>;
   return json;

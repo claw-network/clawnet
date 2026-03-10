@@ -165,16 +165,30 @@ describe('parseMarketSubmissionSubmitPayload — composite envelopes', () => {
     ).toThrow(/delivery requires envelope or non-empty envelopes/);
   });
 
-  it('still requires at least deliverables or delivery', () => {
+  it('rejects legacy-only submission (Phase 3)', () => {
     const payload = {
       orderId: 'order-5',
       submissionId: 'sub-5',
+      worker: baseDid,
+      deliverables: [{ result: 'data' }],
+      resourcePrev: null,
+    };
+
+    expect(() =>
+      parseMarketSubmissionSubmitPayload(payload as Record<string, unknown>),
+    ).toThrow(/delivery\.envelope.*is required/);
+  });
+
+  it('rejects submission with neither delivery nor deliverables', () => {
+    const payload = {
+      orderId: 'order-6',
+      submissionId: 'sub-6',
       worker: baseDid,
       resourcePrev: null,
     };
 
     expect(() =>
       parseMarketSubmissionSubmitPayload(payload as Record<string, unknown>),
-    ).toThrow(/either deliverables or delivery/);
+    ).toThrow(/delivery\.envelope.*is required/);
   });
 });

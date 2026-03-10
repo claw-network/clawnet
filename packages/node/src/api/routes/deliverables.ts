@@ -297,88 +297,13 @@ export function deliverableRoutes(ctx: RuntimeContext): Router {
   return r;
 }
 
-// ── SSRF-safe fetch helper ────────────────────────────────────────
+// ── SSRF-safe fetch helper (delegates to shared guard) ─────────────
 
-/** Blocked RFC1918 + loopback prefixes for SSRF prevention. */
-const RFC1918_PATTERNS = [
-  /^10\.\d+\.\d+\.\d+$/,
-  /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/,
-  /^192\.168\.\d+\.\d+$/,
-  /^127\.\d+\.\d+\.\d+$/,
-  /^169\.254\.\d+\.\d+$/,
-  /^\[?::1\]?$/,
-  /^\[?fc[0-9a-f]{2}:/i,
-];
-
-function isPrivateHost(hostname: string): boolean {
-  const h = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  return (
-    h === 'localhost' ||
-    RFC1918_PATTERNS.some((re) => re.test(h))
-  );
-}
+import { ssrfSafeFetchBytes } from '../../services/ssrf-guard.js';
 
 async function fetchExternalWithSsrfGuard(
   uri: string,
   expectedHash?: string,
 ): Promise<Uint8Array> {
-  let parsed: URL;
-  try {
-    parsed = new URL(uri);
-  } catch {
-    throw new Error(`Invalid URI: ${uri}`);
-  }
-
-  if (isPrivateHost(parsed.hostname)) {
-    throw new Error(`SSRF blocked: private/loopback address "${parsed.hostname}"`);
-  }
-
-  const MAX_BYTES = 50 * 1024 * 1024; // 50 MB
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
-
-  let resp: Response;
-  try {
-    resp = await fetch(uri, { signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!resp.ok) {
-    throw new Error(`External fetch failed: HTTP ${resp.status}`);
-  }
-
-  const reader = resp.body?.getReader();
-  if (!reader) throw new Error('No response body');
-
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.length;
-    if (total > MAX_BYTES) {
-      reader.cancel();
-      throw new Error(`External content exceeds size limit (${MAX_BYTES} bytes)`);
-    }
-    chunks.push(value);
-  }
-
-  const result = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  // Verify hash if provided
-  if (expectedHash) {
-    const { blake3Hex } = await import('@claw-network/core');
-    const actual = blake3Hex(result);
-    if (actual !== expectedHash) {
-      throw new Error(`Content hash mismatch: expected ${expectedHash.slice(0, 16)}… got ${actual.slice(0, 16)}…`);
-    }
-  }
-
-  return result;
+  return ssrfSafeFetchBytes(uri, { expectedHash });
 }
