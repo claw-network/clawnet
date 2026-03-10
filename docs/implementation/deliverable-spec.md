@@ -638,30 +638,223 @@ interface AcceptanceTest {
 
 ### Phase 1 — MVP (v1): Integrity + Provenance
 
-- [ ] 定义 `DeliverableEnvelope` 类型（`packages/protocol/src/deliverables/`）
-- [ ] 统一 `DeliverableType` 枚举（9 种），migration alias 兼容旧类型
-- [ ] 实现 envelope 签名和验证（域前缀 `clawnet:deliverable:v1:`，复用 `@noble/ed25519`）
-- [ ] 改造 `TaskSubmission.deliverables` → `DeliverableEnvelope[]`
-- [ ] 改造 `ContractMilestoneSubmission.deliverables` 同上
-- [ ] 更新链下 `submitMilestone`：消除二次哈希，直接透传 BLAKE3(JCS(envelope)) digest
-- [ ] 信息市场对齐：`InfoDeliveryRecord` 增加 `envelopeHash`，MIME type migration
-- [ ] 更新 SDK types + REST API schemas
-- [ ] 扩展 `market.submission.submit` / `market.submission.review` payload 携带 delivery envelope
-- [ ] 实现点对点令牌下发协议 `/clawnet/1.0.0/delivery-auth`
+> **状态（2026-03-10）**：8/10 项完成，剩余 2 项为协议类型迁移。
+
+| # | 任务 | 文件 | 状态 |
+|---|------|------|------|
+| 1 | 定义 `DeliverableEnvelope` 类型 | `packages/protocol/src/deliverables/types.ts` | ✅ |
+| 2 | 统一 `DeliverableType` 枚举（9 种）+ migration alias | `packages/protocol/src/deliverables/types.ts` | ✅ |
+| 3 | 实现 envelope 签名和验证（域前缀 `clawnet:deliverable:v1:`） | `packages/core/src/protocol/deliverable-hash.ts` | ✅ |
+| 4 | 改造 `TaskSubmission.deliverables` → `DeliverableEnvelope[]` | `packages/protocol/src/markets/types.ts:399` | ❌ |
+| 5 | 改造 `ContractMilestoneSubmission.deliverables` 同上 | `packages/protocol/src/contracts/types.ts:46` | ❌ |
+| 6 | 更新链下 `submitMilestone`：消除二次哈希 | `packages/node/src/services/contracts-service.ts:325` | ✅ |
+| 7 | `InfoDeliveryRecord` 增加 `envelopeHash`，MIME type migration | `packages/protocol/src/markets/info-store.ts:63` | ✅ (partial: `envelopeHash` 已加，MIME 迁移未完成) |
+| 8 | 更新 SDK types + REST API schemas | `packages/sdk/src/types.ts`, `packages/node/src/api/schemas/` | ✅ |
+| 9 | 扩展 `market.submission.submit` / `market.submission.review` payload | `packages/node/src/api/routes/markets-tasks.ts:465` | ✅ |
+| 10 | 实现点对点令牌下发协议 `/clawnet/1.0.0/delivery-auth` | `packages/node/src/services/messaging-service.ts:1177` | ✅ |
+
+**剩余任务（Phase 1 收尾）**：
+
+- [ ] **P1-REM-1**: 将 `TaskSubmission.deliverables` 从 `Record<string, unknown>[]` 改为 `DeliverableEnvelope[] | Record<string, unknown>[]`（discriminated union 过渡），并在 `markets/events.ts` 的 `parseMarketSubmissionSubmitPayload` 中放宽 `deliverables` 为 optional（有 `delivery.envelope` 时不强制）。
+  - 文件：`packages/protocol/src/markets/types.ts`, `packages/protocol/src/markets/events.ts`
+- [ ] **P1-REM-2**: 同步 `ContractMilestoneSubmission.deliverables` 改为 optional。
+  - 文件：`packages/protocol/src/contracts/types.ts`
+
+---
 
 ### Phase 2 — Structure (v2)
 
-- [ ] `schema` 字段支持 + JSON Schema 验证
-- [ ] Stream / Endpoint / External transport 实现
-- [ ] Composite deliverables
-- [ ] MIME type 完全迁移
+> **状态（2026-03-10）**：类型层已就绪，功能实现未开始。
+> **前置条件**：Phase 1 全部完成（含 P1-REM-1、P1-REM-2）。
+
+#### 2.1 JSON Schema 验证（Layer 2）
+
+将 `envelope.schema.ref` 从"存储字段"升级为"执行验证"。
+
+- [ ] **P2-1-1**: 在 `packages/node` 添加 `ajv`（JSON Schema 验证库）依赖。`pnpm add ajv@8 --filter @claw-network/node`
+- [ ] **P2-1-2**: 实现 `packages/protocol/src/deliverables/schema-validator.ts`：
+  - 输入：plaintext bytes + `envelope.schema.ref`
+  - `schema.ref` 为 content hash 时：从本地缓存或 P2P 获取 schema 内容，验证 `BLAKE3(schema) == ref`。
+  - `schema.ref` 为 URI 时：按 URI scheme 解析（仅支持 `ipfs://` 和本地 `clawnet://` scheme，**不支持任意 HTTP fetch**，防止 SSRF）。
+  - 执行 `ajv.validate(schema, JSON.parse(plaintext))` 并返回 `{ valid, errors }`。
+  - 仅对 `format = 'application/json'` 或 `'application/jsonl'` 执行，其他格式跳过。
+- [ ] **P2-1-3**: 在 Node 的交付验证流水线中接入：`packages/node/src/services/deliverable-verifier.ts`（新建服务）
+  - 方法：`verifyLayer1(envelope, plaintext, producerPublicKey) → VerificationResult`
+  - 方法：`verifyLayer2(envelope, plaintext) → VerificationResult`
+  - `VerificationResult = { passed: boolean; layer: 1 | 2; checks: CheckResult[]; degraded?: boolean }`
+- [ ] **P2-1-4**: 在任务市场 review 路由中调用 Layer 2 验证，结果写入 `submission.verificationResult`。
+  - 文件：`packages/node/src/api/routes/markets-tasks.ts`
+- [ ] **P2-1-5**: 更新 REST API schema 增加 `verificationResult` 字段。
+  - 文件：`packages/node/src/api/schemas/markets.ts`
+- [ ] **P2-1-6**: 在 SDK 暴露 `verificationResult` 类型。
+  - 文件：`packages/sdk/src/types.ts`
+
+#### 2.2 External transport（750 KB – 1 GB）
+
+- [ ] **P2-2-1**: 实现 libp2p 协议流 `/clawnet/1.0.0/delivery-external`（新增，需在 `packages/core/src/p2p/topics.ts` 登记）：
+  - 发送方：将 encrypted blob 通过 stream 推送至接收方 peer。
+  - 接收方：接收后先验证 `BLAKE3(blob) == envelope.transport.encryptedHash`，通过后解密，再验证 `BLAKE3(plaintext) == envelope.contentHash`。
+  - 文件：`packages/core/src/p2p/delivery-external.ts`（新建）
+- [ ] **P2-2-2**: 在 `MessagingService` 注册 `/clawnet/1.0.0/delivery-external` 协议处理器。
+  - 文件：`packages/node/src/services/messaging-service.ts`
+- [ ] **P2-2-3**: HTTP(S) 外部引用 fetch（降级路径，仅支持 `https://` scheme，防止 SSRF）：
+  - 使用 Node 内置 `fetch`，不允许重定向到私有 IP（需校验 `Host` 不在 RFC1918 范围）。
+  - 文件：`packages/node/src/services/deliverable-verifier.ts`
+- [ ] **P2-2-4**: REST API 新增端点 `POST /api/v1/deliverables/fetch`（内部服务端调用，不对外暴露），供 Node 拉取外部 blob。
+- [ ] **P2-2-5**: 单元测试（mock P2P stream + mock HTTP）。
+  - 文件：`packages/node/test/services/deliverable-verifier.test.ts`
+
+#### 2.3 Stream transport 实现
+
+- [ ] **P2-3-1**: 在 Node 实现 SSE 流代理端点 `GET /api/v1/deliverables/stream/:deliverableId`：
+  - 向 producer 节点建立 P2P stream，数据实时转发给 HTTP 客户端（SSE）。
+  - 同时接收方增量计算 `BLAKE3`（`packages/core` 已有 BLAKE3，需验证其是否支持增量更新 API）。
+  - 文件：`packages/node/src/api/routes/deliverables.ts`（新建）
+- [ ] **P2-3-2**: WebSocket 流接收：`WS /api/v1/deliverables/stream/:deliverableId`。
+  - 文件同上
+- [ ] **P2-3-3**: 流完成时的 `finalHash` 验证：
+  - 接收方在流结束后比对 `BLAKE3(accumulated_bytes) == delivery.finalHash`。
+  - 不匹配时调用 `DeliverableVerifier.reportMismatch()`，为后续自动争议预留接口（Phase 3 实现）。
+  - 文件：`packages/node/src/services/deliverable-verifier.ts`
+- [ ] **P2-3-4**: Endpoint transport 的 smoke test：
+  - 调用 `EndpointTransport.baseUrl + /health`（或 `specRef` 中声明的端点），验证响应 status 2xx。
+  - 文件：`packages/node/src/services/deliverable-verifier.ts`
+
+#### 2.4 Composite deliverables 交付流程
+
+> `computeCompositeHash()` 已在 `packages/protocol/src/deliverables/envelope.ts` 实现，缺少完整交付流程。
+
+- [ ] **P2-4-1**: REST API 支持多 envelope 一次提交：`body.delivery.envelopes: DeliverableEnvelope[]`（当 type=`composite` 时）。
+  - 文件：`packages/node/src/api/schemas/markets.ts`, `routes/markets-tasks.ts`
+- [ ] **P2-4-2**: 服务端验证 composite：
+  - 检查 `envelope.parts` 的每个 ID 都有对应的子 envelope 提交。
+  - 验证 `envelope.contentHash == computeCompositeHash(parts.map(p => p.contentHash))`。
+  - 文件：`packages/node/src/services/deliverable-verifier.ts`
+- [ ] **P2-4-3**: P2P 事件中携带 composite：`market.submission.submit` payload 的 `delivery.envelopes` 数组。
+  - 文件：`packages/protocol/src/deliverables/types.ts`（`DeliveryPayload` 增加 `envelopes?: DeliverableEnvelope[]`）
+
+#### 2.5 MIME type 完全迁移
+
+- [ ] **P2-5-1**: 信息市场旧 `ContentFormat`（`'text'`, `'json'`, `'csv'`, etc.）迁移到标准 MIME：
+  - 在 `packages/protocol/src/markets/info-store.ts` 或迁移工具中添加 legacy-to-MIME 映射表。
+  - 读取旧格式时自动转换，写入新格式时使用 MIME。
+  - 映射：`'text' → 'text/plain'`, `'json' → 'application/json'`, `'csv' → 'text/csv'`, `'html' → 'text/html'`, `'pdf' → 'application/pdf'`, `'video' → 'video/mp4'`, `'audio' → 'audio/wav'`, `'image' → 'image/png'`, `'binary' → 'application/octet-stream'`
+  - 文件：`packages/protocol/src/markets/info-store.ts`
+- [ ] **P2-5-2**: `parseMarketSubmissionSubmitPayload` 放宽 `deliverables` 为 optional（完成 P1-REM-1 后同步）。
+  - 文件：`packages/protocol/src/markets/events.ts`
+- [ ] **P2-5-3**: OpenAPI spec 更新 `deliverables` 字段标注 `deprecated: true`。
+  - 文件：`docs/api/openapi.yaml`
+- [ ] **P2-5-4**: SDK-Python types 同步（`DeliverableEnvelope` 结构）。
+  - 文件：`packages/sdk-python/src/clawnet/types.py`
+
+#### 2.6 Phase 2 测试矩阵
+
+- [ ] `packages/protocol/test/deliverable-schema-validator.test.ts`：JSON Schema 验证
+- [ ] `packages/node/test/services/deliverable-verifier.test.ts`：Layer 1 + Layer 2 全流程（mock 加密 + mock P2P）
+- [ ] `packages/node/test/deliverable-stream-api.test.ts`：SSE/WS 流接收 + finalHash 验证
+- [ ] `packages/node/test/deliverable-composite.test.ts`：composite 提交 + hash 验证
+
+---
 
 ### Phase 3 — Automation (v3)
 
-- [ ] `AcceptanceTest` 声明式断言 + WASM sandbox 脚本验收
-- [ ] 自动争议触发（Layer 1 验证失败 → 自动开启争议）
-- [ ] SLA 监控（capability market）
-- [ ] Reputation integration
+> **状态（2026-03-10）**：未开始。
+> **前置条件**：Phase 2 全部完成（特别是 `DeliverableVerifier` 服务和 Layer 2 流水线）。
+
+#### 3.1 AcceptanceTest 类型定义与声明式断言
+
+- [ ] **P3-1-1**: 在 `packages/protocol/src/deliverables/types.ts` 添加 `AcceptanceTest` 类型：
+  ```typescript
+  export interface AcceptanceTest {
+    id: string;
+    name: string;
+    type: 'script' | 'assertion' | 'manual';
+    scriptHash?: string;      // content hash of the WASM test script
+    assertions?: Array<{
+      field: string;          // JSONPath expression
+      operator: 'eq' | 'gt' | 'lt' | 'contains' | 'matches';
+      value: unknown;
+    }>;
+    required: boolean;
+  }
+  ```
+- [ ] **P3-1-2**: 在任务市场订单中允许 buyer 声明 `acceptanceTests: AcceptanceTest[]`。
+  - 文件：`packages/protocol/src/markets/types.ts`（`TaskOrder` 增加字段）
+- [ ] **P3-1-3**: 实现声明式断言执行器 `packages/protocol/src/deliverables/assertion-runner.ts`：
+  - 以 JSONPath 表达式定位字段，执行 `eq/gt/lt/contains/matches` 比较。
+  - 输入：plaintext（JSON 解析后）+ assertions 数组。
+  - 输出：`{ passed: boolean; results: { testId, passed, actual?, expected? }[] }`
+- [ ] **P3-1-4**: REST API `POST /api/v1/markets/task/orders/:orderId/submissions/:submissionId/verify`：
+  - 触发 Layer 1 → Layer 2 → Layer 3 全量验证。
+  - 返回 `{ layer1, layer2, layer3 }` 各层结果。
+  - 文件：`packages/node/src/api/routes/markets-tasks.ts`
+
+#### 3.2 WASM sandbox 脚本验收
+
+- [ ] **P3-2-1**: 引入 WASM runtime（推荐 `@wasmer/wasi` 或 Node.js 内置 `WebAssembly`）：
+  - `pnpm add @wasmer/wasi --filter @claw-network/node`（若用 wasmer）或使用 Node >= 22 内置 WASM。
+  - 文件：`packages/node/src/services/wasm-sandbox.ts`（新建）
+- [ ] **P3-2-2**: Sandbox 约束：
+  - 禁止网络访问（隔离 sandbox，无 `fetch`）。
+  - 内存上限 64 MB，执行时限 5s。
+  - 仅允许读取交付物内容（只读），不允许写入文件系统。
+- [ ] **P3-2-3**: Script 内容寻址验证：
+  - 执行前先验证 `BLAKE3(script_wasm) == acceptanceTest.scriptHash`，防止脚本被替换。
+- [ ] **P3-2-4**: Script 发布流程（buyer 上传 WASM 脚本作为 deliverable，由 seller 在提交时使用）：
+  - 文件：`packages/node/src/api/routes/deliverables.ts`
+
+#### 3.3 自动争议触发
+
+> 依赖：`DeliverableVerifier.reportMismatch()` 预留接口（Phase 2 P2-3-3）。
+
+- [ ] **P3-3-1**: 在 `DisputeService`（或新建）实现 `autoOpenDispute(orderId, deliverableId, reason, evidence)`:
+  - 调用现有争议 API（如有）或发出 `market.order.dispute` 事件。
+  - `evidence` 为一个 `composite` 类型的 `DeliverableEnvelope`，包含：失败的 verification result JSON + 原始 envelope + 签名。
+  - 文件：`packages/node/src/services/dispute-service.ts`（新建或扩展现有）
+- [ ] **P3-3-2**: 触发时机：
+  - Layer 1 `contentHash` 不匹配 → 自动开启争议（无需人工确认）。
+  - Layer 1 签名验证失败 → 自动开启争议。
+  - Layer 2 schema 验证失败且 `required: true` → 自动开启争议。
+  - Layer 3 `required: true` 的断言失败 → 自动开启争议。
+  - 流完成 `finalHash` 不匹配 → 自动开启争议。
+- [ ] **P3-3-3**: 争议证据打包：
+  - `evidenceEnvelope = composite DeliverableEnvelope { parts: [verificationResultId, originalEnvelopeId] }`
+  - `on-chain evidenceHash = BLAKE3(JCS(evidenceEnvelope))`（见 §7.4）
+
+#### 3.4 SLA 监控（capability market）
+
+- [ ] **P3-4-1**: `packages/node/src/services/sla-monitor.ts`（新建）:
+  - 订阅 `CapabilityUsageRecord` 写入事件。
+  - 按 lease 维度聚合：调用次数、成功率、P99 延迟。
+  - 对比 `lease.sla` 中声明的阈值（`maxLatencyMs`, `minSuccessRate`, `maxMonthlyDowntimeSec`）。
+- [ ] **P3-4-2**: SLA 违约时自动发出 `capability.sla.violation` 事件（新增），写入 indexer。
+  - 文件：`packages/protocol/src/markets/events.ts`（需走冻结规范变更流程，或类似 delivery 采用 payload 扩展方式）
+- [ ] **P3-4-3**: SLA 违约触发 `autoOpenDispute()`（同 P3-3-1）。
+- [ ] **P3-4-4**: REST API `GET /api/v1/markets/capability/leases/:leaseId/sla` 返回当前 SLA 指标。
+  - 文件：`packages/node/src/api/routes/markets-capabilities.ts`
+
+#### 3.5 Reputation integration
+
+> 依赖：`packages/node/src/services/reputation-service.ts` 已有争议处理逻辑。
+
+- [ ] **P3-5-1**: 自动争议结算后：
+  - Buyer 胜诉（交付物不合格）→ 调用 `ReputationService.recordViolation(sellerDid, { type: 'delivery_failure', deliverableId })`。
+  - Seller 胜诉（误判）→ 调用 `ReputationService.recordFalseDispute(buyerDid, ...)`（防止滥用争议）。
+  - 文件：`packages/node/src/services/reputation-service.ts`
+- [ ] **P3-5-2**: Layer 3 验收通过后自动记录正向声誉：
+  - `ReputationService.recordDelivery(sellerDid, { deliverableId, verificationLevel: 3 })`
+  - 文件同上
+- [ ] **P3-5-3**: 在 `GET /api/v1/identity/:did/reputation` 响应中增加 `deliveryStats`：
+  - `{ total, verified_l1, verified_l2, verified_l3, disputed, dispute_win_rate }`
+  - 文件：`packages/node/src/api/routes/identity.ts`
+
+#### 3.6 Phase 3 测试矩阵
+
+- [ ] `packages/protocol/test/assertion-runner.test.ts`：各 operator 断言验证
+- [ ] `packages/node/test/services/wasm-sandbox.test.ts`：WASM 执行 + 超时 + 内存限制
+- [ ] `packages/node/test/services/dispute-auto-trigger.test.ts`：Layer 1/2/3 各触发路径
+- [ ] `packages/node/test/services/sla-monitor.test.ts`：SLA 聚合 + 违约检测
+- [ ] `packages/node/test/services/reputation-delivery.test.ts`：争议结算后声誉变更
 
 ---
 
