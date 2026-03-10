@@ -50,6 +50,7 @@
   "dependencies": {
     "@claw-network/core": "workspace:^",
     "@claw-network/protocol": "workspace:^",
+    "@extism/extism": "^1.0.3",
     "@libp2p/crypto": "^5.1.13",
     "@libp2p/peer-id-factory": "^4.2.4",
     "ajv": "^8.18.0",

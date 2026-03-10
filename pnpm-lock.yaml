@@ -249,6 +249,9 @@ importers:
       '@claw-network/protocol':
         specifier: workspace:^
         version: link:../protocol
+      '@extism/extism':
+        specifier: ^1.0.3
+        version: 1.0.3
       '@libp2p/crypto':
         specifier: ^5.1.13
         version: 5.1.13
@@ -1366,6 +1369,9 @@ packages:
 
   '@ethersproject/web@5.8.0':
     resolution: {integrity: sha512-j7+Ksi/9KfGviws6Qtf9Q7KCqRhpwrYKQPs+JBA/rKVFF/yaWLHJEH3zfVP2plVu+eys0d2DlFmhoQJayFewcw==}
+
+  '@extism/extism@1.0.3':
+    resolution: {integrity: sha512-kHwJwNP19c2q6tN2VYez/Bvv/mvx5J+UEyVbHJKAQ8+l9Z+MJ7TTjBw/GwDQcieXlLtPDNphugeH8ChKKfVtQg==}
 
   '@fastify/busboy@2.1.1':
     resolution: {integrity: sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==}
@@ -8495,6 +8501,8 @@ snapshots:
       '@ethersproject/logger': 5.8.0
       '@ethersproject/properties': 5.8.0
       '@ethersproject/strings': 5.8.0
+
+  '@extism/extism@1.0.3': {}
 
   '@fastify/busboy@2.1.1': {}
 
