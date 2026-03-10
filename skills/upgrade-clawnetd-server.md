@@ -13,10 +13,10 @@ This skill describes the full procedure to upgrade the production ClawNet node r
 | **IP**              | `66.94.125.242`                           |
 | **OS**              | Ubuntu 24.04                              |
 | **Domain**          | `clawnetd.com` / `api.clawnetd.com`       |
-| **SSH**             | `ssh root@66.94.125.242` (key-based auth) |
+| **SSH**             | `ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242` |
 | **Code path**       | `/opt/clawnet`                            |
-| **Data path**       | `/var/lib/clawnet`                        |
-| **Service**         | `clawnet.service` (systemd)               |
+| **Data path**       | `/opt/clawnet/clawnetd-data`              |
+| **Service**         | `clawnetd.service` (systemd)              |
 | **API port**        | `9528` (internal, behind Caddy)           |
 | **P2P port**        | `9527` (public TCP)                       |
 | **Reverse proxy**   | Caddy → `localhost:9528`                  |
@@ -25,22 +25,26 @@ This skill describes the full procedure to upgrade the production ClawNet node r
 
 ### Systemd Service File
 
-Located at `/etc/systemd/system/clawnet.service`:
+Located at `/etc/systemd/system/clawnetd.service`:
 
 ```ini
 [Unit]
-Description=ClawNet Node
-After=network.target
+Description=ClawNet Node (clawnetd)
+After=network-online.target docker.service
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=root
 WorkingDirectory=/opt/clawnet/packages/node
-ExecStart=/usr/bin/node dist/daemon.js --data-dir /var/lib/clawnet --api-host 127.0.0.1 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527
+ExecStartPre=/usr/bin/test -f /opt/clawnet/clawnetd-data/config.yaml
+ExecStartPre=/usr/bin/grep -q '^chain:' /opt/clawnet/clawnetd-data/config.yaml
+ExecStart=/usr/bin/node dist/daemon.js --data-dir /opt/clawnet/clawnetd-data --api-host 127.0.0.1 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527 --passphrase ${CLAW_PASSPHRASE}
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
-Environment=CLAW_DATA_DIR=/var/lib/clawnet
+Environment=CLAW_DATA_DIR=/opt/clawnet/clawnetd-data
+Environment=CLAW_NETWORK=testnet
 Environment=CLAW_API_KEY=<redacted>
 Environment=CLAW_PASSPHRASE=<redacted>
 Environment=CLAW_PRIVATE_KEY=<redacted>
@@ -96,7 +100,7 @@ git log --oneline -1          # note the commit hash
 **All platforms (same SSH command):**
 
 ```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && git log --oneline -1 && systemctl is-active clawnet"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && git log --oneline -1 && systemctl is-active clawnetd"
 ```
 
 This shows the commit currently deployed and whether the service is running.
@@ -104,19 +108,19 @@ This shows the commit currently deployed and whether the service is running.
 ### Step 3: Pull latest code on the server
 
 ```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1"
 ```
 
 > **Note**: The remote on the server is set to HTTPS (`https://github.com/claw-network/clawnet.git`). If it was previously SSH and fails with "Permission denied (publickey)", fix it with:
 >
 > ```bash
-> ssh root@66.94.125.242 "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
+> ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
 > ```
 
 ### Step 4: Install dependencies (if needed)
 
 ```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && pnpm install 2>&1 | tail -5"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && pnpm install 2>&1 | tail -5"
 ```
 
 This is only needed if `package.json` or `pnpm-lock.yaml` changed. It's safe to always run — it will report "Already up to date" if nothing changed.
@@ -124,7 +128,7 @@ This is only needed if `package.json` or `pnpm-lock.yaml` changed. It's safe to 
 ### Step 5: Rebuild
 
 ```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && pnpm build 2>&1 | tail -10"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && pnpm build 2>&1 | tail -10"
 ```
 
 Verify the output shows all packages built successfully:
@@ -140,13 +144,13 @@ packages/cli build: Done
 If you encounter stale `tsbuildinfo` errors like `TS6305: Output file ... has not been built from source file`, clean and rebuild:
 
 ```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && find packages -name dist -type d -exec rm -rf {} + 2>/dev/null; find packages -name tsconfig.tsbuildinfo -delete 2>/dev/null; pnpm build 2>&1 | tail -10"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && find packages -name dist -type d -exec rm -rf {} + 2>/dev/null; find packages -name tsconfig.tsbuildinfo -delete 2>/dev/null; pnpm build 2>&1 | tail -10"
 ```
 
 ### Step 6: Restart the service
 
 ```bash
-ssh root@66.94.125.242 "systemctl restart clawnet"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "systemctl restart clawnetd"
 ```
 
 ### Step 7: Verify the upgrade
@@ -154,7 +158,7 @@ ssh root@66.94.125.242 "systemctl restart clawnet"
 Wait a few seconds for startup, then verify:
 
 ```bash
-ssh root@66.94.125.242 "sleep 3 && curl -s http://127.0.0.1:9528/api/v1/node | python3 -m json.tool"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "sleep 3 && curl -s http://127.0.0.1:9528/api/v1/node | python3 -m json.tool"
 ```
 
 Expected output (example):
@@ -196,7 +200,7 @@ curl -s https://api.clawnetd.com/api/v1/node | python3 -m json.tool
 ### Step 8: Check service logs (optional)
 
 ```bash
-ssh root@66.94.125.242 "journalctl -u clawnet --no-pager -n 20"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "journalctl -u clawnetd --no-pager -n 20"
 ```
 
 Look for the startup banner:
@@ -221,7 +225,7 @@ For a fast upgrade when you know the code is already pushed:
 **All platforms (same SSH command):**
 
 ```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm install 2>&1 | tail -3 && pnpm build 2>&1 | tail -10 && systemctl restart clawnet && sleep 3 && curl -s http://127.0.0.1:9528/api/v1/node | python3 -m json.tool"
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm install 2>&1 | tail -3 && pnpm build 2>&1 | tail -10 && systemctl restart clawnetd && sleep 3 && curl -s http://127.0.0.1:9528/api/v1/node | python3 -m json.tool"
 ```
 
 ---
@@ -232,14 +236,14 @@ ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main 2>&1 && pnpm ins
 
 ```bash
 # Check logs
-journalctl -u clawnet --no-pager -n 50
+journalctl -u clawnetd --no-pager -n 50
 
 # Check if port is in use
 ss -tlnp | grep -E '9527|9528'
 
 # Manual test run
 cd /opt/clawnet/packages/node
-CLAW_PASSPHRASE=<passphrase> node dist/daemon.js --data-dir /var/lib/clawnet --api-host 127.0.0.1 --api-port 9528
+CLAW_PASSPHRASE=<passphrase> node dist/daemon.js --data-dir /opt/clawnet/clawnetd-data --api-host 127.0.0.1 --api-port 9528
 ```
 
 ### Git pull fails with permission denied
@@ -258,6 +262,10 @@ find packages -name dist -type d -exec rm -rf {} + 2>/dev/null
 find packages -name tsconfig.tsbuildinfo -delete 2>/dev/null
 pnpm build
 ```
+
+### Service fails with "config.yaml not found" or "missing chain config"
+
+The service has two `ExecStartPre` checks that require `/opt/clawnet/clawnetd-data/config.yaml` to exist and contain a `chain:` section. If the data directory or config is missing, the service will fail before starting. Restore the config from backup or regenerate it.
 
 ### API returns old version
 
