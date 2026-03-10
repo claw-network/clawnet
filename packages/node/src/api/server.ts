@@ -10,6 +10,7 @@ import { Router } from './router.js';
 import { createCors, createErrorBoundary, requestLogger } from './middleware.js';
 import { apiKeyAuth } from './auth.js';
 import { attachWebSocketHandler } from './ws-messaging.js';
+import { attachDeliveryStreamHandler } from './ws-delivery-stream.js';
 import type { RuntimeContext, ApiServerConfig } from './types.js';
 import type { ApiKeyStore } from './api-key-store.js';
 
@@ -172,7 +173,8 @@ export class ApiServer {
       });
     });
 
-    // Attach WebSocket handler for /api/v1/messaging/subscribe
+    // Attach WebSocket handlers — delivery stream first (more specific path)
+    attachDeliveryStreamHandler(this.server, this.runtime.apiKeyStore);
     attachWebSocketHandler(
       this.server,
       () => this.runtime.messagingService,

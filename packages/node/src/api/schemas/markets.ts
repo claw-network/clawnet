@@ -149,7 +149,9 @@ export const TaskDeliverSchema = z
     notes: z.string().optional(),
     /** New delivery envelope (Phase 1 transition) */
     delivery: z.object({
-      envelope: z.record(z.unknown()),
+      envelope: z.record(z.unknown()).optional(),
+      /** Composite: multiple envelopes submitted together */
+      envelopes: z.array(z.record(z.unknown())).optional(),
     }).optional(),
   })
   .passthrough();

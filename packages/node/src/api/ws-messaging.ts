@@ -122,8 +122,7 @@ export function attachWebSocketHandler(
     }
 
     if (url.pathname !== WS_PATH) {
-      // Not our path — destroy socket so other upgrade handlers can work
-      socket.destroy();
+      // Not our path — let other upgrade handlers pick it up
       return;
     }
 

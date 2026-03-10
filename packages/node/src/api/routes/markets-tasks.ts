@@ -463,8 +463,10 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
-      // Validate delivery envelope if provided
+      // Validate delivery envelope(s) if provided
       let envelopeDigestHex: string | undefined;
+      const envelopeDigests: string[] = [];
+
       if (body.delivery?.envelope) {
         const envelope = body.delivery.envelope as unknown as DeliverableEnvelope;
         const validation = validateEnvelopeStructure(envelope);
@@ -475,8 +477,21 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
         envelopeDigestHex = computeEnvelopeDigest(body.delivery.envelope);
       }
 
+      // Composite: validate each envelope in the array
+      if (body.delivery?.envelopes && Array.isArray(body.delivery.envelopes)) {
+        for (let i = 0; i < body.delivery.envelopes.length; i++) {
+          const env = body.delivery.envelopes[i] as unknown as DeliverableEnvelope;
+          const v2 = validateEnvelopeStructure(env);
+          if (!v2.valid) {
+            badRequest(res, `Invalid delivery.envelopes[${i}]: ${v2.errors.join(', ')}`, route.url.pathname);
+            return;
+          }
+          envelopeDigests.push(computeEnvelopeDigest(body.delivery.envelopes[i] as Record<string, unknown>));
+        }
+      }
+
       // Emit deprecation warning when legacy deliverables field is used without delivery.envelope
-      if (body.deliverables !== undefined && !body.delivery?.envelope) {
+      if (body.deliverables !== undefined && !body.delivery?.envelope && !body.delivery?.envelopes) {
         console.warn('[deprecated] POST /:id/actions/deliver: "deliverables" field is deprecated — use "delivery.envelope" instead (Phase 2+)');
       }
 
@@ -517,6 +532,7 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
           submissionHash: h1,
           orderUpdateHash: h2,
           ...(envelopeDigestHex ? { envelopeDigest: envelopeDigestHex } : {}),
+          ...(envelopeDigests.length > 0 ? { envelopeDigests } : {}),
         },
         { self: `/api/v1/markets/tasks/${id}` },
       );

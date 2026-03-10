@@ -162,4 +162,51 @@ export class DeliverableVerifier {
 
     return { passed: result.passed, layer: 2, checks: [check] };
   }
+
+  /**
+   * Endpoint transport smoke test — verify that the endpoint URL is reachable.
+   *
+   * Sends a HEAD (or GET) request to `{baseUrl}/health` with SSRF guard.
+   * Returns a check result (not a full VerificationResult).
+   *
+   * @param baseUrl  The endpoint transport base URL (e.g. https://agent.example.com).
+   * @param timeoutMs  Request timeout (default: 5 000 ms).
+   */
+  async smokeTestEndpoint(
+    baseUrl: string,
+    timeoutMs = 5_000,
+  ): Promise<CheckResult> {
+    let parsed: URL;
+    try {
+      parsed = new URL('/health', baseUrl);
+    } catch {
+      return { name: 'endpointSmoke', passed: false, detail: `Invalid base URL: ${baseUrl}` };
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return { name: 'endpointSmoke', passed: false, detail: `Unsupported scheme: ${parsed.protocol}` };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch(parsed.href, {
+        method: 'HEAD',
+        signal: controller.signal,
+      });
+      const ok = resp.status >= 200 && resp.status < 400;
+      return {
+        name: 'endpointSmoke',
+        passed: ok,
+        detail: ok ? `HTTP ${resp.status}` : `HTTP ${resp.status} (non-2xx/3xx)`,
+      };
+    } catch (err) {
+      return {
+        name: 'endpointSmoke',
+        passed: false,
+        detail: (err as Error).message ?? 'Unknown error',
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }

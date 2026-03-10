@@ -272,6 +272,8 @@ export interface DeliverableEnvelope {
  */
 export interface DeliveryPayload {
   envelope?: DeliverableEnvelope;
+  /** Composite submissions: multiple envelopes in one delivery. */
+  envelopes?: DeliverableEnvelope[];
   deliverableId?: string;
   verified?: boolean;
   failureReason?: string;

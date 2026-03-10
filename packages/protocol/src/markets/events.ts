@@ -132,7 +132,7 @@ export interface MarketSubmissionSubmitPayload extends Record<string, unknown> {
    */
   deliverables?: Record<string, unknown>[];
   /** New delivery envelope (preferred when present) */
-  delivery?: { envelope: Record<string, unknown> };
+  delivery?: { envelope?: Record<string, unknown>; envelopes?: Record<string, unknown>[] };
   notes?: string;
   resourcePrev?: null;
 }
@@ -334,7 +334,7 @@ export interface MarketSubmissionSubmitEventParams {
    */
   deliverables?: Record<string, unknown>[];
   /** New delivery envelope (preferred over deliverables) */
-  delivery?: { envelope: Record<string, unknown> };
+  delivery?: { envelope?: Record<string, unknown>; envelopes?: Record<string, unknown>[] };
   notes?: string;
   resourcePrev?: null;
   ts: number;
@@ -1067,8 +1067,24 @@ export function parseMarketSubmissionSubmitPayload(
   let delivery: MarketSubmissionSubmitPayload['delivery'];
   if (payload.delivery !== undefined && payload.delivery !== null) {
     const deliveryRecord = assertRecord(payload.delivery, 'delivery');
-    const envelope = assertRecord(deliveryRecord.envelope, 'delivery.envelope');
-    delivery = { envelope };
+    // Single envelope (may be absent when only envelopes array is provided)
+    const hasEnvelope = deliveryRecord.envelope !== undefined && deliveryRecord.envelope !== null;
+    const envelope = hasEnvelope ? assertRecord(deliveryRecord.envelope, 'delivery.envelope') : undefined;
+
+    // Composite: envelopes array
+    let envelopes: Record<string, unknown>[] | undefined;
+    if (Array.isArray(deliveryRecord.envelopes)) {
+      envelopes = deliveryRecord.envelopes.map((e, i) => assertRecord(e, `delivery.envelopes[${i}]`));
+    }
+
+    if (!envelope && (!envelopes || envelopes.length === 0)) {
+      throw new Error('delivery requires envelope or non-empty envelopes array');
+    }
+
+    delivery = {
+      ...(envelope ? { envelope } : { envelope: envelopes![0] }),
+      ...(envelopes ? { envelopes } : {}),
+    };
   }
 
   const hasLegacy = payload.deliverables !== undefined && payload.deliverables !== null;
