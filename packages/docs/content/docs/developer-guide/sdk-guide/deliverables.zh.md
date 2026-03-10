@@ -7,6 +7,8 @@ description: '构建、签名、加密、交付和验证 ClawNet 各市场中的
 
 概念层面（交付物是什么、为什么需要、信任如何运作），请参阅[核心概念 → 交付物](/getting-started/core-concepts/deliverables)。
 
+> **实现状态（v0.4.0）**：Phase 1 已上线。所有市场和服务合约均支持基于信封的交付和 Layer 1 验证（完整性 + 来源证明）。旧格式通过自动包装接受，验证流程为降级模式。
+
 ## 架构概览
 
 无论来自哪个市场，ClawNet 中的每次交付都遵循同一流水线：
@@ -25,7 +27,33 @@ flowchart TD
     I --> J[P2P 广播 + 链上锚定]
 ```
 
-协议模块（`@claw-network/protocol`）提供全部类型和辅助函数。节点服务层在内部处理签名、加密和 P2P 广播——**SDK 调用方只需提供信封字段**。
+协议模块（`@claw-network/protocol`）提供全部类型和辅助函数。核心模块（`@claw-network/core`）提供底层密码学原语（签名、哈希、验证）。节点服务层在内部处理签名、加密和 P2P 广播——**SDK 调用方只需提供信封字段**。
+
+## 核心工具函数
+
+两个包提供交付物相关工具：
+
+### `@claw-network/protocol`
+
+| 函数 | 用途 |
+|------|------|
+| `buildUnsignedEnvelope(input, computeId)` | 构建完整信封（不含签名） |
+| `validateEnvelopeStructure(envelope)` | 验证所有必填字段和字段类型 |
+| `computeCompositeHash(partHashes, blake3Fn, utf8Fn)` | 计算组合交付物的确定性哈希 |
+| `wrapLegacyDeliverable(legacy, ...)` | 将旧格式记录包装为最小信封 |
+| `resolveDeliverableType(value)` | 将遗留类型字符串映射为规范类型 |
+
+### `@claw-network/core`
+
+| 函数 | 用途 |
+|------|------|
+| `computeEnvelopeId(contextId, producer, nonce, createdAt)` | 确定性 `SHA-256` ID 计算 |
+| `signDeliverable(envelope, privateKey)` | Ed25519 域前缀签名 → base58btc |
+| `verifyDeliverableSignature(envelope, signatureBase58, publicKey)` | 验证 Ed25519 签名 |
+| `envelopeDigest(envelope)` | `BLAKE3(JCS(envelope))` 用于链上锚定 |
+| `contentHash(data)` | `BLAKE3(明文)` 用于内容寻址 |
+| `canonicalDeliverableBytes(envelope)` | JCS 规范化字节（不含签名） |
+| `deliverableSigningBytes(envelope)` | 域前缀 + 规范化字节（签名输入） |
 
 ## 信封结构
 
@@ -108,6 +136,7 @@ resolveDeliverableType('integration'); // → 'code'
 
 ```ts
 import { buildUnsignedEnvelope } from '@claw-network/protocol';
+import { computeEnvelopeId } from '@claw-network/core';
 
 const envelope = buildUnsignedEnvelope(
   {
@@ -126,10 +155,7 @@ const envelope = buildUnsignedEnvelope(
       uri: 'ipfs://bafybeig...',
     },
   },
-  // ID 计算函数（对拼接字段做 SHA-256）
-  (contextId, producer, nonce, createdAt) => {
-    return sha256Hex(contextId + producer + nonce + createdAt);
-  },
+  computeEnvelopeId,  // SHA-256(contextId + producer + nonce + createdAt)
 );
 ```
 
@@ -420,22 +446,27 @@ sequenceDiagram
 
 ### 手动验证
 
-外部验证签名：
+外部验证签名，使用 core 包的 `verifyDeliverableSignature`：
 
 ```ts
-import { canonicalize } from 'json-canonicalize';  // RFC 8785
+import { verifyDeliverableSignature } from '@claw-network/core';
 
-function verifyDeliverableSignature(
-  envelope: DeliverableEnvelope,
-  publicKey: Uint8Array,
-): boolean {
-  const { signature, ...rest } = envelope;
-  const canonical = canonicalize(rest);
-  const message = `clawnet:deliverable:v1:${canonical}`;
-  const messageBytes = new TextEncoder().encode(message);
-  const sigBytes = base58btcDecode(signature);
-  return ed25519Verify(sigBytes, messageBytes, publicKey);
-}
+const isValid = await verifyDeliverableSignature(
+  envelope,              // 完整信封（内部会自动移除 signature 字段）
+  envelope.signature,    // base58btc 编码的签名
+  publicKey,             // Ed25519 公钥（Uint8Array）
+);
+```
+
+或者逐步操作以获得完全控制：
+
+```ts
+import { deliverableSigningBytes } from '@claw-network/core';
+import { verifyBase58 } from '@claw-network/core';
+
+const signingBytes = deliverableSigningBytes(envelope);
+// signingBytes = utf8("clawnet:deliverable:v1:") + JCS(envelope \ {signature})
+const isValid = await verifyBase58(envelope.signature, signingBytes, publicKey);
 ```
 
 ## 凭证交付（delivery-auth）
@@ -504,6 +535,8 @@ interface DeliveryAuthResponse {
 
 对于**端点**交付物，`BLAKE3(token) == tokenHash` 验证凭证绑定。
 
+> **Legacy 例外**：没有生产方签名的旧格式交付会被自动包装为 `legacy` 信封（`legacy: true`、`signedBy: 'node'`）。这些信封进入降级验证路径——既不自动拒绝，也不自动通过——标记为需要人工审核。
+
 ### 第二层——Schema 验证（计划中）
 
 解密后的内容结构验证：
@@ -550,6 +583,14 @@ const composite = {
 ## 链上锚定
 
 服务合约里程碑将交付证明锚定到链上：
+
+```ts
+import { envelopeDigest } from '@claw-network/core';
+
+// 计算存储在链上的摘要
+const digest = envelopeDigest(envelope);  // BLAKE3(JCS(envelope))
+// digest 是 64 字符十六进制字符串 → 智能合约中的 bytes32
+```
 
 ```
 deliverableHash = BLAKE3(JCS(envelope))    →    智能合约中的 bytes32

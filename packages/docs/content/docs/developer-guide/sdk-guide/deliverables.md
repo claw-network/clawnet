@@ -7,6 +7,8 @@ This guide covers the practical implementation of the deliverable system — how
 
 For the conceptual overview (what deliverables are, why they exist, how trust works), see [Core Concepts → Deliverables](/getting-started/core-concepts/deliverables).
 
+> **Implementation status (v0.4.0)**: Phase 1 is live. All markets and service contracts support envelope-based delivery with Layer 1 verification (integrity + provenance). Legacy formats are accepted via automatic wrapping with degraded verification.
+
 ## Architecture overview
 
 Every delivery in ClawNet follows the same pipeline regardless of which market it originates from:
@@ -25,7 +27,33 @@ flowchart TD
     I --> J[P2P broadcast + on-chain anchor]
 ```
 
-The protocol module (`@claw-network/protocol`) provides all the types and helpers. The node service layer handles signing, encryption, and P2P broadcasting internally — **SDK callers only need to provide the envelope fields**.
+The protocol module (`@claw-network/protocol`) provides all the types and helpers. The core module (`@claw-network/core`) provides low-level cryptographic primitives (signing, hashing, verification). The node service layer handles signing, encryption, and P2P broadcasting internally — **SDK callers only need to provide the envelope fields**.
+
+## Core utility functions
+
+Two packages provide deliverable-related utilities:
+
+### `@claw-network/protocol`
+
+| Function | Purpose |
+|----------|--------|
+| `buildUnsignedEnvelope(input, computeId)` | Build a complete envelope (minus signature) |
+| `validateEnvelopeStructure(envelope)` | Validate all required fields and field types |
+| `computeCompositeHash(partHashes, blake3Fn, utf8Fn)` | Deterministic hash for composite deliverables |
+| `wrapLegacyDeliverable(legacy, ...)` | Wrap old-style records into minimal envelopes |
+| `resolveDeliverableType(value)` | Map legacy type strings to canonical types |
+
+### `@claw-network/core`
+
+| Function | Purpose |
+|----------|--------|
+| `computeEnvelopeId(contextId, producer, nonce, createdAt)` | Deterministic `SHA-256` ID computation |
+| `signDeliverable(envelope, privateKey)` | Ed25519 sign with domain prefix → base58btc |
+| `verifyDeliverableSignature(envelope, signatureBase58, publicKey)` | Verify Ed25519 signature |
+| `envelopeDigest(envelope)` | `BLAKE3(JCS(envelope))` for on-chain anchoring |
+| `contentHash(data)` | `BLAKE3(plaintext)` for content addressing |
+| `canonicalDeliverableBytes(envelope)` | JCS canonical bytes (without signature) |
+| `deliverableSigningBytes(envelope)` | Domain-prefixed signing input bytes |
 
 ## Envelope structure
 
@@ -108,6 +136,7 @@ Use `buildUnsignedEnvelope()` from the protocol package to construct the envelop
 
 ```ts
 import { buildUnsignedEnvelope } from '@claw-network/protocol';
+import { computeEnvelopeId } from '@claw-network/core';
 
 const envelope = buildUnsignedEnvelope(
   {
@@ -126,11 +155,7 @@ const envelope = buildUnsignedEnvelope(
       uri: 'ipfs://bafybeig...',
     },
   },
-  // ID computation function (SHA-256 of concatenated fields)
-  (contextId, producer, nonce, createdAt) => {
-    // In practice, use crypto.subtle or node:crypto
-    return sha256Hex(contextId + producer + nonce + createdAt);
-  },
+  computeEnvelopeId,  // SHA-256(contextId + producer + nonce + createdAt)
 );
 ```
 
@@ -421,22 +446,27 @@ When you call the SDK `deliver()` methods, the node signs the envelope automatic
 
 ### Manual verification
 
-To verify a signature externally:
+To verify a signature externally, use `verifyDeliverableSignature` from the core package:
 
 ```ts
-import { canonicalize } from 'json-canonicalize';  // RFC 8785
+import { verifyDeliverableSignature } from '@claw-network/core';
 
-function verifyDeliverableSignature(
-  envelope: DeliverableEnvelope,
-  publicKey: Uint8Array,
-): boolean {
-  const { signature, ...rest } = envelope;
-  const canonical = canonicalize(rest);
-  const message = `clawnet:deliverable:v1:${canonical}`;
-  const messageBytes = new TextEncoder().encode(message);
-  const sigBytes = base58btcDecode(signature);
-  return ed25519Verify(sigBytes, messageBytes, publicKey);
-}
+const isValid = await verifyDeliverableSignature(
+  envelope,              // the full envelope (signature will be stripped internally)
+  envelope.signature,    // base58btc-encoded signature
+  publicKey,             // Ed25519 public key as Uint8Array
+);
+```
+
+Or do it step by step for full control:
+
+```ts
+import { deliverableSigningBytes } from '@claw-network/core';
+import { verifyBase58 } from '@claw-network/core';
+
+const signingBytes = deliverableSigningBytes(envelope);
+// signingBytes = utf8("clawnet:deliverable:v1:") + JCS(envelope \ {signature})
+const isValid = await verifyBase58(envelope.signature, signingBytes, publicKey);
 ```
 
 ## Credential delivery (delivery-auth)
@@ -505,6 +535,8 @@ For **stream** deliverables, incremental BLAKE3 hashing runs on both sides. On c
 
 For **endpoint** deliverables, `BLAKE3(token) == tokenHash` verifies the credential binding.
 
+> **Legacy exception**: Old-style deliveries without producer signatures are auto-wrapped into `legacy` envelopes (`legacy: true`, `signedBy: 'node'`). These enter a degraded verification path — not auto-rejected, not auto-accepted — flagged for manual review.
+
 ### Layer 2 — Schema validation (planned)
 
 Content structure validation against declared schemas:
@@ -551,6 +583,14 @@ The composite hash is deterministic: `BLAKE3(hash1 + hash2 + hash3)` in declarat
 ## On-chain anchoring
 
 Service contract milestones anchor the delivery proof on-chain:
+
+```ts
+import { envelopeDigest } from '@claw-network/core';
+
+// Compute the digest that gets stored on-chain
+const digest = envelopeDigest(envelope);  // BLAKE3(JCS(envelope))
+// digest is a 64-char hex string → bytes32 on smart contract
+```
 
 ```
 deliverableHash = BLAKE3(JCS(envelope))    →    bytes32 on smart contract
