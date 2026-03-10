@@ -271,6 +271,75 @@ class TaskDeliverResponse(TypedDict):
     txHash: str
 
 
+class DeliverableEnvelopeSchema(TypedDict, total=False):
+    """JSON Schema reference embedded in a DeliverableEnvelope."""
+    ref: str
+
+
+class DeliverableEnvelope(TypedDict, total=False):
+    """Signed deliverable envelope (Phase 2+)."""
+    contentHash: str
+    contentMimeType: str
+    contentSize: int
+    submitterDid: str
+    signature: str
+    schema: DeliverableEnvelopeSchema
+    ts: int
+
+
+class VerificationCheckResult(TypedDict, total=False):
+    """Single named verification check result."""
+    name: str
+    passed: bool
+    detail: str | None
+
+
+class VerificationResult(TypedDict, total=False):
+    """Result of one verification layer (Layer 1 or Layer 2)."""
+    passed: bool
+    layer: int  # 1 or 2
+    checks: list[VerificationCheckResult]
+    degraded: bool | None
+
+
+class DeliveryVerificationResult(TypedDict, total=False):
+    """Combined cryptographic + structural verification result."""
+    layer1: VerificationResult | None
+    layer2: VerificationResult | None
+
+
+class TaskConfirmDelivery(TypedDict, total=False):
+    """Delivery fields for on-confirm verification (Phase 2+)."""
+    envelope: DeliverableEnvelope
+    content: str  # base64-encoded plaintext for Layer 1 hash check
+
+
+class TaskConfirmParams(TypedDict, total=False):
+    """Parameters for task-market confirm (approve/reject) action."""
+    did: str
+    passphrase: str
+    orderId: str
+    submissionId: str
+    approved: bool
+    feedback: str
+    rating: float | str | None
+    revisionDeadline: int | None
+    escrowId: str | None
+    ruleId: str | None
+    delivery: TaskConfirmDelivery | None
+    nonce: int
+    prev: str | None
+    ts: int | None
+
+
+class TaskConfirmResponse(TypedDict, total=False):
+    """Response from task confirm endpoint."""
+    submissionReviewHash: str
+    escrowReleaseHash: str | None
+    orderUpdateHash: str | None
+    verificationResult: DeliveryVerificationResult | None
+
+
 # ---------------------------------------------------------------------------
 # Markets — Capability
 # ---------------------------------------------------------------------------

@@ -90,6 +90,14 @@ export class SchemaValidator {
       return { passed: true, errors: [] };
     }
 
+    // Layer 2 JSON Schema validation only applies to JSON content.
+    // Skip gracefully for other MIME types.
+    const fmt = String(envelope.format ?? '');
+    const isJson = fmt === 'application/json' || fmt === 'json' || fmt.includes('/json');
+    if (!isJson) {
+      return { passed: true, errors: [] };
+    }
+
     let validate = schemaCache.get(schemaRef);
     if (!validate) {
       const ajv = await getAjv();

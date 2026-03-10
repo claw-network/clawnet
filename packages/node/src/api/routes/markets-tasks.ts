@@ -43,7 +43,11 @@ import {
   validateEnvelopeStructure,
 } from '@claw-network/protocol';
 import type { DeliverableEnvelope } from '@claw-network/protocol';
-import { envelopeDigest as computeEnvelopeDigest } from '@claw-network/core';
+import { envelopeDigest as computeEnvelopeDigest, base64ToBytes, bytesToUtf8 } from '@claw-network/core';
+import { DeliverableVerifier } from '../../services/deliverable-verifier.js';
+
+/** Shared verifier (stateless). */
+const verifier = new DeliverableVerifier();
 
 export function marketsTaskRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -540,6 +544,39 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       const ts = body.ts ?? Date.now();
       let nonce = body.nonce;
 
+      // ── Optional delivery verification (Phase 2) ──────────────
+      let verificationResult:
+        | { layer1?: Record<string, unknown>; layer2?: Record<string, unknown> }
+        | undefined;
+      if (body.delivery?.envelope) {
+        const delivEnvelope = body.delivery.envelope as unknown as DeliverableEnvelope;
+        verificationResult = {};
+        if (body.delivery.content) {
+          let plaintext: Uint8Array;
+          try {
+            plaintext = base64ToBytes(body.delivery.content);
+          } catch {
+            badRequest(res, '"delivery.content" is not valid base64', route.url.pathname);
+            return;
+          }
+          const l1 = await verifier.verifyLayer1(delivEnvelope, plaintext);
+          verificationResult.layer1 = l1 as unknown as Record<string, unknown>;
+          if (l1.passed) {
+            try {
+              const parsed = JSON.parse(bytesToUtf8(plaintext));
+              const l2 = await verifier.verifyLayer2(delivEnvelope, parsed);
+              verificationResult.layer2 = l2 as unknown as Record<string, unknown>;
+            } catch {
+              // Non-JSON content — skip Layer 2
+            }
+          }
+        } else {
+          // Schema-only check (no content bytes)
+          const l2 = await verifier.verifyLayer2(delivEnvelope, null);
+          verificationResult.layer2 = l2 as unknown as Record<string, unknown>;
+        }
+      }
+
       const e1 = await createMarketSubmissionReviewEnvelope({
         issuer: body.did,
         privateKey,
@@ -597,7 +634,7 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
         result.orderUpdateHash = h2;
       }
 
-      ok(res, result, { self: `/api/v1/markets/tasks/${id}` });
+      ok(res, { ...result, ...(verificationResult ? { verificationResult } : {}) }, { self: `/api/v1/markets/tasks/${id}` });
     } catch (err) {
       internalError(res, (err as Error).message || 'Task confirm failed');
     }

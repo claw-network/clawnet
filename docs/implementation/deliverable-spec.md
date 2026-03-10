@@ -692,11 +692,11 @@ interface AcceptanceTest {
   - 方法：`verifyLayer2(envelope, content) → Promise<VerificationResult>`
   - `VerificationResult = { passed: boolean; layer: 1 | 2; checks: CheckResult[]; degraded?: boolean }`
   - REST 端点：`POST /api/v1/deliverables/verify`（Layer 1）、`POST /api/v1/deliverables/verify/schema`（Layer 2）
-- [ ] **P2-1-4**: 在任务市场 review 路由中调用 Layer 2 验证，结果写入 `submission.verificationResult`。
+- [x] **P2-1-4**: 在任务市场 review 路由中调用 Layer 2 验证，结果写入 `submission.verificationResult`。
   - 文件：`packages/node/src/api/routes/markets-tasks.ts`
-- [ ] **P2-1-5**: 更新 REST API schema 增加 `verificationResult` 字段。
+- [x] **P2-1-5**: 更新 REST API schema 增加 `verificationResult` 字段。
   - 文件：`packages/node/src/api/schemas/markets.ts`
-- [ ] **P2-1-6**: 在 SDK 暴露 `verificationResult` 类型。
+- [x] **P2-1-6**: 在 SDK 暴露 `verificationResult` 类型。
   - 文件：`packages/sdk/src/types.ts`
 
 #### 2.2 External transport（750 KB – 1 GB）
@@ -716,7 +716,7 @@ interface AcceptanceTest {
   - fetch 后验证 `BLAKE3(bytes) == envelope.contentHash`。
   - 文件：`packages/node/src/api/routes/deliverables.ts`
 - [x] **P2-2-4**: REST API 端点 `POST /api/v1/deliverables/fetch` + `POST /api/v1/deliverables/fetch/p2p` + `POST /api/v1/deliverables/store`（均需认证）。
-- [ ] **P2-2-5**: 单元测试（mock P2P stream + mock HTTP）。
+- [x] **P2-2-5**: 单元测试（mock P2P stream + mock HTTP）。
   - 文件：`packages/node/test/services/deliverable-verifier.test.ts`
 
 #### 2.3 Stream transport 实现
@@ -744,22 +744,22 @@ interface AcceptanceTest {
 
 #### 2.5 MIME type 完全迁移
 
-- [ ] **P2-5-1**: 信息市场旧 `ContentFormat`（`'text'`, `'json'`, `'csv'`, etc.）迁移到标准 MIME：
+- [x] **P2-5-1**: 信息市场旧 `ContentFormat`（`'text'`, `'json'`, `'csv'`, etc.）迁移到标准 MIME：
   - 在 `packages/protocol/src/markets/info-store.ts` 或迁移工具中添加 legacy-to-MIME 映射表。
   - 读取旧格式时自动转换，写入新格式时使用 MIME。
   - 映射：`'text' → 'text/plain'`, `'json' → 'application/json'`, `'csv' → 'text/csv'`, `'html' → 'text/html'`, `'pdf' → 'application/pdf'`, `'video' → 'video/mp4'`, `'audio' → 'audio/wav'`, `'image' → 'image/png'`, `'binary' → 'application/octet-stream'`
   - 文件：`packages/protocol/src/markets/info-store.ts`
 - [ ] **P2-5-2**: `parseMarketSubmissionSubmitPayload` 放宽 `deliverables` 为 optional（完成 P1-REM-1 后同步）。
   - 文件：`packages/protocol/src/markets/events.ts`
-- [ ] **P2-5-3**: OpenAPI spec 更新 `deliverables` 字段标注 `deprecated: true`。
+- [x] **P2-5-3**: OpenAPI spec 更新 `deliverables` 字段标注 `deprecated: true`。
   - 文件：`docs/api/openapi.yaml`
-- [ ] **P2-5-4**: SDK-Python types 同步（`DeliverableEnvelope` 结构）。
+- [x] **P2-5-4**: SDK-Python types 同步（`DeliverableEnvelope` 结构）。
   - 文件：`packages/sdk-python/src/clawnet/types.py`
 
 #### 2.6 Phase 2 测试矩阵
 
 - [ ] `packages/protocol/test/deliverable-schema-validator.test.ts`：JSON Schema 验证
-- [ ] `packages/node/test/services/deliverable-verifier.test.ts`：Layer 1 + Layer 2 全流程（mock 加密 + mock P2P）
+- [x] `packages/node/test/services/deliverable-verifier.test.ts`：Layer 1 + Layer 2 全流程（mock 加密 + mock P2P）
 - [ ] `packages/node/test/deliverable-stream-api.test.ts`：SSE/WS 流接收 + finalHash 验证
 - [ ] `packages/node/test/deliverable-composite.test.ts`：composite 提交 + hash 验证
 

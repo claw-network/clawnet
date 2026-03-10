@@ -165,6 +165,16 @@ export const TaskConfirmSchema = z
     revisionDeadline: z.number().optional(),
     escrowId: z.string().optional(),
     ruleId: z.string().optional(),
+    /**
+     * Optional delivery verification (Phase 2).
+     * When provided: envelope + content → Layer 1 + Layer 2.
+     * When only envelope → Layer 2 schema check only.
+     */
+    delivery: z.object({
+      envelope: z.record(z.unknown()).optional(),
+      /** Base64-encoded plaintext content for Layer 1 hash verification. */
+      content: z.string().optional(),
+    }).optional(),
   })
   .passthrough();
 

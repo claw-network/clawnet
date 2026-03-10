@@ -4780,7 +4780,7 @@ components:
 
     TaskDeliverRequest:
       type: object
-      required: [did, passphrase, orderId, deliverables, nonce]
+      required: [did, passphrase, orderId, nonce]
       properties:
         did:
           type: string
@@ -4791,10 +4791,18 @@ components:
         submissionId:
           type: string
         deliverables:
+          deprecated: true
+          description: Legacy deliverables array. Use delivery.envelope instead (Phase 2+).
           type: array
           items:
             type: object
             additionalProperties: true
+        delivery:
+          type: object
+          description: New delivery envelope (Phase 2+). Takes precedence over deliverables.
+          properties:
+            envelope:
+              $ref: '#/components/schemas/DeliverableEnvelope'
         notes:
           type: string
         nonce:
@@ -4842,6 +4850,15 @@ components:
           type: string
         ruleId:
           type: string
+        delivery:
+          type: object
+          description: Optional delivery for on-confirm verification (Phase 2+).
+          properties:
+            envelope:
+              $ref: '#/components/schemas/DeliverableEnvelope'
+            content:
+              type: string
+              description: Base64-encoded plaintext content for Layer 1 hash verification.
         nonce:
           type: integer
           minimum: 1
@@ -4860,6 +4877,8 @@ components:
           type: string
         orderUpdateHash:
           type: string
+        verificationResult:
+          $ref: '#/components/schemas/DeliveryVerificationResult'
 
     TaskReviewRequest:
       type: object
@@ -5466,6 +5485,80 @@ components:
           enum: [broadcast, pending, confirmed, failed]
         timestamp:
           type: integer
+
+    # ---- Deliverable types (Phase 2+) ----------------------------------------
+
+    DeliverableEnvelope:
+      type: object
+      description: Signed deliverable envelope as defined in the Phase 2 deliverable spec.
+      properties:
+        contentHash:
+          type: string
+          description: BLAKE3 hex hash of the content bytes.
+        contentMimeType:
+          type: string
+          description: MIME type (e.g. application/json, text/plain).
+        contentSize:
+          type: integer
+          description: Size of the content in bytes.
+        submitterDid:
+          type: string
+          description: DID of the submitting agent.
+        signature:
+          type: string
+          description: Base64url Ed25519 signature over the canonical digest.
+        schema:
+          type: object
+          description: Optional JSON Schema reference for Layer 2 structural validation.
+          properties:
+            ref:
+              type: string
+              description: URI to the JSON Schema (e.g. https://…/schema.json).
+          additionalProperties: true
+        ts:
+          type: integer
+          description: Unix timestamp (ms) of envelope creation.
+      additionalProperties: true
+
+    VerificationCheckResult:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Check name (e.g. contentHash, signature).
+        passed:
+          type: boolean
+        detail:
+          type: string
+          description: Human-readable error detail when check fails.
+      required: [name, passed]
+
+    VerificationResult:
+      type: object
+      properties:
+        passed:
+          type: boolean
+        layer:
+          type: integer
+          enum: [1, 2]
+          description: Which verification layer this result is from.
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/VerificationCheckResult'
+        degraded:
+          type: boolean
+          description: True when verification passed but signature check was skipped.
+      required: [passed, layer, checks]
+
+    DeliveryVerificationResult:
+      type: object
+      description: Combined result of Layer 1 (cryptographic) and Layer 2 (structural) verification.
+      properties:
+        layer1:
+          $ref: '#/components/schemas/VerificationResult'
+        layer2:
+          $ref: '#/components/schemas/VerificationResult'
 
   # --------------------------------------------------------------------------
   # Security Schemes (可选，用于远程访问)

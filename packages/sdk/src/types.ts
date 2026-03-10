@@ -383,6 +383,20 @@ export interface TaskDeliverParams extends EventFields {
 
 export interface TaskConfirmParams extends EventFields {
   resourcePrev?: string;
+  /** Optional delivery envelope + content for Layer 1/2 verification (Phase 2). */
+  delivery?: {
+    envelope?: DeliverableEnvelope;
+    /** Base64-encoded plaintext content for Layer 1 hash verification. */
+    content?: string;
+  };
+}
+
+export interface TaskConfirmResponse {
+  submissionReviewHash: string;
+  escrowReleaseHash?: string;
+  orderUpdateHash?: string;
+  /** Verification result when delivery.envelope was provided. */
+  verificationResult?: DeliveryVerificationResult;
 }
 
 export interface TaskReviewParams extends EventFields {
@@ -1011,4 +1025,25 @@ export interface DeliverableEnvelope {
   encryption?: DeliverableEncryption;
   schema?: DeliverableSchema;
   parts?: string[];
+}
+
+// ── Verification results (Phase 2) ─────────────────────────────
+
+export interface VerificationCheckResult {
+  name: string;
+  passed: boolean;
+  detail?: string;
+}
+
+export interface VerificationResult {
+  passed: boolean;
+  layer: 1 | 2;
+  checks: VerificationCheckResult[];
+  /** Signature check was skipped but hash passed. */
+  degraded?: boolean;
+}
+
+export interface DeliveryVerificationResult {
+  layer1?: VerificationResult;
+  layer2?: VerificationResult;
 }

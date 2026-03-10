@@ -73,6 +73,36 @@ export interface InfoOrderDeliveryLink {
   updatedAt: number;
 }
 
+// ── MIME migration helpers (P2-5-1) ────────────────────────────────
+
+/**
+ * Maps legacy info-market content format names → standard MIME types.
+ * Used to convert old stored values to the canonical CONTENT_FORMATS list.
+ * Spec: deliverable-spec.md §2.5, P2-5-1.
+ */
+export const LEGACY_FORMAT_TO_MIME: Record<string, string> = {
+  text:    'text/plain',
+  json:    'application/json',
+  csv:     'text/csv',
+  html:    'text/html',
+  pdf:     'application/pdf',
+  image:   'image/png',
+  video:   'video/mp4',
+  audio:   'audio/wav',
+  binary:  'application/octet-stream',
+  parquet: 'application/parquet',
+  mixed:   'application/octet-stream',
+};
+
+/**
+ * Normalise a content format string: converts legacy names to MIME types.
+ * Already-valid MIME types (containing '/') are returned unchanged.
+ */
+export function normalizeLegacyFormat(format: string): string {
+  if (format.includes('/')) return format;          // already MIME-style
+  return LEGACY_FORMAT_TO_MIME[format] ?? `application/octet-stream`;
+}
+
 function encodeJson(value: unknown): Uint8Array {
   return utf8ToBytes(JSON.stringify(value));
 }
