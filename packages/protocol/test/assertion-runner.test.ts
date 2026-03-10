@@ -8,7 +8,7 @@ import {
   runAcceptanceTest,
   runAcceptanceTests,
   type AcceptanceTest,
-} from '../../src/deliverables/assertion-runner.js';
+} from '../src/deliverables/assertion-runner.js';
 
 // ── resolveField ─────────────────────────────────────────────
 
