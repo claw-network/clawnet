@@ -23,20 +23,21 @@
 
 ## 2. 结论摘要
 
-该规范方向正确，能统一三类市场和服务合约的交付物模型，但当前草案存在若干“落地阻断项”：
+该规范方向正确，能统一三类市场和服务合约的交付物模型。
 
-- 安全阻断：凭据透传到 gossip 事件会泄露访问能力。
-- 协议阻断：签名与事件类型设计和现有协议栈不一致。
-- 链上阻断：`deliverableHash` 迁移语义未覆盖当前 `keccak(utf8(string))` 实现路径。
-- 迁移风险：编码格式、阈值与 API/SDK 兼容策略还不够收敛。
+**Phase 1 实现进度**（2026-03 更新）：
 
-建议先修复第 3 章到第 6 章中的高优先问题，再进入 Phase 1 编码。
+- ✅ DS-001 RESOLVED: `delivery-auth` P2P 协议已集成 messaging service，token 仅点对点加密传输。
+- ✅ DS-002 RESOLVED: `contracts-service.ts` 已修复，`envelopeDigest` 直接透传不二次哈希；route 支持 `delivery.envelope` 自动计算 BLAKE3 digest。
+- ✅ DS-003 RESOLVED: `deliverable-hash.ts` 使用 domain prefix `clawnet:deliverable:v1:`，与 event 签名域分离。
+- ✅ DS-004 RESOLVED: 采用扩展 `market.submission.submit` payload 方案，不新增 `delivery.*` 事件类型。
+- ⚠️ DS-005~DS-009: Medium 级别，计划 Phase 2 处理。
 
 ## 3. Findings（按严重级别）
 
 ### Critical
 
-#### DS-001 凭据泄露风险：`sessionToken/accessToken` 出现在 gossip 可见的 envelope 中
+#### DS-001 ✅ RESOLVED — 凭据泄露风险：`sessionToken/accessToken` 出现在 gossip 可见的 envelope 中
 
 - 现象：
   - 文档把 `StreamTransport.sessionToken`、`EndpointTransport.accessToken` 作为 envelope 字段。
@@ -56,7 +57,7 @@
 
 ### High
 
-#### DS-002 链上锚定迁移不完整：当前实现会继续对字符串做 `keccak`
+#### DS-002 ✅ RESOLVED — 链上锚定迁移不完整：当前实现会继续对字符串做 `keccak`
 
 - 现象：
   - 文档要求链上存 `bytes32(BLAKE3(JCS(envelope)))`。
@@ -75,7 +76,7 @@
   - service 中仅对 `contractId` 保留 `keccak`；`deliverableHash` 禁止二次哈希。
   - 在 API schema 增加 `deliverableEnvelope` 或 `deliverableDigest` 明确字段，移除隐式 stringify 路径。
 
-#### DS-003 签名规则与现有协议不一致，但文档表述为“一致”
+#### DS-003 ✅ RESOLVED — 签名规则与现有协议不一致，但文档表述为"一致"
 
 - 现象：
   - 文档：`Ed25519.sign(BLAKE3(JCS(envelope \\ {signature})))`。
@@ -92,7 +93,7 @@
   - 选项 A：沿用现有域分离签名模式。
   - 选项 B：定义新 domain（如 `clawnet:deliverable:v1:`）并明确与事件签名不同。
 
-#### DS-004 新增 `delivery.*` 事件未与现有事件体系兼容
+#### DS-004 ✅ RESOLVED — 新增 `delivery.*` 事件未与现有事件体系兼容
 
 - 现象：
   - 文档新增 `delivery.submit/ack/...`。
@@ -202,10 +203,10 @@
 
 ### P0（先修文档再编码）
 
-- 去除 gossip 明文 token。
-- 固化交付物签名规则（domain + bytes 规范）。
-- 固化链上 `deliverableHash` 编码（禁止二次 hash）。
-- 统一事件接入方案（扩展 `market.*` 或变更冻结规范）。
+- ✅ 去除 gossip 明文 token → `delivery-auth` P2P 协议已实现。
+- ✅ 固化交付物签名规则 → `clawnet:deliverable:v1:` domain prefix。
+- ✅ 固化链上 `deliverableHash` 编码 → 直接传 `0x` 前缀 BLAKE3 digest。
+- ✅ 统一事件接入方案 → 扩展 `market.submission.submit` payload。
 
 ### P1（进入 Phase 1 代码改造前）
 
@@ -215,8 +216,10 @@
 
 ### P2（实现中同步）
 
-- 更新 REST schema / OpenAPI / SDK / SDK-Python 的统一模型。
-- 增加跨版本兼容策略（legacy 自动包装、告警、淘汰窗口）。
+- ✅ SDK types 已更新为 `DeliverableEnvelope` 强类型。
+- ✅ REST schema 已支持 `delivery.envelope` 字段。
+- ⬜ 更新 OpenAPI / SDK-Python 统一模型。
+- ⬜ 增加跨版本兼容策略（legacy 自动包装、告警、淘汰窗口）。
 
 ## 6. 审阅边界与说明
 

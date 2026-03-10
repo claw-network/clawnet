@@ -377,8 +377,8 @@ export interface TaskDeliverParams extends EventFields {
   submission: Record<string, unknown>;
   message?: string;
   resourcePrev?: string;
-  /** New delivery envelope (Phase 1 transition) */
-  delivery?: { envelope: Record<string, unknown> };
+  /** Delivery envelope per deliverable spec v0.4.0 */
+  delivery?: { envelope: DeliverableEnvelope };
 }
 
 export interface TaskConfirmParams extends EventFields {
@@ -594,8 +594,8 @@ export interface MilestoneSubmitParams extends EventFields {
   resourcePrev?: string;
   /** Pre-computed BLAKE3(JCS(envelope)) hex — bypasses legacy keccak256 path */
   envelopeDigest?: string;
-  /** New delivery envelope (Phase 1 transition) */
-  delivery?: { envelope: Record<string, unknown> };
+  /** Delivery envelope per deliverable spec v0.4.0 */
+  delivery?: { envelope: DeliverableEnvelope };
 }
 
 export interface MilestoneApproveParams extends EventFields {
@@ -921,4 +921,94 @@ export interface DaoTxResult {
   txHash: string;
   status: string;
   [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// Deliverables
+// ---------------------------------------------------------------------------
+
+/** Deliverable types per spec v0.4.0 §3.1 */
+export type DeliverableType =
+  | 'text'
+  | 'data'
+  | 'document'
+  | 'code'
+  | 'model'
+  | 'binary'
+  | 'stream'
+  | 'interactive'
+  | 'composite';
+
+/** Content format (MIME-like) per spec §3.2 */
+export type ContentFormat =
+  | 'text/plain'
+  | 'text/markdown'
+  | 'text/html'
+  | 'application/json'
+  | 'application/xml'
+  | 'application/pdf'
+  | 'application/octet-stream'
+  | (string & {});
+
+/** Transport variants per spec §5 */
+export interface InlineTransport {
+  method: 'inline';
+  data: string;
+}
+export interface ExternalTransport {
+  method: 'external';
+  urls: string[];
+  checksumAlgorithm?: string;
+}
+export interface StreamTransport {
+  method: 'stream';
+  protocol: string;
+  peerId: string;
+  streamId: string;
+}
+export interface EndpointTransport {
+  method: 'endpoint';
+  url: string;
+  authMethod?: string;
+  tokenHash?: string;
+}
+export type DeliverableTransport =
+  | InlineTransport
+  | ExternalTransport
+  | StreamTransport
+  | EndpointTransport;
+
+/** Encryption metadata per spec §6 */
+export interface DeliverableEncryption {
+  algorithm: 'x25519-aes-256-gcm';
+  keyEnvelopes: Record<string, string>;
+  nonce: string;
+  tag: string;
+}
+
+/** Schema reference for typed deliverables */
+export interface DeliverableSchema {
+  name: string;
+  version: string;
+  hash?: string;
+}
+
+/** Full deliverable envelope per spec v0.4.0 */
+export interface DeliverableEnvelope {
+  id: string;
+  nonce: string;
+  contextId: string;
+  type: DeliverableType;
+  format: ContentFormat;
+  name: string;
+  description?: string;
+  contentHash: string;
+  size: number;
+  producer: string;
+  signature: string;
+  createdAt: string;
+  transport: DeliverableTransport;
+  encryption?: DeliverableEncryption;
+  schema?: DeliverableSchema;
+  parts?: string[];
 }

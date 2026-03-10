@@ -40,7 +40,10 @@ import {
   createInfoEscrowReleaseEnvelope,
   createInfoOrderCompletionEnvelope,
   createInfoOrderReviewEnvelope,
+  validateEnvelopeStructure,
 } from '@claw-network/protocol';
+import type { DeliverableEnvelope } from '@claw-network/protocol';
+import { envelopeDigest as computeEnvelopeDigest } from '@claw-network/core';
 
 export function marketsTaskRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -456,6 +459,18 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       return;
     }
     try {
+      // Validate delivery envelope if provided
+      let envelopeDigestHex: string | undefined;
+      if (body.delivery?.envelope) {
+        const envelope = body.delivery.envelope as unknown as DeliverableEnvelope;
+        const validation = validateEnvelopeStructure(envelope);
+        if (!validation.valid) {
+          badRequest(res, `Invalid delivery envelope: ${validation.errors.join(', ')}`, route.url.pathname);
+          return;
+        }
+        envelopeDigestHex = computeEnvelopeDigest(body.delivery.envelope);
+      }
+
       const submissionId =
         body.submissionId ?? `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const ts = body.ts ?? Date.now();
@@ -487,7 +502,12 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
 
       ok(
         res,
-        { submissionId, submissionHash: h1, orderUpdateHash: h2 },
+        {
+          submissionId,
+          submissionHash: h1,
+          orderUpdateHash: h2,
+          ...(envelopeDigestHex ? { envelopeDigest: envelopeDigestHex } : {}),
+        },
         { self: `/api/v1/markets/tasks/${id}` },
       );
     } catch (err) {

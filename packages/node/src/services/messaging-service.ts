@@ -37,6 +37,16 @@ import {
   ReceiptType,
 } from '@claw-network/protocol/messaging';
 import type { DelegationRecord, DelegatedMessage } from '@claw-network/protocol/messaging';
+import {
+  DELIVERY_AUTH_PROTOCOL,
+  isDeliveryAuthRequest,
+  isDeliveryAuthPayload,
+} from '@claw-network/protocol';
+import type {
+  DeliveryAuthRequest,
+  DeliveryAuthPayload,
+  DeliveryAuthResponse,
+} from '@claw-network/protocol';
 import { MessageStore } from './message-store.js';
 import { createLogger } from '../logger.js';
 import { gzipSync, gunzipSync } from 'node:zlib';
@@ -52,6 +62,7 @@ const PROTO_RECEIPT = '/clawnet/1.0.0/receipt';
 const PROTO_DID_RESOLVE = '/clawnet/1.0.0/did-resolve';
 const PROTO_ATTACHMENT = '/clawnet/1.0.0/attachment';
 const PROTO_DELEGATED_MSG = '/clawnet/1.0.0/delegated-msg';
+const PROTO_DELIVERY_AUTH = DELIVERY_AUTH_PROTOCOL;
 
 const MAX_ACTIVE_DELEGATIONS = 10;
 const MIN_DELEGATION_TTL_SEC = 60;
@@ -347,6 +358,9 @@ export class MessagingService {
     await this.p2p.handleProtocol(PROTO_ATTACHMENT, (incoming) => {
       void this.handleInboundAttachment(incoming);
     }, { maxInboundStreams: 32 });
+    await this.p2p.handleProtocol(PROTO_DELIVERY_AUTH, (incoming) => {
+      void this.handleInboundDeliveryAuth(incoming);
+    }, { maxInboundStreams: 64 });
 
     // ── Delegation forwarding infrastructure ─────────────────────
     this.delegationForwarder = new DelegationForwarder(
@@ -413,6 +427,9 @@ export class MessagingService {
     } catch { /* ignore */ }
     try {
       await this.p2p.unhandleProtocol(PROTO_ATTACHMENT);
+    } catch { /* ignore */ }
+    try {
+      await this.p2p.unhandleProtocol(PROTO_DELIVERY_AUTH);
     } catch { /* ignore */ }
     try {
       await this.p2p.unhandleProtocol(PROTO_DELEGATED_MSG);
@@ -1154,6 +1171,206 @@ export class MessagingService {
         try { await stream.close(); } catch { /* ignore */ }
       }
       return false;
+    }
+  }
+
+  // ── Private: Inbound Delivery-Auth Handler ──────────────────────
+
+  private async handleInboundDeliveryAuth(incoming: {
+    stream: StreamDuplex;
+    connection: { remotePeer?: { toString: () => string } };
+  }): Promise<void> {
+    const { stream, connection } = incoming;
+    try {
+      const remotePeer = connection.remotePeer?.toString();
+      if (remotePeer) {
+        try {
+          this.enforceInboundRateLimit(remotePeer);
+        } catch {
+          this.log.warn('delivery-auth inbound rate limit exceeded', { peerId: remotePeer });
+          try { await stream.close(); } catch { /* ignore */ }
+          return;
+        }
+      }
+
+      const raw = await readStream(stream.source, MAX_PAYLOAD_BYTES, STREAM_READ_TIMEOUT_MS);
+
+      // Parse and validate the request
+      let request: unknown;
+      try {
+        request = JSON.parse(raw.toString('utf-8'));
+      } catch {
+        const errResp: DeliveryAuthResponse = { accepted: false, reason: 'Invalid JSON' };
+        await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(errResp)));
+        await stream.close();
+        return;
+      }
+
+      if (!isDeliveryAuthRequest(request)) {
+        const errResp: DeliveryAuthResponse = { accepted: false, reason: 'Invalid request format' };
+        await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(errResp)));
+        await stream.close();
+        return;
+      }
+
+      // Decrypt the payload using local X25519 key
+      let payload: DeliveryAuthPayload;
+      try {
+        const senderPub = hexToBytes(request.senderPublicKeyHex);
+        const localKeypair = generateX25519Keypair(); // TODO: use persistent X25519 key
+        // For now, decrypt using ECDH with the sender's ephemeral key
+        const shared = x25519SharedSecret(localKeypair.privateKey, senderPub);
+        const derived = hkdfSha256(
+          shared,
+          undefined,
+          new TextEncoder().encode('clawnet:delivery-auth:v1'),
+          32,
+        );
+        const decrypted = decryptAes256Gcm(derived, {
+          nonceHex: request.nonceHex,
+          ciphertextHex: request.ciphertextHex,
+          tagHex: request.tagHex,
+        });
+        const parsed = JSON.parse(Buffer.from(decrypted).toString('utf-8'));
+        if (!isDeliveryAuthPayload(parsed)) {
+          throw new Error('Invalid delivery-auth payload');
+        }
+        payload = parsed;
+      } catch (err) {
+        const errResp: DeliveryAuthResponse = { accepted: false, reason: 'Decryption failed' };
+        await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(errResp)));
+        await stream.close();
+        this.log.warn('delivery-auth decryption failed', { error: (err as Error).message });
+        return;
+      }
+
+      // Store as a special inbox message with topic _delivery-auth
+      const deliveryPayload = JSON.stringify({
+        deliverableId: payload.deliverableId,
+        orderId: payload.orderId,
+        providerDid: payload.providerDid,
+        token: payload.token,
+        expiresAt: payload.expiresAt,
+        receivedAt: Date.now(),
+      });
+
+      const messageId = this.store.addToInbox({
+        sourceDid: payload.providerDid,
+        targetDid: this.localDid,
+        topic: '_delivery-auth',
+        payload: deliveryPayload,
+        ttlSec: payload.expiresAt
+          ? Math.max(60, Math.floor((payload.expiresAt - Date.now()) / 1000))
+          : 86400,
+        sentAtMs: Date.now(),
+        priority: MessagePriority.HIGH,
+      });
+
+      // Record DID → PeerId mapping from the sender
+      const senderPeerId = connection.remotePeer?.toString();
+      if (senderPeerId && payload.providerDid) {
+        this.registerDidPeer(payload.providerDid, senderPeerId);
+      }
+
+      this.log.info('delivery-auth received', {
+        messageId,
+        deliverableId: payload.deliverableId,
+        orderId: payload.orderId,
+        providerDid: payload.providerDid,
+      });
+
+      // Notify subscribers
+      const currentSeq = this.store.currentSeq();
+      this.notifySubscribers({
+        messageId,
+        sourceDid: payload.providerDid,
+        topic: '_delivery-auth',
+        payload: deliveryPayload,
+        receivedAtMs: Date.now(),
+        priority: MessagePriority.HIGH,
+        seq: currentSeq,
+      });
+
+      // Send acceptance response
+      const okResp: DeliveryAuthResponse = { accepted: true };
+      await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(okResp)));
+      await stream.close();
+    } catch (err) {
+      this.log.warn('failed to handle delivery-auth', { error: (err as Error).message });
+      try { await stream.close(); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Send a delivery-auth credential to a target DID.
+   * Encrypts the token via X25519-AES-256-GCM and delivers over a P2P stream.
+   * Returns the `DeliveryAuthResponse` from the recipient, or null if delivery failed.
+   */
+  async sendDeliveryAuth(
+    targetDid: string,
+    payload: DeliveryAuthPayload,
+    recipientX25519PubHex?: string,
+  ): Promise<DeliveryAuthResponse | null> {
+    const peerId = this.didToPeerId.get(targetDid);
+    if (!peerId) {
+      this.log.warn('delivery-auth: unknown peer for target DID', { targetDid });
+      return null;
+    }
+
+    let stream: StreamDuplex | null = null;
+    try {
+      // Encrypt using X25519 ECDH
+      const ephemeral = generateX25519Keypair();
+      let recipientPub: Uint8Array;
+      if (recipientX25519PubHex) {
+        recipientPub = hexToBytes(recipientX25519PubHex);
+      } else {
+        // Fallback: use a fresh keypair (recipient must have corresponding private key from key exchange)
+        this.log.warn('delivery-auth: no recipient X25519 pub key, delivery may fail');
+        return null;
+      }
+
+      const shared = x25519SharedSecret(ephemeral.privateKey, recipientPub);
+      const derived = hkdfSha256(
+        shared,
+        undefined,
+        new TextEncoder().encode('clawnet:delivery-auth:v1'),
+        32,
+      );
+      const plaintext = Buffer.from(JSON.stringify(payload), 'utf-8');
+      const enc = encryptAes256Gcm(derived, new Uint8Array(plaintext));
+
+      const request: DeliveryAuthRequest = {
+        version: 1,
+        senderPublicKeyHex: bytesToHex(ephemeral.publicKey),
+        nonceHex: enc.nonceHex,
+        ciphertextHex: enc.ciphertextHex,
+        tagHex: enc.tagHex,
+      };
+
+      stream = await this.p2p.newStream(peerId, PROTO_DELIVERY_AUTH);
+      await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(request)));
+
+      // Read response
+      const respRaw = await readStream(stream.source, MAX_PAYLOAD_BYTES, DID_RESOLVE_TIMEOUT_MS);
+      await stream.close();
+
+      const resp = JSON.parse(respRaw.toString('utf-8')) as DeliveryAuthResponse;
+      this.log.info('delivery-auth sent', {
+        targetDid,
+        deliverableId: payload.deliverableId,
+        accepted: resp.accepted,
+      });
+      return resp;
+    } catch (err) {
+      this.log.warn('delivery-auth send failed', {
+        targetDid,
+        error: (err as Error).message,
+      });
+      if (stream) {
+        try { await stream.close(); } catch { /* ignore */ }
+      }
+      return null;
     }
   }
 

@@ -46,6 +46,12 @@ import {
   type ContractMilestone,
 } from '@claw-network/protocol';
 import { keccak256, toUtf8Bytes } from 'ethers';
+import { envelopeDigest as computeEnvelopeDigest } from '@claw-network/core';
+import { validateEnvelopeStructure } from '@claw-network/protocol';
+import type { DeliverableEnvelope } from '@claw-network/protocol';
+import { createLogger } from '../../logger.js';
+
+const contractsLog = createLogger({ level: 'info' });
 
 /** Legacy helper: keccak256(utf8(value)) — for backward-compat when no envelopeDigest is provided. */
 function legacyHash(value: string): string {
@@ -595,8 +601,18 @@ export function contractRoutes(ctx: RuntimeContext): Router {
         if (body.envelopeDigest) {
           // New path: caller provides pre-computed BLAKE3(JCS(envelope)) hex
           digest = body.envelopeDigest;
+        } else if (body.delivery?.envelope) {
+          // Envelope path: compute BLAKE3(JCS(envelope)) from provided envelope
+          const envelope = body.delivery.envelope as unknown as DeliverableEnvelope;
+          const validation = validateEnvelopeStructure(envelope);
+          if (!validation.valid) {
+            badRequest(res, `Invalid delivery envelope: ${validation.errors.join(', ')}`, route.url.pathname);
+            return;
+          }
+          digest = computeEnvelopeDigest(body.delivery.envelope);
         } else {
           // Legacy path: hash JSON-stringified deliverables via keccak256
+          contractsLog.warn('milestone submit using deprecated legacy keccak256 hash path — migrate to envelopeDigest or delivery.envelope');
           const raw = body.deliverables
             ? JSON.stringify(body.deliverables)
             : (body.notes ?? '');
