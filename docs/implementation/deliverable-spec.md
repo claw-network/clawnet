@@ -768,9 +768,31 @@ interface AcceptanceTest {
 
 ### Phase 3 — Automation (v3)
 
-> **状态（2026-03-10）**：未开始。
+> **状态（2026-03-11）**：基础设施已完成（P3-0），功能项未开始。
 > **前置条件**：Phase 2 全部完成（特别是 P2-1-4 markets-tasks 集成、`DeliverableVerifier` 完整流水线）。
 > **注意**：`DeliverableVerifier.reportMismatch()` stub 已在 Phase 2 预留，Phase 3 直接实现自动争议触发逻辑即可。
+
+#### 3.0 Phase 3 基础设施（已完成）
+
+- [x] **P3-0-1**: 共享 SSRF 防护工具 `packages/node/src/services/ssrf-guard.ts`：
+  - 从 `deliverables.ts` 和 `schema-validator.ts` 抽取重复代码到共享模块。
+  - 新增 DNS 解析检查（`resolve4`/`resolve6`），阻断 `evil.corp → 10.0.0.1` 类 DNS 绕过。
+  - `redirect: 'manual'` + 3xx 状态拦截，阻断 302 → 内网 IP 重定向绕过。
+  - 导出：`isPrivateHost`, `assertPublicResolution`, `ssrfSafeFetch`, `ssrfSafeFetchBytes`。
+  - 消费方已迁移：`deliverables.ts`, `schema-validator.ts`, `deliverable-verifier.ts`。
+- [x] **P3-0-2**: 磁盘 blob 暂存 `packages/node/src/services/blob-stage.ts`：
+  - `createBlobWriter(deliverableId, opts)` — 基于 `FileHandle` 的追加写入，`.blob.tmp` → `.blob` rename。
+  - `startBlobSweeper(opts)` — 定期清理超 TTL（默认 24h）的暂存文件。
+  - 路径遍历防护（`safeId` 消毒）。
+  - 已集成到 `ws-delivery-stream.ts`，`DeliveryStreamOptions` 向后兼容。
+- [x] **P3-0-3**: Legacy `deliverables` 字段 Phase 3 拒绝：
+  - `events.ts` parser：`delivery.envelope`（或 `delivery.envelopes`）现为必填，纯 legacy 提交直接抛错。
+  - `markets-tasks.ts` route：请求体校验前置，缺少 `delivery.envelope` 时返回 `400 Bad Request`。
+  - 旧字段 `deliverables` 同时存在时降级为结构化日志警告（`tasksLog.warn`）。
+- [x] **P3-0-4**: Phase 3 基础设施测试：
+  - `test/services/ssrf-guard.test.ts`（30 tests）
+  - `test/services/blob-stage.test.ts`（4 tests）
+  - `test/deliverable-composite.test.ts` Phase 3 rejection 测试更新
 
 #### 3.1 AcceptanceTest 类型定义与声明式断言
 
@@ -861,6 +883,9 @@ interface AcceptanceTest {
 
 #### 3.6 Phase 3 测试矩阵
 
+- [x] `packages/node/test/services/ssrf-guard.test.ts`：共享 SSRF 防护（30 tests）
+- [x] `packages/node/test/services/blob-stage.test.ts`：磁盘 blob 暂存（4 tests）
+- [x] `packages/node/test/deliverable-composite.test.ts`：Phase 3 legacy 拒绝（updated）
 - [ ] `packages/protocol/test/assertion-runner.test.ts`：各 operator 断言验证
 - [ ] `packages/node/test/services/wasm-sandbox.test.ts`：WASM 执行 + 超时 + 内存限制
 - [ ] `packages/node/test/services/dispute-auto-trigger.test.ts`：Layer 1/2/3 各触发路径
