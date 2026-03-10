@@ -1,4 +1,5 @@
 export * from './aes.js';
+export * from './blake3-hasher.js';
 export * from './ed25519.js';
 export * from './hash.js';
 export * from './hkdf.js';

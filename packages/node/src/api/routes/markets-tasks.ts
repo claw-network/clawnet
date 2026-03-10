@@ -471,6 +471,11 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
         envelopeDigestHex = computeEnvelopeDigest(body.delivery.envelope);
       }
 
+      // Emit deprecation warning when legacy deliverables field is used without delivery.envelope
+      if (body.deliverables !== undefined && !body.delivery?.envelope) {
+        console.warn('[deprecated] POST /:id/actions/deliver: "deliverables" field is deprecated — use "delivery.envelope" instead (Phase 2+)');
+      }
+
       const submissionId =
         body.submissionId ?? `sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const ts = body.ts ?? Date.now();

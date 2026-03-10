@@ -18,6 +18,13 @@ import {
   decryptAes256Gcm,
   bytesToHex,
   hexToBytes,
+  DELIVERY_EXTERNAL_PROTOCOL,
+  encodeHeader as encodeDeliveryHeader,
+  decodeHeader as decodeDeliveryHeader,
+  isDeliveryExternalRequest,
+  type DeliveryExternalRequest,
+  type DeliveryExternalResponseHeader,
+  type DeliveryExternalNotFound,
 } from '@claw-network/core';
 import {
   encodeDirectMessageBytes,
@@ -63,6 +70,10 @@ const PROTO_DID_RESOLVE = '/clawnet/1.0.0/did-resolve';
 const PROTO_ATTACHMENT = '/clawnet/1.0.0/attachment';
 const PROTO_DELEGATED_MSG = '/clawnet/1.0.0/delegated-msg';
 const PROTO_DELIVERY_AUTH = DELIVERY_AUTH_PROTOCOL;
+const PROTO_DELIVERY_EXTERNAL = DELIVERY_EXTERNAL_PROTOCOL;
+
+/** Max content bytes for delivery-external (50 MB). */
+const MAX_DELIVERABLE_BYTES = 50 * 1024 * 1024;
 
 const MAX_ACTIVE_DELEGATIONS = 10;
 const MIN_DELEGATION_TTL_SEC = 60;
@@ -298,6 +309,8 @@ export class MessagingService {
   private readonly p2p: P2PNode;
   private readonly localDid: string;
   private readonly attachmentsDir: string;
+  /** Directory for deliverable content blobs (delivery-external protocol). */
+  private readonly deliverableDataDir: string;
   private cleanupTimer?: NodeJS.Timeout;
 
   /**
@@ -326,13 +339,15 @@ export class MessagingService {
     this.store = store;
     this.localDid = localDid;
     this.attachmentsDir = dataDir ? join(dataDir, 'attachments') : join(process.cwd(), 'data', 'attachments');
+    this.deliverableDataDir = dataDir ? join(dataDir, 'deliverables') : join(process.cwd(), 'data', 'deliverables');
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────
 
   async start(): Promise<void> {
-    // Ensure attachments directory exists
+    // Ensure attachments and deliverables directories exist
     await mkdir(this.attachmentsDir, { recursive: true });
+    await mkdir(this.deliverableDataDir, { recursive: true });
 
     // Restore persisted DID→PeerId mappings from SQLite
     for (const { did, peerId, updatedAtMs } of this.store.getAllDidPeers()) {
@@ -361,6 +376,9 @@ export class MessagingService {
     await this.p2p.handleProtocol(PROTO_DELIVERY_AUTH, (incoming) => {
       void this.handleInboundDeliveryAuth(incoming);
     }, { maxInboundStreams: 64 });
+    await this.p2p.handleProtocol(PROTO_DELIVERY_EXTERNAL, (incoming) => {
+      void this.handleInboundDeliveryExternal(incoming);
+    }, { maxInboundStreams: 16 });
 
     // ── Delegation forwarding infrastructure ─────────────────────
     this.delegationForwarder = new DelegationForwarder(
@@ -430,6 +448,9 @@ export class MessagingService {
     } catch { /* ignore */ }
     try {
       await this.p2p.unhandleProtocol(PROTO_DELIVERY_AUTH);
+    } catch { /* ignore */ }
+    try {
+      await this.p2p.unhandleProtocol(PROTO_DELIVERY_EXTERNAL);
     } catch { /* ignore */ }
     try {
       await this.p2p.unhandleProtocol(PROTO_DELEGATED_MSG);
@@ -1299,6 +1320,182 @@ export class MessagingService {
       this.log.warn('failed to handle delivery-auth', { error: (err as Error).message });
       try { await stream.close(); } catch { /* ignore */ }
     }
+  }
+
+  // ── Private: Delivery-External Protocol ───────────────────────
+
+  /**
+   * Handle an inbound delivery-external request from a remote peer.
+   * Looks up the deliverable content in `deliverableDataDir`, streams it back.
+   */
+  private async handleInboundDeliveryExternal(incoming: {
+    stream: StreamDuplex;
+    connection: { remotePeer?: { toString: () => string } };
+  }): Promise<void> {
+    const { stream, connection } = incoming;
+    try {
+      const remotePeer = connection.remotePeer?.toString();
+      if (remotePeer) {
+        try {
+          this.enforceInboundRateLimit(remotePeer);
+        } catch {
+          this.log.warn('delivery-external inbound rate limit exceeded', { peerId: remotePeer });
+          try { await stream.close(); } catch { /* ignore */ }
+          return;
+        }
+      }
+
+      // Read the JSON request (small — just an ID)
+      const raw = await readStream(stream.source, 4096, STREAM_READ_TIMEOUT_MS);
+      await stream.close();
+
+      let request: unknown;
+      try {
+        request = JSON.parse(raw.toString('utf-8'));
+      } catch {
+        this.log.warn('delivery-external: invalid JSON request');
+        return;
+      }
+
+      if (!isDeliveryExternalRequest(request)) {
+        this.log.warn('delivery-external: invalid request format', { deliverableId: (request as Record<string, unknown>)?.deliverableId });
+        return;
+      }
+
+      const req = request as DeliveryExternalRequest;
+      const filePath = join(this.deliverableDataDir, `${req.deliverableId}`);
+
+      let content: Buffer;
+      try {
+        content = await fsReadFile(filePath);
+      } catch {
+        // Not found — send not-found header
+        const notFound: DeliveryExternalNotFound = {
+          version: 1,
+          deliverableId: req.deliverableId,
+          error: 'not_found',
+        };
+        const outStream = await this.p2p.newStream(remotePeer ?? '', PROTO_DELIVERY_EXTERNAL).catch(() => null);
+        if (outStream) {
+          await writeBinaryStream(outStream.sink, encodeDeliveryHeader(notFound as unknown as Record<string, unknown>));
+          await outStream.close();
+        }
+        this.log.info('delivery-external: not found', { deliverableId: req.deliverableId });
+        return;
+      }
+
+      // Load content hash from sidecar (.hash file)
+      let contentHash = '';
+      try {
+        const hashFile = await fsReadFile(`${filePath}.hash`, 'utf-8');
+        contentHash = hashFile.trim();
+      } catch { /* hash sidecar optional */ }
+
+      const responseHdr: DeliveryExternalResponseHeader = {
+        version: 1,
+        deliverableId: req.deliverableId,
+        size: content.length,
+        contentHash,
+      };
+
+      // Open outbound stream back to requester and send header + body
+      const outPeerId = remotePeer ?? this.didToPeerId.get(req.requesterDid);
+      if (!outPeerId) {
+        this.log.warn('delivery-external: cannot send response — requester peer unknown');
+        return;
+      }
+
+      let outStream: StreamDuplex | null = null;
+      try {
+        outStream = await this.p2p.newStream(outPeerId, PROTO_DELIVERY_EXTERNAL);
+        const hdrBytes = encodeDeliveryHeader(responseHdr as unknown as Record<string, unknown>);
+        // Concatenate header + body
+        const msg = new Uint8Array(hdrBytes.length + content.length);
+        msg.set(hdrBytes, 0);
+        msg.set(content, hdrBytes.length);
+        await writeBinaryStream(outStream.sink, msg);
+        await outStream.close();
+        this.log.info('delivery-external: content sent', {
+          deliverableId: req.deliverableId,
+          size: content.length,
+          requesterDid: req.requesterDid,
+        });
+      } catch (err) {
+        this.log.warn('delivery-external: failed to send response', { error: (err as Error).message });
+        if (outStream) { try { await outStream.close(); } catch { /* ignore */ } }
+      }
+    } catch (err) {
+      this.log.warn('failed to handle delivery-external', { error: (err as Error).message });
+      try { await stream.close(); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Request deliverable content from a remote provider node via P2P.
+   * Returns the raw content bytes and the hash declared by the provider.
+   * The caller should verify `blake3Hex(bytes) === contentHash`.
+   */
+  async requestDeliverableFromPeer(
+    providerDid: string,
+    deliverableId: string,
+  ): Promise<{ bytes: Uint8Array; contentHash: string } | null> {
+    const peerId = this.didToPeerId.get(providerDid);
+    if (!peerId) {
+      this.log.warn('delivery-external: unknown peer for provider DID', { providerDid });
+      return null;
+    }
+
+    let stream: StreamDuplex | null = null;
+    try {
+      stream = await this.p2p.newStream(peerId, PROTO_DELIVERY_EXTERNAL);
+      const req: DeliveryExternalRequest = {
+        version: 1,
+        deliverableId,
+        requesterDid: this.localDid,
+      };
+      await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(req)));
+
+      // Read response (header + body together)
+      const raw = await readStream(stream.source, MAX_DELIVERABLE_BYTES + 4096, ATTACHMENT_STREAM_TIMEOUT_MS);
+      await stream.close();
+
+      const data = new Uint8Array(raw);
+      const { header, bodyOffset } = decodeDeliveryHeader<DeliveryExternalResponseHeader | DeliveryExternalNotFound>(data);
+
+      if ('error' in header && header.error === 'not_found') {
+        this.log.info('delivery-external: provider returned not_found', { deliverableId });
+        return null;
+      }
+
+      const hdr = header as DeliveryExternalResponseHeader;
+      const body = data.subarray(bodyOffset);
+
+      if (body.length !== hdr.size) {
+        throw new Error(`Delivery-external size mismatch: expected ${hdr.size} got ${body.length}`);
+      }
+
+      return { bytes: body, contentHash: hdr.contentHash };
+    } catch (err) {
+      this.log.warn('delivery-external: request failed', {
+        providerDid,
+        deliverableId,
+        error: (err as Error).message,
+      });
+      if (stream) { try { await stream.close(); } catch { /* ignore */ } }
+      return null;
+    }
+  }
+
+  /**
+   * Store deliverable content blob so it can be served via delivery-external.
+   * Creates `deliverableDataDir/<deliverableId>` + `.hash` sidecar.
+   */
+  async storeDeliverableContent(deliverableId: string, bytes: Uint8Array, contentHash: string): Promise<void> {
+    await mkdir(this.deliverableDataDir, { recursive: true });
+    const filePath = join(this.deliverableDataDir, deliverableId);
+    await writeFile(filePath, bytes);
+    await writeFile(`${filePath}.hash`, contentHash, 'utf-8');
+    this.log.info('deliverable content stored', { deliverableId, size: bytes.length });
   }
 
   /**
