@@ -166,7 +166,6 @@ export class DisputeService {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
   private hashId(id: string): string {
     // Simple deterministic hash for on-chain ID mapping
     // In production this would use keccak256

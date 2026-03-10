@@ -17,7 +17,7 @@ import type { DeliverableEnvelope } from '@claw-network/protocol';
 import { type AcceptanceTest, runAcceptanceTests, type AcceptanceTestResult } from '@claw-network/protocol';
 import { SchemaValidator } from './schema-validator.js';
 import { ssrfSafeFetch } from './ssrf-guard.js';
-import { DisputeService, type AutoDisputeResult, type DisputeReason } from './dispute-service.js';
+import { DisputeService, type DisputeReason } from './dispute-service.js';
 
 // ── Result types ─────────────────────────────────────────────────
 

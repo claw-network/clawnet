@@ -38,7 +38,6 @@ async function safeFetchSchema(uri: string): Promise<Record<string, unknown>> {
 
 // ── Schema cache ────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const schemaCache = new Map<string, AnyFn & { errors?: Array<{ instancePath?: string; message?: string }> }>();
 
 // ── Validator ────────────────────────────────────────────────────
