@@ -25,6 +25,7 @@ import {
   type DeliverableType,
   isDeliverableType,
   resolveDeliverableType,
+  type AcceptanceTest,
 } from '../deliverables/types.js';
 
 export { DELIVERABLE_TYPES, type DeliverableType, isDeliverableType, resolveDeliverableType };
@@ -113,6 +114,8 @@ export interface TaskMarketData {
   workerRequirements?: TaskWorkerRequirements;
   bidding?: TaskBiddingSettings;
   milestones?: TaskMilestone[];
+  /** Phase 3: declarative acceptance tests for automated delivery verification */
+  acceptanceTests?: AcceptanceTest[];
 }
 
 export interface TaskListing extends MarketListing {

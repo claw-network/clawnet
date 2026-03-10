@@ -264,6 +264,45 @@ export interface DeliverableEnvelope {
   signedBy?: 'producer' | 'node';
 }
 
+// ── Acceptance testing (Phase 3) ──────────────────────────
+
+export const ASSERTION_OPERATORS = ['eq', 'gt', 'lt', 'contains', 'matches'] as const;
+export type AssertionOperator = (typeof ASSERTION_OPERATORS)[number];
+
+export interface Assertion {
+  /** JSONPath expression to locate the field in the deliverable content */
+  field: string;
+  /** Comparison operator */
+  operator: AssertionOperator;
+  /** Expected value to compare against */
+  value: unknown;
+}
+
+export interface AcceptanceTest {
+  id: string;
+  name: string;
+  type: 'script' | 'assertion' | 'manual';
+  /** Content hash of the WASM test script (required when type = 'script') */
+  scriptHash?: string;
+  /** Declarative assertions (required when type = 'assertion') */
+  assertions?: Assertion[];
+  /** Whether this test must pass for the delivery to be accepted */
+  required: boolean;
+}
+
+export interface AssertionTestResult {
+  testId: string;
+  passed: boolean;
+  actual?: unknown;
+  expected?: unknown;
+  error?: string;
+}
+
+export interface AcceptanceTestResult {
+  passed: boolean;
+  results: AssertionTestResult[];
+}
+
 // ── P2P event payload extension ───────────────────────────
 
 /**

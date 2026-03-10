@@ -69,6 +69,27 @@ export interface AnchorResult {
   timestamp: number;
 }
 
+export interface DeliveryStats {
+  total: number;
+  verified_l1: number;
+  verified_l2: number;
+  verified_l3: number;
+  disputed: number;
+  disputeWinRate: number;
+}
+
+export interface DeliveryRecord {
+  deliverableId: string;
+  verificationLevel: 1 | 2 | 3;
+  timestamp: number;
+}
+
+export interface DisputeOutcome {
+  deliverableId: string;
+  won: boolean;
+  timestamp: number;
+}
+
 export interface ReviewListResult {
   reviews: ReviewItem[];
   total: number;
@@ -311,6 +332,103 @@ export class ReputationService {
       epoch,
       timestamp: Date.now(),
     };
+  }
+
+  // ========================================================================
+  // Delivery reputation tracking (Phase 3)
+  // ========================================================================
+
+  /** In-memory delivery records per DID (production would use indexer). */
+  private readonly deliveryRecords = new Map<string, DeliveryRecord[]>();
+  private readonly disputeOutcomes = new Map<string, DisputeOutcome[]>();
+
+  /**
+   * Record a successful delivery with its verification level.
+   *
+   * Called after Layer 3 verification passes (or highest achieved layer).
+   */
+  recordDelivery(
+    sellerDid: string,
+    record: { deliverableId: string; verificationLevel: 1 | 2 | 3 },
+  ): void {
+    let records = this.deliveryRecords.get(sellerDid);
+    if (!records) {
+      records = [];
+      this.deliveryRecords.set(sellerDid, records);
+    }
+    records.push({
+      deliverableId: record.deliverableId,
+      verificationLevel: record.verificationLevel,
+      timestamp: Date.now(),
+    });
+
+    this.log.info(
+      'Delivery recorded: seller=%s deliverable=%s level=%d',
+      sellerDid,
+      record.deliverableId,
+      record.verificationLevel,
+    );
+  }
+
+  /**
+   * Record a delivery violation (buyer wins dispute).
+   */
+  recordViolation(
+    sellerDid: string,
+    opts: { type: string; deliverableId: string },
+  ): void {
+    let outcomes = this.disputeOutcomes.get(sellerDid);
+    if (!outcomes) {
+      outcomes = [];
+      this.disputeOutcomes.set(sellerDid, outcomes);
+    }
+    outcomes.push({ deliverableId: opts.deliverableId, won: false, timestamp: Date.now() });
+
+    this.log.warn(
+      'Delivery violation: seller=%s type=%s deliverable=%s',
+      sellerDid,
+      opts.type,
+      opts.deliverableId,
+    );
+  }
+
+  /**
+   * Record a false dispute (seller wins, buyer penalized).
+   */
+  recordFalseDispute(
+    buyerDid: string,
+    opts: { deliverableId: string },
+  ): void {
+    let outcomes = this.disputeOutcomes.get(buyerDid);
+    if (!outcomes) {
+      outcomes = [];
+      this.disputeOutcomes.set(buyerDid, outcomes);
+    }
+    outcomes.push({ deliverableId: opts.deliverableId, won: true, timestamp: Date.now() });
+
+    this.log.warn(
+      'False dispute recorded: buyer=%s deliverable=%s',
+      buyerDid,
+      opts.deliverableId,
+    );
+  }
+
+  /**
+   * Get delivery statistics for a DID.
+   */
+  getDeliveryStats(did: string): DeliveryStats {
+    const records = this.deliveryRecords.get(did) ?? [];
+    const outcomes = this.disputeOutcomes.get(did) ?? [];
+
+    const total = records.length;
+    const verified_l1 = records.filter(r => r.verificationLevel >= 1).length;
+    const verified_l2 = records.filter(r => r.verificationLevel >= 2).length;
+    const verified_l3 = records.filter(r => r.verificationLevel >= 3).length;
+    const disputed = outcomes.length;
+    const wins = outcomes.filter(o => o.won).length;
+    const disputeWinRate = disputed > 0 ? wins / disputed : 0;
+
+    return { total, verified_l1, verified_l2, verified_l3, disputed, disputeWinRate };
   }
 
   // ========================================================================

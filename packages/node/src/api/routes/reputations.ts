@@ -31,6 +31,7 @@ export function reputationRoutes(ctx: RuntimeContext): Router {
         const profile = await ctx.reputationService.getProfile(did);
         if (profile) {
           const p = profile as unknown as Record<string, unknown>;
+          const deliveryStats = ctx.reputationService.getDeliveryStats(did);
           ok(res, {
             did,
             score: p.score ?? p.overallScore ?? 0,
@@ -39,6 +40,7 @@ export function reputationRoutes(ctx: RuntimeContext): Router {
             epoch: (profile as unknown as Record<string, unknown>).epoch ?? 0,
             merkleRoot: (profile as unknown as Record<string, unknown>).merkleRoot ?? '',
             timestamp: (profile as unknown as Record<string, unknown>).timestamp ?? Date.now(),
+            deliveryStats,
           }, { self: `/api/v1/reputations/${did}` });
           return;
         }

@@ -191,6 +191,30 @@ export const TaskReviewSchema = z
   })
   .passthrough();
 
+export const TaskVerifySchema = z
+  .object({
+    /** Delivery envelope to verify */
+    envelope: z.record(z.unknown()),
+    /** Base64-encoded plaintext content for Layer 1 hash verification */
+    content: z.string(),
+    /** Skip Ed25519 signature check */
+    skipSignature: z.boolean().optional(),
+    /** Buyer-declared acceptance tests for Layer 3 */
+    acceptanceTests: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      type: z.enum(['script', 'assertion', 'manual']),
+      scriptHash: z.string().optional(),
+      assertions: z.array(z.object({
+        field: z.string(),
+        operator: z.enum(['eq', 'gt', 'lt', 'contains', 'matches']),
+        value: z.unknown(),
+      })).optional(),
+      required: z.boolean(),
+    })).optional(),
+  })
+  .passthrough();
+
 // ─── Capability Market ──────────────────────────────────────────
 
 export const CapabilityPublishSchema = z

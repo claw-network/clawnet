@@ -14,8 +14,10 @@ import {
   type DeliverableEnvelopeRecord,
 } from '@claw-network/core';
 import type { DeliverableEnvelope } from '@claw-network/protocol';
+import { type AcceptanceTest, runAcceptanceTests, type AcceptanceTestResult } from '@claw-network/protocol';
 import { SchemaValidator } from './schema-validator.js';
 import { ssrfSafeFetch } from './ssrf-guard.js';
+import { DisputeService, type AutoDisputeResult, type DisputeReason } from './dispute-service.js';
 
 // ── Result types ─────────────────────────────────────────────────
 
@@ -27,10 +29,20 @@ export interface CheckResult {
 
 export interface VerificationResult {
   passed: boolean;
-  layer: 1 | 2;
+  layer: 1 | 2 | 3;
   checks: CheckResult[];
   /** True when signature check was skipped (key unavailable) but hash passed. */
   degraded?: boolean;
+  /** Layer 3 acceptance test details (only present for layer 3). */
+  acceptanceTestResult?: AcceptanceTestResult;
+}
+
+/** Combined result from verifyAll (Layer 1 → 2 → 3). */
+export interface FullVerificationResult {
+  passed: boolean;
+  layer1: VerificationResult;
+  layer2?: VerificationResult;
+  layer3?: VerificationResult;
 }
 
 // ── Mismatch report (Phase 3 hook) ───────────────────────────────
@@ -46,6 +58,11 @@ export interface MismatchReport {
 
 export class DeliverableVerifier {
   private readonly schemaValidator = new SchemaValidator();
+  private readonly disputeService?: DisputeService;
+
+  constructor(opts?: { disputeService?: DisputeService }) {
+    this.disputeService = opts?.disputeService;
+  }
   /**
    * Layer 1 verification:
    *  - check BLAKE3(plaintext) === envelope.contentHash
@@ -125,16 +142,34 @@ export class DeliverableVerifier {
   }
 
   /**
-   * Report a content mismatch (Phase 3 hook — stub for now).
-   * In Phase 3 this will emit an on-chain dispute event.
+   * Report a content mismatch and trigger auto-dispute if DisputeService is available.
+   *
+   * Returns a MismatchReport for backward compat. If DisputeService is wired,
+   * also opens an on-chain dispute asynchronously.
    */
-  reportMismatch(orderId: string, deliverableId: string, reason: string): MismatchReport {
-    return {
+  reportMismatch(
+    orderId: string,
+    deliverableId: string,
+    reason: string,
+  ): MismatchReport {
+    const report: MismatchReport = {
       orderId,
       deliverableId,
       reason,
       reportedAtMs: Date.now(),
     };
+
+    // Fire auto-dispute asynchronously (non-blocking)
+    if (this.disputeService) {
+      void this.disputeService.autoOpenDispute(
+        orderId,
+        deliverableId,
+        'content_hash_mismatch' as DisputeReason,
+        { details: reason },
+      );
+    }
+
+    return report;
   }
 
   /**
@@ -162,6 +197,81 @@ export class DeliverableVerifier {
     };
 
     return { passed: result.passed, layer: 2, checks: [check] };
+  }
+
+  /**
+   * Layer 3 verification: acceptance test assertions.
+   *
+   * Runs declarative assertions (JSONPath + operator) against the parsed content.
+   * Only evaluates tests of type 'assertion'; 'script' and 'manual' tests
+   * produce an automatic skip/fail result.
+   *
+   * @param tests   AcceptanceTest array declared by the buyer.
+   * @param content Parsed JSON value (the deliverable content).
+   */
+  verifyLayer3(
+    tests: AcceptanceTest[],
+    content: unknown,
+  ): VerificationResult {
+    if (tests.length === 0) {
+      return { passed: true, layer: 3, checks: [{ name: 'acceptanceTests', passed: true, detail: 'no tests declared' }] };
+    }
+
+    const result = runAcceptanceTests(tests, content);
+    const detail = result.passed
+      ? `${result.results.length} assertion(s) passed`
+      : `${result.results.filter(r => !r.passed).length}/${result.results.length} assertion(s) failed`;
+
+    return {
+      passed: result.passed,
+      layer: 3,
+      checks: [{ name: 'acceptanceTests', passed: result.passed, detail }],
+      acceptanceTestResult: result,
+    };
+  }
+
+  /**
+   * Full verification pipeline: Layer 1 → Layer 2 → Layer 3.
+   *
+   * Stops at the first failing layer (unless `runAll` is true).
+   *
+   * @param envelope      The signed DeliverableEnvelope.
+   * @param plaintext     Decrypted content bytes.
+   * @param opts.skipSignature  Skip Ed25519 signature verification.
+   * @param opts.acceptanceTests  Buyer-declared acceptance tests for Layer 3.
+   */
+  async verifyAll(
+    envelope: DeliverableEnvelope | DeliverableEnvelopeRecord,
+    plaintext: Uint8Array,
+    opts: {
+      skipSignature?: boolean;
+      acceptanceTests?: AcceptanceTest[];
+    } = {},
+  ): Promise<FullVerificationResult> {
+    const l1 = await this.verifyLayer1(envelope, plaintext, { skipSignature: opts.skipSignature });
+    if (!l1.passed) {
+      return { passed: false, layer1: l1 };
+    }
+
+    let l2: VerificationResult | undefined;
+    try {
+      const parsed = JSON.parse(new TextDecoder().decode(plaintext));
+      l2 = await this.verifyLayer2(envelope, parsed);
+
+      if (!l2.passed) {
+        return { passed: false, layer1: l1, layer2: l2 };
+      }
+
+      // Layer 3
+      if (opts.acceptanceTests && opts.acceptanceTests.length > 0) {
+        const l3 = this.verifyLayer3(opts.acceptanceTests, parsed);
+        return { passed: l3.passed, layer1: l1, layer2: l2, layer3: l3 };
+      }
+    } catch {
+      // Non-JSON content — skip Layer 2 and Layer 3
+    }
+
+    return { passed: true, layer1: l1, ...(l2 ? { layer2: l2 } : {}) };
   }
 
   /**

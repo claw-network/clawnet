@@ -30,6 +30,10 @@ import {
   createMarketCapabilityLeaseTerminateEnvelope,
   createMarketListingRemoveEnvelope,
 } from '@claw-network/protocol';
+import { SlaMonitor } from '../../services/sla-monitor.js';
+
+/** Shared SLA monitor instance for capability leases. */
+const slaMonitor = new SlaMonitor();
 
 export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -549,6 +553,28 @@ export function marketsCapabilityRoutes(ctx: RuntimeContext): Router {
     } catch (err) {
       internalError(res, (err as Error).message || 'Lease terminate failed');
     }
+  });
+
+  // ── GET /leases/:leaseId/sla ──────────────────────────────────
+  r.get('/leases/:leaseId/sla', async (_req, res, route) => {
+    const { leaseId } = route.params;
+    const metrics = slaMonitor.getMetrics(leaseId);
+    if (!metrics) {
+      ok(res, {
+        leaseId,
+        totalCalls: 0,
+        successfulCalls: 0,
+        failedCalls: 0,
+        successRate: 1,
+        p50Latency: 0,
+        p95Latency: 0,
+        p99Latency: 0,
+      }, { self: `/api/v1/markets/capabilities/leases/${leaseId}/sla` });
+      return;
+    }
+    // Strip raw latencies array to keep response compact
+    const { latencies: _, ...rest } = metrics;
+    ok(res, rest, { self: `/api/v1/markets/capabilities/leases/${leaseId}/sla` });
   });
 
   return r;

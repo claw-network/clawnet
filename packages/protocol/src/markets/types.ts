@@ -1,4 +1,4 @@
-import type { DeliverableEnvelope, DeliveryPayload } from '../deliverables/types.js';
+import type { DeliverableEnvelope, DeliveryPayload, AcceptanceTest } from '../deliverables/types.js';
 
 export type TokenAmount = string;
 
@@ -325,6 +325,8 @@ export interface Order {
   dispute?: OrderDisputeRef;
   messages: OrderMessage[];
   metadata: Record<string, unknown>;
+  /** Phase 3: buyer-declared acceptance tests for automated verification (Layer 3) */
+  acceptanceTests?: AcceptanceTest[];
 }
 
 export interface MarketSubscription {

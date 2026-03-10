@@ -21,6 +21,7 @@ import {
   TaskDeliverSchema,
   TaskConfirmSchema,
   TaskReviewSchema,
+  TaskVerifySchema,
 } from '../schemas/markets.js';
 import type { RuntimeContext } from '../types.js';
 import { resolvePrivateKey, addressFromDid } from '../types.js';
@@ -43,6 +44,7 @@ import {
   validateEnvelopeStructure,
 } from '@claw-network/protocol';
 import type { DeliverableEnvelope } from '@claw-network/protocol';
+import type { AcceptanceTest } from '@claw-network/protocol';
 import { envelopeDigest as computeEnvelopeDigest, base64ToBytes, bytesToUtf8 } from '@claw-network/core';
 import { DeliverableVerifier } from '../../services/deliverable-verifier.js';
 import { createLogger } from '../../logger.js';
@@ -662,6 +664,48 @@ export function marketsTaskRoutes(ctx: RuntimeContext): Router {
       ok(res, { ...result, ...(verificationResult ? { verificationResult } : {}) }, { self: `/api/v1/markets/tasks/${id}` });
     } catch (err) {
       internalError(res, (err as Error).message || 'Task confirm failed');
+    }
+  });
+
+  // ── POST /:id/submissions/:submissionId/verify ────────────────
+  r.post('/:id/submissions/:submissionId/verify', async (_req, res, route) => {
+    const { id, submissionId } = route.params;
+    const v = validate(TaskVerifySchema, route.body);
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
+    const body = v.data;
+
+    try {
+      const envelope = body.envelope as unknown as DeliverableEnvelope;
+      let plaintext: Uint8Array;
+      try {
+        plaintext = base64ToBytes(body.content);
+      } catch {
+        badRequest(res, '"content" is not valid base64', route.url.pathname);
+        return;
+      }
+
+      const fullResult = await verifier.verifyAll(envelope, plaintext, {
+        skipSignature: body.skipSignature,
+        acceptanceTests: body.acceptanceTests as AcceptanceTest[] | undefined,
+      });
+
+      ok(
+        res,
+        {
+          orderId: id,
+          submissionId,
+          passed: fullResult.passed,
+          layer1: fullResult.layer1,
+          ...(fullResult.layer2 ? { layer2: fullResult.layer2 } : {}),
+          ...(fullResult.layer3 ? { layer3: fullResult.layer3 } : {}),
+        },
+        { self: `/api/v1/markets/tasks/${id}/submissions/${submissionId}/verify` },
+      );
+    } catch (err) {
+      internalError(res, (err as Error).message || 'Verification failed');
     }
   });
 
