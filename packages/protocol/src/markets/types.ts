@@ -396,8 +396,11 @@ export interface TaskSubmission {
   id: string;
   orderId: string;
   worker: string;
-  /** Legacy deliverables (Phase 1 transition — kept for backward compat) */
-  deliverables: Record<string, unknown>[];
+  /**
+   * Legacy deliverables (Phase 1 transition — optional when `delivery` is present).
+   * Phase 2: parser relaxes this to optional; Phase 3: removed.
+   */
+  deliverables?: Record<string, unknown>[];
   /** Typed deliverable envelopes (new format, preferred when present) */
   delivery?: DeliveryPayload;
   notes?: string;

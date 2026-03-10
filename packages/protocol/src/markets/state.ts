@@ -11,6 +11,7 @@ import {
   MarketSubscription,
   MarketDispute,
 } from './types.js';
+import type { DeliveryPayload } from '../deliverables/types.js';
 import {
   MarketListingPublishPayload,
   MarketListingUpdatePayload,
@@ -379,7 +380,8 @@ function applySubmissionSubmit(
     id: payload.submissionId,
     orderId: payload.orderId,
     worker: payload.worker,
-    deliverables: payload.deliverables,
+    ...(payload.deliverables !== undefined ? { deliverables: payload.deliverables } : {}),
+    ...(payload.delivery !== undefined ? { delivery: payload.delivery as unknown as DeliveryPayload } : {}),
     notes: payload.notes,
     status: 'pending_review',
     submittedAt: ts,

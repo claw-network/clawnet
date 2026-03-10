@@ -638,27 +638,20 @@ interface AcceptanceTest {
 
 ### Phase 1 — MVP (v1): Integrity + Provenance
 
-> **状态（2026-03-10）**：8/10 项完成，剩余 2 项为协议类型迁移。
+> **状态（2026-03-10）**：10/10 项全部完成。
 
 | # | 任务 | 文件 | 状态 |
 |---|------|------|------|
 | 1 | 定义 `DeliverableEnvelope` 类型 | `packages/protocol/src/deliverables/types.ts` | ✅ |
 | 2 | 统一 `DeliverableType` 枚举（9 种）+ migration alias | `packages/protocol/src/deliverables/types.ts` | ✅ |
 | 3 | 实现 envelope 签名和验证（域前缀 `clawnet:deliverable:v1:`） | `packages/core/src/protocol/deliverable-hash.ts` | ✅ |
-| 4 | 改造 `TaskSubmission.deliverables` → `DeliverableEnvelope[]` | `packages/protocol/src/markets/types.ts:399` | ❌ |
-| 5 | 改造 `ContractMilestoneSubmission.deliverables` 同上 | `packages/protocol/src/contracts/types.ts:46` | ❌ |
+| 4 | 改造 `TaskSubmission.deliverables` → optional，parser 接受 `delivery.envelope` 替代 | `packages/protocol/src/markets/types.ts`, `events.ts`, `state.ts` | ✅ |
+| 5 | 改造 `ContractMilestoneSubmission.deliverables` → optional | `packages/protocol/src/contracts/types.ts` | ✅ |
 | 6 | 更新链下 `submitMilestone`：消除二次哈希 | `packages/node/src/services/contracts-service.ts:325` | ✅ |
 | 7 | `InfoDeliveryRecord` 增加 `envelopeHash`，MIME type migration | `packages/protocol/src/markets/info-store.ts:63` | ✅ (partial: `envelopeHash` 已加，MIME 迁移未完成) |
 | 8 | 更新 SDK types + REST API schemas | `packages/sdk/src/types.ts`, `packages/node/src/api/schemas/` | ✅ |
 | 9 | 扩展 `market.submission.submit` / `market.submission.review` payload | `packages/node/src/api/routes/markets-tasks.ts:465` | ✅ |
 | 10 | 实现点对点令牌下发协议 `/clawnet/1.0.0/delivery-auth` | `packages/node/src/services/messaging-service.ts:1177` | ✅ |
-
-**剩余任务（Phase 1 收尾）**：
-
-- [ ] **P1-REM-1**: 将 `TaskSubmission.deliverables` 从 `Record<string, unknown>[]` 改为 `DeliverableEnvelope[] | Record<string, unknown>[]`（discriminated union 过渡），并在 `markets/events.ts` 的 `parseMarketSubmissionSubmitPayload` 中放宽 `deliverables` 为 optional（有 `delivery.envelope` 时不强制）。
-  - 文件：`packages/protocol/src/markets/types.ts`, `packages/protocol/src/markets/events.ts`
-- [ ] **P1-REM-2**: 同步 `ContractMilestoneSubmission.deliverables` 改为 optional。
-  - 文件：`packages/protocol/src/contracts/types.ts`
 
 ---
 

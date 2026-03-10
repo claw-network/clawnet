@@ -144,7 +144,8 @@ export const TaskDeliverSchema = z
     ...SignedRequestBase,
     orderId: z.string().min(1),
     submissionId: z.string().optional(),
-    deliverables: z.array(z.record(z.unknown())),
+    /** Legacy deliverables (optional when delivery.envelope is provided) */
+    deliverables: z.array(z.record(z.unknown())).optional(),
     notes: z.string().optional(),
     /** New delivery envelope (Phase 1 transition) */
     delivery: z.object({

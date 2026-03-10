@@ -126,8 +126,11 @@ export interface MarketSubmissionSubmitPayload extends Record<string, unknown> {
   orderId: string;
   submissionId: string;
   worker: string;
-  /** Legacy deliverables (Phase 1 transition — required for old parser compat) */
-  deliverables: Record<string, unknown>[];
+  /**
+   * Legacy deliverables (Phase 1 transition — optional when `delivery.envelope` is present).
+   * Phase 2: parser relaxes this to optional; Phase 3: removed.
+   */
+  deliverables?: Record<string, unknown>[];
   /** New delivery envelope (preferred when present) */
   delivery?: { envelope: Record<string, unknown> };
   notes?: string;
@@ -325,7 +328,13 @@ export interface MarketSubmissionSubmitEventParams {
   orderId: string;
   submissionId: string;
   workerDid?: string;
-  deliverables: Record<string, unknown>[];
+  /**
+   * Legacy deliverables. Optional when `delivery.envelope` is provided.
+   * New callers should pass `delivery` instead.
+   */
+  deliverables?: Record<string, unknown>[];
+  /** New delivery envelope (preferred over deliverables) */
+  delivery?: { envelope: Record<string, unknown> };
   notes?: string;
   resourcePrev?: null;
   ts: number;
@@ -1000,6 +1009,7 @@ function parseBidProposal(value: unknown): MarketBidSubmitPayload['proposal'] {
 }
 
 function parseSubmissionDeliverables(value: unknown): Record<string, unknown>[] {
+  if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) {
     throw new Error('deliverables must be an array');
   }
@@ -1048,13 +1058,12 @@ export function parseMarketSubmissionSubmitPayload(
   requireNonEmpty(submissionId, 'submissionId');
   const worker = String(payload.worker ?? '');
   assertValidDid(worker, 'worker');
-  const deliverables = parseSubmissionDeliverables(payload.deliverables);
   const notes = typeof payload.notes === 'string' ? payload.notes : undefined;
   if (payload.resourcePrev !== undefined && payload.resourcePrev !== null) {
     throw new Error('resourcePrev must be null for submission submit');
   }
 
-  // Phase 1 transition: pass through delivery envelope when present
+  // Phase 2+: delivery.envelope replaces deliverables — both optional, at least one required.
   let delivery: MarketSubmissionSubmitPayload['delivery'];
   if (payload.delivery !== undefined && payload.delivery !== null) {
     const deliveryRecord = assertRecord(payload.delivery, 'delivery');
@@ -1062,11 +1071,17 @@ export function parseMarketSubmissionSubmitPayload(
     delivery = { envelope };
   }
 
+  const hasLegacy = payload.deliverables !== undefined && payload.deliverables !== null;
+  if (!delivery && !hasLegacy) {
+    throw new Error('either deliverables or delivery.envelope is required');
+  }
+  const deliverables = hasLegacy ? parseSubmissionDeliverables(payload.deliverables) : undefined;
+
   return {
     orderId,
     submissionId,
     worker,
-    deliverables,
+    ...(deliverables !== undefined ? { deliverables } : {}),
     delivery,
     notes,
     resourcePrev: undefined,
@@ -1576,7 +1591,8 @@ export async function createMarketSubmissionSubmitEnvelope(
     orderId: params.orderId,
     submissionId: params.submissionId,
     worker: workerDid,
-    deliverables: params.deliverables,
+    ...(params.deliverables !== undefined ? { deliverables: params.deliverables } : {}),
+    ...(params.delivery !== undefined ? { delivery: params.delivery } : {}),
     notes: params.notes,
     resourcePrev: params.resourcePrev,
   });
