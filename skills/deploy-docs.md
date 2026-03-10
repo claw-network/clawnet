@@ -13,7 +13,7 @@ This skill describes the full procedure to edit, build, commit, push, and deploy
 | **IP** | `66.94.125.242` |
 | **OS** | Ubuntu 24.04 |
 | **Domain** | `docs.clawnetd.com` |
-| **SSH alias** | `clawnet-geth-a` (configured in `~/.ssh/config`) |
+| **SSH command** | `ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242` |
 | **SSH key** | `~/.ssh/id_ed25519_clawnet` |
 | **Code path** | `/opt/clawnet` |
 | **Docs source** | `/opt/clawnet/packages/docs` |
@@ -93,14 +93,24 @@ packages/docs/
 │   │       ├── identity.md / .zh.md
 │   │       ├── wallet.md / .zh.md
 │   │       ├── markets.md / .zh.md
+│   │       ├── deliverables.md / .zh.md
 │   │       ├── service-contracts.md / .zh.md
 │   │       ├── smart-contracts.md / .zh.md
 │   │       ├── reputation.md / .zh.md
 │   │       └── dao.md / .zh.md
-│   ├── developer-guide/                  # API reference, SDK, etc.
+│   ├── developer-guide/                  # API reference, SDK guide, etc.
+│   │   ├── meta.json / meta.zh.json
+│   │   └── sdk-guide/                    # Per-module SDK usage guides
+│   │       ├── meta.json / meta.zh.json
+│   │       ├── index.md / .zh.md         # SDK overview
+│   │       ├── identity.md / .zh.md
+│   │       ├── wallet.md / .zh.md
+│   │       ├── markets.md / .zh.md
+│   │       ├── deliverables.md / .zh.md
+│   │       ├── contracts.md / .zh.md
+│   │       └── error-handling.md / .zh.md
+│   ├── protocol/                         # Protocol specs (identity, wallet, markets, etc.)
 │   ├── business-economics/               # Economics, DAO proposals
-│   ├── implementation-specs/             # Protocol spec, security, etc.
-│   ├── implementation-tasks/             # Rollout tasks
 │   └── event-schemas/                    # Event schema docs
 ├── app/
 │   ├── [lang]/
@@ -123,7 +133,7 @@ packages/docs/
 
 ## Prerequisites
 
-1. SSH alias `clawnet-geth-a` is configured in `~/.ssh/config` pointing to `root@66.94.125.242` with key `~/.ssh/id_ed25519_clawnet`
+1. SSH key `~/.ssh/id_ed25519_clawnet` exists and can connect to `root@66.94.125.242`
 2. Local repo is on the `main` branch with a clean working tree
 3. pnpm v10 and Node.js v20+ available locally
 
@@ -214,7 +224,8 @@ git push --no-verify origin main
 **Standard deploy (single command):**
 
 ```bash
-ssh clawnet-geth-a "cd /opt/clawnet && git pull origin main && pnpm --filter docs build && systemctl restart clawnet-docs"
+SSH_HOST="ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242"
+$SSH_HOST "cd /opt/clawnet && git pull origin main && pnpm --filter docs build && systemctl restart clawnet-docs"
 ```
 
 This command:
@@ -225,7 +236,7 @@ This command:
 **If `pnpm-lock.yaml` changed (dependency update):**
 
 ```bash
-ssh clawnet-geth-a "cd /opt/clawnet && git pull origin main && pnpm install && pnpm --filter docs build && systemctl restart clawnet-docs"
+$SSH_HOST "cd /opt/clawnet && git pull origin main && pnpm install && pnpm --filter docs build && systemctl restart clawnet-docs"
 ```
 
 ### Step 6: Verify
@@ -267,7 +278,7 @@ Expected: `HTTP/2 308` with `location: /<path>` (permanent redirect from old `/d
 For a fast deploy when code is already pushed:
 
 ```bash
-ssh clawnet-geth-a "cd /opt/clawnet && git pull origin main && pnpm --filter docs build && systemctl restart clawnet-docs" && echo "--- Deployed ---" && curl -sI https://docs.clawnetd.com/ | head -3
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && git pull origin main && pnpm --filter docs build && systemctl restart clawnet-docs" && echo "--- Deployed ---" && curl -sI https://docs.clawnetd.com/ | head -3
 ```
 
 ---
@@ -328,45 +339,46 @@ head -10 packages/docs/content/docs/path/to/file.md
 ### Service won't start
 
 ```bash
-ssh clawnet-geth-a "systemctl status clawnet-docs"
-ssh clawnet-geth-a "journalctl -u clawnet-docs --no-pager -n 30"
+SSH_HOST="ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242"
+$SSH_HOST "systemctl status clawnet-docs"
+$SSH_HOST "journalctl -u clawnet-docs --no-pager -n 30"
 
 # Check if port 3001 is already in use
-ssh clawnet-geth-a "ss -tlnp | grep 3001"
+$SSH_HOST "ss -tlnp | grep 3001"
 ```
 
 ### Git pull fails
 
 ```bash
 # Verify remote uses HTTPS
-ssh clawnet-geth-a "cd /opt/clawnet && git remote -v"
+$SSH_HOST "cd /opt/clawnet && git remote -v"
 
 # Fix if needed
-ssh clawnet-geth-a "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
+$SSH_HOST "cd /opt/clawnet && git remote set-url origin https://github.com/claw-network/clawnet.git"
 ```
 
 ### Stale build cache
 
 ```bash
-ssh clawnet-geth-a "cd /opt/clawnet/packages/docs && rm -rf .next && pnpm --filter docs build"
+$SSH_HOST "cd /opt/clawnet/packages/docs && rm -rf .next && pnpm --filter docs build"
 ```
 
 ### Page shows but looks broken (CSS missing)
 
 ```bash
 # Verify the .next directory has static assets
-ssh clawnet-geth-a "ls /opt/clawnet/packages/docs/.next/static/css/"
+$SSH_HOST "ls /opt/clawnet/packages/docs/.next/static/css/"
 
 # Full clean rebuild
-ssh clawnet-geth-a "cd /opt/clawnet/packages/docs && rm -rf .next node_modules/.cache && cd ../.. && pnpm --filter docs build && systemctl restart clawnet-docs"
+$SSH_HOST "cd /opt/clawnet/packages/docs && rm -rf .next node_modules/.cache && cd ../.. && pnpm --filter docs build && systemctl restart clawnet-docs"
 ```
 
 ### Caddy not proxying
 
 ```bash
-ssh clawnet-geth-a "systemctl status caddy"
-ssh clawnet-geth-a "journalctl -u caddy --no-pager -n 20"
-ssh clawnet-geth-a "caddy validate --config /etc/caddy/Caddyfile 2>&1"
+$SSH_HOST "systemctl status caddy"
+$SSH_HOST "journalctl -u caddy --no-pager -n 20"
+$SSH_HOST "caddy validate --config /etc/caddy/Caddyfile 2>&1"
 ```
 
 ---
@@ -377,16 +389,17 @@ If a deploy causes issues, roll back to the previous commit:
 
 ```bash
 # Find the previous good commit
-ssh clawnet-geth-a "cd /opt/clawnet && git log --oneline -5"
+SSH_HOST="ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242"
+$SSH_HOST "cd /opt/clawnet && git log --oneline -5"
 
 # Check out that commit
-ssh clawnet-geth-a "cd /opt/clawnet && git checkout <commit-hash> && pnpm --filter docs build && systemctl restart clawnet-docs"
+$SSH_HOST "cd /opt/clawnet && git checkout <commit-hash> && pnpm --filter docs build && systemctl restart clawnet-docs"
 ```
 
 Return to tracking `main` afterwards:
 
 ```bash
-ssh clawnet-geth-a "cd /opt/clawnet && git checkout main"
+$SSH_HOST "cd /opt/clawnet && git checkout main"
 ```
 
 ---
@@ -403,7 +416,7 @@ Use this checklist for every docs deployment:
 [ ] Local build passes: pnpm --filter docs build
 [ ] Committed with "docs: ..." message
 [ ] Pushed with --no-verify
-[ ] Deployed: ssh clawnet-geth-a "cd /opt/clawnet && git pull origin main && pnpm --filter docs build && systemctl restart clawnet-docs"
+[ ] Deployed: ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && git pull origin main && pnpm --filter docs build && systemctl restart clawnet-docs"
 [ ] Verified: curl -sI https://docs.clawnetd.com/<path> returns 200
 [ ] Verified: removed pages return 404 (or redirect)
 ```
