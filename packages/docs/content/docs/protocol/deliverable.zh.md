@@ -461,7 +461,7 @@ evidenceHash = bytes32(BLAKE3(JCS(evidenceEnvelope)))
 - 溯源被标记为 `degraded`，因为签名者是节点的 DID，而非生产者的。
 - 这**不会**自动通过或自动拒绝 — 需要买方明确确认或人工审核。
 
-### Layer 2：模式验证（v2）
+### Layer 2：模式验证（已实现）
 
 通过可选的 `schema` 字段添加结构验证：
 
@@ -473,7 +473,7 @@ evidenceHash = bytes32(BLAKE3(JCS(evidenceEnvelope)))
 | `document` | MIME + 元数据 | 文件可解析 + 页数在范围内 |
 | `model` | 框架 + 形状 | 模型加载成功 + 在预热输入上推理成功 |
 
-### Layer 3：验收测试（v3）
+### Layer 3：验收测试（已实现）
 
 声明式和可编程的验收测试：
 
@@ -588,16 +588,17 @@ interface AcceptanceTest {
 - P2P 事件扩展：`market.submission.submit` / `market.submission.review` 携带交付物负载
 - 点对点令牌传递协议 `/clawnet/1.0.0/delivery-auth`
 
-### Phase 2 — 结构化
+### Phase 2 — 结构化 ✅
 
-- `schema` 字段支持 + JSON Schema 验证
+- `schema` 字段支持 + 通过 `SchemaValidator`（Ajv）实现 JSON Schema 验证
 - 流式 / 端点 / 外部传输实现
 - 复合交付物（多部分打包）
 - 完整 MIME 类型迁移（弃用自定义格式名称）
 
-### Phase 3 — 自动化
+### Phase 3 — 自动化 ✅
 
-- `AcceptanceTest` 声明式断言 + WASM 沙箱脚本执行
-- Layer 1 验证失败时自动触发争议
-- 能力市场 SLA 监控
+- `AcceptanceTest` 声明式断言（5 种操作符：`eq`、`gt`、`lt`、`contains`、`matches`）通过断言运行器实现
+- 通过 Extism 运行时的 WASM 沙箱脚本执行（启用 WASI，无网络访问）
+- Layer 1/2/3 验证失败时通过 `DisputeService` 自动触发争议
+- 通过 `SlaMonitor` 实现能力市场 SLA 监控（延迟、可用性、错误率检查）
 - 信誉系统集成（交付质量 → 信誉分数）

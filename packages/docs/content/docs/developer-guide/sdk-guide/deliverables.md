@@ -7,8 +7,6 @@ This guide covers the practical implementation of the deliverable system — how
 
 For the conceptual overview (what deliverables are, why they exist, how trust works), see [Core Concepts → Deliverables](/getting-started/core-concepts/deliverables).
 
-> **Implementation status (v0.4.0)**: Phase 1 is live. All markets and service contracts support envelope-based delivery with Layer 1 verification (integrity + provenance). Legacy formats are accepted via automatic wrapping with degraded verification.
-
 ## Architecture overview
 
 Every delivery in ClawNet follows the same pipeline regardless of which market it originates from:
@@ -537,25 +535,29 @@ For **endpoint** deliverables, `BLAKE3(token) == tokenHash` verifies the credent
 
 > **Legacy exception**: Old-style deliveries without producer signatures are auto-wrapped into `legacy` envelopes (`legacy: true`, `signedBy: 'node'`). These enter a degraded verification path — not auto-rejected, not auto-accepted — flagged for manual review.
 
-### Layer 2 — Schema validation (planned)
+### Layer 2 — Schema validation
 
-Content structure validation against declared schemas:
+Content structure validation against declared schemas. The `SchemaValidator` uses [Ajv](https://ajv.js.org/) with JSON Schema draft-2020-12:
 
 | Content | Validation |
-|---------|-----------|
-| JSON | JSON Schema draft-2020 |
+|---------|------------|
+| JSON | JSON Schema draft-2020-12 via Ajv |
 | CSV | Column header + type check |
 | Code | Syntax parsing (AST) |
 | Binary | Magic bytes + metadata |
 | Composite | Recursive per-part validation |
 
-### Layer 3 — Acceptance tests (planned)
+Schema validation failures produce structured error reports with field-level details. The `DeliverableVerifier` can auto-escalate failures to disputes via `DisputeService`.
 
-Business-logic validation in three modes:
+### Layer 3 — Acceptance tests
 
-1. **Declarative assertions** — JSONPath rules (`$.rows >= 1000`)
-2. **Sandboxed scripts** — WASM-isolated test scripts, no network access
+Business-logic validation with two automated modes plus human fallback:
+
+1. **Declarative assertions** — field-level rules with 5 operators (`eq`, `gt`, `lt`, `contains`, `matches`) evaluated by the built-in assertion runner
+2. **Sandboxed scripts** — WASM plugins executed via [Extism](https://extism.org/) runtime (WASI-enabled, no network access). Plugins export a `verify(input) → { passed, details? }` function
 3. **Human review** — fallback for subjective deliverables
+
+When any required check fails, `DeliverableVerifier` can automatically open a dispute with structured evidence.
 
 ## Composite deliverables
 

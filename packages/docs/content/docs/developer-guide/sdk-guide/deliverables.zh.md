@@ -7,8 +7,6 @@ description: '构建、签名、加密、交付和验证 ClawNet 各市场中的
 
 概念层面（交付物是什么、为什么需要、信任如何运作），请参阅[核心概念 → 交付物](/getting-started/core-concepts/deliverables)。
 
-> **实现状态（v0.4.0）**：Phase 1 已上线。所有市场和服务合约均支持基于信封的交付和 Layer 1 验证（完整性 + 来源证明）。旧格式通过自动包装接受，验证流程为降级模式。
-
 ## 架构概览
 
 无论来自哪个市场，ClawNet 中的每次交付都遵循同一流水线：
@@ -519,7 +517,7 @@ interface DeliveryAuthResponse {
 
 ## 验证
 
-### 第一层——完整性 + 来源证明（已实现）
+### 第一层——完整性 + 来源证明
 
 每次交付自动执行五项检查：
 
@@ -537,25 +535,29 @@ interface DeliveryAuthResponse {
 
 > **Legacy 例外**：没有生产方签名的旧格式交付会被自动包装为 `legacy` 信封（`legacy: true`、`signedBy: 'node'`）。这些信封进入降级验证路径——既不自动拒绝，也不自动通过——标记为需要人工审核。
 
-### 第二层——Schema 验证（计划中）
+### 第二层——Schema 验证
 
-解密后的内容结构验证：
+解密后的内容结构验证。`SchemaValidator` 使用 [Ajv](https://ajv.js.org/)（JSON Schema draft-2020-12）：
 
 | 内容类型 | 验证方式 |
-|---------|---------|
-| JSON | JSON Schema draft-2020 |
+|---------|----------|
+| JSON | JSON Schema draft-2020-12（Ajv） |
 | CSV | 列头 + 类型检查 |
 | 代码 | 语法解析（AST） |
 | 二进制 | 魔数 + 元数据 |
 | 组合 | 递归逐部分验证 |
 
-### 第三层——验收测试（计划中）
+Schema 验证失败会生成带有字段级详情的结构化错误报告。`DeliverableVerifier` 可通过 `DisputeService` 自动将失败升级为争议。
 
-业务逻辑验证，三种模式：
+### 第三层——验收测试
 
-1. **声明式断言** — JSONPath 规则（`$.rows >= 1000`）
-2. **沙箱脚本** — WASM 隔离的测试脚本，无网络访问
+业务逻辑验证，两种自动化模式加人工兜底：
+
+1. **声明式断言** — 通过内置断言运行器执行的字段级规则，支持 5 种操作符（`eq`、`gt`、`lt`、`contains`、`matches`）
+2. **沙箱脚本** — 通过 [Extism](https://extism.org/) 运行时执行的 WASM 插件（启用 WASI，无网络访问）。插件导出 `verify(input) → { passed, details? }` 函数
 3. **人工评审** — 主观交付物的兜底方案
+
+当任何必要检查失败时，`DeliverableVerifier` 可自动开启争议并附带结构化证据。
 
 ## 组合交付物
 

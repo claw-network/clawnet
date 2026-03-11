@@ -461,7 +461,7 @@ All Layer 1 checks are **fully automatic and machine-verifiable**:
 - Provenance is marked `degraded` because the signer is the node's DID, not the producer's.
 - This does **not** auto-pass or auto-reject — it requires explicit buyer confirmation or manual review.
 
-### Layer 2: Schema validation (v2)
+### Layer 2: Schema validation (implemented)
 
 Adds structural validation using the optional `schema` field:
 
@@ -473,7 +473,7 @@ Adds structural validation using the optional `schema` field:
 | `document` | MIME + metadata | File parseable + page count within range |
 | `model` | Framework + shapes | Model loads + inference succeeds on warm-up input |
 
-### Layer 3: Acceptance tests (v3)
+### Layer 3: Acceptance tests (implemented)
 
 Declarative and programmable acceptance testing:
 
@@ -588,16 +588,17 @@ Old nodes ignore the unknown `delivery` field. New nodes prefer `delivery.envelo
 - P2P event extensions: `market.submission.submit` / `market.submission.review` carry delivery payloads
 - Point-to-point token delivery protocol `/clawnet/1.0.0/delivery-auth`
 
-### Phase 2 — Structure
+### Phase 2 — Structure ✅
 
-- `schema` field support + JSON Schema validation
+- `schema` field support + JSON Schema validation via `SchemaValidator` (Ajv)
 - Stream / Endpoint / External transport implementation
 - Composite deliverables (multi-part bundles)
 - Full MIME type migration (deprecate custom format names)
 
-### Phase 3 — Automation
+### Phase 3 — Automation ✅
 
-- `AcceptanceTest` declarative assertions + WASM sandbox script execution
-- Automatic dispute trigger on Layer 1 verification failure
-- SLA monitoring for Capability Market
+- `AcceptanceTest` declarative assertions (5 operators: `eq`, `gt`, `lt`, `contains`, `matches`) via assertion runner
+- WASM sandbox script execution via Extism runtime (WASI-enabled, no network access)
+- Automatic dispute trigger on Layer 1/2/3 verification failure via `DisputeService`
+- SLA monitoring for Capability Market via `SlaMonitor` (latency, uptime, error-rate checks)
 - Reputation system integration (delivery quality → reputation score)
