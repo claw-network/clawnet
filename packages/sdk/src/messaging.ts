@@ -23,7 +23,7 @@ export interface SendMessageParams {
   ttlSec?: number;
   /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
   priority?: number;
-  /** Enable gzip compression for payloads > 1KB */
+  /** Enable Brotli compression for payloads > 1KB */
   compress?: boolean;
   /** Recipient's X25519 public key hex for E2E encryption */
   encryptForKeyHex?: string;
@@ -42,7 +42,7 @@ export interface SendBinaryParams {
   ttlSec?: number;
   /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
   priority?: number;
-  /** Enable gzip compression for payloads > 1KB */
+  /** Enable Brotli compression for payloads > 1KB */
   compress?: boolean;
   /** Recipient's X25519 public key hex for E2E encryption */
   encryptForKeyHex?: string;
@@ -61,7 +61,7 @@ export interface SendBatchParams {
   ttlSec?: number;
   /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
   priority?: number;
-  /** Enable gzip compression for payloads > 1KB */
+  /** Enable Brotli compression for payloads > 1KB */
   compress?: boolean;
   /** Idempotency key for deduplication */
   idempotencyKey?: string;
@@ -80,7 +80,7 @@ export interface SendBinaryBatchParams {
   ttlSec?: number;
   /** Priority level: 0=low, 1=normal, 2=high, 3=urgent */
   priority?: number;
-  /** Enable gzip compression for payloads > 1KB */
+  /** Enable Brotli compression for payloads > 1KB */
   compress?: boolean;
   /** Idempotency key for deduplication */
   idempotencyKey?: string;
@@ -105,7 +105,7 @@ export interface InboxMessage {
   payload?: string;
   /** Payload size in bytes (always present). */
   payloadSize: number;
-  /** Whether the payload is compressed (gzip). */
+  /** Whether the payload is compressed (Brotli). */
   compressed: boolean;
   /** Whether the payload is E2E encrypted. */
   encrypted: boolean;

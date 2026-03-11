@@ -56,7 +56,7 @@ import type {
 } from '@claw-network/protocol';
 import { MessageStore } from './message-store.js';
 import { createLogger } from '../logger.js';
-import { gzipSync, gunzipSync } from 'node:zlib';
+import { brotliCompressSync, brotliDecompressSync } from 'node:zlib';
 import { mkdir, writeFile, readFile as fsReadFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import crypto from 'node:crypto';
@@ -133,7 +133,7 @@ const OUTBOX_RETRY_MAX_MS = 60_000;
 /** Valid DID format: did:claw:<multibase-base58btc-encoded-key>. */
 const DID_PATTERN = /^did:claw:z[1-9A-HJ-NP-Za-km-z]{32,64}$/;
 
-/** Payload size threshold for automatic gzip compression (1 KB). */
+/** Payload size threshold for automatic Brotli compression (1 KB). */
 const COMPRESSION_THRESHOLD_BYTES = 1024;
 
 /** HKDF info tag for E2E messaging encryption. */
@@ -185,7 +185,7 @@ export interface InboxMessage {
 export interface SendOptions {
   ttlSec?: number;
   priority?: MessagePriority;
-  /** If true, compress payload > 1 KB with gzip before sending. */
+  /** If true, compress payload > 1 KB with Brotli before sending. */
   compress?: boolean;
   /** Recipient's X25519 public key hex for E2E encryption. */
   encryptForKeyHex?: string;
@@ -1061,7 +1061,7 @@ export class MessagingService {
   // ── Private: Payload Encoding (compression + encryption) ────────
 
   /**
-   * Encode a payload: optionally compress (gzip) then optionally encrypt (X25519+AES-256-GCM).
+   * Encode a payload: optionally compress (Brotli) then optionally encrypt (X25519+AES-256-GCM).
    *
    * Returns raw binary bytes — stored directly as BLOB in SQLite.
    * No JSON wrappers, no base64. Flags indicate compression/encryption state.
@@ -1074,9 +1074,9 @@ export class MessagingService {
     let compressed = false;
     let encrypted = false;
 
-    // Compression: gzip if enabled and payload > threshold
+    // Compression: Brotli if enabled and payload > threshold
     if (opts.compress !== false && data.length > COMPRESSION_THRESHOLD_BYTES) {
-      data = gzipSync(data);
+      data = Buffer.from(brotliCompressSync(data));
       compressed = true;
     }
 
@@ -1122,11 +1122,11 @@ export class MessagingService {
   }
 
   /**
-   * Decompress a gzip-compressed payload (raw gzip bytes → decompressed bytes).
+   * Decompress a Brotli-compressed payload (raw Brotli bytes → decompressed bytes).
    */
   static decompressPayload(payload: Uint8Array): Uint8Array | null {
     try {
-      return new Uint8Array(gunzipSync(Buffer.from(payload)));
+      return new Uint8Array(brotliDecompressSync(Buffer.from(payload)));
     } catch {
       return null;
     }
