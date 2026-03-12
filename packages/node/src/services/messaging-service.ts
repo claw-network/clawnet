@@ -12,6 +12,7 @@
 import type { P2PNode, StreamDuplex } from '@claw-network/core';
 import {
   generateX25519Keypair,
+  x25519PublicKeyFromPrivateKey,
   x25519SharedSecret,
   hkdfSha256,
   encryptAes256Gcm,
@@ -335,6 +336,11 @@ export class MessagingService {
   private delegationCleanupTimer?: ReturnType<typeof setInterval>;
   private readonly delegatedMsgSubscribers = new Set<DelegatedMsgSubscriber>();
 
+  /** Persistent X25519 keypair for E2E decryption (delivery-auth, encrypted messages). */
+  private x25519PrivateKey!: Uint8Array;
+  private x25519PublicKey!: Uint8Array;
+  private readonly keysDir: string;
+
   constructor(p2p: P2PNode, store: MessageStore, localDid: string, dataDir?: string) {
     this.log = createLogger({ level: 'info' });
     this.p2p = p2p;
@@ -342,14 +348,19 @@ export class MessagingService {
     this.localDid = localDid;
     this.attachmentsDir = dataDir ? join(dataDir, 'attachments') : join(process.cwd(), 'data', 'attachments');
     this.deliverableDataDir = dataDir ? join(dataDir, 'deliverables') : join(process.cwd(), 'data', 'deliverables');
+    this.keysDir = dataDir ? join(dataDir, 'keys') : join(process.cwd(), 'data', 'keys');
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────
 
   async start(): Promise<void> {
-    // Ensure attachments and deliverables directories exist
+    // Ensure attachments, deliverables, and keys directories exist
     await mkdir(this.attachmentsDir, { recursive: true });
     await mkdir(this.deliverableDataDir, { recursive: true });
+    await mkdir(this.keysDir, { recursive: true });
+
+    // Load or create persistent X25519 keypair for E2E decryption
+    await this.loadOrCreateX25519Key();
 
     // Restore persisted DID→PeerId mappings from SQLite
     for (const { did, peerId, updatedAtMs } of this.store.getAllDidPeers()) {
@@ -463,6 +474,39 @@ export class MessagingService {
     this.subscribers.clear();
     this.attachmentSubscribers.clear();
     this.delegatedMsgSubscribers.clear();
+  }
+
+  /** Returns the node's persistent X25519 public key as hex string. */
+  getX25519PublicKeyHex(): string {
+    return bytesToHex(this.x25519PublicKey);
+  }
+
+  /**
+   * Load or create a persistent X25519 keypair for E2E decryption.
+   * Stored as raw 32-byte private key at `<keysDir>/x25519.key`.
+   */
+  private async loadOrCreateX25519Key(): Promise<void> {
+    const keyPath = join(this.keysDir, 'x25519.key');
+    try {
+      const data = await fsReadFile(keyPath);
+      this.x25519PrivateKey = new Uint8Array(data);
+      this.x25519PublicKey = x25519PublicKeyFromPrivateKey(this.x25519PrivateKey);
+      this.log.info('[messaging] loaded persistent X25519 key', {
+        publicKeyHex: bytesToHex(this.x25519PublicKey).slice(0, 16) + '...',
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code !== 'ENOENT') {
+        throw err;
+      }
+      // Generate new keypair and persist
+      const keypair = generateX25519Keypair();
+      this.x25519PrivateKey = keypair.privateKey;
+      this.x25519PublicKey = keypair.publicKey;
+      await writeFile(keyPath, Buffer.from(this.x25519PrivateKey), { mode: 0o600 });
+      this.log.info('[messaging] created persistent X25519 key', {
+        publicKeyHex: bytesToHex(this.x25519PublicKey).slice(0, 16) + '...',
+      });
+    }
   }
 
   // ── Public API ─────────────────────────────────────────────────
@@ -1223,13 +1267,11 @@ export class MessagingService {
         return;
       }
 
-      // Decrypt the payload using local X25519 key
+      // Decrypt the payload using persistent X25519 key
       let payload: DeliveryAuthPayload;
       try {
         const senderPub = hexToBytes(request.senderPublicKeyHex);
-        const localKeypair = generateX25519Keypair(); // TODO: use persistent X25519 key
-        // For now, decrypt using ECDH with the sender's ephemeral key
-        const shared = x25519SharedSecret(localKeypair.privateKey, senderPub);
+        const shared = x25519SharedSecret(this.x25519PrivateKey, senderPub);
         const derived = hkdfSha256(
           shared,
           undefined,
