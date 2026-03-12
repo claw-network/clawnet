@@ -2,7 +2,7 @@
   "network": "clawnetTestnet",
   "chainId": 7625,
   "deployer": "0xA9b95A4fDCD673f6aE0D2a873E0f4771CA7D0119",
-  "timestamp": "2026-03-07T08:53:04.208Z",
+  "timestamp": "2026-03-12T06:24:06.126Z",
   "contracts": {
     "ClawToken": {
       "proxy": "0xE1cf20376ef0372E26CEE715F84A15348bdbB5c6",
@@ -39,10 +39,15 @@
     "ClawRouter": {
       "proxy": "0xb58187c2dca213e491110a9557234b3D3E097592",
       "impl": "0x8992Ee0e3Ce8381c662DE2f5e0a4a4CDE34216ad"
+    },
+    "ClawRelayReward": {
+      "proxy": "0xC2acB9DFBc10c4F32417e179655b2664244a8dC6",
+      "impl": "0x9a440AEfc7156478c3C912c38c012d01355d293E"
     }
   },
   "roles": {
     "minterToStaking": "0x6269D9358a8C4502fC8b629E8998Eb9C98961995",
+    "minterToRelayReward": "0xC2acB9DFBc10c4F32417e179655b2664244a8dC6",
     "governorToDao": "0x98f5280ceBEe1eD067A3Cb6729eaAF5ceb3f7Bd9",
     "anchorAddress": null,
     "arbiterAddress": null
@@ -62,6 +67,11 @@
     "votingPeriod": 259200,
     "timelockDelay": 86400,
     "quorumBps": 400,
-    "platformFeeBps": 100
+    "platformFeeBps": 100,
+    "relayRewardBaseRate": 100,
+    "relayRewardMaxPerPeriod": 1000,
+    "relayRewardMinBytes": 1048576,
+    "relayRewardMinPeers": 1,
+    "relayRewardAttachmentWeight": 3000
   }
 }
