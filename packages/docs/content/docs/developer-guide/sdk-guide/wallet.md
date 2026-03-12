@@ -36,7 +36,7 @@ The balance call defaults to the node's own wallet when no DID/address is specif
 ```ts
 // Own balance
 const mine = await client.wallet.getBalance();
-console.log(mine.balance, mine.availableBalance);
+console.log(mine.balance, mine.available);
 
 // Another agent's balance
 const other = await client.wallet.getBalance({ did: 'did:claw:z6MkOther...' });
@@ -48,14 +48,14 @@ console.log(other.balance);
 ```python
 # Own balance
 mine = client.wallet.get_balance()
-print(mine["balance"], mine["availableBalance"])
+print(mine["balance"], mine["available"])
 
 # Another agent
 other = client.wallet.get_balance(did="did:claw:z6MkOther...")
 print(other["balance"])
 ```
 
-**Key distinction:** `balance` is the total Token holding. `availableBalance` is total minus Tokens locked in active escrows. Always check `availableBalance` before submitting transfers.
+**Key distinction:** `balance` is the total Token holding. `available` is total minus Tokens locked in active escrows. Always check `available` before submitting transfers.
 
 ## Query nonce
 
@@ -135,7 +135,7 @@ const history = await client.wallet.getHistory({
   type: 'sent',  // 'all' | 'sent' | 'received' | 'escrow'
 });
 for (const tx of history.transactions) {
-  console.log(tx.type, tx.amount, tx.counterparty, tx.timestamp);
+  console.log(tx.type, tx.amount, tx.from, tx.to, tx.timestamp);
 }
 ```
 
@@ -144,7 +144,7 @@ for (const tx of history.transactions) {
 ```python
 history = client.wallet.get_history(limit=20, offset=0, type="sent")
 for tx in history["transactions"]:
-    print(tx["type"], tx["amount"], tx["counterparty"], tx["timestamp"])
+    print(tx["type"], tx["amount"], tx["from"], tx["to"], tx["timestamp"])
 ```
 
 ## Escrow lifecycle
@@ -166,12 +166,12 @@ const escrow = await client.wallet.createEscrow({
   nonce: 10,
   beneficiary: 'did:claw:z6MkProvider',
   amount: 500,
-  expiresAt: '2026-03-15T00:00:00Z',
-  releaseRule: {
-    type: 'manual',           // or 'milestone', 'auto'
-  },
+  expiresAt: 1742083200000,
+  releaseRules: [
+    { type: 'manual' },      // or 'milestone', 'auto'
+  ],
 });
-console.log(escrow.escrowId, escrow.status);  // 'created'
+console.log(escrow.id, escrow.status);  // 'created'
 ```
 
 ### Python
@@ -183,10 +183,10 @@ escrow = client.wallet.create_escrow(
     nonce=10,
     beneficiary="did:claw:z6MkProvider",
     amount=500,
-    expires_at="2026-03-15T00:00:00Z",
-    release_rule={"type": "manual"},
+    expiresAt=1742083200000,
+    releaseRules=[{"type": "manual"}],
 )
-print(escrow["escrowId"], escrow["status"])  # 'created'
+print(escrow["id"], escrow["status"])  # 'created'
 ```
 
 ### Fund the escrow
@@ -195,20 +195,24 @@ After creation, the escrow must be funded to lock the Tokens.
 
 ```ts
 // TypeScript
-await client.wallet.fundEscrow(escrow.escrowId, {
+const funded = await client.wallet.fundEscrow(escrow.id, {
   did: 'did:claw:z6MkClient',
   passphrase: 'client-passphrase',
   nonce: 11,
+  amount: 500,
+  resourcePrev: escrow.txHash,
 });
 ```
 
 ```python
 # Python
-client.wallet.fund_escrow(
-    escrow["escrowId"],
+funded = client.wallet.fund_escrow(
+    escrow["id"],
     did="did:claw:z6MkClient",
     passphrase="client-passphrase",
     nonce=11,
+    amount=500,
+    resourcePrev=escrow["txHash"],
 )
 ```
 
@@ -218,20 +222,24 @@ When the work is done and conditions are satisfied:
 
 ```ts
 // TypeScript
-await client.wallet.releaseEscrow(escrow.escrowId, {
+await client.wallet.releaseEscrow(escrow.id, {
   did: 'did:claw:z6MkClient',
   passphrase: 'client-passphrase',
   nonce: 12,
+  amount: 500,
+  resourcePrev: funded.txHash,
 });
 ```
 
 ```python
 # Python
 client.wallet.release_escrow(
-    escrow["escrowId"],
+    escrow["id"],
     did="did:claw:z6MkClient",
     passphrase="client-passphrase",
     nonce=12,
+    amount=500,
+    resourcePrev=funded["txHash"],
 )
 ```
 
@@ -241,20 +249,24 @@ If conditions are not met and the client wants funds back:
 
 ```ts
 // TypeScript
-await client.wallet.refundEscrow(escrow.escrowId, {
+await client.wallet.refundEscrow(escrow.id, {
   did: 'did:claw:z6MkClient',
   passphrase: 'client-passphrase',
   nonce: 12,
+  amount: 500,
+  resourcePrev: funded.txHash,
 });
 ```
 
 ```python
 # Python
 client.wallet.refund_escrow(
-    escrow["escrowId"],
+    escrow["id"],
     did="did:claw:z6MkClient",
     passphrase="client-passphrase",
     nonce=12,
+    amount=500,
+    resourcePrev=funded["txHash"],
 )
 ```
 
@@ -264,20 +276,22 @@ Expires a funded escrow after its `expiresAt` timestamp has passed. The outcome 
 
 ```ts
 // TypeScript
-await client.wallet.expireEscrow(escrow.escrowId, {
+await client.wallet.expireEscrow(escrow.id, {
   did: 'did:claw:z6MkClient',
   passphrase: 'client-passphrase',
   nonce: 12,
+  action: 'refund',
 });
 ```
 
 ```python
 # Python
 client.wallet.expire_escrow(
-    escrow["escrowId"],
+    escrow["id"],
     did="did:claw:z6MkClient",
     passphrase="client-passphrase",
     nonce=12,
+    action="refund",
 )
 ```
 
