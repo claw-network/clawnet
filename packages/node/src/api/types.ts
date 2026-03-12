@@ -57,6 +57,8 @@ export interface ApiServerConfig {
   network?: NetworkType;
   /** Allowed CORS origins. Defaults to `['*']`. Set explicitly for mainnet. */
   corsOrigins?: string[];
+  /** Rate limiting options. Applied per-IP with separate read/write limits. */
+  rateLimit?: import('./middleware.js').RateLimitOptions;
 }
 
 export interface RuntimeContext {

@@ -7,7 +7,7 @@
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { Router } from './router.js';
-import { createCors, createErrorBoundary, requestLogger } from './middleware.js';
+import { createCors, createErrorBoundary, requestLogger, createRateLimiter } from './middleware.js';
 import { apiKeyAuth } from './auth.js';
 import { attachWebSocketHandler } from './ws-messaging.js';
 import { attachDeliveryStreamHandler } from './ws-delivery-stream.js';
@@ -155,18 +155,21 @@ export class ApiServer {
       origins: this.config.corsOrigins ?? (isMainnet ? [] : ['*']),
     });
     const errorMiddleware = createErrorBoundary({ hideDetails: isMainnet });
+    const rateLimitMiddleware = createRateLimiter(this.config.rateLimit);
 
     this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      // Middleware chain: CORS → auth → error boundary → logger → router
+      // Middleware chain: CORS → rate limit → auth → error boundary → logger → router
       void corsMiddleware(req, res, async () => {
-        await authMiddleware(req, res, async () => {
-          await errorMiddleware(req, res, async () => {
-            await requestLogger(() => {})(req, res, async () => {
-              const matched = await router.handle(req, res);
-              if (!matched && !res.headersSent) {
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
-              }
+        await rateLimitMiddleware(req, res, async () => {
+          await authMiddleware(req, res, async () => {
+            await errorMiddleware(req, res, async () => {
+              await requestLogger(() => {})(req, res, async () => {
+                const matched = await router.handle(req, res);
+                if (!matched && !res.headersSent) {
+                  res.writeHead(404, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
+                }
+              });
             });
           });
         });

@@ -102,3 +102,134 @@ export function requestLogger(log: (msg: string) => void): Middleware {
     log(`${req.method} ${req.url} ${res.statusCode} ${ms}ms`);
   };
 }
+
+// ---------------------------------------------------------------------------
+// Rate Limiting
+// ---------------------------------------------------------------------------
+
+export interface RateLimitOptions {
+  /** Max requests per window for read operations (GET/HEAD). Default: 300. */
+  readLimit?: number;
+  /** Max requests per window for write operations (POST/PUT/PATCH/DELETE). Default: 60. */
+  writeLimit?: number;
+  /** Sliding window duration in milliseconds. Default: 60_000 (1 minute). */
+  windowMs?: number;
+  /** Max number of tracked clients before oldest entries are evicted. Default: 10_000. */
+  maxClients?: number;
+}
+
+interface ClientBucket {
+  /** Timestamps of requests within the current window. */
+  timestamps: number[];
+}
+
+/**
+ * Create a per-IP sliding-window rate limiter middleware.
+ *
+ * - GET/HEAD → readLimit per window (default 300/min)
+ * - POST/PUT/PATCH/DELETE → writeLimit per window (default 60/min)
+ * - OPTIONS and GET /api/v1/node are exempt
+ * - Returns 429 with Retry-After header when exceeded
+ */
+export function createRateLimiter(options?: RateLimitOptions): Middleware {
+  const readLimit = options?.readLimit ?? 300;
+  const writeLimit = options?.writeLimit ?? 60;
+  const windowMs = options?.windowMs ?? 60_000;
+  const maxClients = options?.maxClients ?? 10_000;
+
+  // Separate buckets for read vs write per client IP
+  const readBuckets = new Map<string, ClientBucket>();
+  const writeBuckets = new Map<string, ClientBucket>();
+
+  // Periodic cleanup of expired entries (every 2 minutes)
+  const cleanupInterval = setInterval(() => {
+    const cutoff = Date.now() - windowMs;
+    for (const [key, bucket] of readBuckets) {
+      bucket.timestamps = bucket.timestamps.filter(t => t > cutoff);
+      if (bucket.timestamps.length === 0) readBuckets.delete(key);
+    }
+    for (const [key, bucket] of writeBuckets) {
+      bucket.timestamps = bucket.timestamps.filter(t => t > cutoff);
+      if (bucket.timestamps.length === 0) writeBuckets.delete(key);
+    }
+  }, 120_000);
+  cleanupInterval.unref();
+
+  function getClientIp(req: import('node:http').IncomingMessage): string {
+    // Trust X-Forwarded-For from reverse proxy (Caddy)
+    const forwarded = req.headers['x-forwarded-for'];
+    if (typeof forwarded === 'string') {
+      return forwarded.split(',')[0].trim();
+    }
+    return req.socket.remoteAddress ?? 'unknown';
+  }
+
+  function isExempt(req: import('node:http').IncomingMessage): boolean {
+    const method = req.method ?? 'GET';
+    if (method === 'OPTIONS') return true;
+    const url = req.url ?? '/';
+    // Node status endpoint is always public
+    if (url === '/api/v1/node' || url === '/api/v1/node/') return true;
+    return false;
+  }
+
+  function checkLimit(buckets: Map<string, ClientBucket>, clientIp: string, limit: number, now: number): { allowed: boolean; retryAfterSec: number } {
+    const cutoff = now - windowMs;
+    let bucket = buckets.get(clientIp);
+    if (!bucket) {
+      // Evict oldest client if at capacity
+      if (buckets.size >= maxClients) {
+        const firstKey = buckets.keys().next().value;
+        if (firstKey !== undefined) buckets.delete(firstKey);
+      }
+      bucket = { timestamps: [] };
+      buckets.set(clientIp, bucket);
+    }
+
+    // Prune expired entries
+    bucket.timestamps = bucket.timestamps.filter(t => t > cutoff);
+
+    if (bucket.timestamps.length >= limit) {
+      // Calculate retry-after from oldest request in window
+      const oldestInWindow = bucket.timestamps[0];
+      const retryAfterSec = Math.ceil((oldestInWindow + windowMs - now) / 1000);
+      return { allowed: false, retryAfterSec: Math.max(retryAfterSec, 1) };
+    }
+
+    bucket.timestamps.push(now);
+    return { allowed: true, retryAfterSec: 0 };
+  }
+
+  return async (req, res, next) => {
+    if (isExempt(req)) {
+      await next();
+      return;
+    }
+
+    const clientIp = getClientIp(req);
+    const method = req.method ?? 'GET';
+    const isWrite = method !== 'GET' && method !== 'HEAD';
+    const now = Date.now();
+
+    const { allowed, retryAfterSec } = isWrite
+      ? checkLimit(writeBuckets, clientIp, writeLimit, now)
+      : checkLimit(readBuckets, clientIp, readLimit, now);
+
+    if (!allowed) {
+      const { tooManyRequests } = await import('./response.js');
+      tooManyRequests(res, `Rate limit exceeded: max ${isWrite ? writeLimit : readLimit} ${isWrite ? 'write' : 'read'} requests per ${windowMs / 1000}s`, req.url ?? undefined, retryAfterSec);
+      return;
+    }
+
+    // Set informational rate-limit headers
+    const limit = isWrite ? writeLimit : readLimit;
+    const buckets = isWrite ? writeBuckets : readBuckets;
+    const bucket = buckets.get(clientIp);
+    const remaining = limit - (bucket?.timestamps.length ?? 0);
+    res.setHeader('X-RateLimit-Limit', String(limit));
+    res.setHeader('X-RateLimit-Remaining', String(Math.max(remaining, 0)));
+    res.setHeader('X-RateLimit-Reset', String(Math.ceil((now + windowMs) / 1000)));
+
+    await next();
+  };
+}

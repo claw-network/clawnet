@@ -10,11 +10,11 @@
 
 ### P0 — 上线阻断项
 
-- [ ] **API 全局限流**
-  - 现状：仅消息端点有 600/min 限流（`messaging-service.ts`），其余端点（转账、合约创建、市场搜索等）无任何限流
-  - 风险：DoS 攻击可耗尽节点资源
-  - 方案：在 `packages/node/src/api/middleware.ts` 添加全局限流中间件，或在 Caddy 配置 `rate_limit` 指令
-  - 相关文件：`packages/node/src/api/middleware.ts`、`/etc/caddy/Caddyfile`
+- [x] **API 全局限流** ✅ `v0.6.6`
+  - 已实现：`middleware.ts` 添加 `createRateLimiter()` — 基于滑动窗口的 per-IP 限流，读操作 300/min，写操作 60/min
+  - OPTIONS 和 GET `/api/v1/node` 免限流；支持 `X-Forwarded-For`（Caddy 反代）
+  - 429 响应含 `Retry-After` + `X-RateLimit-*` 信息头
+  - 相关文件：`packages/node/src/api/middleware.ts`、`packages/node/src/api/server.ts`
 
 - [ ] **智能合约第三方安全审计**
   - 现状：10 个合约管理真实 Token 资产，未经过任何专业审计
@@ -121,6 +121,7 @@
 | 智能合约核心 | ✅ | 10 合约已部署、UUPS 可升级、proxy 地址稳定 |
 | P2P 同步 | ✅ | libp2p gossipsub + 速率限制 |
 | 消息限流 | ✅ | 600/min per-DID + 300/min per-peer inbound + 3000/min global |
+| API 全局限流 | ✅ | per-IP 滑动窗口：读 300/min、写 60/min，429 + Retry-After |
 | 链索引 | ✅ | `eth_getLogs` 轮询 + SQLite 持久化 |
 
 ---
@@ -132,7 +133,7 @@
 | 序号 | 任务 | 估计工作量 | 负责 |
 |------|------|-----------|------|
 | 1.1 | X25519 密钥持久化 | ✅ 已完成 | 后端 |
-| 1.2 | API 全局限流 | 1d | 后端 |
+| 1.2 | API 全局限流 | ✅ 已完成 | 后端 |
 | 1.3 | 启用备份 cron | 0.5d | 运维 |
 | 1.4 | 压力测试脚本 + 基线 | 2-3d | QA |
 
