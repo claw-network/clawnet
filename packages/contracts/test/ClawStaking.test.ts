@@ -329,6 +329,73 @@ describe("ClawStaking", function () {
     });
   });
 
+  // ─── Slash → DAO Treasury ──────────────────────────────────────────
+
+  describe("slash → DAO treasury forwarding", function () {
+    let daoTreasury: HardhatEthersSigner;
+    const reason = ethers.keccak256(ethers.toUtf8Bytes("offline"));
+
+    beforeEach(async function () {
+      daoTreasury = outsider; // reuse outsider as treasury address
+      await stakeDefaultNode1();
+    });
+
+    it("should forward slashed tokens to DAO treasury when set", async function () {
+      await staking.connect(admin).setDaoTreasury(daoTreasury.address);
+
+      const treasuryBefore = await token.balanceOf(daoTreasury.address);
+      await staking.connect(admin).slash(node1.address, 100, reason);
+      const treasuryAfter = await token.balanceOf(daoTreasury.address);
+
+      expect(treasuryAfter - treasuryBefore).to.equal(100);
+    });
+
+    it("should keep slashed tokens in contract when daoTreasury is zero address", async function () {
+      // daoTreasury is address(0) by default
+      const stakingAddr = await staking.getAddress();
+      const contractBefore = await token.balanceOf(stakingAddr);
+      await staking.connect(admin).slash(node1.address, 100, reason);
+      const contractAfter = await token.balanceOf(stakingAddr);
+
+      // tokens remain in contract (no transfer out)
+      expect(contractBefore - contractAfter).to.equal(0);
+    });
+
+    it("should transfer correct amount when slash is capped", async function () {
+      await staking.connect(admin).setDaoTreasury(daoTreasury.address);
+
+      const treasuryBefore = await token.balanceOf(daoTreasury.address);
+      // slash more than staked — should be capped at MIN_STAKE
+      await staking.connect(admin).slash(node1.address, Number(MIN_STAKE) + 5000, reason);
+      const treasuryAfter = await token.balanceOf(daoTreasury.address);
+
+      expect(treasuryAfter - treasuryBefore).to.equal(MIN_STAKE);
+    });
+
+    it("setDaoTreasury should emit DaoTreasurySet event", async function () {
+      await expect(staking.connect(admin).setDaoTreasury(daoTreasury.address))
+        .to.emit(staking, "DaoTreasurySet")
+        .withArgs(daoTreasury.address);
+    });
+
+    it("non-admin cannot call setDaoTreasury", async function () {
+      await expect(
+        staking.connect(node1).setDaoTreasury(daoTreasury.address),
+      ).to.be.revertedWithCustomError(staking, "AccessControlUnauthorizedAccount");
+    });
+
+    it("can disable forwarding by setting treasury to zero address", async function () {
+      await staking.connect(admin).setDaoTreasury(daoTreasury.address);
+      await staking.connect(admin).setDaoTreasury(ethers.ZeroAddress);
+
+      const treasuryBefore = await token.balanceOf(daoTreasury.address);
+      await staking.connect(admin).slash(node1.address, 100, reason);
+      const treasuryAfter = await token.balanceOf(daoTreasury.address);
+
+      expect(treasuryAfter - treasuryBefore).to.equal(0);
+    });
+  });
+
   // ─── Distribute Rewards ────────────────────────────────────────────
 
   describe("distributeRewards", function () {

@@ -84,6 +84,9 @@ contract ClawStaking is
     /// @notice Sum of all credited but unclaimed reward amounts (for reserve accounting).
     uint256 public totalPendingRewards;
 
+    /// @notice DAO treasury address. When set, slashed tokens are forwarded here.
+    address public daoTreasury;
+
     // ─── Events ──────────────────────────────────────────────────────
 
     event Staked(address indexed node, uint256 amount, NodeType nodeType);
@@ -93,6 +96,7 @@ contract ClawStaking is
     event Slashed(address indexed node, uint256 amount, bytes32 reason);
     event RewardsDistributed(uint256 totalAmount, uint256 validatorCount);
     event StakingParamsInitialized(uint256 minStake, uint64 unstakeCooldown, uint256 slashPerViolation);
+    event DaoTreasurySet(address indexed treasury);
 
     // ─── Errors ──────────────────────────────────────────────────────
 
@@ -289,10 +293,12 @@ contract ClawStaking is
             _removeFromActiveList(node);
         }
 
-        // Transfer slashed tokens to treasury (the contract holds them; admin can recover)
-        // For MVP, slashed tokens stay in the contract. Phase 2 sends to DAO treasury.
-
         emit Slashed(node, actualSlash, reason);
+
+        // Forward slashed tokens to DAO treasury if configured
+        if (daoTreasury != address(0) && actualSlash > 0) {
+            token.safeTransfer(daoTreasury, actualSlash);
+        }
     }
 
     /**
@@ -430,6 +436,15 @@ contract ClawStaking is
      */
     function setParamRegistry(address registryAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
         paramRegistry = ParamRegistry(registryAddress);
+    }
+
+    /**
+     * @notice Set the DAO treasury address for receiving slashed tokens.
+     *         Pass address(0) to disable forwarding (tokens stay in contract).
+     */
+    function setDaoTreasury(address treasury_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        daoTreasury = treasury_;
+        emit DaoTreasurySet(treasury_);
     }
 
     // ─── Internal ────────────────────────────────────────────────────

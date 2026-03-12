@@ -76,11 +76,10 @@
   - 位置：`packages/contracts/contracts/ClawStaking.sol` — `getLockupMultiplier()`
   - 测试：10 个新测试覆盖所有阶梯边界、连续性、非质押/非活跃返回 1x
 
-- [ ] **Slash 罚没 Token 未转入 DAO 金库**
-  - 现状：罚没的 Token 留在 Staking 合约内，未转入 DAO 金库
-  - 位置：`packages/contracts/contracts/ClawStaking.sol:293`
-  - 代码标记：`Phase 2 sends to DAO treasury`
-  - 方案：添加 `_forwardSlashedTokens()` 内部方法，slash 时自动转入 ClawDAO
+- [x] **Slash 罚没 Token 未转入 DAO 金库** ✅ 已完成
+  - 实现：添加 `daoTreasury` 状态变量 + `setDaoTreasury()` 管理员方法，`slash()` 时自动 `safeTransfer` 到 DAO 金库
+  - 位置：`packages/contracts/contracts/ClawStaking.sol`
+  - 测试：6 个新测试覆盖转账、零地址不转、封顶转账、事件、权限、禁用
 
 - [ ] **Merkle 证明库为占位符**
   - 现状：`ClawMerkle.sol` 为 Phase 2 占位符，deliverable 链上验证不可用
@@ -155,7 +154,7 @@
 | 2.2 | Prometheus + Grafana 监控 | ✅ 指标导出已完成，Grafana 仪表盘配置待部署 | 后端+运维 |
 | 2.3 | 集中式日志 | 1-2d | 运维 |
 | 2.4 | Staking 奖励乘数实现 | ✅ 已完成 | 合约 |
-| 2.5 | Slash → DAO 金库 | 1d | 合约 |
+| 2.5 | Slash → DAO 金库 | ✅ 已完成 | 合约 |
 | 2.6 | Ed25519 链上验证 | 3-5d | 合约 |
 | 2.7 | Merkle 证明库 | 2-3d | 合约 |
 | 2.8 | ParamRegistry 集成 | 2d | 合约 |
