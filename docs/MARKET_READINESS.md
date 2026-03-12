@@ -68,11 +68,13 @@
 
 ### P1 — 主网前必须完成
 
-- [ ] **Staking 奖励乘数始终返回 1x**
-  - 现状：`getRewardMultiplier()` 返回固定值 1000（即 1x），锁定时长不影响收益
-  - 位置：`packages/contracts/contracts/ClawStaking.sol:363`
-  - 代码标记：`Phase 3 will implement actual lockup bonus logic (up to 3x)`
-  - 方案：实现基于锁定时长的阶梯乘数（30d=1x, 90d=1.5x, 180d=2x, 365d=3x）
+- [x] **Staking 奖励乘数始终返回 1x** ✅ 已修复
+  - 已实现：`getLockupMultiplier()` 基于锁定时长的线性插值阶梯乘数
+  - 阶梯：<30d=1.0x, 30–90d=1.0x→1.5x, 90–180d=1.5x→2.0x, 180–365d=2.0x→3.0x, ≥365d=3.0x（上限）
+  - 各阶梯间线性插值，无跳跃式阶升
+  - ClawDAO 投票权计算已通过 `_getLockupMultiplier()` 静态调用集成
+  - 位置：`packages/contracts/contracts/ClawStaking.sol` — `getLockupMultiplier()`
+  - 测试：10 个新测试覆盖所有阶梯边界、连续性、非质押/非活跃返回 1x
 
 - [ ] **Slash 罚没 Token 未转入 DAO 金库**
   - 现状：罚没的 Token 留在 Staking 合约内，未转入 DAO 金库
@@ -152,7 +154,7 @@
 | 2.1 | 智能合约安全审计 | 2-4w（外部） | 安全 |
 | 2.2 | Prometheus + Grafana 监控 | ✅ 指标导出已完成，Grafana 仪表盘配置待部署 | 后端+运维 |
 | 2.3 | 集中式日志 | 1-2d | 运维 |
-| 2.4 | Staking 奖励乘数实现 | 2-3d | 合约 |
+| 2.4 | Staking 奖励乘数实现 | ✅ 已完成 | 合约 |
 | 2.5 | Slash → DAO 金库 | 1d | 合约 |
 | 2.6 | Ed25519 链上验证 | 3-5d | 合约 |
 | 2.7 | Merkle 证明库 | 2-3d | 合约 |

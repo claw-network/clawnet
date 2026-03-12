@@ -360,16 +360,43 @@ contract ClawStaking is
 
     /**
      * @notice Get the lockup multiplier for a staked node.
-     * @dev I-01 fix: stub implementation returning 1000 (1x) for all stakers.
-     *      Phase 3 will implement actual lockup bonus logic (up to 3x).
+     * @dev Tiered multiplier based on lock duration (time since stakedAt):
+     *        < 30 days  → 1000 (1.0x)
+     *       30–89 days  → 1000–1499 (1.0x–1.5x, linearly interpolated)
+     *       90–179 days → 1500–1999 (1.5x–2.0x, linearly interpolated)
+     *      180–364 days → 2000–2999 (2.0x–3.0x, linearly interpolated)
+     *       ≥ 365 days  → 3000 (3.0x cap)
+     *
+     *      ClawDAO clamps the returned value to [1000, 3000].
      * @param node The staker address.
      * @return multiplier 1000-based multiplier (1000 = 1x, 2000 = 2x, etc.)
      */
     function getLockupMultiplier(address node) external view returns (uint256) {
         StakeInfo storage s = stakes[node];
         if (s.amount == 0 || !s.active) return 1000;
-        // Stub: return 1x for all stakers. Future: scale by lock duration.
-        return 1000;
+
+        uint256 elapsed = block.timestamp - uint256(s.stakedAt);
+
+        // Tier thresholds in seconds
+        uint256 tier1 = 30 days;   //  30d → 1000
+        uint256 tier2 = 90 days;   //  90d → 1500
+        uint256 tier3 = 180 days;  // 180d → 2000
+        uint256 tier4 = 365 days;  // 365d → 3000
+
+        if (elapsed < tier1) {
+            return 1000;
+        } else if (elapsed < tier2) {
+            // Linear interpolation: 1000 → 1500 over 60 days
+            return 1000 + (500 * (elapsed - tier1)) / (tier2 - tier1);
+        } else if (elapsed < tier3) {
+            // Linear interpolation: 1500 → 2000 over 90 days
+            return 1500 + (500 * (elapsed - tier2)) / (tier3 - tier2);
+        } else if (elapsed < tier4) {
+            // Linear interpolation: 2000 → 3000 over 185 days
+            return 2000 + (1000 * (elapsed - tier3)) / (tier4 - tier3);
+        } else {
+            return 3000;
+        }
     }
 
     // ─── Admin ───────────────────────────────────────────────────────

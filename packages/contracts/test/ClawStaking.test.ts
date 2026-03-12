@@ -577,4 +577,87 @@ describe("ClawStaking", function () {
       ).to.be.revertedWithCustomError(staking, "AccessControlUnauthorizedAccount");
     });
   });
+
+  // ─── Lockup Multiplier ────────────────────────────────────────────
+
+  describe("getLockupMultiplier", function () {
+    beforeEach(async function () {
+      await stakeDefaultNode1();
+    });
+
+    it("returns 1000 (1x) for non-staked address", async function () {
+      expect(await staking.getLockupMultiplier(outsider.address)).to.equal(1000);
+    });
+
+    it("returns 1000 (1x) when staked for less than 30 days", async function () {
+      // Just staked — 0 days elapsed
+      expect(await staking.getLockupMultiplier(node1.address)).to.equal(1000);
+
+      // 29 days later — still under 30d threshold
+      await time.increase(29 * 86400);
+      expect(await staking.getLockupMultiplier(node1.address)).to.equal(1000);
+    });
+
+    it("returns ~1000 at exactly 30 days (start of tier 1)", async function () {
+      await time.increase(30 * 86400);
+      const multiplier = await staking.getLockupMultiplier(node1.address);
+      // At exactly 30d, multiplier should be 1000 (start of interpolation)
+      expect(multiplier).to.be.greaterThanOrEqual(1000);
+      expect(multiplier).to.be.lessThanOrEqual(1010); // tiny drift from block time
+    });
+
+    it("returns ~1250 at 60 days (midpoint of tier 1)", async function () {
+      await time.increase(60 * 86400);
+      const multiplier = await staking.getLockupMultiplier(node1.address);
+      // 60d = midpoint between 30d (1000) and 90d (1500) → ~1250
+      expect(multiplier).to.be.greaterThanOrEqual(1240);
+      expect(multiplier).to.be.lessThanOrEqual(1260);
+    });
+
+    it("returns ~1500 at 90 days (start of tier 2)", async function () {
+      await time.increase(90 * 86400);
+      const multiplier = await staking.getLockupMultiplier(node1.address);
+      expect(multiplier).to.be.greaterThanOrEqual(1495);
+      expect(multiplier).to.be.lessThanOrEqual(1510);
+    });
+
+    it("returns ~2000 at 180 days (start of tier 3)", async function () {
+      await time.increase(180 * 86400);
+      const multiplier = await staking.getLockupMultiplier(node1.address);
+      expect(multiplier).to.be.greaterThanOrEqual(1995);
+      expect(multiplier).to.be.lessThanOrEqual(2010);
+    });
+
+    it("returns 3000 at 365 days (max cap)", async function () {
+      await time.increase(365 * 86400);
+      const multiplier = await staking.getLockupMultiplier(node1.address);
+      expect(multiplier).to.equal(3000);
+    });
+
+    it("returns 3000 beyond 365 days (capped)", async function () {
+      await time.increase(500 * 86400);
+      expect(await staking.getLockupMultiplier(node1.address)).to.equal(3000);
+    });
+
+    it("returns 1000 for inactive (unstake-requested) node", async function () {
+      await time.increase(180 * 86400); // would be 2x if active
+      await staking.connect(node1).requestUnstake();
+      expect(await staking.getLockupMultiplier(node1.address)).to.equal(1000);
+    });
+
+    it("multiplier increases continuously (no step jumps)", async function () {
+      // Sample at multiple points and verify monotonic increase
+      const checkpoints = [0, 15, 30, 45, 60, 75, 90, 120, 150, 180, 270, 365, 400];
+      let prev = 0n;
+      for (const day of checkpoints) {
+        if (day > 0) await time.increase(
+          (day - Number(checkpoints[checkpoints.indexOf(day) - 1])) * 86400,
+        );
+        const m = await staking.getLockupMultiplier(node1.address);
+        expect(m).to.be.greaterThanOrEqual(prev);
+        prev = m;
+      }
+      expect(prev).to.equal(3000);
+    });
+  });
 });
