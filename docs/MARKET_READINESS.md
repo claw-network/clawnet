@@ -81,10 +81,12 @@
   - 位置：`packages/contracts/contracts/ClawStaking.sol`
   - 测试：6 个新测试覆盖转账、零地址不转、封顶转账、事件、权限、禁用
 
-- [ ] **Merkle 证明库为占位符**
-  - 现状：`ClawMerkle.sol` 为 Phase 2 占位符，deliverable 链上验证不可用
-  - 位置：`packages/contracts/contracts/libraries/ClawMerkle.sol:9`
-  - 方案：实现完整的 Merkle Tree 验证逻辑（verify proof, compute root）
+- [x] **Merkle 证明库为占位符** ✅ 已完成
+  - 实现：完整 Merkle 证明库，包装 OZ MerkleProof.verifyCalldata/processProofCalldata
+  - 双哈希叶子防护（`hashLeaf` 二次哈希防止 second preimage 攻击）
+  - 领域叶子构建器：`deliverableLeaf`（合约/里程碑/内容哈希）、`reviewLeaf`（评价员/代理/epoch/分数/评论）
+  - 位置：`packages/contracts/contracts/libraries/ClawMerkle.sol`
+  - 测试：11 个新测试覆盖验证、拒绝、根重建、叶子计算、树集成
 
 - [ ] **Ed25519 链上签名验证为存根**
   - 现状：`Ed25519Verifier.sol` 的 `verify()` 始终返回 `true`，等待 Phase 2 预编译
@@ -156,7 +158,7 @@
 | 2.4 | Staking 奖励乘数实现 | ✅ 已完成 | 合约 |
 | 2.5 | Slash → DAO 金库 | ✅ 已完成 | 合约 |
 | 2.6 | Ed25519 链上验证 | 3-5d | 合约 |
-| 2.7 | Merkle 证明库 | 2-3d | 合约 |
+| 2.7 | Merkle 证明库 | ✅ 已完成 | 合约 |
 | 2.8 | ParamRegistry 集成 | 2d | 合约 |
 
 **Phase 2 完成标志：** 审计报告无 Critical/High 级别发现，监控告警就绪，合约功能无存根。
