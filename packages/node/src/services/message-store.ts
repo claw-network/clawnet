@@ -292,8 +292,10 @@ export class MessageStore {
     const params: unknown[] = [];
 
     if (opts.topic) {
-      sql += ' AND topic = ?';
-      params.push(opts.topic);
+      const topicClauses = this.buildTopicFilter(opts.topic, params);
+      if (topicClauses) {
+        sql += ` AND (${topicClauses})`;
+      }
     }
     if (opts.sinceMs) {
       sql += ' AND received_at_ms > ?';
@@ -325,6 +327,30 @@ export class MessageStore {
       compressed: r.compressed === 1,
       encrypted: r.encrypted === 1,
     }));
+  }
+
+  /**
+   * Build a SQL WHERE clause for topic filtering.
+   * Supports wildcards (`telagent/*`) and comma-separated lists (`a,b,c`).
+   */
+  private buildTopicFilter(filter: string, params: unknown[]): string | null {
+    const parts = filter.split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length === 0) return null;
+
+    const clauses: string[] = [];
+    for (const part of parts) {
+      if (part.endsWith('*')) {
+        // Prefix match: telagent/* → topic LIKE 'telagent/%'
+        const prefix = part.slice(0, -1);
+        clauses.push('topic LIKE ?');
+        // Escape SQL LIKE wildcards in the prefix, then append %
+        params.push(prefix.replace(/[%_]/g, '\\$&') + '%');
+      } else {
+        clauses.push('topic = ?');
+        params.push(part);
+      }
+    }
+    return clauses.join(' OR ');
   }
 
   /** Fetch a single inbox message by ID (for payload download). */

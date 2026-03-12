@@ -41,9 +41,10 @@
 
 ### P2 — 后续优化
 
-- [ ] **WebSocket 主题通配符订阅**
-  - 现状：无法订阅 `telagent/*` 等前缀过滤，客户端被迫全量接收再过滤
-  - 方案：在 `ws-messaging.ts` 添加 glob/prefix 匹配支持
+- [x] **WebSocket 主题通配符订阅** ✅ 已实现
+  - 支持通配符前缀：`telagent/*` 匹配所有以 `telagent/` 开头的主题
+  - 支持逗号分隔：`telagent/envelope,chat/message` 订阅多个主题
+  - 实时推送（`buildTopicMatcher`）和重放回放（`getInbox` SQL LIKE）均支持通配符
 
 - [ ] **拜占庭容错/网络分区测试**
   - 现状：无网络分区场景测试
@@ -156,7 +157,7 @@
 
 | 序号 | 任务 |
 |------|------|
-| 3.1 | WebSocket 主题通配符 |
+| 3.1 | ~~WebSocket 主题通配符~~ ✅ 已完成 |
 | 3.2 | 拜占庭容错测试 |
 | 3.3 | 多链支持规划 |
 | 3.4 | SDK 功能增强（WebSocket 客户端、重试策略） |

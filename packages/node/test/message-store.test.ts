@@ -62,6 +62,37 @@ describe('MessageStore', () => {
       expect(filtered[0].topic).toBe('telagent/envelope');
     });
 
+    it('filters by wildcard prefix topic', () => {
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'telagent/envelope', payload: b('d1') });
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'telagent/receipt', payload: b('d2') });
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'other/topic', payload: b('d3') });
+
+      const filtered = store.getInbox({ topic: 'telagent/*' });
+      expect(filtered).toHaveLength(2);
+      expect(filtered.map(m => m.topic).sort()).toEqual(['telagent/envelope', 'telagent/receipt']);
+    });
+
+    it('filters by comma-separated topics', () => {
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'telagent/envelope', payload: b('d1') });
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'chat/message', payload: b('d2') });
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'other/topic', payload: b('d3') });
+
+      const filtered = store.getInbox({ topic: 'telagent/envelope,chat/message' });
+      expect(filtered).toHaveLength(2);
+      expect(filtered.map(m => m.topic).sort()).toEqual(['chat/message', 'telagent/envelope']);
+    });
+
+    it('filters by mixed wildcard and exact topics', () => {
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'telagent/envelope', payload: b('d1') });
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'telagent/receipt', payload: b('d2') });
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'chat/message', payload: b('d3') });
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'other/topic', payload: b('d4') });
+
+      const filtered = store.getInbox({ topic: 'telagent/*,chat/message' });
+      expect(filtered).toHaveLength(3);
+      expect(filtered.map(m => m.topic).sort()).toEqual(['chat/message', 'telagent/envelope', 'telagent/receipt']);
+    });
+
     it('filters by sinceMs', () => {
       const before = Date.now();
       store.addToInbox({
