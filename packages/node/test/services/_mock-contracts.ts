@@ -37,12 +37,18 @@ export function mockTxResponse(receiptOverrides: Record<string, unknown> = {}) {
 // Mock contract factory — auto-creates vi.fn() for every accessed method
 // ---------------------------------------------------------------------------
 
+const CONTRACT_ADDRESS = '0x' + '22'.repeat(20);
+
 export function mockContract(
   stubs: Record<string, unknown> = {},
    
 ): Record<string, any> {
    
-  const contract: any = new Proxy(stubs, {
+  const defaults: Record<string, unknown> = {
+    getAddress: vi.fn().mockResolvedValue(CONTRACT_ADDRESS),
+  };
+  const merged = { ...defaults, ...stubs };
+  const contract: any = new Proxy(merged, {
     get(target, prop: string) {
       if (prop in target) return target[prop];
       // Auto-create a vi.fn stub the first time a method is accessed.
@@ -98,6 +104,7 @@ export function createMockProvider(
     get: vi.fn((key: string) => (contracts as Record<string, MockContract>)[key]),
     provider: {
       getTransactionCount: vi.fn().mockResolvedValue(0),
+      getNetwork: vi.fn().mockResolvedValue({ chainId: 31337n }),
     },
     signer: {
       signMessage: vi.fn().mockResolvedValue('0x' + 'ab'.repeat(65)),

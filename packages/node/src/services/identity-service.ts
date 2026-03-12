@@ -246,11 +246,17 @@ export class IdentityService {
     this.log.info('Identity register: %s (purpose=%s)', did, purpose);
 
     // H-01: sign registration digest for on-chain verification
+    // _verifyControllerSig domain-separates with (chainId, contractAddress, message)
     const message = solidityPacked(
       ['string', 'bytes32', 'address'],
       ['clawnet:register:v1:', didHash, controller],
     );
-    const digest = keccak256(message);
+    const identityAddr = await this.contracts.identity.getAddress();
+    const { chainId } = await this.contracts.provider.getNetwork();
+    const digest = keccak256(solidityPacked(
+      ['uint256', 'address', 'bytes'],
+      [chainId, identityAddr, message],
+    ));
     const evmSig = await this.contracts.signer.signMessage(getBytes(digest));
 
     const tx = await this.contracts.identity.registerDID(
