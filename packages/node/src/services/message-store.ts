@@ -207,6 +207,21 @@ export class MessageStore {
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.exec(SCHEMA_SQL);
+    this.migrateSchema();
+  }
+
+  /** Add columns that may be missing from older database files. */
+  private migrateSchema(): void {
+    const addColumnIfMissing = (table: string, column: string, colDef: string) => {
+      const cols = this.db.pragma(`table_info(${table})`) as { name: string }[];
+      if (!cols.some((c) => c.name === column)) {
+        this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${colDef}`);
+      }
+    };
+    addColumnIfMissing('inbox', 'compressed', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing('inbox', 'encrypted', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing('outbox', 'compressed', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing('outbox', 'encrypted', 'INTEGER NOT NULL DEFAULT 0');
   }
 
   // ── Inbox ──────────────────────────────────────────────────────
