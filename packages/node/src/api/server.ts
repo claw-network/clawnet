@@ -8,6 +8,7 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import { Router } from './router.js';
 import { createCors, createErrorBoundary, requestLogger, createRateLimiter } from './middleware.js';
+import { metricsMiddleware } from './metrics.js';
 import { apiKeyAuth } from './auth.js';
 import { attachWebSocketHandler } from './ws-messaging.js';
 import { attachDeliveryStreamHandler } from './ws-delivery-stream.js';
@@ -35,6 +36,7 @@ import { messagingRoutes } from './routes/messaging.js';
 import { relayRoutes } from './routes/relay.js';
 import { deliverableRoutes } from './routes/deliverables.js';
 import { authRoutes } from './routes/auth.js';
+import { metricsRoutes } from './routes/metrics.js';
 
 export { ApiServerConfig } from './types.js';
 export type { RuntimeContext } from './types.js';
@@ -66,6 +68,7 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/relay', relayRoutes(ctx));
   api.mount('/api/v1/auth', authRoutes(ctx));
   api.mount('/api/v1/deliverables', deliverableRoutes(ctx));
+  api.mount('/api/v1/metrics', metricsRoutes(ctx));
 
   // Dev routes (faucet, etc.) are NOT available on mainnet — prevents unauthorized minting.
   if (ctx.config.network !== 'mainnet') {
@@ -156,19 +159,22 @@ export class ApiServer {
     });
     const errorMiddleware = createErrorBoundary({ hideDetails: isMainnet });
     const rateLimitMiddleware = createRateLimiter(this.config.rateLimit);
+    const metricsRecorder = metricsMiddleware();
 
     this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      // Middleware chain: CORS → rate limit → auth → error boundary → logger → router
+      // Middleware chain: CORS → metrics → rate limit → auth → error boundary → logger → router
       void corsMiddleware(req, res, async () => {
-        await rateLimitMiddleware(req, res, async () => {
-          await authMiddleware(req, res, async () => {
-            await errorMiddleware(req, res, async () => {
-              await requestLogger(() => {})(req, res, async () => {
-                const matched = await router.handle(req, res);
-                if (!matched && !res.headersSent) {
-                  res.writeHead(404, { 'Content-Type': 'application/json' });
-                  res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
-                }
+        await metricsRecorder(req, res, async () => {
+          await rateLimitMiddleware(req, res, async () => {
+            await authMiddleware(req, res, async () => {
+              await errorMiddleware(req, res, async () => {
+                await requestLogger(() => {})(req, res, async () => {
+                  const matched = await router.handle(req, res);
+                  if (!matched && !res.headersSent) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
+                  }
+                });
               });
             });
           });

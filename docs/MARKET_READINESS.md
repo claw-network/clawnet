@@ -24,10 +24,15 @@
 
 ### P1 — 主网前必须完成
 
-- [ ] **Prometheus 指标导出**
-  - 现状：节点无 `/metrics` 端点，无法接入 Grafana 监控
-  - 方案：添加 `prom-client` 导出关键指标（请求延迟、tx 吞吐量、P2P 连接数、区块高度、escrow 数量等）
-  - 相关文件：`packages/node/src/api/server.ts`
+- [x] **Prometheus 指标导出** ✅ `v0.6.6`
+  - 已实现：`GET /api/v1/metrics` 端点导出 Prometheus 格式指标，可直接接入 Grafana
+  - HTTP 指标：`clawnet_http_request_duration_seconds`（直方图）、`clawnet_http_requests_total`（计数器），按 method/route/status_code 分标签
+  - 节点指标：`clawnet_block_height`、`clawnet_p2p_peers`、`clawnet_p2p_connections`、`clawnet_node_uptime_seconds`
+  - 中继指标：`clawnet_relay_active_circuits`、`clawnet_relay_bytes_total`、`clawnet_relay_messages_total`
+  - 进程指标：CPU、内存、event loop 延迟等（`prom-client` 默认指标）
+  - 路径归一化防止标签基数爆炸（DID/地址/数字ID → `:id`）
+  - `/metrics` 免认证免限流，支持 Prometheus 直接抓取
+  - 相关文件：`packages/node/src/api/metrics.ts`、`packages/node/src/api/routes/metrics.ts`、`packages/node/src/api/server.ts`
 
 - [ ] **集中式日志方案**
   - 现状：日志仅输出到 stdout，systemd journal 本地存储
@@ -122,6 +127,7 @@
 | P2P 同步 | ✅ | libp2p gossipsub + 速率限制 |
 | 消息限流 | ✅ | 600/min per-DID + 300/min per-peer inbound + 3000/min global |
 | API 全局限流 | ✅ | per-IP 滑动窗口：读 300/min、写 60/min，429 + Retry-After |
+| Prometheus 指标 | ✅ | `/api/v1/metrics` 导出 HTTP 延迟/吞吐 + 链高度 + P2P + 中继 + 进程指标 |
 | 链索引 | ✅ | `eth_getLogs` 轮询 + SQLite 持久化 |
 
 ---
@@ -144,7 +150,7 @@
 | 序号 | 任务 | 估计工作量 | 负责 |
 |------|------|-----------|------|
 | 2.1 | 智能合约安全审计 | 2-4w（外部） | 安全 |
-| 2.2 | Prometheus + Grafana 监控 | 2-3d | 后端+运维 |
+| 2.2 | Prometheus + Grafana 监控 | ✅ 指标导出已完成，Grafana 仪表盘配置待部署 | 后端+运维 |
 | 2.3 | 集中式日志 | 1-2d | 运维 |
 | 2.4 | Staking 奖励乘数实现 | 2-3d | 合约 |
 | 2.5 | Slash → DAO 金库 | 1d | 合约 |

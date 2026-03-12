@@ -168,8 +168,9 @@ export function createRateLimiter(options?: RateLimitOptions): Middleware {
     const method = req.method ?? 'GET';
     if (method === 'OPTIONS') return true;
     const url = req.url ?? '/';
-    // Node status endpoint is always public
+    // Node status and metrics endpoints are always public
     if (url === '/api/v1/node' || url === '/api/v1/node/') return true;
+    if (url === '/api/v1/metrics' || url === '/api/v1/metrics/') return true;
     return false;
   }
 

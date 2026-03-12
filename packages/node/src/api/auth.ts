@@ -41,6 +41,8 @@ export function getApiKeyAuth(req: IncomingMessage): ApiKeyAuth | undefined {
 const PUBLIC_ROUTES: Array<(url: string, method: string) => boolean> = [
   // Node status — needed by health checks and SDK connection probing
   (url) => url === '/api/v1/node' || url === '/api/v1/node/',
+  // Prometheus metrics scrape endpoint
+  (url) => url === '/api/v1/metrics' || url === '/api/v1/metrics/',
   // OPTIONS (CORS preflight)
   (_url, method) => method === 'OPTIONS',
 ];
