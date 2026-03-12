@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { metricsRegistry, httpRequestsTotal, httpRequestDuration, metricsMiddleware, blockHeight, p2pPeers } from '../src/api/metrics.js';
+import { metricsRegistry, metricsMiddleware, blockHeight, p2pPeers } from '../src/api/metrics.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 function mockReq(method = 'GET', url = '/api/v1/wallet'): IncomingMessage {

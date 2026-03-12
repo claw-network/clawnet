@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createRateLimiter } from '../src/api/middleware.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
