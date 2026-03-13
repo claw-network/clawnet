@@ -286,6 +286,10 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 - 集成测试覆盖注册与轮换正反用例
 - 节点升级和回滚流程已经演练
 
+mainnet 推进前的现场执行清单：见 `infra/besu/mainnet-rollout-checklist.md`。
+
+Besu fork 实现者与运维的一页交接摘要：见 `infra/besu/implementer-ops-handoff.md`。
+
 ---
 
 ## 6. 仓库内具体改动清单

@@ -31,6 +31,8 @@ Before testnet rollout, fill in and keep updated:
 - `infra/besu/ed25519-precompile-spec.md`: repository-side interface contract, test vectors, and acceptance commands for the `0x0100` Ed25519 precompile
 - `infra/besu/ed25519-precompile-task-list.md`: detailed implementation and rollout checklist for the Besu fork workstream
 - `infra/besu/testnet-rollout-checklist.md`: operator-facing checklist for testnet rollout, smoke checks, and rollback using `CLAWNET_BESU_IMAGE`
+- `infra/besu/mainnet-rollout-checklist.md`: stricter promotion checklist for mainnet rollout after testnet validation
+- `infra/besu/implementer-ops-handoff.md`: one-page summary for the Besu fork implementer and chain operators
 - `docs/implementation/tasks/besu-ed25519-precompile-rollout.md`: rollout plan across devnet, testnet, and mainnet
 
 ## Usage
