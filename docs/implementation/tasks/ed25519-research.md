@@ -1,5 +1,7 @@
 # Ed25519 On-Chain Verification — Research & Decision
 
+> **状态更新（2026-03-13）**: 本文保留为研究记录。运行时假设中的“Reth 自定义预编译”已经过时，当前可执行计划已切换为 Besu 路线，见 `docs/implementation/tasks/besu-ed25519-precompile-rollout.md`。
+
 > T-0.13 产出物。评估 Ed25519 签名在 ClawNet Chain（独立 EVM 链）上的验证方案。
 
 ## 1. 背景
@@ -9,20 +11,20 @@ ClawNet 的 DID 体系使用 Ed25519 密钥对。关键操作（密钥轮换 `ro
 
 ## 2. 方案对比
 
-### 方案 A：Reth 自定义预编译
+### 方案 A：Besu 自定义预编译
 
-- **原理**：在 Reth 节点软件中注册一个自定义预编译合约（如 `0x0100`），
+- **原理**：在 Besu 节点软件中注册一个自定义预编译合约（如 `0x0100`），
   接受 `(message, signature, pubkey)` 输入，执行 Ed25519 验证，返回 `bool`。
 - **优点**：
   - Gas 成本极低（~3,000 gas，类似 `ecrecover`）
   - 链上验证最安全
   - ClawNet 是独立链，可自由添加预编译
 - **缺点**：
-  - 需要 Fork Reth 源码（Rust），增加维护成本
-  - 升级 Reth 时需合并自定义代码
+  - 需要 Fork Besu 源码，增加维护成本
+  - 升级 Besu 时需合并自定义代码
   - 需要所有验证者节点同步升级
-- **工时**：~5 天（Rust 实现 + 测试 + 节点端部署）
-- **风险**：中等（Reth API 可能变动）
+- **工时**：~5 天（链客户端实现 + 测试 + 节点端部署）
+- **风险**：中等（Besu 内部 API 可能变动）
 
 ### 方案 B：纯 Solidity Ed25519 验证库
 
@@ -58,7 +60,7 @@ ClawNet 的 DID 体系使用 Ed25519 密钥对。关键操作（密钥轮换 `ro
 
 - **优点**：
   - **零额外 Gas 成本**
-  - 不需要 Reth fork
+  - 不需要 Besu fork
   - 实现简单，当前 ClawIdentity.sol 已经是此模式
   - 可在 Phase 2 随时升级到方案 A（添加预编译后加一个 `verify()` 调用即可）
 - **缺点**：
@@ -83,10 +85,10 @@ ClawNet 的 DID 体系使用 Ed25519 密钥对。关键操作（密钥轮换 `ro
 1. ClawIdentity.sol 已实现此模式，代码已通过 49 个测试，覆盖率 100%
 2. Gas 成本为零（无额外验证开销）
 3. 安全性由 `onlyController` 保障，与 EVM 原生安全模型一致
-4. 保持升级路径：Phase 2 可通过添加 Reth 自定义预编译无缝升级到方案 A
+4. 保持升级路径：Phase 2 可通过添加 Besu 自定义预编译无缝升级到方案 A
 
 **Phase 2 升级路线**：
-1. 在 Reth 中添加 Ed25519 预编译（方案 A）
+1. 在 Besu 中添加 Ed25519 预编译（方案 A）
 2. Ed25519Verifier.sol 调用预编译进行验证
 3. ClawIdentity.rotateKey() 添加可选的链上验证调用
 4. 通过 DAO 提案启用链上验证（开关参数存 ParamRegistry）
@@ -119,7 +121,7 @@ library Ed25519Verifier {
 
 - [ed25519 RFC 8032](https://tools.ietf.org/html/rfc8032)
 - [@noble/ed25519](https://github.com/paulmillr/noble-ed25519) — TypeScript 实现
-- [Reth Custom Precompile Docs](https://paradigmxyz.github.io/reth/docs/) 
+- Hyperledger Besu fork and runtime integration notes
 - ClawNet crypto-spec: `docs/implementation/crypto-spec.md`
 - ClawIdentity.sol: 当前已实现链下验证 + onlyController 模式
 

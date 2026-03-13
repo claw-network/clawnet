@@ -4,8 +4,10 @@ pragma solidity ^0.8.28;
 /**
  * @title Ed25519Verifier
  * @notice Ed25519 signature helper library for ClawNet.
- * @dev Phase 1 implements off-chain verification (Approach C from T-0.13 research).
- *      On-chain verification is deferred to Phase 2 (Reth custom precompile at 0x0100).
+ * @dev Phase 1 implements the precompile adapter and fail-closed semantics while
+ *      ClawIdentity continues to use controller ECDSA proof on its main path.
+ *      Phase 2 on-chain Ed25519 verification is targeted at a Besu custom
+ *      precompile backend at address 0x0100.
  *
  *      This library provides:
  *      - Domain-separated signing payloads for key rotation, DID registration, platform links
