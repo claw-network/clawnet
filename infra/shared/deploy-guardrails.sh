@@ -99,3 +99,31 @@ ensure_remote_besu_image_ready() {
     exit 1
   fi
 }
+
+# ── Backup cron setup ────────────────────────────────────────────────────────
+# Sets up daily backup cron on a remote host.
+# Usage: setup_backup_cron <host> [data_dir]
+#   host      — remote server IP
+#   data_dir  — clawnetd data directory (default: /opt/clawnet/clawnetd-data)
+setup_backup_cron() {
+  local host="$1"
+  local data_dir="${2:-/opt/clawnet/clawnetd-data}"
+  local backup_script="/opt/clawnet/infra/shared/backup.sh"
+  local cron_entry="0 3 * * * DATA_DIR=$data_dir $backup_script >> /var/log/clawnet-backup.log 2>&1"
+
+  echo "  [$host] Setting up backup cron..."
+
+  # Ensure backup dir and script exist
+  run_remote "$host" "mkdir -p /backup/clawnet"
+  run_remote "$host" "chmod +x $backup_script"
+
+  # Install cron idempotently — skip if already present
+  local has_cron
+  has_cron=$(run_remote "$host" "crontab -l 2>/dev/null | grep -cF 'infra/shared/backup.sh' || echo 0")
+  if [[ "$has_cron" == "0" ]]; then
+    run_remote "$host" "(crontab -l 2>/dev/null; echo '$cron_entry') | crontab -"
+    echo "  [$host] Backup cron installed (daily 3am UTC, 7-day retention)"
+  else
+    echo "  [$host] Backup cron already present, skipping"
+  fi
+}

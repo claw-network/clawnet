@@ -871,6 +871,16 @@ install_docs_service "$SERVER_A" "docs.clawnetd.com"
 echo "  Documentation site deployed."
 echo ""
 
+# ══════════════════════════════════════════════════════════════════
+# Phase 16: Enable automated backups on all servers
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 16: Enabling automated backups..."
+for HOST in $SERVER_A $SERVER_B $SERVER_C; do
+  setup_backup_cron "$HOST"
+done
+echo "  Automated backups enabled on all servers."
+echo ""
+
 echo "============================================================"
 echo "Redeployment complete!"
 echo "============================================================"

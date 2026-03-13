@@ -1,8 +1,8 @@
 # ClawNet 市场就绪审计报告
 
-> 审计日期：2026-03-12
+> 审计日期：2026-03-13
 > 当前版本：v0.6.6
-> 整体就绪度：**85%**（Testnet 公开可用，Mainnet 需完成 Phase 2）
+> 整体就绪度：**91%**（Testnet 公开可用，Besu Ed25519 预编译 Testnet 已验证，ParamRegistry 集成代码就绪，备份已启用，Mainnet 需完成 Phase 2）
 
 ---
 
@@ -88,28 +88,35 @@
   - 位置：`packages/contracts/contracts/libraries/ClawMerkle.sol`
   - 测试：11 个新测试覆盖验证、拒绝、根重建、叶子计算、树集成
 
-- [ ] **Ed25519 链上签名验证为存根**
-  - 现状：`Ed25519Verifier.sol` 已改为预编译适配器；在链上 Ed25519 backend 缺失时会显式 revert `Ed25519VerificationUnavailable()`，不再静默返回成功或失败
-  - 当前主路径：`ClawIdentity` 的注册/轮换已使用 controller 的 ECDSA proof-of-possession，避免把未落地的 Ed25519 verifier 接入主网关键路径
+- [ ] **Ed25519 链上签名验证为存根**（Testnet ✅ 已验证，Mainnet 待执行）
+  - **Testnet（2026-03-13 完成）**：选定方案 A（Besu 自定义预编译），Testnet 三台验证者已全部切换到 `ghcr.io/claw-network/besu-ed25519:24.12.2-494c77f440-amd64`，Ed25519 探测和合约测试均通过，当前处于观察窗口期
+  - **Mainnet**：待 Testnet 观察窗口关闭后执行，部署脚本已加固（架构预检、GHCR 登录重试、健康检查）
+  - **`ClawIdentity` 主路径**：注册/轮换仍使用 controller 的 ECDSA proof-of-possession，主路径切换至 Ed25519 预编译的决策**有意推迟**至 Testnet 观察窗口完成后
+  - `Ed25519Verifier.sol` 为预编译适配器，backend 缺失时显式 revert `Ed25519VerificationUnavailable()`
   - 位置：`packages/contracts/contracts/libraries/Ed25519Verifier.sol`、`packages/contracts/contracts/ClawIdentity.sol`
-  - 仓库已具备最小集成骨架：`infra/devnet/docker-compose.ed25519.yml`、`scripts/test-ed25519-precompile.mjs`、`packages/contracts/test/Ed25519Verifier.besu.test.ts`
-  - 方案（二选一）：
-    - A. 部署自定义 Besu 节点，添加 Ed25519 预编译（地址 0x0100）
-    - B. 接入纯 Solidity 实现（例如 SCL / SmoothCryptoLib，gas 较高但可用）
-  - 执行计划：`docs/implementation/tasks/besu-ed25519-precompile-rollout.md`
+  - 部署加固：`infra/shared/deploy-guardrails.sh`（共享守卫）、`infra/testnet/prod/deploy.sh`、`infra/mainnet/prod/deploy.sh`
+  - 状态文档：`docs/handover/20260313-besu-ed25519-status-summary.md`
 
 ### P2 — 后续优化
 
-- [ ] **Escrow/Staking 参数未接入 ParamRegistry**
-  - 现状：费率等参数硬编码在合约存储中，只能通过 admin 函数单独修改
-  - 位置：`ClawEscrow.sol:378`、`ClawStaking.sol:386`
-  - 代码标记：`Phase 2 will move to ParamRegistry`
-  - 方案：将 `feeRate`、`minStake`、`lockPeriod` 等参数迁移到 ParamRegistry，合约运行时读取
+- [x] **Escrow/Staking 参数接入 ParamRegistry** ✅ 代码已完成，运维激活待执行
+  - 合约层面已全部实现：`paramRegistry` 状态变量 + `setParamRegistry()` + 双路 fallback 读取逻辑
+  - **ClawEscrow**：`_calculateFee()` 优先读 `ESCROW_BASE_RATE`、`ESCROW_HOLDING_RATE`、`ESCROW_MIN_FEE`，本地存储兜底
+  - **ClawStaking**：`_getMinStake()`、`_getUnstakeCooldown()`、`_getSlashPerViolation()` 均已接入 `MIN_NODE_STAKE`、`UNSTAKE_COOLDOWN`、`SLASH_PER_VIOLATION`
+  - **ParamRegistry**：所有对应 key 常量已定义，bounds 校验已实现
+  - 剩余运维操作（部署后执行一次即可）：
+    1. 在 ParamRegistry 合约调用 `setParam()` 写入初始值
+    2. 在 ClawEscrow / ClawStaking 调用 `setParamRegistry(paramRegistryAddress)` 激活接入
+    3. 后续参数修改走 ClawDAO → GOVERNOR_ROLE 治理路径
+  - 位置：`ClawEscrow.sol`、`ClawStaking.sol`、`ParamRegistry.sol`
 
-- [ ] **备份策略未启用**
-  - 现状：infra 文档有 cron 命令示例但生产环境未配置，`BACKUP_TARGET` 为空
-  - 位置：`infra/testnet/.env.example:85`、`infra/README.md:860`
-  - 方案：在服务器配置每日 cron 备份 chain-data + SQLite，rsync 到远程存储
+- [x] **备份策略已启用** ✅ 2026-03-13
+  - 脚本：`infra/shared/backup.sh`，每日 03:00 UTC 自动执行
+  - SQLite 热备份（`sqlite3 .backup`，节点在线时也安全）：`api-keys.sqlite`、`indexer.sqlite`、`messages.sqlite`
+  - Besu chain-data 全量打包：`/opt/clawnet/chain-data/`
+  - 归档存放：`/backup/clawnet/`，7 天自动清理
+  - 日志：`/var/log/clawnet-backup.log`
+  - 已验证首次运行：2 个归档，共 1.1M
 
 ---
 
@@ -146,7 +153,7 @@
 |------|------|-----------|------|
 | 1.1 | X25519 密钥持久化 | ✅ 已完成 | 后端 |
 | 1.2 | API 全局限流 | ✅ 已完成 | 后端 |
-| 1.3 | 启用备份 cron | 0.5d | 运维 |
+| 1.3 | 启用备份 cron | ✅ 已完成（`infra/shared/backup.sh`，每日 3am UTC，7 天保留） | 运维 |
 | 1.4 | 压力测试脚本 + 基线 | 2-3d | QA |
 
 **Phase 1 完成标志：** Testnet 可接受外部开发者注册、调用 API、发布市场，72 小时无人工干预稳定运行。
@@ -160,9 +167,9 @@
 | 2.3 | 集中式日志 | 1-2d | 运维 |
 | 2.4 | Staking 奖励乘数实现 | ✅ 已完成 | 合约 |
 | 2.5 | Slash → DAO 金库 | ✅ 已完成 | 合约 |
-| 2.6 | Ed25519 链上验证 | 3-5d | 合约 |
+| 2.6 | Ed25519 链上验证 | Testnet ✅ 验证通过；Mainnet 待观察窗口关闭后执行 | 合约+运维 |
 | 2.7 | Merkle 证明库 | ✅ 已完成 | 合约 |
-| 2.8 | ParamRegistry 集成 | 2d | 合约 |
+| 2.8 | ParamRegistry 集成 | ✅ 代码已完成；部署后调用 `setParamRegistry()` 激活（0.5d 运维） | 合约+运维 |
 
 **Phase 2 完成标志：** 审计报告无 Critical/High 级别发现，监控告警就绪，合约功能无存根。
 

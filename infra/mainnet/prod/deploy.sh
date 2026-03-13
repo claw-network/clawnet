@@ -883,6 +883,16 @@ install_docs_service "$SERVER_1" "docs.clawnet.io"
 echo "  Documentation site deployed."
 echo ""
 
+# ══════════════════════════════════════════════════════════════════
+# Phase 15: Enable automated backups on all servers
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 15: Enabling automated backups..."
+for HOST in $ALL_SERVERS; do
+  setup_backup_cron "$HOST"
+done
+echo "  Automated backups enabled on all servers."
+echo ""
+
 echo "============================================================"
 echo "Deployment complete!"
 echo "============================================================"
