@@ -190,6 +190,8 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 
 目标：让定制 Besu 对 `0x0100` 给出可验证、可测试的响应。
 
+链客户端实现输入规范：见 `infra/besu/ed25519-precompile-spec.md`。
+
 外部 Besu fork 任务：
 
 1. 在 Besu EVM 预编译注册流程中挂载 `0x0100`
@@ -223,6 +225,8 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 - `packages/contracts/test/Ed25519Verifier.besu.test.ts`
 
 当前仓库状态：以上 3 个入口已经落地，可作为 Phase 2 的最小执行骨架；后续只需把 `CLAWNET_BESU_IMAGE` 指向真实带预编译的 Besu 镜像。
+
+仓库侧验收命令与固定测试向量：见 `infra/besu/ed25519-precompile-spec.md`。
 
 约束：
 

@@ -41,6 +41,10 @@ CLAWNET_BESU_IMAGE=clawnet/besu-ed25519:dev \
 docker compose -f docker-compose.ed25519.yml up -d
 
 ../../scripts/test-ed25519-precompile.mjs
+
+CLAWNET_BESU_PRECOMPILE_TEST=1 \
+CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
+pnpm --dir ../.. contracts:test:ed25519:besu
 ```
 
 停止：
@@ -48,6 +52,8 @@ docker compose -f docker-compose.ed25519.yml up -d
 ```bash
 docker compose -f docker-compose.ed25519.yml down
 ```
+
+固定测试向量与实现侧接口契约见 `../besu/ed25519-precompile-spec.md`。
 
 ## 脚本说明
 

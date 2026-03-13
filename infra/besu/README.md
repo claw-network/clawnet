@@ -26,6 +26,11 @@ Before testnet rollout, fill in and keep updated:
 - Built image digest
 - Change summary for custom precompiles
 
+## Related Docs
+
+- `infra/besu/ed25519-precompile-spec.md`: repository-side interface contract, test vectors, and acceptance commands for the `0x0100` Ed25519 precompile
+- `docs/implementation/tasks/besu-ed25519-precompile-rollout.md`: rollout plan across devnet, testnet, and mainnet
+
 ## Usage
 
 Local or remote compose invocation can override the image at runtime:
