@@ -40,10 +40,15 @@ cd infra/devnet
 CLAWNET_BESU_IMAGE=clawnet/besu-ed25519:dev \
 docker compose -f docker-compose.ed25519.yml up -d
 
+./fund-deployer.sh
+
+CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
+CLAWNET_BESU_CHAIN_ID=1337 \
 ../../scripts/test-ed25519-precompile.mjs
 
 CLAWNET_BESU_PRECOMPILE_TEST=1 \
 CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
+CLAWNET_BESU_CHAIN_ID=1337 \
 pnpm --dir ../.. contracts:test:ed25519:besu
 ```
 
