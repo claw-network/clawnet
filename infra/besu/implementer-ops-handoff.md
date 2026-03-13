@@ -144,6 +144,7 @@ pnpm ed25519:test:testnet
 
 ## Rollout Guardrails Captured In Repository
 
+- `infra/shared/deploy-guardrails.sh` is the shared source of truth for deploy guardrails used by both testnet and mainnet rollout scripts.
 - `infra/testnet/prod/deploy.sh` now pre-stashes dirty remote repositories before `git pull --ff-only`.
 - `infra/testnet/prod/deploy.sh` pre-pulls the Besu image on every validator, retries with GHCR login when needed, and fails early on architecture mismatches.
 - `infra/testnet/prod/deploy.sh` now runs the Ed25519 probe and focused Besu contract test automatically on Server A during rollout.
