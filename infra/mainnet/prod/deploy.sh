@@ -20,6 +20,7 @@
 #
 # Usage:
 #   cd infra/mainnet/prod
+#   GHCR_USERNAME=<github-user> GHCR_TOKEN=<ghcr-token> \
 #   bash deploy.sh
 # ==============================================================================
 set -euo pipefail
@@ -106,7 +107,12 @@ SERVER_4="${SERVER_4:?ERROR: SERVER_4 IP not set in secrets.env}"
 SERVER_5="${SERVER_5:?ERROR: SERVER_5 IP not set in secrets.env}"
 
 ALL_SERVERS="$SERVER_1 $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5"
+ALL_SERVER_ARRAY=($ALL_SERVERS)
 CLAWNET_BESU_IMAGE="${CLAWNET_BESU_IMAGE:-hyperledger/besu:24.12.2}"
+GHCR_USERNAME="${GHCR_USERNAME:-}"
+GHCR_TOKEN="${GHCR_TOKEN:-}"
+CLAWNET_AUTO_STASH_REMOTE_REPO="${CLAWNET_AUTO_STASH_REMOTE_REPO:-1}"
+DEPLOY_RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 
 SSH_USER="${SSH_USER:-root}"
 SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/.ssh/id_ed25519_clawnet}"
@@ -162,6 +168,105 @@ scp_from() {
     scp -i "$SSH_KEY_PATH" -o StrictHostKeyChecking=no "${SSH_USER}@$host:$src" "$dest"
   else
     sshpass -p "$SSH_PASS" scp -o StrictHostKeyChecking=no "${SSH_USER}@$host:$src" "$dest"
+  fi
+}
+
+shell_quote() {
+  printf "'%s'" "$(printf "%s" "$1" | sed "s/'/'\\''/g")"
+}
+
+normalize_arch() {
+  case "$1" in
+    x86_64|amd64)
+      echo "amd64"
+      ;;
+    aarch64|arm64)
+      echo "arm64"
+      ;;
+    *)
+      echo "$1"
+      ;;
+  esac
+}
+
+debug_remote_clawnetd() {
+  local host="$1"
+  run_remote "$host" "systemctl status clawnetd --no-pager -n 80 || true"
+  run_remote "$host" "journalctl -u clawnetd -n 120 --no-pager || true"
+}
+
+wait_for_remote_clawnetd_health() {
+  local host="$1"
+  local label="$2"
+  local attempt
+
+  for attempt in 1 2 3 4 5; do
+    if run_remote "$host" "systemctl is-active clawnetd >/dev/null && curl -sf http://127.0.0.1:9528/api/v1/node >/dev/null"; then
+      echo "  [$label] clawnetd health check passed (attempt $attempt)."
+      return 0
+    fi
+    sleep 3
+  done
+
+  echo "ERROR: [$label] clawnetd failed health checks after restart"
+  debug_remote_clawnetd "$host"
+  exit 1
+}
+
+prepare_remote_repo() {
+  local host="$1"
+  local dirty_status
+
+  dirty_status="$(run_remote "$host" "cd /opt/clawnet && git status --porcelain")"
+  if [[ -n "$dirty_status" ]]; then
+    if [[ "$CLAWNET_AUTO_STASH_REMOTE_REPO" != "1" ]]; then
+      echo "ERROR: remote repository on $host is dirty and CLAWNET_AUTO_STASH_REMOTE_REPO=0"
+      printf '%s\n' "$dirty_status"
+      exit 1
+    fi
+
+    local stash_label="auto-stash-mainnet-deploy-$DEPLOY_RUN_ID"
+    echo "  [$host] Remote repo dirty; stashing as $stash_label"
+    run_remote "$host" "cd /opt/clawnet && git stash push -u -m $(shell_quote "$stash_label") >/dev/null"
+  fi
+
+  echo "  [$host] git pull --ff-only..."
+  run_remote "$host" "cd /opt/clawnet && git pull --ff-only"
+}
+
+ensure_remote_besu_image_ready() {
+  local host="$1"
+  local image="$CLAWNET_BESU_IMAGE"
+  local quoted_image
+  local remote_arch
+  local image_arch
+
+  quoted_image="$(shell_quote "$image")"
+
+  echo "  [$host] Pre-pulling Besu image..."
+  if ! run_remote "$host" "docker pull $quoted_image >/dev/null"; then
+    if [[ "$image" == ghcr.io/* ]]; then
+      if [[ -z "$GHCR_USERNAME" || -z "$GHCR_TOKEN" ]]; then
+        echo "ERROR: failed to pull $image on $host. Set GHCR_USERNAME and GHCR_TOKEN for private GHCR images."
+        exit 1
+      fi
+
+      echo "  [$host] GHCR pull failed; logging into ghcr.io and retrying..."
+      run_remote "$host" "printf '%s\n' $(shell_quote "$GHCR_TOKEN") | docker login ghcr.io -u $(shell_quote "$GHCR_USERNAME") --password-stdin >/dev/null"
+      run_remote "$host" "docker pull $quoted_image >/dev/null"
+    else
+      echo "ERROR: failed to pull Besu image on $host: $image"
+      exit 1
+    fi
+  fi
+
+  remote_arch="$(normalize_arch "$(run_remote "$host" "uname -m")")"
+  image_arch="$(normalize_arch "$(run_remote "$host" "docker image inspect $quoted_image --format '{{.Architecture}}'")")"
+
+  echo "  [$host] Host arch=$remote_arch image arch=$image_arch"
+  if [[ "$remote_arch" != "$image_arch" ]]; then
+    echo "ERROR: Besu image architecture mismatch on $host (host=$remote_arch image=$image_arch image=$image)"
+    exit 1
   fi
 }
 
@@ -320,13 +425,12 @@ SVCEOF"
   echo "  [$host] Switching to systemd-managed daemon..."
   run_remote "$host" "systemctl stop clawnetd 2>/dev/null || true
 pkill -f '/opt/clawnet/packages/node/dist/daemon.js' 2>/dev/null || true
+systemctl reset-failed clawnetd 2>/dev/null || true
 systemctl daemon-reload
 systemctl enable clawnetd
 systemctl restart clawnetd"
 
-  run_remote "$host" "sleep 3
-systemctl is-active clawnetd >/dev/null
-curl -sf http://127.0.0.1:9528/api/v1/node >/dev/null"
+  wait_for_remote_clawnetd_health "$host" "$host"
   echo "  [$host] clawnetd active."
 }
 
@@ -364,6 +468,9 @@ for HOST in $ALL_SERVERS; do
   run_remote "$HOST" 'echo ok >/dev/null'
   echo "  [preflight] Runtime check on $HOST"
   run_remote "$HOST" 'test -d /opt/clawnet && command -v docker >/dev/null && command -v git >/dev/null && command -v python3 >/dev/null'
+  echo "  [preflight] Repo/image guardrails on $HOST"
+  prepare_remote_repo "$HOST"
+  ensure_remote_besu_image_ready "$HOST"
 done
 
 echo "  [preflight] Local bootstrap script syntax"
@@ -438,8 +545,7 @@ echo ""
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 3: Updating code on all servers..."
 for HOST in $ALL_SERVERS; do
-  echo "  [$HOST] git pull..."
-  run_remote "$HOST" 'cd /opt/clawnet && git pull' || true
+  echo "  [$HOST] Code already prepared during preflight."
 done
 echo ""
 
@@ -630,11 +736,11 @@ echo ""
 echo ">>> Phase 11: Verifying cluster health..."
 
 ALL_HEALTHY=true
-for i in "${!SERVERS[@]}"; do
+for i in "${!ALL_SERVER_ARRAY[@]}"; do
   NODE_NUM=$((i + 1))
-  BLOCK=$(rpc_block_number "${SERVERS[$i]}")
-  PEERS=$(rpc_peer_count "${SERVERS[$i]}")
-  echo "  Node $NODE_NUM (${SERVERS[$i]}): block=$BLOCK peers=$PEERS"
+  BLOCK=$(rpc_block_number "${ALL_SERVER_ARRAY[$i]}")
+  PEERS=$(rpc_peer_count "${ALL_SERVER_ARRAY[$i]}")
+  echo "  Node $NODE_NUM (${ALL_SERVER_ARRAY[$i]}): block=$BLOCK peers=$PEERS"
 
   if [[ "$BLOCK" -le 0 ]]; then
     echo "  ERROR: Node $NODE_NUM reports block number <= 0"
@@ -658,6 +764,24 @@ fi
 
 echo "  Cluster health checks passed."
 
+echo ""
+
+# ══════════════════════════════════════════════════════════════════
+# Phase 11b: Run Ed25519 smoke tests on Node 1
+# ══════════════════════════════════════════════════════════════════
+echo ">>> Phase 11b: Running Ed25519 smoke tests on Node 1..."
+
+run_remote "$SERVER_1" "cd /opt/clawnet && \
+  DEPLOYER_PRIVATE_KEY='$DEPLOYER_PRIVATE_KEY' \
+  CLAWNET_MAINNET_RPC_URL='http://127.0.0.1:8545' \
+  pnpm ed25519:probe:mainnet"
+
+run_remote "$SERVER_1" "cd /opt/clawnet && \
+  DEPLOYER_PRIVATE_KEY='$DEPLOYER_PRIVATE_KEY' \
+  CLAWNET_MAINNET_RPC_URL='http://127.0.0.1:8545' \
+  pnpm ed25519:test:mainnet"
+
+echo "  Ed25519 probe and focused contract test passed on Node 1."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
@@ -775,11 +899,13 @@ echo "  clawnetd systemd service installed."
 
 # 12d. Build and deploy node package
 echo "  [Node 1] Pulling latest code and building..."
-run_remote "$SERVER_1" "cd /opt/clawnet && git pull && pnpm install && pnpm build"
+run_remote "$SERVER_1" "cd /opt/clawnet && pnpm install && pnpm build"
 
 # 12e. Start clawnetd and verify EventIndexer
 echo "  [Node 1] Starting clawnetd..."
-run_remote "$SERVER_1" "systemctl restart clawnetd"
+run_remote "$SERVER_1" "systemctl reset-failed clawnetd 2>/dev/null || true && systemctl restart clawnetd"
+
+wait_for_remote_clawnetd_health "$SERVER_1" "Node 1"
 
 echo "  Waiting 10s for EventIndexer to start..."
 sleep 10
@@ -816,6 +942,10 @@ for HOST in $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5; do
   install_peer_clawnetd_service "$HOST" "$NODE_1_BOOTSTRAP_MULTIADDR"
 done
 
+for HOST in $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5; do
+  wait_for_remote_clawnetd_health "$HOST" "$HOST"
+done
+
 echo "  Waiting 10s for mesh convergence..."
 sleep 10
 
@@ -825,9 +955,9 @@ echo "  Node 1 clawnetd mesh: peers=$NODE_1_CLAWNET_PEERS connections=$NODE_1_CL
 
 if [[ "$NODE_1_CLAWNET_PEERS" -lt 4 || "$NODE_1_CLAWNET_CONNECTIONS" -lt 4 ]]; then
   echo "ERROR: clawnetd mesh not converged on Node 1 (expected peers/connections >= 4)"
-  run_remote "$SERVER_1" "systemctl status clawnetd --no-pager -n 80 || true"
+  debug_remote_clawnetd "$SERVER_1"
   for HOST in $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5; do
-    run_remote "$HOST" "systemctl status clawnetd --no-pager -n 80 || true"
+    debug_remote_clawnetd "$HOST"
   done
   exit 1
 fi

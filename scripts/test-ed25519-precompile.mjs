@@ -27,6 +27,12 @@ if (network === "clawnetTestnet") {
   }
 }
 
+if (network === "clawnetMainnet") {
+  if (env.CLAWNET_BESU_RPC_URL && !env.CLAWNET_MAINNET_RPC_URL) {
+    env.CLAWNET_MAINNET_RPC_URL = env.CLAWNET_BESU_RPC_URL;
+  }
+}
+
 execFileSync(
   "pnpm",
   [

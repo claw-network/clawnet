@@ -21,6 +21,9 @@ Status markers:
   - `infra/mainnet/prod/deploy.sh`
 - Image injection variable:
   - `CLAWNET_BESU_IMAGE`
+- Optional GHCR auth variables for private images:
+  - `GHCR_USERNAME`
+  - `GHCR_TOKEN`
 
 ## Release Inputs
 
@@ -79,6 +82,8 @@ Command:
 cd infra/mainnet/prod
 
 CLAWNET_BESU_IMAGE=ghcr.io/claw-network/besu-ed25519:<git-sha> \
+GHCR_USERNAME=<github-user> \
+GHCR_TOKEN=<ghcr-token> \
 SSH_KEY_PATH=~/.ssh/id_ed25519_clawnet \
 bash deploy.sh
 ```
@@ -93,6 +98,7 @@ Checklist:
 Acceptance:
 
 - All mainnet validators start on the intended image tag
+- The deploy script fails before rollout if remote `git pull`, GHCR image pull, or image architecture checks do not pass.
 
 ### M-5. Validate Primary Validator
 
@@ -124,11 +130,14 @@ Acceptance:
 
 Run internally on the primary validator if RPC is not exposed directly.
 
+The deploy script now runs this automatically during rollout. Re-run manually only for spot checks or post-rollout validation.
+
 ```bash
 cd /opt/clawnet
 
-CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
-node scripts/test-ed25519-precompile.mjs
+DEPLOYER_PRIVATE_KEY=<mainnet-deployer-private-key> \
+CLAWNET_MAINNET_RPC_URL=http://127.0.0.1:8545 \
+pnpm ed25519:probe:mainnet
 ```
 
 Checklist:
@@ -139,12 +148,14 @@ Checklist:
 
 ### M-9. Focused Contract Test Against Mainnet RPC
 
+The deploy script now runs this automatically during rollout. Re-run manually only for spot checks or post-rollout validation.
+
 ```bash
 cd /opt/clawnet
 
-CLAWNET_BESU_PRECOMPILE_TEST=1 \
-CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
-pnpm contracts:test:ed25519:besu
+DEPLOYER_PRIVATE_KEY=<mainnet-deployer-private-key> \
+CLAWNET_MAINNET_RPC_URL=http://127.0.0.1:8545 \
+pnpm ed25519:test:mainnet
 ```
 
 Checklist:
