@@ -172,15 +172,16 @@ describe("Ed25519Verifier", function () {
     });
   });
 
-  // ─── verify (precompile stub) ─────────────────────────────────
+  // ─── verify (backend unavailable on local chain) ─────────────
 
-  describe("verify (precompile — not yet deployed)", function () {
-    it("should return false when precompile is not deployed", async function () {
+  describe("verify (verifier backend unavailable)", function () {
+    it("should revert when the Ed25519 backend is unavailable", async function () {
       const message = ethers.keccak256(ethers.toUtf8Bytes("test"));
       const signature = ethers.randomBytes(64);
       const publicKey = ethers.hexlify(ethers.randomBytes(32));
-      const result = await harness.verify(message, signature, publicKey);
-      expect(result).to.equal(false);
+      await expect(
+        harness.verify(message, signature, publicKey)
+      ).to.be.revertedWithCustomError(harness, "Ed25519VerificationUnavailable");
     });
 
     it("should revert with invalid signature length", async function () {
@@ -189,7 +190,7 @@ describe("Ed25519Verifier", function () {
       const publicKey = ethers.hexlify(ethers.randomBytes(32));
       await expect(
         harness.verify(message, badSig, publicKey)
-      ).to.be.revertedWith("Ed25519: invalid signature length");
+      ).to.be.revertedWithCustomError(harness, "InvalidSignatureLength");
     });
   });
 

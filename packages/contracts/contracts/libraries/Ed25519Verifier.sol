@@ -27,6 +27,9 @@ library Ed25519Verifier {
     /// @notice Version tag appended to domain for upgradability.
     bytes internal constant VERSION_TAG = "v1";
 
+    error InvalidSignatureLength();
+    error Ed25519VerificationUnavailable();
+
     // ─── Payload Builders ──────────────────────────────────────────
 
     /**
@@ -102,11 +105,12 @@ library Ed25519Verifier {
     // ─── Phase 2: On-Chain Verification (Precompile) ────────────────
 
     /**
-     * @notice Verify an Ed25519 signature on-chain via custom precompile.
-     * @dev NOT YET ACTIVE. Will revert until the Reth precompile is deployed.
-     *      Phase 2 will deploy a precompile at ED25519_PRECOMPILE that accepts:
-     *        input = message (32 bytes) || signature (64 bytes) || publicKey (32 bytes)
-     *        output = 0x01 (valid) or 0x00 (invalid)
+     * @notice Verify an Ed25519 signature on-chain via the configured verifier backend.
+     * @dev Today this library only supports the reserved Ed25519 precompile path.
+     *      If the chain does not expose that backend, this function reverts with
+     *      Ed25519VerificationUnavailable() instead of silently returning false.
+     *      That keeps accidental production usage fail-closed until a real verifier
+     *      is wired in.
      * @param message   The 32-byte message hash to verify.
      * @param signature The 64-byte Ed25519 signature.
      * @param publicKey The 32-byte Ed25519 public key.
@@ -117,7 +121,7 @@ library Ed25519Verifier {
         bytes calldata signature,
         bytes32 publicKey
     ) internal view returns (bool valid) {
-        require(signature.length == 64, "Ed25519: invalid signature length");
+        if (signature.length != 64) revert InvalidSignatureLength();
 
         // Encode: message (32) || signature (64) || publicKey (32) = 128 bytes
         bytes memory input = abi.encodePacked(message, signature, publicKey);
@@ -126,7 +130,7 @@ library Ed25519Verifier {
         (bool success, bytes memory output) = ED25519_PRECOMPILE.staticcall(input);
 
         if (!success || output.length < 32) {
-            return false;
+            revert Ed25519VerificationUnavailable();
         }
 
         // Check first byte of output

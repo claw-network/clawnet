@@ -89,11 +89,12 @@
   - 测试：11 个新测试覆盖验证、拒绝、根重建、叶子计算、树集成
 
 - [ ] **Ed25519 链上签名验证为存根**
-  - 现状：`Ed25519Verifier.sol` 的 `verify()` 始终返回 `true`，等待 Phase 2 预编译
-  - 位置：`packages/contracts/contracts/libraries/Ed25519Verifier.sol:102`
+  - 现状：`Ed25519Verifier.sol` 已改为预编译适配器；在链上 Ed25519 backend 缺失时会显式 revert `Ed25519VerificationUnavailable()`，不再静默返回成功或失败
+  - 当前主路径：`ClawIdentity` 的注册/轮换已使用 controller 的 ECDSA proof-of-possession，避免把未落地的 Ed25519 verifier 接入主网关键路径
+  - 位置：`packages/contracts/contracts/libraries/Ed25519Verifier.sol`、`packages/contracts/contracts/ClawIdentity.sol`
   - 方案（二选一）：
     - A. 部署自定义 Reth 节点，添加 Ed25519 预编译（地址 0x0100）
-    - B. 使用纯 Solidity 实现（gas 较高但可用）
+    - B. 接入纯 Solidity 实现（例如 SCL / SmoothCryptoLib，gas 较高但可用）
 
 ### P2 — 后续优化
 
