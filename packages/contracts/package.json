@@ -18,6 +18,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "test:ed25519:besu": "CLAWNET_BESU_PRECOMPILE_TEST=1 hardhat test test/Ed25519Verifier.besu.test.ts",
     "coverage": "hardhat coverage",
     "clean": "hardhat clean",
     "gas-report": "REPORT_GAS=true hardhat test",

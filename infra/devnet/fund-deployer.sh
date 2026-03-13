@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ============================================================
-# ClawNet Local Devnet — Fund deployer from geth dev account
+# ClawNet Local Devnet — Fund deployer from Besu dev account
 # ============================================================
-# geth --dev creates a pre-funded account. This script sends
+# Besu `--network=dev` creates a pre-funded account. This script sends
 # ETH from that account to the Hardhat default deployer so
 # contract deployment works.
 # ============================================================
@@ -24,7 +24,7 @@ DEV_ACCOUNT=$(curl -s -X POST "$RPC" \
   | python3 -c "import sys,json; r=json.load(sys.stdin); print(r['result'][0])")
 
 if [[ -z "$DEV_ACCOUNT" ]]; then
-  echo "ERROR: Could not get dev account. Is geth running?"
+  echo "ERROR: Could not get dev account. Is Besu running?"
   exit 1
 fi
 

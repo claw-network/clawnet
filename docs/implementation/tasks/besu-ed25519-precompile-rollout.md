@@ -221,6 +221,8 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 - `scripts/test-ed25519-precompile.mjs`
 - `packages/contracts/test/Ed25519Verifier.besu.test.ts`
 
+当前仓库状态：以上 3 个入口已经落地，可作为 Phase 2 的最小执行骨架；后续只需把 `CLAWNET_BESU_IMAGE` 指向真实带预编译的 Besu 镜像。
+
 约束：
 
 - 默认 `pnpm --filter @claw-network/contracts test` 仍可在普通 Hardhat 本地网络上运行

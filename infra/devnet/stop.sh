@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================
-# ClawNet Local Devnet — Stop geth
+# ClawNet Local Devnet — Stop Besu
 # ============================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PIDFILE="$SCRIPT_DIR/geth.pid"
+PIDFILE="$SCRIPT_DIR/besu.pid"
 
 if [[ ! -f "$PIDFILE" ]]; then
   echo "No PID file found. Devnet may not be running."
   # Try to kill by process name as fallback
-  pkill -f "geth --dev.*datadir.*$SCRIPT_DIR/data" 2>/dev/null && echo "Killed geth by pattern." || echo "Nothing to stop."
+  pkill -f "besu.*--data-path=$SCRIPT_DIR/data" 2>/dev/null && echo "Killed Besu by pattern." || echo "Nothing to stop."
   exit 0
 fi
 

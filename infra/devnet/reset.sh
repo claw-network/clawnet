@@ -13,6 +13,6 @@ echo "Resetting devnet…"
 
 # Wipe chain data
 rm -rf "$SCRIPT_DIR/data"
-rm -f "$SCRIPT_DIR/geth.log"
+rm -f "$SCRIPT_DIR/besu.log"
 
 echo "✓ Data wiped. Run ./start.sh to start fresh."

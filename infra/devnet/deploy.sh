@@ -3,7 +3,7 @@
 # ClawNet Local Devnet — Deploy all contracts
 # ============================================================
 # Prerequisites:
-#   1. geth devnet running  (./start.sh -d)
+#   1. Besu devnet running  (./start.sh -d)
 #   2. deployer funded      (./fund-deployer.sh)
 #   3. pnpm install done    (from repo root)
 # ============================================================
@@ -33,7 +33,7 @@ if ! curl -s -X POST "$CLAWNET_DEVNET_RPC_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
   | grep -q result; then
-  echo "ERROR: Cannot reach geth at $CLAWNET_DEVNET_RPC_URL"
+  echo "ERROR: Cannot reach Besu at $CLAWNET_DEVNET_RPC_URL"
   echo "       Run ./start.sh -d first."
   exit 1
 fi

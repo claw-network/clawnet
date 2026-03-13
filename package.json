@@ -10,6 +10,7 @@
     "ci:local": "bash scripts/ci-local.sh",
     "contracts:compile": "pnpm --filter @claw-network/contracts compile",
     "contracts:test": "pnpm --filter @claw-network/contracts test",
+    "contracts:test:ed25519:besu": "pnpm --filter @claw-network/contracts test:ed25519:besu",
     "contracts:coverage": "pnpm --filter @claw-network/contracts coverage",
     "publish:dry": "bash scripts/publish.sh",
     "publish:release": "bash scripts/publish.sh --release",
