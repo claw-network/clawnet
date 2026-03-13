@@ -25,6 +25,9 @@ Status markers:
   - `infra/testnet/prod/deploy.sh`
 - Image injection variable:
   - `CLAWNET_BESU_IMAGE`
+- Optional GHCR auth variables for private images:
+  - `GHCR_USERNAME`
+  - `GHCR_TOKEN`
 
 ## Release Inputs
 
@@ -83,6 +86,8 @@ Command:
 cd infra/testnet/prod
 
 CLAWNET_BESU_IMAGE=ghcr.io/claw-network/besu-ed25519:<git-sha> \
+GHCR_USERNAME=<github-user> \
+GHCR_TOKEN=<ghcr-token> \
 SSH_KEY_PATH=~/.ssh/id_ed25519_clawnet \
 bash deploy.sh
 ```
@@ -98,6 +103,7 @@ Acceptance:
 
 - All 3 validators start on the intended image tag
 - The phase-14 `clawnetd` handoff needed manual recovery on Server B after the deploy script exited, but the final validator and application state was recovered successfully.
+- The deploy script now fails before rollout if remote `git pull`, GHCR image pull, or image architecture checks do not pass.
 
 ### T-5. Validate Server A
 
@@ -138,15 +144,16 @@ Acceptance:
 
 If RPC is only reachable internally, run this on Server A or through SSH.
 
+The deploy script now runs this automatically during rollout. Re-run manually only for spot checks or post-rollout validation.
+
 Command:
 
 ```bash
 cd /opt/clawnet
 
 DEPLOYER_PRIVATE_KEY=<testnet-deployer-private-key> \
-CLAWNET_BESU_TEST_NETWORK=clawnetTestnet \
 CLAWNET_RPC_URL=http://127.0.0.1:8545 \
-node scripts/test-ed25519-precompile.mjs
+pnpm ed25519:probe:testnet
 ```
 
 Checklist:
@@ -157,16 +164,16 @@ Checklist:
 
 ### T-9. Run Focused Contract Test Against Testnet RPC
 
+The deploy script now runs this automatically during rollout. Re-run manually only for spot checks or post-rollout validation.
+
 Command:
 
 ```bash
 cd /opt/clawnet
 
 DEPLOYER_PRIVATE_KEY=<testnet-deployer-private-key> \
-CLAWNET_BESU_TEST_NETWORK=clawnetTestnet \
-CLAWNET_BESU_PRECOMPILE_TEST=1 \
 CLAWNET_RPC_URL=http://127.0.0.1:8545 \
-pnpm contracts:test:ed25519:besu
+pnpm ed25519:test:testnet
 ```
 
 Checklist:

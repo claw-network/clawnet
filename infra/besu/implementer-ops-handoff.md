@@ -111,6 +111,22 @@ Record these in:
 
 - `infra/besu/README.md`
 
+## Explicit Testnet Smoke Commands
+
+For a remote testnet smoke run on a validator host, set:
+
+```bash
+DEPLOYER_PRIVATE_KEY=<testnet-deployer-private-key> \
+CLAWNET_RPC_URL=http://127.0.0.1:8545
+```
+
+Then use:
+
+```bash
+pnpm ed25519:probe:testnet
+pnpm ed25519:test:testnet
+```
+
 ## Rollout Order
 
 1. Local custom image validation
@@ -125,6 +141,13 @@ Record these in:
   - `infra/besu/testnet-rollout-checklist.md`
 - Mainnet rollout:
   - `infra/besu/mainnet-rollout-checklist.md`
+
+## Rollout Guardrails Captured In Repository
+
+- `infra/testnet/prod/deploy.sh` now pre-stashes dirty remote repositories before `git pull --ff-only`.
+- `infra/testnet/prod/deploy.sh` pre-pulls the Besu image on every validator, retries with GHCR login when needed, and fails early on architecture mismatches.
+- `infra/testnet/prod/deploy.sh` now runs the Ed25519 probe and focused Besu contract test automatically on Server A during rollout.
+- `infra/testnet/prod/deploy.sh` performs stronger `clawnetd` restart health checks and dumps service logs on failure.
 
 ## Important Constraints
 

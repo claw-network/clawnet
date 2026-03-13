@@ -9,14 +9,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 
 const env = { ...process.env };
-if (env.CLAWNET_BESU_RPC_URL && !env.CLAWNET_DEVNET_RPC_URL) {
-  env.CLAWNET_DEVNET_RPC_URL = env.CLAWNET_BESU_RPC_URL;
-}
-if (env.CLAWNET_BESU_CHAIN_ID && !env.CLAWNET_DEVNET_CHAIN_ID) {
-  env.CLAWNET_DEVNET_CHAIN_ID = env.CLAWNET_BESU_CHAIN_ID;
+const network =
+  env.CLAWNET_BESU_TEST_NETWORK || env.CLAWNET_ED25519_NETWORK || "clawnetDevnet";
+
+if (network === "clawnetDevnet") {
+  if (env.CLAWNET_BESU_RPC_URL && !env.CLAWNET_DEVNET_RPC_URL) {
+    env.CLAWNET_DEVNET_RPC_URL = env.CLAWNET_BESU_RPC_URL;
+  }
+  if (env.CLAWNET_BESU_CHAIN_ID && !env.CLAWNET_DEVNET_CHAIN_ID) {
+    env.CLAWNET_DEVNET_CHAIN_ID = env.CLAWNET_BESU_CHAIN_ID;
+  }
 }
 
-const network = env.CLAWNET_BESU_TEST_NETWORK || "clawnetDevnet";
+if (network === "clawnetTestnet") {
+  if (env.CLAWNET_BESU_RPC_URL && !env.CLAWNET_RPC_URL) {
+    env.CLAWNET_RPC_URL = env.CLAWNET_BESU_RPC_URL;
+  }
+}
 
 execFileSync(
   "pnpm",

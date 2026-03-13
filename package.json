@@ -8,6 +8,8 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "ci:local": "bash scripts/ci-local.sh",
+    "ed25519:probe:testnet": "CLAWNET_BESU_TEST_NETWORK=clawnetTestnet node scripts/test-ed25519-precompile.mjs",
+    "ed25519:test:testnet": "CLAWNET_BESU_TEST_NETWORK=clawnetTestnet CLAWNET_BESU_PRECOMPILE_TEST=1 pnpm contracts:test:ed25519:besu",
     "contracts:compile": "pnpm --filter @claw-network/contracts compile",
     "contracts:test": "pnpm --filter @claw-network/contracts test",
     "contracts:test:ed25519:besu": "pnpm --filter @claw-network/contracts test:ed25519:besu",
