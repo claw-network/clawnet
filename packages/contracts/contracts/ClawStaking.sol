@@ -443,6 +443,7 @@ contract ClawStaking is
      *         Pass address(0) to disable forwarding (tokens stay in contract).
      */
     function setDaoTreasury(address treasury_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (treasury_ == address(this)) revert InvalidAddress();
         daoTreasury = treasury_;
         emit DaoTreasurySet(treasury_);
     }

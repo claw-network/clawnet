@@ -93,6 +93,16 @@ describe('MessageStore', () => {
       expect(filtered.map(m => m.topic).sort()).toEqual(['chat/message', 'telagent/envelope', 'telagent/receipt']);
     });
 
+    it('wildcard does not match topics containing SQL LIKE special chars', () => {
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'test%prefix/foo', payload: b('d1') });
+      store.addToInbox({ sourceDid: 'did:claw:alice', targetDid: 'did:claw:bob', topic: 'testXprefix/bar', payload: b('d2') });
+
+      // Wildcard 'test%prefix/*' should match only the literal '%' topic, not 'X' via SQL % wildcard
+      const filtered = store.getInbox({ topic: 'test%prefix/*' });
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].topic).toBe('test%prefix/foo');
+    });
+
     it('filters by sinceMs', () => {
       const before = Date.now();
       store.addToInbox({

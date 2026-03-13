@@ -52,6 +52,13 @@ api.clawnet.io {
         close
     }
 
+    # Block /api/v1/metrics from external access (Prometheus scrapes locally)
+    @metrics_path path /api/v1/metrics /api/v1/metrics/
+    respond @metrics_path 403 {
+        body "Forbidden: metrics endpoint is internal only"
+        close
+    }
+
     reverse_proxy localhost:9528 {
         transport http {
             read_timeout  30s

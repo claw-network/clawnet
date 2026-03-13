@@ -342,9 +342,9 @@ export class MessageStore {
       if (part.endsWith('*')) {
         // Prefix match: telagent/* → topic LIKE 'telagent/%'
         const prefix = part.slice(0, -1);
-        clauses.push('topic LIKE ?');
+        clauses.push("topic LIKE ? ESCAPE '\\'");
         // Escape SQL LIKE wildcards in the prefix, then append %
-        params.push(prefix.replace(/[%_]/g, '\\$&') + '%');
+        params.push(prefix.replace(/[%_\\]/g, '\\$&') + '%');
       } else {
         clauses.push('topic = ?');
         params.push(part);

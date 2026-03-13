@@ -384,6 +384,13 @@ describe("ClawStaking", function () {
       ).to.be.revertedWithCustomError(staking, "AccessControlUnauthorizedAccount");
     });
 
+    it("rejects setting treasury to staking contract itself", async function () {
+      const stakingAddr = await staking.getAddress();
+      await expect(
+        staking.connect(admin).setDaoTreasury(stakingAddr),
+      ).to.be.revertedWithCustomError(staking, "InvalidAddress");
+    });
+
     it("can disable forwarding by setting treasury to zero address", async function () {
       await staking.connect(admin).setDaoTreasury(daoTreasury.address);
       await staking.connect(admin).setDaoTreasury(ethers.ZeroAddress);
