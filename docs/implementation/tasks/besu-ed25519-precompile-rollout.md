@@ -192,6 +192,8 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 
 链客户端实现输入规范：见 `infra/besu/ed25519-precompile-spec.md`。
 
+链客户端分工清单：见 `infra/besu/ed25519-precompile-task-list.md`。
+
 外部 Besu fork 任务：
 
 1. 在 Besu EVM 预编译注册流程中挂载 `0x0100`
