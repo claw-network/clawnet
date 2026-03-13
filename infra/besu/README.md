@@ -65,8 +65,26 @@ infra/besu/upgrade-fork.sh 24.12.3
 
 Notes:
 
-- This is a locally built validation artifact, not a published shared registry image.
-- A shared rollout tag and registry digest still need to be produced before testnet rollout.
+- This local artifact was the first validation image before the shared registry publication step.
+- Testnet did not use the local tag directly; it used the published amd64 shared artifact recorded below.
+
+## Published Shared Artifact
+
+- Shared image tag:
+  - `ghcr.io/claw-network/besu-ed25519:24.12.2-494c77f440-amd64`
+- Shared image digest:
+  - `sha256:d382a32799010d236b709503b39356deb66119cb8fee0d96455116d8433d1725`
+- Alternate commit tag:
+  - `ghcr.io/claw-network/besu-ed25519:494c77f440`
+- Alternate commit-tag digest:
+  - `sha256:73f6aabc3e8ae3d8e25a85dcc247024cdf361883976a7c8690227f9e3986a2b9`
+
+Notes:
+
+- The first published artifact was `linux/arm64` and could not run on the amd64 testnet validators.
+- The amd64 rollout artifact above is the one actually used for testnet deployment.
+- Testnet rollout command used:
+  - `CLAWNET_BESU_IMAGE=ghcr.io/claw-network/besu-ed25519:24.12.2-494c77f440-amd64`
 
 ## Required Tracking Fields
 

@@ -30,21 +30,21 @@ Status markers:
 
 Fill these before rollout:
 
-- [ ] Custom image tag:
-- [ ] Custom image digest:
-- [ ] Besu fork commit/tag:
-- [ ] Operator:
-- [ ] Rollout start time:
-- [ ] Rollback image tag:
+- [x] Custom image tag: `ghcr.io/claw-network/besu-ed25519:24.12.2-494c77f440-amd64`
+- [x] Custom image digest: `sha256:d382a32799010d236b709503b39356deb66119cb8fee0d96455116d8433d1725`
+- [x] Besu fork commit/tag: `494c77f440`
+- [x] Operator: `GitHub Copilot`
+- [x] Rollout start time: `2026-03-13T09:53:08Z`
+- [x] Rollback image tag: `hyperledger/besu:24.12.2`
 - [ ] Rollback image digest:
 
 ## P0 — Pre-Rollout Gate
 
 ### T-1. Confirm Build Artifact
 
-- [ ] The custom image exists in the registry or on the target hosts
-- [ ] The tag and digest are recorded in `infra/besu/README.md`
-- [ ] The image corresponds to the intended Besu fork commit
+- [x] The custom image exists in the registry or on the target hosts
+- [x] The tag and digest are recorded in `infra/besu/README.md`
+- [x] The image corresponds to the intended Besu fork commit
 
 Acceptance:
 
@@ -52,9 +52,9 @@ Acceptance:
 
 ### T-2. Confirm Repository-Side Validation
 
-- [ ] `node scripts/test-ed25519-precompile.mjs` passes against the custom image locally
-- [ ] `pnpm contracts:test:ed25519:besu` passes against the custom image locally
-- [ ] `pnpm --filter @claw-network/contracts exec hardhat test test/Ed25519Verifier.test.ts` still passes on the no-backend path
+- [x] `node scripts/test-ed25519-precompile.mjs` passes against the custom image locally
+- [x] `pnpm contracts:test:ed25519:besu` passes against the custom image locally
+- [x] `pnpm --filter @claw-network/contracts exec hardhat test test/Ed25519Verifier.test.ts` still passes on the no-backend path
 
 Acceptance:
 
@@ -63,9 +63,9 @@ Acceptance:
 
 ### T-3. Confirm Testnet Deploy Path
 
-- [ ] `infra/testnet/prod/deploy.sh` is up to date
-- [ ] `infra/testnet/docker-compose.yml` / `peer.yml` / `sync.yml` are up to date
-- [ ] All operators agree to use `CLAWNET_BESU_IMAGE` as the only image override
+- [x] `infra/testnet/prod/deploy.sh` is up to date
+- [x] `infra/testnet/docker-compose.yml` / `peer.yml` / `sync.yml` are up to date
+- [x] All operators agree to use `CLAWNET_BESU_IMAGE` as the only image override
 
 Acceptance:
 
@@ -89,21 +89,22 @@ bash deploy.sh
 
 Checklist:
 
-- [ ] `CLAWNET_BESU_IMAGE` is set explicitly
-- [ ] `deploy.sh` completes all phases
-- [ ] `contracts.json` is regenerated if a full redeploy occurs
-- [ ] `enodes.env` is regenerated if a full redeploy occurs
+- [x] `CLAWNET_BESU_IMAGE` is set explicitly
+- [~] `deploy.sh` completes all phases
+- [x] `contracts.json` is regenerated if a full redeploy occurs
+- [x] `enodes.env` is regenerated if a full redeploy occurs
 
 Acceptance:
 
 - All 3 validators start on the intended image tag
+- The phase-14 `clawnetd` handoff needed manual recovery on Server B after the deploy script exited, but the final validator and application state was recovered successfully.
 
 ### T-5. Validate Server A
 
-- [ ] `eth_blockNumber` advances on Server A
-- [ ] `admin_nodeInfo` returns an enode URL
-- [ ] `net_peerCount` is healthy after peers join
-- [ ] `qbft_getValidatorsByBlockNumber("latest")` returns the expected validator set
+- [x] `eth_blockNumber` advances on Server A
+- [x] `admin_nodeInfo` returns an enode URL
+- [x] `net_peerCount` is healthy after peers join
+- [x] `qbft_getValidatorsByBlockNumber("latest")` returns the expected validator set
 
 Useful command:
 
@@ -115,10 +116,10 @@ curl -s http://127.0.0.1:8545 \
 
 ### T-6. Validate Server B and Server C
 
-- [ ] Server B catches up and continues advancing blocks
-- [ ] Server C catches up and continues advancing blocks
-- [ ] Each node reports the expected peer count
-- [ ] No node appears stuck or isolated
+- [x] Server B catches up and continues advancing blocks
+- [x] Server C catches up and continues advancing blocks
+- [x] Each node reports the expected peer count
+- [x] No node appears stuck or isolated
 
 Acceptance:
 
@@ -128,10 +129,10 @@ Acceptance:
 
 ### T-7. Run Chain Health Checks
 
-- [ ] `eth_blockNumber` increases on all three servers
-- [ ] `net_peerCount` is stable on all three servers
-- [ ] `eth_gasPrice` remains `0x0`
-- [ ] `baseFeePerGas` remains `0x0`
+- [x] `eth_blockNumber` increases on all three servers
+- [x] `net_peerCount` is stable on all three servers
+- [x] `eth_gasPrice` remains `0x0`
+- [x] `baseFeePerGas` remains `0x0`
 
 ### T-8. Run Repository-Side Probe Against Testnet RPC
 
@@ -142,15 +143,17 @@ Command:
 ```bash
 cd /opt/clawnet
 
-CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
+DEPLOYER_PRIVATE_KEY=<testnet-deployer-private-key> \
+CLAWNET_BESU_TEST_NETWORK=clawnetTestnet \
+CLAWNET_RPC_URL=http://127.0.0.1:8545 \
 node scripts/test-ed25519-precompile.mjs
 ```
 
 Checklist:
 
-- [ ] Probe script prints `valid: true`
-- [ ] Probe script prints `invalid: false`
-- [ ] No revert or backend-unavailable error occurs
+- [x] Probe script prints `valid: true`
+- [x] Probe script prints `invalid: false`
+- [x] No revert or backend-unavailable error occurs
 
 ### T-9. Run Focused Contract Test Against Testnet RPC
 
@@ -159,15 +162,17 @@ Command:
 ```bash
 cd /opt/clawnet
 
+DEPLOYER_PRIVATE_KEY=<testnet-deployer-private-key> \
+CLAWNET_BESU_TEST_NETWORK=clawnetTestnet \
 CLAWNET_BESU_PRECOMPILE_TEST=1 \
-CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
+CLAWNET_RPC_URL=http://127.0.0.1:8545 \
 pnpm contracts:test:ed25519:besu
 ```
 
 Checklist:
 
-- [ ] Focused Besu contract test passes unchanged
-- [ ] No contract-side adapter changes were needed for the custom image
+- [x] Focused Besu contract test passes unchanged
+- [x] No contract-side adapter changes were needed for the custom image
 
 ## P3 — Observation Window
 
@@ -234,10 +239,10 @@ Acceptance:
 
 ### T-13. Record Outcome
 
-- [ ] Record the final image tag and digest used
-- [ ] Record whether rollout succeeded or rolled back
-- [ ] Record probe/contract-test outcomes
-- [ ] Save notes in `docs/handover/` or an equivalent ops note
+- [x] Record the final image tag and digest used
+- [x] Record whether rollout succeeded or rolled back
+- [x] Record probe/contract-test outcomes
+- [x] Save notes in `docs/handover/` or an equivalent ops note
 
 ## Minimal Done Definition
 
@@ -249,3 +254,28 @@ The testnet rollout is complete only when all items below are true:
 - [ ] Focused Besu contract test passes on testnet
 - [ ] Observation window completes without consensus instability
 - [ ] Rollback image is documented even if rollback was not needed
+
+Current status after rollout:
+
+- [x] Custom image tag and digest are recorded
+- [x] All 3 validators run the same custom image
+- [x] Probe script passes on testnet
+- [x] Focused Besu contract test passes on testnet
+- [ ] Observation window completes without consensus instability
+- [ ] Rollback image is documented even if rollback was not needed
+
+Health snapshot immediately after rollout recovery:
+
+- Server A `66.94.125.242`: `eth_blockNumber=252`, `net_peerCount=2`, `clawnetd=active`
+- Server B `85.239.236.49`: `eth_blockNumber=253`, `net_peerCount=2`, `clawnetd=active`
+- Server C `85.239.235.67`: `eth_blockNumber=255`, `net_peerCount=2`, `clawnetd=active`
+
+Outcome summary:
+
+- Rollout succeeded on the custom amd64 Besu image.
+- No rollback was required.
+- The deploy script exited during the application handoff phase, but the final chain and application state was recovered and validated.
+
+Reference note:
+
+- `docs/handover/20260313-besu-ed25519-testnet-rollout.md`

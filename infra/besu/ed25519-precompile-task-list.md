@@ -122,9 +122,9 @@ Acceptance:
 
 ### B-9. Build Shared Image Artifact
 
-- [ ] Produce a shared image tag such as `ghcr.io/claw-network/besu-ed25519:<git-sha>`
-- [ ] Record the image digest in `infra/besu/README.md`
-- [ ] Publish build provenance or minimal build notes
+- [x] Produce a shared image tag such as `ghcr.io/claw-network/besu-ed25519:<git-sha>`
+- [x] Record the image digest in `infra/besu/README.md`
+- [x] Publish build provenance or minimal build notes
 
 Acceptance:
 
@@ -165,9 +165,9 @@ Acceptance:
 
 ### B-13. Wire Testnet Image Override
 
-- [ ] Set `CLAWNET_BESU_IMAGE` to the shared custom image tag during deployment
+- [x] Set `CLAWNET_BESU_IMAGE` to the shared custom image tag during deployment
 - [x] Verify `infra/testnet/prod/deploy.sh` propagates the intended image
-- [ ] Record the exact tag used for testnet
+- [x] Record the exact tag used for testnet
 
 Acceptance:
 
@@ -175,10 +175,10 @@ Acceptance:
 
 ### B-14. Execute Testnet Smoke Checks
 
-- [ ] Confirm blocks continue progressing
-- [ ] Confirm peer counts remain healthy
-- [ ] Run the repository probe against testnet RPC if exposed internally
-- [ ] Confirm no consensus divergence is observed
+- [x] Confirm blocks continue progressing
+- [x] Confirm peer counts remain healthy
+- [x] Run the repository probe against testnet RPC if exposed internally
+- [x] Confirm no consensus divergence is observed
 
 Acceptance:
 
@@ -214,5 +214,5 @@ The Besu precompile is ready for testnet rollout only when all items below are t
 - [x] tampered vector returns `false`
 - [x] `node scripts/test-ed25519-precompile.mjs` passes
 - [x] `pnpm contracts:test:ed25519:besu` passes
-- [ ] shared image tag and digest are recorded
+- [x] shared image tag and digest are recorded
 - [x] testnet deploy path uses the custom image through `CLAWNET_BESU_IMAGE`
