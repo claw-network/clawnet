@@ -108,6 +108,7 @@ SSH_KEY_PATH="${SSH_KEY_PATH:-}"
 SSH_PASS="${SSH_PASSWORD:-G66tdTcmvBz*k1sf}"
 CLAW_PASSPHRASE="${CLAW_PASSPHRASE:-$(openssl rand -hex 32)}"
 CLAW_API_KEY="${CLAW_API_KEY:-$(openssl rand -hex 32)}"
+CLAWNET_BESU_IMAGE="${CLAWNET_BESU_IMAGE:-hyperledger/besu:24.12.2}"
 
 require_local_command() {
   local cmd="$1"
@@ -347,6 +348,7 @@ echo "Deployer  : $DEPLOYER_ADDRESS"
 echo "Treasury  : $TREASURY_ADDRESS"
 echo "Liquidity : $LIQUIDITY_ADDRESS"
 echo "Reserve   : $RESERVE_ADDRESS"
+echo "Besu Img  : $CLAWNET_BESU_IMAGE"
 echo "============================================================"
 echo ""
 
@@ -451,7 +453,7 @@ echo ""
 # Phase 6: Start Server A (QBFT validator)
 # ══════════════════════════════════════════════════════════════════
 echo ">>> Phase 6: Starting Besu on Server A..."
-run_remote "$SERVER_A" 'cd /opt/clawnet && cp infra/testnet/docker-compose.yml docker-compose.chain.yml && docker compose -f docker-compose.chain.yml up -d'
+run_remote "$SERVER_A" "cd /opt/clawnet && cp infra/testnet/docker-compose.yml docker-compose.chain.yml && CLAWNET_BESU_IMAGE='$CLAWNET_BESU_IMAGE' docker compose -f docker-compose.chain.yml up -d"
 
 echo "  Waiting 15s for Server A to start producing blocks..."
 sleep 15
@@ -476,7 +478,7 @@ echo ">>> Phase 7: Starting Besu on Server B..."
 run_remote "$SERVER_B" "cd /opt/clawnet && cp infra/testnet/docker-compose.peer.yml docker-compose.chain.yml && \
   sed -i 's|enode://.*@66.94.125.242:30303|${ENODE_A}|g' docker-compose.chain.yml && \
   sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${ENODE_A#enode://}|g' docker-compose.chain.yml && \
-  docker compose -f docker-compose.chain.yml up -d"
+  CLAWNET_BESU_IMAGE='$CLAWNET_BESU_IMAGE' docker compose -f docker-compose.chain.yml up -d"
 
 echo "  Waiting 10s for Server B to join consensus..."
 sleep 10
@@ -499,7 +501,7 @@ BOOTNODES_C="${ENODE_A},${ENODE_B}"
 run_remote "$SERVER_C" "cd /opt/clawnet && cp infra/testnet/docker-compose.peer.yml docker-compose.chain.yml && \
   sed -i 's|enode://.*@66.94.125.242:30303|${BOOTNODES_C}|g' docker-compose.chain.yml && \
   sed -i 's|<SERVER_A_ENODE_PUBKEY>@66.94.125.242:30303|${BOOTNODES_C#enode://}|g' docker-compose.chain.yml && \
-  docker compose -f docker-compose.chain.yml up -d"
+  CLAWNET_BESU_IMAGE='$CLAWNET_BESU_IMAGE' docker compose -f docker-compose.chain.yml up -d"
 
 echo "  Waiting 10s for Server C to join consensus..."
 sleep 10

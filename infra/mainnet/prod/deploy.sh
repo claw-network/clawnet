@@ -3,13 +3,13 @@
 # ClawNet Mainnet — Full Deployment Script
 # ==============================================================================
 # This script performs a complete mainnet deployment on all 5 servers:
-#   1. Stop existing Geth on all servers
+#   1. Stop existing Besu on all servers
 #   2. Wipe chain data
-#   3. Upload genesis.json and re-initialize
-#   4. Import validator keys
-#   5. Create .env files + security hardening
-#   6. Start Node 1 (mining), wait for blocks
-#   7. Start Node 2-5 (sync then mine)
+#   3. Upload genesis.json and validator key files
+#   4. Update code on all servers
+#   5. Security hardening
+#   6. Start Node 1, wait for blocks
+#   7. Start Node 2-5 with bootnodes
 #   8. Deploy contracts
 #   9. Run bootstrap mint
 #
@@ -106,6 +106,7 @@ SERVER_4="${SERVER_4:?ERROR: SERVER_4 IP not set in secrets.env}"
 SERVER_5="${SERVER_5:?ERROR: SERVER_5 IP not set in secrets.env}"
 
 ALL_SERVERS="$SERVER_1 $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5"
+CLAWNET_BESU_IMAGE="${CLAWNET_BESU_IMAGE:-hyperledger/besu:24.12.2}"
 
 SSH_USER="${SSH_USER:-root}"
 SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/.ssh/id_ed25519_clawnet}"
@@ -379,6 +380,7 @@ echo "Node 2     : $SERVER_2 (Validator 2 — $VALIDATOR_2_ADDRESS)"
 echo "Node 3     : $SERVER_3 (Validator 3 — $VALIDATOR_3_ADDRESS)"
 echo "Node 4     : $SERVER_4 (Validator 4 — $VALIDATOR_4_ADDRESS)"
 echo "Node 5     : $SERVER_5 (Validator 5 — $VALIDATOR_5_ADDRESS)"
+echo "Besu Img  : $CLAWNET_BESU_IMAGE"
 echo "Deployer   : $DEPLOYER_ADDRESS"
 echo "Treasury   : $TREASURY_ADDRESS"
 echo "Liquidity  : $LIQUIDITY_ADDRESS"
@@ -387,20 +389,32 @@ echo "============================================================"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 1: Stop all Geth instances
+# Phase 1: Stop all Besu instances
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 1: Stopping Geth on all servers..."
+echo ">>> Phase 1: Stopping Besu on all servers..."
 for HOST in $ALL_SERVERS; do
-  echo "  Stopping Geth on $HOST..."
-  run_remote "$HOST" 'cd /opt/clawnet && docker compose -f docker-compose.chain.yml down 2>/dev/null; docker stop clawnet-geth 2>/dev/null; docker rm clawnet-geth 2>/dev/null; echo "done"' || true
+  echo "  Stopping Besu on $HOST..."
+  run_remote "$HOST" 'cd /opt/clawnet && docker compose -f docker-compose.chain.yml down 2>/dev/null; docker stop clawnet-besu 2>/dev/null; docker rm clawnet-besu 2>/dev/null; docker stop clawnet-geth 2>/dev/null; docker rm clawnet-geth 2>/dev/null; echo "done"' || true
 done
-echo "  All Geth instances stopped."
+echo "  All Besu instances stopped."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 2: Wipe chain data and re-initialize on all servers
+# Phase 2: Wipe chain data and upload genesis + key files
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 2: Wiping chain data and re-initializing..."
+echo ">>> Phase 2: Wiping chain data and uploading config..."
+
+write_validator_key() {
+  local host="$1"
+  local privkey="$2"
+  local label="$3"
+
+  local raw_key="${privkey#0x}"
+
+  echo "  [$host] Writing $label key file..."
+  run_remote "$host" "echo '$raw_key' > /opt/clawnet/config/key && chmod 600 /opt/clawnet/config/key"
+  echo "  [$host] $label key file written."
+}
 
 for HOST in $ALL_SERVERS; do
   echo "  [$HOST] Wiping chain data..."
@@ -409,57 +423,20 @@ for HOST in $ALL_SERVERS; do
   echo "  [$HOST] Uploading genesis.json..."
   run_remote "$HOST" 'mkdir -p /opt/clawnet/config'
   scp_to "$GENESIS_FILE" "$HOST" "/opt/clawnet/config/genesis.json"
-
-  echo "  [$HOST] Creating password.txt..."
-  run_remote "$HOST" "echo '$VALIDATOR_PASSWORD' > /opt/clawnet/config/password.txt && chmod 600 /opt/clawnet/config/password.txt"
-
-  echo "  [$HOST] Initializing Geth..."
-  run_remote "$HOST" 'docker run --rm \
-    -v /opt/clawnet/chain-data:/data \
-    -v /opt/clawnet/config:/config:ro \
-    ethereum/client-go:v1.13.15 \
-    init --datadir /data /config/genesis.json'
-
-  echo "  [$HOST] Geth initialized."
   echo ""
 done
 
-# ══════════════════════════════════════════════════════════════════
-# Phase 3: Import validator keys
-# ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 3: Importing validator keys..."
-
-import_validator_key() {
-  local host="$1"
-  local privkey="$2"  # with 0x prefix
-  local label="$3"
-
-  # Strip 0x prefix for the key file
-  local raw_key="${privkey#0x}"
-
-  echo "  [$host] Importing $label key..."
-  run_remote "$host" "echo '$raw_key' > /tmp/val.key && \
-    docker run --rm \
-      -v /opt/clawnet/chain-data:/data \
-      -v /opt/clawnet/config:/config:ro \
-      -v /tmp/val.key:/tmp/val.key:ro \
-      ethereum/client-go:v1.13.15 \
-      account import --datadir /data --password /config/password.txt /tmp/val.key && \
-    rm -f /tmp/val.key"
-  echo "  [$host] $label key imported."
-}
-
-import_validator_key "$SERVER_1" "$VALIDATOR_1_PRIVATE_KEY" "Validator 1"
-import_validator_key "$SERVER_2" "$VALIDATOR_2_PRIVATE_KEY" "Validator 2"
-import_validator_key "$SERVER_3" "$VALIDATOR_3_PRIVATE_KEY" "Validator 3"
-import_validator_key "$SERVER_4" "$VALIDATOR_4_PRIVATE_KEY" "Validator 4"
-import_validator_key "$SERVER_5" "$VALIDATOR_5_PRIVATE_KEY" "Validator 5"
+write_validator_key "$SERVER_1" "$VALIDATOR_1_PRIVATE_KEY" "Validator 1"
+write_validator_key "$SERVER_2" "$VALIDATOR_2_PRIVATE_KEY" "Validator 2"
+write_validator_key "$SERVER_3" "$VALIDATOR_3_PRIVATE_KEY" "Validator 3"
+write_validator_key "$SERVER_4" "$VALIDATOR_4_PRIVATE_KEY" "Validator 4"
+write_validator_key "$SERVER_5" "$VALIDATOR_5_PRIVATE_KEY" "Validator 5"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 4: Update code on all servers
+# Phase 3: Update code on all servers
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 4: Updating code on all servers..."
+echo ">>> Phase 3: Updating code on all servers..."
 for HOST in $ALL_SERVERS; do
   echo "  [$HOST] git pull..."
   run_remote "$HOST" 'cd /opt/clawnet && git pull' || true
@@ -467,26 +444,15 @@ done
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 5: Create .env on each server
+# Phase 4: (Reserved — Besu derives validator address from key file)
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 5: Creating .env files..."
-
-SERVERS=($SERVER_1 $SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5)
-ADDRESSES=($VALIDATOR_1_ADDRESS $VALIDATOR_2_ADDRESS $VALIDATOR_3_ADDRESS $VALIDATOR_4_ADDRESS $VALIDATOR_5_ADDRESS)
-
-for i in "${!SERVERS[@]}"; do
-  run_remote "${SERVERS[$i]}" "cat > /opt/clawnet/.env << 'ENVEOF'
-VALIDATOR_ADDRESS=${ADDRESSES[$i]}
-ENVEOF"
-done
-
-echo "  .env files created."
+echo ">>> Phase 4: Skipped (Besu uses --node-private-key-file, no validator .env needed)."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 5b: Security hardening on all servers
+# Phase 5: Security hardening on all servers
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 5b: Applying security hardening..."
+echo ">>> Phase 5: Applying security hardening..."
 
 SECURITY_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 HARDEN_SCRIPT="$SECURITY_DIR/harden-server.sh"
@@ -522,10 +488,10 @@ echo ""
 # ══════════════════════════════════════════════════════════════════
 # Phase 6: Start Node 1 (mining)
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 6: Starting Geth on Node 1 (mining mode)..."
-run_remote "$SERVER_1" 'cd /opt/clawnet && cp infra/mainnet/docker-compose.yml docker-compose.chain.yml && docker compose -f docker-compose.chain.yml up -d'
+echo ">>> Phase 6: Starting Besu on Node 1..."
+run_remote "$SERVER_1" "cd /opt/clawnet && cp infra/mainnet/docker-compose.yml docker-compose.chain.yml && CLAWNET_BESU_IMAGE='$CLAWNET_BESU_IMAGE' docker compose -f docker-compose.chain.yml up -d"
 
-echo "  Waiting 10s for Node 1 to start mining..."
+echo "  Waiting 10s for Node 1 to start producing blocks..."
 sleep 10
 
 BLOCK_NUM=$(rpc_block_number "$SERVER_1")
@@ -539,7 +505,7 @@ echo ""
 BOOTNODES="$ENODE_1"
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 7: Start Nodes 2-5 (sync-first-then-mine)
+# Phase 7: Start Nodes 2-5 with bootnodes
 # ══════════════════════════════════════════════════════════════════
 PEER_SERVERS=($SERVER_2 $SERVER_3 $SERVER_4 $SERVER_5)
 ENODES=("$ENODE_1")
@@ -548,11 +514,11 @@ for idx in "${!PEER_SERVERS[@]}"; do
   NODE_NUM=$((idx + 2))
   HOST="${PEER_SERVERS[$idx]}"
 
-  echo ">>> Phase 7.$NODE_NUM: Starting Geth on Node $NODE_NUM (sync → mine)..."
+  echo ">>> Phase 7.$NODE_NUM: Starting Besu on Node $NODE_NUM..."
 
   # Sync phase
   run_remote "$HOST" "cd /opt/clawnet && \
-    BOOTNODES='$BOOTNODES' docker compose -f infra/mainnet/docker-compose.sync.yml up -d"
+    BOOTNODES='$BOOTNODES' CLAWNET_BESU_IMAGE='$CLAWNET_BESU_IMAGE' docker compose -f infra/mainnet/docker-compose.sync.yml up -d"
 
   echo "  Waiting 15s for Node $NODE_NUM to sync..."
   sleep 15
@@ -561,12 +527,11 @@ for idx in "${!PEER_SERVERS[@]}"; do
   echo "  Node $NODE_NUM block number: $N_BLOCK"
 
   # Switch to mining mode
-  echo "  Switching Node $NODE_NUM to mining mode..."
+  echo "  Switching Node $NODE_NUM to validator mode..."
   run_remote "$HOST" "cd /opt/clawnet && \
     docker compose -f infra/mainnet/docker-compose.sync.yml down && \
     cp infra/mainnet/docker-compose.peer.yml docker-compose.chain.yml && \
-    echo 'BOOTNODES=$BOOTNODES' >> /opt/clawnet/.env && \
-    docker compose -f docker-compose.chain.yml up -d"
+    BOOTNODES='$BOOTNODES' CLAWNET_BESU_IMAGE='$CLAWNET_BESU_IMAGE' docker compose -f docker-compose.chain.yml up -d"
 
   sleep 5
 
@@ -575,7 +540,7 @@ for idx in "${!PEER_SERVERS[@]}"; do
   ENODES+=("$ENODE_N")
   BOOTNODES="${BOOTNODES},${ENODE_N}"
   echo "  Node $NODE_NUM enode: $ENODE_N"
-  echo "  Node $NODE_NUM mining."
+  echo "  Node $NODE_NUM validating."
   echo ""
 done
 

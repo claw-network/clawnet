@@ -10,7 +10,7 @@
 
 services:
   besu:
-    image: hyperledger/besu:latest
+    image: ${CLAWNET_BESU_IMAGE:-hyperledger/besu:24.12.2}
     container_name: clawnet-besu
     restart: unless-stopped
     deploy:
