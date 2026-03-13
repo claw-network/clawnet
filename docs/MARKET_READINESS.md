@@ -51,9 +51,17 @@
   - 支持逗号分隔：`telagent/envelope,chat/message` 订阅多个主题
   - 实时推送（`buildTopicMatcher`）和重放回放（`getInbox` SQL LIKE）均支持通配符
 
-- [ ] **拜占庭容错/网络分区测试**
-  - 现状：无网络分区场景测试
-  - 方案：在 Docker Compose 中用 `tc netem` 模拟网络分区，验证节点恢复一致性
+- [x] **拜占庭容错/网络分区测试** ✅ 测试脚本已实现，待 Docker 环境运行验证
+  - 脚本：`scripts/partition-test.mjs`，运行命令：`pnpm test:partition [--verbose]`
+  - 使用 `docker network disconnect/connect` 模拟网络分区（无需 `tc netem` 或容器特权）
+  - 5 个测试场景：
+    1. 基线检查 — 3 节点健康、block height 一致
+    2. 隔离 peer2 — 少数派分区，多数派（bootstrap + peer1）继续工作
+    3. 恢复 peer2 — 重连后 peer 发现恢复、block height 收敛
+    4. 隔离 bootstrap — 种子节点分区，peer1/peer2 优雅降级
+    5. 恢复 bootstrap — 全集群恢复，数据一致性验证
+  - 前提：`docker compose -f docker-compose.testnet.yml up --build -d`
+  - `finally` 块确保测试后所有容器网络恢复
 
 ---
 
@@ -178,6 +186,6 @@
 | 序号 | 任务 |
 |------|------|
 | 3.1 | ~~WebSocket 主题通配符~~ ✅ 已完成 |
-| 3.2 | 拜占庭容错测试 |
+| 3.2 | ~~拜占庭容错测试~~ ✅ 脚本已实现（`scripts/partition-test.mjs`） |
 | 3.3 | 多链支持规划 |
 | 3.4 | SDK 功能增强（WebSocket 客户端、重试策略） |
