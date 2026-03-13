@@ -17,8 +17,8 @@ Status markers:
 
 - [x] Choose the exact upstream Besu version to fork
 - [x] Record the upstream tag or commit in `infra/besu/README.md`
-- [ ] Create the fork branch for the Ed25519 precompile work
-- [ ] Decide the image naming convention for local, CI, and testnet builds
+- [x] Create the fork branch for the Ed25519 precompile work
+- [x] Decide the image naming convention for local, CI, and testnet builds
 
 Acceptance:
 
@@ -112,9 +112,9 @@ Acceptance:
 
 ### B-8. Build Local Development Image
 
-- [ ] Produce `clawnet/besu-ed25519:dev` or equivalent local tag
-- [ ] Start it through `infra/devnet/docker-compose.ed25519.yml`
-- [ ] Confirm RPC is available on `http://127.0.0.1:8545`
+- [x] Produce `clawnet/besu-ed25519:dev` or equivalent local tag
+- [x] Start it through `infra/devnet/docker-compose.ed25519.yml`
+- [x] Confirm RPC is available on `http://127.0.0.1:8545`
 
 Acceptance:
 
@@ -134,9 +134,9 @@ Acceptance:
 
 ### B-10. Run Direct Probe Script
 
-- [ ] Start the custom Besu image locally
-- [ ] Run `node scripts/test-ed25519-precompile.mjs`
-- [ ] Confirm the script reports `valid=true` and `invalid=false`
+- [x] Start the custom Besu image locally
+- [x] Run `node scripts/test-ed25519-precompile.mjs`
+- [x] Confirm the script reports `valid=true` and `invalid=false`
 
 Acceptance:
 
@@ -144,9 +144,9 @@ Acceptance:
 
 ### B-11. Run Focused Contract Test
 
-- [ ] Set `CLAWNET_BESU_PRECOMPILE_TEST=1`
-- [ ] Set `CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545`
-- [ ] Run `pnpm contracts:test:ed25519:besu`
+- [x] Set `CLAWNET_BESU_PRECOMPILE_TEST=1`
+- [x] Set `CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545`
+- [x] Run `pnpm contracts:test:ed25519:besu`
 
 Acceptance:
 
@@ -154,8 +154,8 @@ Acceptance:
 
 ### B-12. Re-run Fail-Closed Baseline
 
-- [ ] Run `pnpm --filter @claw-network/contracts exec hardhat test test/Ed25519Verifier.test.ts`
-- [ ] Confirm the local Hardhat network still reverts with `Ed25519VerificationUnavailable()` when no backend exists
+- [x] Run `pnpm --filter @claw-network/contracts exec hardhat test test/Ed25519Verifier.test.ts`
+- [x] Confirm the local Hardhat network still reverts with `Ed25519VerificationUnavailable()` when no backend exists
 
 Acceptance:
 
@@ -166,7 +166,7 @@ Acceptance:
 ### B-13. Wire Testnet Image Override
 
 - [ ] Set `CLAWNET_BESU_IMAGE` to the shared custom image tag during deployment
-- [ ] Verify `infra/testnet/prod/deploy.sh` propagates the intended image
+- [x] Verify `infra/testnet/prod/deploy.sh` propagates the intended image
 - [ ] Record the exact tag used for testnet
 
 Acceptance:
@@ -209,10 +209,10 @@ Mark the work blocked if any of the following happen:
 
 The Besu precompile is ready for testnet rollout only when all items below are true:
 
-- [ ] `infra/besu/ed25519-precompile-spec.md` remains accurate
-- [ ] valid vector returns `true`
-- [ ] tampered vector returns `false`
-- [ ] `node scripts/test-ed25519-precompile.mjs` passes
-- [ ] `pnpm contracts:test:ed25519:besu` passes
+- [x] `infra/besu/ed25519-precompile-spec.md` remains accurate
+- [x] valid vector returns `true`
+- [x] tampered vector returns `false`
+- [x] `node scripts/test-ed25519-precompile.mjs` passes
+- [x] `pnpm contracts:test:ed25519:besu` passes
 - [ ] shared image tag and digest are recorded
-- [ ] testnet deploy path uses the custom image through `CLAWNET_BESU_IMAGE`
+- [x] testnet deploy path uses the custom image through `CLAWNET_BESU_IMAGE`

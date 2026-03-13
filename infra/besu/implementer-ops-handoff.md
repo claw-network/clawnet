@@ -64,14 +64,22 @@ CLAWNET_BESU_IMAGE=clawnet/besu-ed25519:dev \
 docker compose -f docker-compose.ed25519.yml up -d
 ```
 
-2. Run the direct probe:
+2. Fund the local deployer account:
+
+```bash
+cd /path/to/clawnet/infra/devnet
+./fund-deployer.sh
+```
+
+3. Run the direct probe:
 
 ```bash
 cd /path/to/clawnet
+CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
 node scripts/test-ed25519-precompile.mjs
 ```
 
-3. Run the focused contract test:
+4. Run the focused contract test:
 
 ```bash
 cd /path/to/clawnet
@@ -81,7 +89,7 @@ CLAWNET_BESU_RPC_URL=http://127.0.0.1:8545 \
 pnpm contracts:test:ed25519:besu
 ```
 
-4. Re-run the no-backend baseline:
+5. Re-run the no-backend baseline:
 
 ```bash
 cd /path/to/clawnet/packages/contracts

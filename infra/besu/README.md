@@ -46,6 +46,28 @@ infra/besu/upgrade-fork.sh 24.12.3
 - Shared CI or staged rollout override:
   - `CLAWNET_BESU_IMAGE=ghcr.io/claw-network/besu-ed25519:<git-sha>`
 
+## Validated Local Artifact
+
+- Fork repository URL:
+  - `https://github.com/claw-network/besu.git`
+- Fork branch:
+  - `clawnet/ed25519-precompile`
+- Fork commit:
+  - `494c77f440`
+- Local validated image tag:
+  - `clawnet/besu-ed25519:24.12.2-dev`
+- Local image ID:
+  - `sha256:2505e3c6fb2a6b3f75fe1fa7cac502741276391d979c6b52ccdbf923863a13ef`
+- Local validation results:
+  - `node scripts/test-ed25519-precompile.mjs` passed
+  - `pnpm contracts:test:ed25519:besu` passed
+  - `pnpm --filter @claw-network/contracts exec hardhat test test/Ed25519Verifier.test.ts` passed
+
+Notes:
+
+- This is a locally built validation artifact, not a published shared registry image.
+- A shared rollout tag and registry digest still need to be produced before testnet rollout.
+
 ## Required Tracking Fields
 
 Before testnet rollout, fill in and keep updated:
