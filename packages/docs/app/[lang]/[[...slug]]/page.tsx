@@ -3,6 +3,7 @@ import { source } from '@/lib/source';
 import { DocsPage, DocsBody, DocsDescription, DocsTitle } from 'fumadocs-ui/page';
 import { notFound } from 'next/navigation';
 import { Mermaid } from '@/components/mermaid';
+import { TurnstileFeedback } from '@/components/turnstile-feedback';
 import { DEFAULT_LOCALE } from '@/lib/i18n';
 import type { AnchorHTMLAttributes } from 'react';
 import type { MDXComponents } from 'mdx/types';
@@ -48,6 +49,7 @@ export default async function Page(props: { params: Promise<{ lang: string; slug
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
         <MDX components={components} />
+        <TurnstileFeedback />
       </DocsBody>
     </DocsPage>
   );

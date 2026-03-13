@@ -74,6 +74,13 @@ Key points:
 1. All homepage changes are committed and pushed to `origin/main`
 2. SSH key access to `root@66.94.125.242` is configured
 3. The homepage builds locally (`cd packages/homepage && pnpm exec vite build`)
+4. Turnstile frontend env is configured for the target domain when needed:
+
+```bash
+# packages/homepage/.env.production.local
+VITE_TURNSTILE_SITE_KEY=0x4AAAAAACqCItnNjID1lMqd
+VITE_TURNSTILE_VERIFY_ENDPOINT=https://docs.clawnetd.com/api/turnstile/verify
+```
 
 ---
 
@@ -132,6 +139,12 @@ Only needed if `package.json` or `pnpm-lock.yaml` changed. Safe to always run.
 ssh root@66.94.125.242 "cd /opt/clawnet/packages/homepage && pnpm exec vite build 2>&1"
 ```
 
+If you need to set Turnstile endpoint for this build only:
+
+```bash
+ssh root@66.94.125.242 "cd /opt/clawnet/packages/homepage && VITE_TURNSTILE_VERIFY_ENDPOINT=https://docs.clawnetd.com/api/turnstile/verify pnpm exec vite build 2>&1"
+```
+
 Expected output:
 ```
 vite v6.4.1 building for production...
@@ -188,6 +201,10 @@ ssh root@66.94.125.242 "curl -sI https://clawnetd.com/install.sh 2>&1 | head -3"
 
 ssh root@66.94.125.242 "curl -sI https://clawnetd.com/.well-known/ai-plugin.json 2>&1 | head -3"
 # Should return: HTTP/2 200 with content-type: application/json
+
+# Turnstile verify endpoint is reachable from homepage origin
+ssh root@66.94.125.242 "curl -sI -X OPTIONS https://docs.clawnetd.com/api/turnstile/verify -H 'Origin: https://clawnetd.com' 2>&1 | head -8"
+# Should include: access-control-allow-origin: https://clawnetd.com
 ```
 
 ---

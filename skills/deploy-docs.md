@@ -76,6 +76,38 @@ WantedBy=multi-user.target
 - **URL structure**: Docs served at root `/` (not `/docs`); old `/docs/*` paths 308-redirect to `/*`
 - **Build output**: `.next/` (SSG static pages + server middleware)
 - **Custom plugins**: `lib/remark-mermaid.mjs` (Mermaid diagram rendering)
+- **Turnstile endpoint**: `POST/OPTIONS /api/turnstile/verify` (server-side siteverify)
+
+### Turnstile Runtime Environment (Required)
+
+The docs service must provide Turnstile server variables at runtime:
+
+```ini
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAACqCItnNjID1lMqd
+TURNSTILE_SECRET_KEY=<your-secret-key>
+TURNSTILE_ALLOWED_ORIGINS=https://clawnetd.com,https://docs.clawnetd.com
+```
+
+Recommended systemd override:
+
+```bash
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "systemctl edit clawnet-docs"
+```
+
+Add:
+
+```ini
+[Service]
+Environment=NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAACqCItnNjID1lMqd
+Environment=TURNSTILE_SECRET_KEY=<your-secret-key>
+Environment=TURNSTILE_ALLOWED_ORIGINS=https://clawnetd.com,https://docs.clawnetd.com
+```
+
+Then reload and restart:
+
+```bash
+ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "systemctl daemon-reload && systemctl restart clawnet-docs"
+```
 
 ---
 
@@ -136,6 +168,7 @@ packages/docs/
 1. SSH key `~/.ssh/id_ed25519_clawnet` exists and can connect to `root@66.94.125.242`
 2. Local repo is on the `main` branch with a clean working tree
 3. pnpm v10 and Node.js v20+ available locally
+4. `TURNSTILE_SECRET_KEY` is configured in `clawnet-docs.service` environment
 
 ---
 
@@ -270,6 +303,20 @@ curl -sI https://docs.clawnetd.com/docs/<path> | head -3
 ```
 
 Expected: `HTTP/2 308` with `location: /<path>` (permanent redirect from old `/docs/` prefix).
+
+**Check Turnstile verification endpoint:**
+
+```bash
+# CORS preflight from homepage origin
+curl -sI -X OPTIONS https://docs.clawnetd.com/api/turnstile/verify -H "Origin: https://clawnetd.com" | head -8
+
+# Missing token should be rejected
+curl -s https://docs.clawnetd.com/api/turnstile/verify -H "content-type: application/json" -d '{}' | head -c 200
+```
+
+Expected:
+- OPTIONS returns `204` and includes `access-control-allow-origin: https://clawnetd.com`
+- POST without token returns error JSON with `token is required`
 
 ---
 
@@ -419,4 +466,6 @@ Use this checklist for every docs deployment:
 [ ] Deployed: ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 "cd /opt/clawnet && git pull origin main && pnpm --filter docs build && systemctl restart clawnet-docs"
 [ ] Verified: curl -sI https://docs.clawnetd.com/<path> returns 200
 [ ] Verified: removed pages return 404 (or redirect)
+[ ] Verified: OPTIONS /api/turnstile/verify returns 204 with CORS allow-origin
+[ ] Verified: TURNSTILE_SECRET_KEY exists in clawnet-docs runtime env
 ```

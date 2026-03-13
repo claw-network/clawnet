@@ -1119,6 +1119,58 @@ button {
   color: var(--text-on-dark-soft);
 }
 
+.turnstile-card {
+  margin-top: 1.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.95));
+  padding: 1.2rem;
+}
+
+.turnstile-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.turnstile-form label {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.turnstile-form input {
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  border-radius: 0.7rem;
+  padding: 0.66rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.turnstile-form input:focus-visible {
+  outline: 2px solid rgba(0, 84, 233, 0.35);
+  outline-offset: 1px;
+  border-color: rgba(0, 84, 233, 0.55);
+}
+
+.turnstile-widget {
+  min-height: 65px;
+}
+
+.turnstile-status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.turnstile-status[data-mode='error'] {
+  color: #b91c1c;
+}
+
+.turnstile-status[data-mode='success'] {
+  color: #047857;
+}
+
 .site-footer {
   margin-top: 2.5rem;
   border-top: 1px solid rgba(148, 163, 184, 0.2);
