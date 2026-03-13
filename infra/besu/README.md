@@ -2,6 +2,28 @@
 
 This directory tracks the Besu runtime baseline used by ClawNet chain environments.
 
+## Submodule Baseline
+
+- Besu source is vendored as a git submodule at `infra/besu/upstream`
+- Upstream URL:
+  - `https://github.com/hyperledger/besu.git`
+- Current pinned baseline:
+  - tag `24.12.2`
+  - commit `eaa75ac`
+
+Initialize it in a fresh clone with:
+
+```bash
+git submodule update --init --recursive infra/besu/upstream
+```
+
+To bootstrap a writable fork branch from the pinned baseline:
+
+```bash
+BESU_FORK_URL=https://github.com/<org>/besu.git \
+infra/besu/bootstrap-fork.sh
+```
+
 ## Current Default Image Contract
 
 - Compose files under `infra/testnet/` and `infra/mainnet/` use:
@@ -33,6 +55,7 @@ Before testnet rollout, fill in and keep updated:
 - `infra/besu/testnet-rollout-checklist.md`: operator-facing checklist for testnet rollout, smoke checks, and rollback using `CLAWNET_BESU_IMAGE`
 - `infra/besu/mainnet-rollout-checklist.md`: stricter promotion checklist for mainnet rollout after testnet validation
 - `infra/besu/implementer-ops-handoff.md`: one-page summary for the Besu fork implementer and chain operators
+- `infra/besu/bootstrap-fork.sh`: helper to add a writable fork remote and create the implementation branch from the pinned submodule baseline
 - `docs/implementation/tasks/besu-ed25519-precompile-rollout.md`: rollout plan across devnet, testnet, and mainnet
 
 ## Usage

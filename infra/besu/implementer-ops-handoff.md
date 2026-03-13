@@ -19,6 +19,24 @@ Authoritative interface doc:
 
 - `infra/besu/ed25519-precompile-spec.md`
 
+## Source Baseline
+
+- Besu source lives in the repository as a git submodule at `infra/besu/upstream`
+- Current pinned baseline: tag `24.12.2` at commit `eaa75ac`
+
+Initialize the submodule in a fresh clone with:
+
+```bash
+git submodule update --init --recursive infra/besu/upstream
+```
+
+To attach your writable fork remote and create the working branch:
+
+```bash
+BESU_FORK_URL=https://github.com/<org>/besu.git \
+infra/besu/bootstrap-fork.sh
+```
+
 ## Repository Validation Path
 
 1. Start the custom image locally with:

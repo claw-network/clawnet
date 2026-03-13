@@ -15,8 +15,8 @@ Status markers:
 
 ### B-1. Freeze Fork Baseline
 
-- [ ] Choose the exact upstream Besu version to fork
-- [ ] Record the upstream tag or commit in `infra/besu/README.md`
+- [x] Choose the exact upstream Besu version to fork
+- [x] Record the upstream tag or commit in `infra/besu/README.md`
 - [ ] Create the fork branch for the Ed25519 precompile work
 - [ ] Decide the image naming convention for local, CI, and testnet builds
 
@@ -25,6 +25,12 @@ Acceptance:
 - Upstream version is recorded
 - Fork branch exists
 - Output image naming scheme is agreed and documented
+
+Current repository baseline:
+
+- submodule path: `infra/besu/upstream`
+- pinned tag: `24.12.2`
+- pinned commit: `eaa75ac`
 
 ### B-2. Register Precompile at `0x0100`
 

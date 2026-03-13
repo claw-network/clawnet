@@ -176,6 +176,7 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
   - 记录镜像命名规则
 - 将 testnet/mainnet 的链镜像从 `hyperledger/besu:latest` 改为固定标签
 - deploy 脚本支持通过 `CLAWNET_BESU_IMAGE` 注入自定义镜像
+- 将 Besu 上游源码以 git submodule 固定到仓库内基线（`infra/besu/upstream`）
 
 建议镜像命名：
 
