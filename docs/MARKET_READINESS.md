@@ -92,6 +92,7 @@
   - 现状：`Ed25519Verifier.sol` 已改为预编译适配器；在链上 Ed25519 backend 缺失时会显式 revert `Ed25519VerificationUnavailable()`，不再静默返回成功或失败
   - 当前主路径：`ClawIdentity` 的注册/轮换已使用 controller 的 ECDSA proof-of-possession，避免把未落地的 Ed25519 verifier 接入主网关键路径
   - 位置：`packages/contracts/contracts/libraries/Ed25519Verifier.sol`、`packages/contracts/contracts/ClawIdentity.sol`
+  - 仓库已具备最小集成骨架：`infra/devnet/docker-compose.ed25519.yml`、`scripts/test-ed25519-precompile.mjs`、`packages/contracts/test/Ed25519Verifier.besu.test.ts`
   - 方案（二选一）：
     - A. 部署自定义 Besu 节点，添加 Ed25519 预编译（地址 0x0100）
     - B. 接入纯 Solidity 实现（例如 SCL / SmoothCryptoLib，gas 较高但可用）

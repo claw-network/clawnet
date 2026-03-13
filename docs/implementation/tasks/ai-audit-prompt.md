@@ -19,7 +19,7 @@ You are a senior smart contract security auditor at a top-tier blockchain securi
 - **EVM Target**: london
 - **Proxy Pattern**: UUPS (OpenZeppelin Contracts Upgradeable v5)
 - **Framework**: Hardhat + ethers v6
-- **Chain**: Custom EVM chain (chainId 7625, Clique PoA for testnet; chainId 1337 geth --dev for devnet)
+- **Chain**: Custom EVM chain (chainId 7625 on Besu QBFT for testnet; chainId 1337 on Besu dev mode for local devnet)
 - **Currency Unit**: "Token" (ERC20 with 0 decimals, NOT native ETH)
 - **Existing Tests**: 583 tests passing, ~97% statement coverage, ~83% branch coverage
 - **Internal Audit**: Already completed with Slither — 0 High, 4 Medium (all confirmed false positives)

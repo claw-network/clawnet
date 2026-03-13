@@ -162,9 +162,9 @@
 - [x] **T-0.13** 调研并实现 Ed25519 自定义预编译
   - 独立链可自由添加自定义预编译，无需 EIP 审批
   - 产出：`docs/implementation/tasks/ed25519-research.md`
-  - 内容：方案对比（Reth 自定义预编译 / 纯 Solidity 库 / 链下验证+链上提交）
+  - 内容：方案对比（链客户端自定义预编译 / 纯 Solidity 库 / 链下验证+链上提交）
   - 推荐方案 + PoC 代码
-  - 结论：采用方案 C（链下验证 + 链上提交），Phase 2 可升级到方案 A（Reth 预编译）
+  - 结论：采用方案 C（链下验证 + 链上提交）；当前 Phase 2 的可执行方向已更新为 Besu `0x0100` 预编译，见 `docs/implementation/tasks/besu-ed25519-precompile-rollout.md`
   - 工时：2 天
 
 - [x] **T-0.14** 实现 Ed25519Verifier.sol（或确定链下验证方案）

@@ -24,7 +24,7 @@ ClawNet Testnet 已完成**共识引擎迁移**，从 Geth Clique PoA 切换至 
 | 改动项 | 详情 |
 |--------|------|
 | **共识引擎** | Clique PoA → QBFT BFT（`blockperiodseconds: 2`） |
-| **客户端** | `clawnet/geth:v1.13.15-zero-gas`（定制镜像）→ `hyperledger/besu:latest`（v26.2.0，官方镜像） |
+| **客户端** | `clawnet/geth:v1.13.15-zero-gas`（定制镜像）→ `hyperledger/besu:latest`（迁移当时使用的官方镜像，当前仓库默认基线已固定） |
 | **Genesis 重新创世** | 全新 QBFT genesis，`zeroBaseFee: true`，London EVM |
 | **合约重新部署** | 全部 9 个合约已重新部署（地址不变，确定性部署） |
 | **Token 铸造** | Bootstrap mint 完成，1,000,000 Token 已分配 |
@@ -85,7 +85,7 @@ client: besu/v26.2.0/linux-x86_64/openjdk-java-25
 - **共识**: QBFT（Quorum Byzantine Fault Tolerance），3 验证者可容忍 0 个拜占庭故障（需 4 节点才能容忍 1 个）
 - **EVM**: London 里程碑，EIP-1559 兼容，`baseFeePerGas` 恒为 0
 - **RPC API**: `ETH,NET,WEB3,TXPOOL,QBFT,ADMIN`（新增 `QBFT`，移除 `CLIQUE`）
-- **Docker 镜像**: `hyperledger/besu:latest`（官方镜像，无定制补丁）
+- **Docker 镜像**: 迁移当时为 `hyperledger/besu:latest`；当前仓库默认基线已固定到 `hyperledger/besu:24.12.2`，并支持通过 `CLAWNET_BESU_IMAGE` 注入自定义镜像
 
 ## 联系方式
 

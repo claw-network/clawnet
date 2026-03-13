@@ -29,8 +29,9 @@
 ClawNet 当前链运行时已经迁移到 **Hyperledger Besu + QBFT**。仓库中的 devnet、testnet、mainnet 相关入口都以 Besu 为准：
 
 - `infra/devnet/start.sh` 直接启动本地 `besu` 进程
-- `infra/testnet/docker-compose.yml` 使用 `hyperledger/besu:latest`
-- `infra/mainnet/docker-compose.yml` 使用 `hyperledger/besu:latest`
+- `infra/testnet/docker-compose.yml` 默认固定到 `hyperledger/besu:24.12.2`
+- `infra/mainnet/docker-compose.yml` 默认固定到 `hyperledger/besu:24.12.2`
+- testnet/mainnet deploy 脚本支持通过 `CLAWNET_BESU_IMAGE` 覆盖为自定义 Besu 镜像
 
 因此，后续链上 Ed25519 验证的正确落地方向不是 Reth，而是：
 
@@ -421,7 +422,7 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 
 | 风险 | 说明 | 缓解 |
 | --- | --- | --- |
-| `latest` 漂移 | 当前 Compose 使用 `hyperledger/besu:latest`，不可复现 | 第一阶段先改固定标签 |
+| `latest` 漂移 | 若继续依赖 `latest` 会导致运行时不可复现 | 已切到固定默认标签，并保留自定义镜像覆盖能力 |
 | 共识不一致 | 不同节点对预编译结果不一致会直接分叉 | 只使用确定性实现，先做多节点测试 |
 | 一次性改太多 | 同时改链客户端和 `ClawIdentity` 主路径，问题难定位 | 分阶段交付，先基础设施后业务 |
 | 测试覆盖不足 | 只有单元测试，没有真实 Besu 集成验证 | 新增自定义 Besu 集成测试 |
@@ -443,7 +444,7 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 
 如果要今天开始动手，按下面顺序执行：
 
-1. 先冻结 Besu 基线版本，停止继续使用 `hyperledger/besu:latest`
+1. 先冻结 Besu 基线版本，并以 `CLAWNET_BESU_IMAGE` 为唯一自定义镜像注入入口
 2. 在外部 Besu fork 中实现并验证 `0x0100`
 3. 在本仓库新增自定义 Besu dev/test 入口与集成测试
 4. 先灰度到 testnet，不动 `ClawIdentity` 主路径
