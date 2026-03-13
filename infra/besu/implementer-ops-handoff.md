@@ -23,6 +23,10 @@ Authoritative interface doc:
 
 - Besu source lives in the repository as a git submodule at `infra/besu/upstream`
 - Current pinned baseline: tag `24.12.2` at commit `eaa75ac`
+- ClawNet fork URL: `https://github.com/claw-network/besu.git`
+- Remote convention:
+  - `origin` -> ClawNet fork
+  - `upstream` -> official Besu
 
 Initialize the submodule in a fresh clone with:
 
@@ -33,9 +37,21 @@ git submodule update --init --recursive infra/besu/upstream
 To attach your writable fork remote and create the working branch:
 
 ```bash
-BESU_FORK_URL=https://github.com/<org>/besu.git \
+BESU_FORK_URL=https://github.com/claw-network/besu.git \
 infra/besu/bootstrap-fork.sh
 ```
+
+To move the ClawNet patch stack onto a newer Besu release:
+
+```bash
+BESU_SOURCE_BRANCH=clawnet/ed25519-precompile \
+infra/besu/upgrade-fork.sh 24.12.3
+```
+
+The durable maintenance workflow is documented in:
+
+- `infra/besu/upgrade-workflow.md`
+- `infra/besu/custom-patch-inventory.md`
 
 ## Repository Validation Path
 
@@ -79,6 +95,7 @@ Before testnet rollout, the implementation side must hand back:
 - custom image tag
 - custom image digest
 - Besu fork commit or tag
+- Besu upgrade branch name for the active release line
 - confirmation that the fixed valid vector returns `true`
 - confirmation that the fixed tampered vector returns `false`
 
@@ -107,3 +124,4 @@ Record these in:
 - Do not change repository-side probe vectors unless the interface contract changes and all dependent docs are updated
 - Do not couple Besu rollout with `ClawIdentity` main-path changes
 - Use `CLAWNET_BESU_IMAGE` as the only runtime image override path
+- Do not rely on unpublished submodule working-tree edits as the long-term home of the Besu customization

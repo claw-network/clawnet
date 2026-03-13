@@ -34,9 +34,9 @@ Current repository baseline:
 
 ### B-2. Register Precompile at `0x0100`
 
-- [ ] Identify the Besu precompile registration hook used by the active EVM schedule
-- [ ] Register `0x0100` without changing any Solidity-side address
-- [ ] Ensure the registration is active on the ClawNet chain configuration actually used by devnet/testnet/mainnet
+- [x] Identify the Besu precompile registration hook used by the active EVM schedule
+- [x] Register `0x0100` without changing any Solidity-side address
+- [x] Ensure the registration is active on the ClawNet chain configuration actually used by devnet/testnet/mainnet
 
 Acceptance:
 
@@ -45,9 +45,9 @@ Acceptance:
 
 ### B-3. Implement Input Decoder
 
-- [ ] Decode exactly 128 bytes of input
-- [ ] Split fields as `message[32] || signature[64] || publicKey[32]`
-- [ ] Reject malformed length deterministically
+- [x] Decode exactly 128 bytes of input
+- [x] Split fields as `message[32] || signature[64] || publicKey[32]`
+- [x] Reject malformed length deterministically
 
 Acceptance:
 
@@ -56,10 +56,10 @@ Acceptance:
 
 ### B-4. Integrate Ed25519 Verification Library
 
-- [ ] Select the Ed25519 library used inside the Besu fork
-- [ ] Document the chosen library and version
-- [ ] Verify the implementation is deterministic across validator nodes
-- [ ] Avoid writing custom curve arithmetic from scratch
+- [x] Select the Ed25519 library used inside the Besu fork
+- [x] Document the chosen library and version
+- [x] Verify the implementation is deterministic across validator nodes
+- [x] Avoid writing custom curve arithmetic from scratch
 
 Acceptance:
 
@@ -67,11 +67,15 @@ Acceptance:
 - Tampered vector fails cleanly
 - Implementation choice is documented for maintenance
 
+Implementation note:
+
+- Current fork implementation uses the JDK Ed25519 provider via `KeyFactory("Ed25519")` and `Signature("Ed25519")`.
+
 ### B-5. Define Return Semantics
 
-- [ ] Return 32-byte `true` for valid signatures
-- [ ] Return 32-byte `false` for invalid signatures
-- [ ] Fail execution for backend-unavailable or malformed execution cases
+- [x] Return 32-byte `true` for valid signatures
+- [x] Return 32-byte `false` for invalid signatures
+- [x] Fail execution for backend-unavailable or malformed execution cases
 
 Acceptance:
 
@@ -83,12 +87,12 @@ Acceptance:
 
 ### B-6. Add Unit Tests in the Besu Fork
 
-- [ ] Valid signature test
-- [ ] Invalid signature test
-- [ ] Wrong public key test
-- [ ] Wrong input length test
-- [ ] Empty input test
-- [ ] Repeated-call determinism test
+- [x] Valid signature test
+- [x] Invalid signature test
+- [x] Wrong public key test
+- [x] Wrong input length test
+- [x] Empty input test
+- [x] Repeated-call determinism test
 
 Acceptance:
 
@@ -96,9 +100,9 @@ Acceptance:
 
 ### B-7. Capture Fixed ClawNet Vectors
 
-- [ ] Use the fixed vectors from `infra/besu/ed25519-precompile-spec.md`
-- [ ] Verify the exact valid vector returns `true`
-- [ ] Verify the exact tampered vector returns `false`
+- [x] Use the fixed vectors from `infra/besu/ed25519-precompile-spec.md`
+- [x] Verify the exact valid vector returns `true`
+- [x] Verify the exact tampered vector returns `false`
 
 Acceptance:
 

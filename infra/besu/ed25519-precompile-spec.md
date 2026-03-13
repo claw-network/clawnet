@@ -69,6 +69,11 @@ For malformed input length, the preferred behavior is to fail execution rather t
 - Do not depend on wall-clock time, randomness, locale, or host-specific settings.
 - Gas charging must be fixed and deterministic.
 
+## Gas Cost
+
+- Fixed gas cost: `5000`
+- The current Besu fork implementation uses a constant gas schedule for all calls to `0x0100`.
+
 ## Fixed Test Vectors
 
 These vectors are already wired into the repository-side probe script.

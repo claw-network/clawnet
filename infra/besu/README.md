@@ -5,7 +5,9 @@ This directory tracks the Besu runtime baseline used by ClawNet chain environmen
 ## Submodule Baseline
 
 - Besu source is vendored as a git submodule at `infra/besu/upstream`
-- Upstream URL:
+- Submodule default remote URL:
+  - `https://github.com/claw-network/besu.git`
+- Official upstream Besu URL:
   - `https://github.com/hyperledger/besu.git`
 - Current pinned baseline:
   - tag `24.12.2`
@@ -20,8 +22,15 @@ git submodule update --init --recursive infra/besu/upstream
 To bootstrap a writable fork branch from the pinned baseline:
 
 ```bash
-BESU_FORK_URL=https://github.com/<org>/besu.git \
+BESU_FORK_URL=https://github.com/claw-network/besu.git \
 infra/besu/bootstrap-fork.sh
+```
+
+To create a Besu upgrade branch and replay the ClawNet patch stack onto a newer upstream tag:
+
+```bash
+BESU_SOURCE_BRANCH=clawnet/ed25519-precompile \
+infra/besu/upgrade-fork.sh 24.12.3
 ```
 
 ## Current Default Image Contract
@@ -44,9 +53,19 @@ Before testnet rollout, fill in and keep updated:
 - Fork repository URL
 - Fork branch or tag
 - Upstream Besu base version
+- Upgrade workflow branch for the current release line
 - Built image tag
 - Built image digest
 - Change summary for custom precompiles
+
+## Long-Term Maintenance Model
+
+- Official Besu remains the upstream update source.
+- ClawNet-specific Besu changes must live on a writable fork branch, not only in a dirty submodule working tree.
+- In the steady state, the Besu submodule uses `origin` for the ClawNet fork and `upstream` for official Besu.
+- Each Besu release upgrade must replay the ClawNet patch stack onto the newer upstream tag and re-run the focused validation path.
+- Before the parent repo pins a fork-only Besu commit, the submodule remote in `.gitmodules` must be moved to the ClawNet fork so fresh clones can fetch that commit.
+- The active ClawNet-owned Besu patch groups must be listed in `infra/besu/custom-patch-inventory.md`.
 
 ## Related Docs
 
@@ -56,6 +75,9 @@ Before testnet rollout, fill in and keep updated:
 - `infra/besu/mainnet-rollout-checklist.md`: stricter promotion checklist for mainnet rollout after testnet validation
 - `infra/besu/implementer-ops-handoff.md`: one-page summary for the Besu fork implementer and chain operators
 - `infra/besu/bootstrap-fork.sh`: helper to add a writable fork remote and create the implementation branch from the pinned submodule baseline
+- `infra/besu/upgrade-fork.sh`: helper to create a Besu upgrade branch and replay the ClawNet patch stack onto a newer upstream ref
+- `infra/besu/upgrade-workflow.md`: durable maintenance process for regular Besu upgrades without losing ClawNet fork changes
+- `infra/besu/custom-patch-inventory.md`: explicit inventory of ClawNet-owned Besu changes that must survive upgrades
 - `docs/implementation/tasks/besu-ed25519-precompile-rollout.md`: rollout plan across devnet, testnet, and mainnet
 
 ## Usage

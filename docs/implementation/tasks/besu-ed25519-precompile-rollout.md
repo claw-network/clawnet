@@ -167,6 +167,7 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 1. 确认当前线上/测试环境实际运行的 Besu 版本。
 2. 在外部 Besu fork 中基于该版本创建工作分支。
 3. 在仓库内记录此次预编译工作所依赖的 Besu 版本与镜像标签。
+4. 明确后续升级策略：自定义改动必须进入可重放的 fork patch stack，而不是长期停留在 submodule 脏工作区。
 
 必须完成的仓库内改动：
 
@@ -174,9 +175,20 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
   - 记录 Besu fork 仓库地址
   - 记录基线版本/tag
   - 记录镜像命名规则
+- 新增 `infra/besu/upgrade-workflow.md`
+  - 记录 Besu 定期升级时如何把 ClawNet patch stack 重放到新版本
+- 新增 `infra/besu/upgrade-fork.sh`
+  - 从新 Besu tag 创建升级分支，并自动重放 ClawNet patch stack
+- 新增 `infra/besu/custom-patch-inventory.md`
+  - 明确哪些 Besu 改动属于 ClawNet patch stack，升级时必须保留
 - 将 testnet/mainnet 的链镜像从 `hyperledger/besu:latest` 改为固定标签
 - deploy 脚本支持通过 `CLAWNET_BESU_IMAGE` 注入自定义镜像
 - 将 Besu 上游源码以 git submodule 固定到仓库内基线（`infra/besu/upstream`）
+
+长期约束：
+
+- 一旦需要在父仓库中固定自定义 Besu commit，`.gitmodules` 中的 submodule URL 必须切到 ClawNet 的 Besu fork。
+- 否则新 clone 无法从官方 Besu remote 拉到 fork-only commit，父仓库的 submodule pin 会失效。
 
 建议镜像命名：
 
