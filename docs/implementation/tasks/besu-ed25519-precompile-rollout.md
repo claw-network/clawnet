@@ -241,6 +241,8 @@ Besu backend 必须返回至少 32 bytes，且与当前 Solidity 适配层保持
 
 目标：在不改变业务主路径的前提下，把自定义 Besu 先上线 testnet。
 
+现场执行清单：见 `infra/besu/testnet-rollout-checklist.md`。
+
 顺序：
 
 1. 先在单机 dev/test 环境验证
