@@ -346,7 +346,7 @@ export class ClawNetNode {
         const apiConfig: ApiServerConfig = {
           host: this.config.api?.host ?? '127.0.0.1',
           port: this.config.api?.port ?? 9528,
-          dataDir: this.config.dataDir,
+          dataDir: paths.root,
           network: this.config.network ?? persisted.network,
         };
         this.apiServer = new ApiServer(apiConfig, {
