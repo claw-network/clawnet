@@ -43,6 +43,10 @@ const PUBLIC_ROUTES: Array<(url: string, method: string) => boolean> = [
   (url) => url === '/api/v1/node' || url === '/api/v1/node/',
   // Prometheus metrics scrape endpoint
   (url) => url === '/api/v1/metrics' || url === '/api/v1/metrics/',
+  // Console SPA static assets (auth handled by the SPA itself)
+  (url) => url === '/console' || url.startsWith('/console/'),
+  // Passphrase verification for console login
+  (url) => url === '/api/v1/auth/verify-passphrase',
   // OPTIONS (CORS preflight)
   (_url, method) => method === 'OPTIONS',
 ];

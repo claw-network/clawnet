@@ -66,15 +66,21 @@ pnpm build
 #### Initialize a Node
 
 ```bash
-# Generate keys and create the data directory
-pnpm --filter @claw-network/cli exec clawnet init
+# Generate keys and create the data directory (auto-generates passphrase)
+pnpm clawnet init
+
+# Or specify your own passphrase
+pnpm clawnet init --passphrase "my-secure-passphrase"
 ```
 
 #### Start the Daemon
 
 ```bash
 # Starts the API server on http://127.0.0.1:9528
-pnpm --filter @claw-network/cli exec clawnet daemon
+CLAW_PASSPHRASE="<your-passphrase>" pnpm start
+
+# Or use --passphrase flag
+pnpm start --passphrase "my-secure-passphrase"
 ```
 
 #### Verify It Works

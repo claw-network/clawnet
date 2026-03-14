@@ -70,14 +70,25 @@ pnpm build
 ### 初始化
 
 ```bash
-pnpm --filter @claw-network/cli exec clawnet init
+pnpm clawnet init
+```
+
+未指定 passphrase 时会自动生成。也可以手动指定：
+
+```bash
+pnpm clawnet init --passphrase "your-secure-passphrase"
 ```
 
 ### 启动 daemon
 
 ```bash
-export CLAW_PASSPHRASE="your-secure-passphrase"
-pnpm --filter @claw-network/cli exec clawnet daemon
+CLAW_PASSPHRASE="your-secure-passphrase" pnpm start
+```
+
+或使用 `--passphrase` 参数：
+
+```bash
+pnpm start --passphrase "your-secure-passphrase"
 ```
 
 默认端口：

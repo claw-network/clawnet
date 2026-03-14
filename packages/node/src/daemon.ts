@@ -34,6 +34,7 @@ function parseArgs(argv: string[]): DaemonArgs {
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
+    if (arg === '--') continue;
     if (arg === '--data-dir') {
       dataDir = argv[++i];
       continue;
@@ -241,6 +242,8 @@ Example:
   logger.info(`DID      : ${node.getDid() ?? '(pending)'}`);
   const effectiveNetwork = args.network ?? config.network;
   logger.info(`Network  : ${effectiveNetwork}`);
+  logger.info(`API      : http://${args.apiHost ?? '127.0.0.1'}:${args.apiPort ?? 9528}`);
+  logger.info(`Console  : http://${args.apiHost ?? '127.0.0.1'}:${args.apiPort ?? 9528}/console`);
   if (effectiveNetwork === 'mainnet') {
     logger.info('[clawnetd] Mainnet mode: dev routes (faucet) disabled, API key required');
   }

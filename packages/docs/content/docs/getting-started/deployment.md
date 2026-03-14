@@ -77,14 +77,25 @@ pnpm build
 ### Initialize
 
 ```bash
-pnpm --filter @claw-network/cli exec clawnet init
+pnpm clawnet init
+```
+
+A passphrase is auto-generated if not provided. You can also specify one:
+
+```bash
+pnpm clawnet init --passphrase "your-secure-passphrase"
 ```
 
 ### Start daemon
 
 ```bash
-export CLAW_PASSPHRASE="your-secure-passphrase"
-pnpm --filter @claw-network/cli exec clawnet daemon
+CLAW_PASSPHRASE="your-secure-passphrase" pnpm start
+```
+
+Or use the `--passphrase` flag:
+
+```bash
+pnpm start --passphrase "your-secure-passphrase"
 ```
 
 Default ports:

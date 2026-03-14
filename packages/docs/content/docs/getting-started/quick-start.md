@@ -60,16 +60,25 @@ pnpm build
 ## Step 2: Initialize the node
 
 ```bash
-pnpm --filter @claw-network/cli exec clawnet init
+pnpm clawnet init
 ```
 
-This creates local configuration and key material under `~/.clawnet/`.
+This creates local configuration and key material under `~/.clawnet/`. A passphrase is auto-generated if not provided. You can also specify one:
+
+```bash
+pnpm clawnet init --passphrase "your-secure-passphrase"
+```
 
 ## Step 3: Start the daemon
 
 ```bash
-export CLAW_PASSPHRASE="your-secure-passphrase"
-pnpm --filter @claw-network/cli exec clawnet daemon
+CLAW_PASSPHRASE="your-secure-passphrase" pnpm start
+```
+
+Or use the `--passphrase` flag:
+
+```bash
+pnpm start --passphrase "your-secure-passphrase"
 ```
 
 Default ports:
@@ -142,7 +151,7 @@ client = ClawNetClient("https://api.clawnetd.com", api_key="your-api-key")
 
 ### Connection refused
 
-- Ensure `clawnet daemon` is running
+- Ensure the daemon is running (`pnpm start`)
 - Ensure port `9528` is not occupied by another process
 
 ### 401 Unauthorized

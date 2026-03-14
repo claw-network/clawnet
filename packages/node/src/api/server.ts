@@ -12,6 +12,7 @@ import { metricsMiddleware } from './metrics.js';
 import { apiKeyAuth } from './auth.js';
 import { attachWebSocketHandler } from './ws-messaging.js';
 import { attachDeliveryStreamHandler } from './ws-delivery-stream.js';
+import { createConsoleStatic } from './console-static.js';
 import type { RuntimeContext, ApiServerConfig } from './types.js';
 import type { ApiKeyStore } from './api-key-store.js';
 
@@ -91,6 +92,7 @@ function buildRouter(ctx: RuntimeContext): Router {
 export class ApiServer {
   private server?: Server;
   private router: Router;
+  public consoleAvailable = false;
 
   constructor(
     private readonly config: ApiServerConfig,
@@ -168,20 +170,24 @@ export class ApiServer {
     const errorMiddleware = createErrorBoundary({ hideDetails: isMainnet });
     const rateLimitMiddleware = createRateLimiter(this.config.rateLimit);
     const metricsRecorder = metricsMiddleware();
+    const { middleware: consoleStatic, available: consoleAvailable } = createConsoleStatic();
+    this.consoleAvailable = consoleAvailable;
 
     this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
-      // Middleware chain: CORS → metrics → rate limit → auth → error boundary → logger → router
-      void corsMiddleware(req, res, async () => {
-        await metricsRecorder(req, res, async () => {
-          await rateLimitMiddleware(req, res, async () => {
-            await authMiddleware(req, res, async () => {
-              await errorMiddleware(req, res, async () => {
-                await requestLogger(() => {})(req, res, async () => {
-                  const matched = await router.handle(req, res);
-                  if (!matched && !res.headersSent) {
-                    res.writeHead(404, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
-                  }
+      // Middleware chain: console static → CORS → metrics → rate limit → auth → error boundary → logger → router
+      void consoleStatic(req, res, async () => {
+        await corsMiddleware(req, res, async () => {
+          await metricsRecorder(req, res, async () => {
+            await rateLimitMiddleware(req, res, async () => {
+              await authMiddleware(req, res, async () => {
+                await errorMiddleware(req, res, async () => {
+                  await requestLogger(() => {})(req, res, async () => {
+                    const matched = await router.handle(req, res);
+                    if (!matched && !res.headersSent) {
+                      res.writeHead(404, { 'Content-Type': 'application/json' });
+                      res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
+                    }
+                  });
                 });
               });
             });

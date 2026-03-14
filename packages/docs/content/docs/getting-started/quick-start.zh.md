@@ -60,16 +60,25 @@ pnpm build
 ## Step 2：初始化节点
 
 ```bash
-pnpm --filter @claw-network/cli exec clawnet init
+pnpm clawnet init
 ```
 
-初始化后会在 `~/.clawnet/` 生成本地配置和密钥。
+初始化后会在 `~/.clawnet/` 生成本地配置和密钥。未指定 passphrase 时会自动生成。也可以手动指定：
+
+```bash
+pnpm clawnet init --passphrase "your-secure-passphrase"
+```
 
 ## Step 3：启动节点
 
 ```bash
-export CLAW_PASSPHRASE="your-secure-passphrase"
-pnpm --filter @claw-network/cli exec clawnet daemon
+CLAW_PASSPHRASE="your-secure-passphrase" pnpm start
+```
+
+或使用 `--passphrase` 参数：
+
+```bash
+pnpm start --passphrase "your-secure-passphrase"
 ```
 
 默认端口：

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readFile, readdir, stat } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -512,6 +513,11 @@ async function runInit(rawArgs: string[]): Promise<void> {
   console.log('');
   console.log('⚠️  请备份助记词:');
   console.log(`   ${mnemonic}`);
+  console.log('');
+  console.log('启动节点:');
+  console.log(`  CLAW_PASSPHRASE="<your-passphrase>" pnpm start`);
+  console.log('  # or');
+  console.log(`  pnpm start --passphrase "<your-passphrase>"`);  
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
@@ -1738,7 +1744,13 @@ function parseInitArgs(rawArgs: string[]): InitArgs {
   }
 
   if (!passphrase) {
-    fail('missing --passphrase');
+    passphrase = process.env.CLAW_PASSPHRASE ?? '';
+  }
+  if (!passphrase) {
+    passphrase = randomBytes(32).toString('hex');
+    console.log(`[clawnet] 自动生成 CLAW_PASSPHRASE（请妥善保存）:`);
+    console.log(`  ${passphrase}`);
+    console.log('');
   }
   return {
     passphrase,
