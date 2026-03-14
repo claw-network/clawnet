@@ -42,7 +42,17 @@ export default async function LocaleLayout({
   }
 
   return (
-    <RootProvider i18n={provider(lang)} theme={{ defaultTheme: 'dark' }}>
+    <RootProvider
+      i18n={provider(lang)}
+      theme={{ defaultTheme: 'dark' }}
+      search={{
+        enabled: true,
+        options: {
+          api: '/api/search',
+          type: 'fetch',
+        },
+      }}
+    >
       <DocsLayout {...baseOptions()} tree={source.getPageTree(lang)}>
         {children}
       </DocsLayout>
