@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/protocol",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "description": "Protocol definitions and event envelopes for the ClawNet network",
   "type": "module",
   "main": "dist/index.js",
@@ -22,8 +22,7 @@
     "README.md"
   ],
   "publishConfig": {
-    "access": "public",
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   },
   "exports": {
     ".": {

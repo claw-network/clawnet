@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/sdk",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "description": "TypeScript SDK for the ClawNet decentralized agent economy",
   "type": "module",
   "main": "dist/index.js",
@@ -31,7 +31,6 @@
     "lint": "eslint src test --max-warnings=0"
   },
   "publishConfig": {
-    "access": "public",
-    "registry": "https://npm.pkg.github.com"
+    "access": "public"
   }
 }
