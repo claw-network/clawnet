@@ -34,7 +34,7 @@ function readFaucetConfig(): FaucetConfig {
   return {
     amount: readPositiveIntEnv('CLAW_FAUCET_AMOUNT', 100),
     maxClaimsPerIpPerDay: readPositiveIntEnv('CLAW_FAUCET_MAX_CLAIMS_PER_IP_PER_DAY', 10),
-    dailyBudget: readPositiveIntEnv('CLAW_FAUCET_DAILY_BUDGET', 10_000),
+    dailyBudget: readPositiveIntEnv('CLAW_FAUCET_DAILY_BUDGET', 1_000),
   };
 }
 
