@@ -1,8 +1,12 @@
-# Skill: Publish ClawNet Packages (npm + PyPI)
+# Skill: Publish ClawNet Packages (npm + GitHub Packages + PyPI)
 
 ## Overview
 
-This skill covers the complete workflow for bumping versions and publishing ClawNet packages to **npm** and **PyPI**. It uses the unified bump script to keep all synced packages at the same version.
+This skill covers the complete workflow for bumping versions and publishing ClawNet packages to **npmjs.org**, **GitHub Packages (GPR)**, and **PyPI**. It uses the unified bump script to keep all synced packages at the same version.
+
+Packages are published to dual npm registries:
+- **npmjs.org** — primary public registry, zero-config install for external users
+- **GitHub Packages** — mirror registry, accessible within the GitHub org ecosystem
 
 ---
 
@@ -12,11 +16,11 @@ This skill covers the complete workflow for bumping versions and publishing Claw
 
 | Package | Registry | Directory |
 |---------|----------|-----------|
-| `@claw-network/core` | npm (public) | `packages/core` |
-| `@claw-network/protocol` | npm (public) | `packages/protocol` |
-| `@claw-network/sdk` | npm (public) | `packages/sdk` |
-| `@claw-network/node` | npm (public) | `packages/node` |
-| `@claw-network/cli` | npm (private) | `packages/cli` |
+| `@claw-network/core` | npm + GPR (public) | `packages/core` |
+| `@claw-network/protocol` | npm + GPR (public) | `packages/protocol` |
+| `@claw-network/sdk` | npm + GPR (public) | `packages/sdk` |
+| `@claw-network/node` | npm + GPR (public) | `packages/node` |
+| `@claw-network/cli` | — (private) | `packages/cli` |
 | `clawnet-sdk` | PyPI (public) | `packages/sdk-python` |
 
 ### Independent-Version Packages (NOT bumped by the script)
@@ -33,10 +37,28 @@ This skill covers the complete workflow for bumping versions and publishing Claw
 ## Prerequisites
 
 ```bash
-npm login                            # npm authenticated (for publish)
+npm login                            # npm authenticated (for npmjs.org publish)
 pip install hatch                    # Python build tool (for PyPI)
 export HATCH_INDEX_AUTH=pypi-token   # PyPI token (for PyPI publish)
 ```
+
+### GitHub Packages (GPR) auth (for local publish only)
+
+Add to `~/.npmrc`:
+
+```
+//npm.pkg.github.com/:_authToken=ghp_YOUR_PERSONAL_ACCESS_TOKEN
+```
+
+PAT needs `write:packages` scope. **Not needed for CI** — CI uses `GITHUB_TOKEN` automatically.
+
+### CI secrets (GitHub Actions)
+
+| Secret | Purpose |
+|--------|---------|
+| `NPM_TOKEN` | npmjs.org publish token |
+| `PYPI_TOKEN` | PyPI API token |
+| *(automatic)* `GITHUB_TOKEN` | GitHub Packages publish |
 
 ---
 
@@ -73,28 +95,49 @@ pnpm build && pnpm test
 
 All 217+ tests must pass before publishing.
 
-### Step 3: Commit the Version Bump
+### Step 3: Commit & Tag
 
 ```bash
 git add -A
 git commit -m "chore: bump to v<VERSION>"
-git push
+git tag v<VERSION>
+git push --no-verify
+git push origin v<VERSION> --no-verify
 ```
 
-### Step 4: Publish to npm + PyPI
+Pushing a `v*` tag triggers the **`publish-packages`** CI workflow automatically.
+
+### Step 4: Publish (two options)
+
+#### Option A: CI Auto-Publish (Recommended)
+
+Pushing the `v*` tag in Step 3 triggers `.github/workflows/publish-packages.yml`, which:
+1. Publishes npm packages to **npmjs.org** (core → protocol → sdk → node)
+2. Publishes npm packages to **GitHub Packages**
+3. Builds and uploads the Python SDK to **PyPI** via hatch
+
+No manual action needed — just wait for CI to complete.
+
+#### Option B: Local Publish via Script
 
 ```bash
 # Dry-run first (preview only)
 pnpm publish:dry
 
-# Actual publish
+# Publish to both npmjs.org + GitHub Packages + PyPI
 pnpm publish:release
+
+# Publish to npmjs.org only (+ PyPI)
+./scripts/publish.sh --npm
+
+# Publish to GitHub Packages only
+./scripts/publish.sh --gpr
 ```
 
 `publish:release` runs `scripts/publish.sh --release`, which:
 1. Builds all TypeScript packages
 2. Runs all tests
-3. Publishes npm packages in dependency order: core → protocol → sdk → node
+3. Publishes npm packages to **both registries** in dependency order: core → protocol → sdk → node
 4. Builds and uploads the Python SDK to PyPI via `hatch`
 
 ---
@@ -107,13 +150,18 @@ When you only need to push updated npm packages without PyPI:
 pnpm bump:patch
 pnpm build && pnpm test
 git add -A && git commit -m "chore: bump to v<VERSION>"
-git push
 
-# Publish each package in dependency order
-cd packages/core     && pnpm publish --access public --no-git-checks && cd ../..
-cd packages/protocol && pnpm publish --access public --no-git-checks && cd ../..
-cd packages/sdk      && pnpm publish --access public --no-git-checks && cd ../..
-cd packages/node     && pnpm publish --access public --no-git-checks && cd ../..
+# Publish to npmjs.org
+for pkg in packages/core packages/protocol packages/sdk packages/node; do
+  cd "$pkg" && pnpm publish --access public --no-git-checks --registry https://registry.npmjs.org && cd ../..
+done
+
+# Publish to GitHub Packages
+for pkg in packages/core packages/protocol packages/sdk packages/node; do
+  cd "$pkg" && pnpm publish --access public --no-git-checks --registry https://npm.pkg.github.com && cd ../..
+done
+
+git tag v<VERSION> && git push --no-verify && git push origin v<VERSION> --no-verify
 ```
 
 ---
@@ -171,7 +219,35 @@ See `skills/upgrade-clawnetd-server.md` for full server deployment details.
 
 - **Version source of truth**: `packages/core/package.json` — the bump script reads from here.
 - **npm publish order matters**: core → protocol → sdk → node (dependency chain).
-- **cli is private**: not published to npm, but its version is synced for consistency.
+- **Dual registry**: always use `--registry` flag when publishing locally to specify the target. Without it, the default npm registry is used.
+- **CI is the recommended publish path**: push a `v*` tag and let `publish-packages` workflow handle everything.
+- **cli is private**: not published to any registry, but its version is synced for consistency.
 - **Python SDK pyproject.toml**: automatically updated by the bump script.
 - **Never manually edit version fields** — always use the bump script to keep packages in sync.
 - **Currency unit is Token**, not CLAW (see `CONVENTIONS.md`).
+
+---
+
+## Install Published Packages
+
+### npm (for external users)
+
+```bash
+npm install @claw-network/sdk
+```
+
+### GitHub Packages
+
+```bash
+# Add to ~/.npmrc first:
+#   @claw-network:registry=https://npm.pkg.github.com
+#   //npm.pkg.github.com/:_authToken=YOUR_TOKEN
+
+npm install @claw-network/sdk
+```
+
+### PyPI
+
+```bash
+pip install clawnet-sdk
+```
