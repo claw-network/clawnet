@@ -10,6 +10,7 @@ import { Router } from './router.js';
 import { createCors, createErrorBoundary, requestLogger, createRateLimiter } from './middleware.js';
 import { metricsMiddleware } from './metrics.js';
 import { apiKeyAuth } from './auth.js';
+import { ConsoleSessionStore } from './console-session.js';
 import { attachWebSocketHandler } from './ws-messaging.js';
 import { attachDeliveryStreamHandler } from './ws-delivery-stream.js';
 import { createConsoleStatic } from './console-static.js';
@@ -92,6 +93,7 @@ function buildRouter(ctx: RuntimeContext): Router {
 export class ApiServer {
   private server?: Server;
   private router: Router;
+  private consoleSessionStore: ConsoleSessionStore;
   public consoleAvailable = false;
 
   constructor(
@@ -126,6 +128,8 @@ export class ApiServer {
     },
   ) {
     // Build the RuntimeContext from constructor args
+    const consoleSessionStore = new ConsoleSessionStore();
+    this.consoleSessionStore = consoleSessionStore;
     const ctx: RuntimeContext = {
       config: this.config,
       publishEvent: this.runtime.publishEvent,
@@ -152,6 +156,7 @@ export class ApiServer {
       relayScorer: this.runtime.relayScorer,
       signProof: this.runtime.signProof,
       indexerQuery: this.runtime.indexerQuery,
+      consoleSessionStore,
     };
 
     this.router = buildRouter(ctx);
@@ -162,7 +167,7 @@ export class ApiServer {
 
     // Set up middleware + router as request handler
     const router = this.router;
-    const authMiddleware = apiKeyAuth(this.runtime.apiKeyStore, this.config.network);
+    const authMiddleware = apiKeyAuth(this.runtime.apiKeyStore, this.config.network, this.consoleSessionStore);
     const isMainnet = this.config.network === 'mainnet';
     const corsMiddleware = createCors({
       origins: this.config.corsOrigins ?? (isMainnet ? [] : ['*']),

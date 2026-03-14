@@ -15,6 +15,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Middleware } from './router.js';
 import type { ApiKeyStore, ApiKeyRecord } from './api-key-store.js';
 import type { NetworkType } from './types.js';
+import type { ConsoleSessionStore } from './console-session.js';
 import { unauthorized } from './response.js';
 
 // ---------------------------------------------------------------------------
@@ -65,7 +66,7 @@ function isPublicRoute(url: string, method: string): boolean {
  * @param store - optional ApiKeyStore. If undefined or has 0 keys, auth is skipped.
  * @param network - network type. On mainnet, 0-key still enforces 401.
  */
-export function apiKeyAuth(store: ApiKeyStore | undefined, network?: NetworkType): Middleware {
+export function apiKeyAuth(store: ApiKeyStore | undefined, network?: NetworkType, consoleSessionStore?: ConsoleSessionStore): Middleware {
   return async (req: IncomingMessage, res: ServerResponse, next: () => Promise<void>) => {
     // No store configured → open access (backward-compatible)
     if (!store) {
@@ -81,6 +82,15 @@ export function apiKeyAuth(store: ApiKeyStore | undefined, network?: NetworkType
     if (isPublicRoute(pathname, method)) {
       await next();
       return;
+    }
+
+    // Check for console session token (before API key validation)
+    if (consoleSessionStore) {
+      const token = extractBearerToken(req);
+      if (token && consoleSessionStore.validate(token)) {
+        await next();
+        return;
+      }
     }
 
     // If no keys have been created yet:
@@ -129,6 +139,10 @@ function extractApiKey(req: IncomingMessage): string | undefined {
   if (xApiKey) return xApiKey.trim();
 
   // Fall back to Authorization: Bearer <key>
+  return extractBearerToken(req);
+}
+
+function extractBearerToken(req: IncomingMessage): string | undefined {
   const auth = firstHeaderValue(req.headers.authorization);
   if (!auth) return undefined;
 

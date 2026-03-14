@@ -90,6 +90,8 @@ export interface RuntimeContext {
   signProof?: (data: Uint8Array) => Promise<string>;
   /** Indexed chain data queries (for faucet claim tracking etc.). */
   indexerQuery?: IndexerQuery;
+  /** Console session store for passphrase-authenticated sessions. */
+  consoleSessionStore?: import('./console-session.js').ConsoleSessionStore;
 }
 
 // ─── Address & DID Helpers ──────────────────────────────────────

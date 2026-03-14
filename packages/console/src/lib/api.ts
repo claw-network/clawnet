@@ -22,8 +22,8 @@ async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     ...opts.headers,
   };
 
-  // Use session token if available
-  const token = sessionStorage.getItem('console-session');
+  // Use console session token if available
+  const token = sessionStorage.getItem('console-token');
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -41,7 +41,8 @@ async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const res = await fetch(url, init);
 
   if (res.status === 401) {
-    sessionStorage.removeItem('console-session');
+    sessionStorage.removeItem('console-token');
+    sessionStorage.removeItem('console-did');
     window.location.href = '/console/login';
     throw new ApiError(401, 'Unauthorized');
   }

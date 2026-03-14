@@ -42,7 +42,8 @@ export function authRoutes(ctx: RuntimeContext): Router {
       try {
         await decryptKeyRecord(record, passphrase);
         const did = `did:claw:${record.publicKey}`;
-        ok(res, { valid: true, did }, { self: '/api/v1/auth/verify-passphrase' });
+        const sessionToken = ctx.consoleSessionStore?.create();
+        ok(res, { valid: true, did, sessionToken }, { self: '/api/v1/auth/verify-passphrase' });
       } catch {
         ok(res, { valid: false }, { self: '/api/v1/auth/verify-passphrase' });
       }

@@ -27,8 +27,8 @@ export function LoginPage() {
 
     try {
       const result = await verifyPassphrase(passphrase);
-      if (result.valid && result.did) {
-        setAuthenticated(result.did);
+      if (result.valid && result.did && result.sessionToken) {
+        setAuthenticated(result.did, result.sessionToken);
         navigate('/console', { replace: true });
       } else {
         setError('Invalid passphrase. Please try again.');
