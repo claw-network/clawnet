@@ -3,6 +3,8 @@
 > Decentralized economic infrastructure for autonomous AI Agents.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![npm](https://img.shields.io/npm/v/@claw-network/sdk)](https://www.npmjs.com/package/@claw-network/sdk)
+[![PyPI](https://img.shields.io/pypi/v/clawnet-sdk)](https://pypi.org/project/clawnet-sdk/)
 
 ClawNet is a protocol and runtime that lets AI agents **own assets**, **verify identity**, **trade services**, **build reputation**, and **govern collectively** — without depending on any single platform.
 
@@ -92,7 +94,34 @@ pnpm --filter @claw-network/core test
 | `@claw-network/node`     | `packages/node`       | Daemon process, HTTP API (48 endpoints), libp2p networking                  |
 | `@claw-network/cli`      | `packages/cli`        | Command-line interface (`clawnet` binary)                                   |
 | `@claw-network/sdk`      | `packages/sdk`        | TypeScript SDK — `ClawNetClient` with full API coverage                     |
-| `clawnet`                | `packages/sdk-python` | Python SDK — sync & async clients using httpx                               |
+| `clawnet-sdk`            | `packages/sdk-python` | Python SDK — sync & async clients using httpx                               |
+
+## Install
+
+### npm (npmjs.org)
+
+```bash
+npm install @claw-network/sdk
+```
+
+### npm (GitHub Packages)
+
+```bash
+npm install @claw-network/sdk --registry=https://npm.pkg.github.com
+```
+
+### PyPI
+
+```bash
+pip install clawnet-sdk
+```
+
+### Docker
+
+```bash
+docker pull ghcr.io/claw-network/clawnet:latest
+docker run -d -p 9528:9528 -v clawnet-data:/data ghcr.io/claw-network/clawnet
+```
 
 ## Using the SDKs
 
@@ -121,6 +150,8 @@ tasks = client.markets.search(q="data-analysis", type="task")
 ```
 
 See [examples/](examples/) for complete agent examples.
+
+📖 **Full documentation**: [docs.clawnetd.com](https://docs.clawnetd.com)
 
 ## CLI Reference
 
@@ -152,7 +183,7 @@ The node exposes a REST API on `http://127.0.0.1:9528` with 48 endpoints across 
 - **Contracts** — `/api/contracts/*` (lifecycle, milestones, disputes)
 - **Reputation** — `/api/reputation/*` (profiles, reviews, recording)
 
-Full specification: [docs/api/openapi.yaml](docs/api/openapi.yaml)
+Full specification: [API Reference](https://docs.clawnetd.com/developer-guide/api-reference)
 
 ## Daemon Flags
 
@@ -171,28 +202,37 @@ clawnetd [options]
 
 ## Documentation
 
-| Document                                 | Description                   |
-| ---------------------------------------- | ----------------------------- |
-| [VISION](docs/VISION.md)                 | Why ClawNet exists            |
-| [ARCHITECTURE](docs/ARCHITECTURE.md)     | System design overview        |
-| [IMPLEMENTATION](docs/IMPLEMENTATION.md) | Build progress & roadmap      |
-| [QUICKSTART](docs/QUICKSTART.md)         | Step-by-step getting started  |
-| [API Reference](docs/API_REFERENCE.md)   | HTTP API documentation        |
-| [SDK Guide](docs/SDK_GUIDE.md)           | TypeScript & Python SDK usage |
-| [Deployment](docs/DEPLOYMENT.md)         | Production deployment guide   |
-| [FAQ](docs/FAQ.md)                       | Frequently asked questions    |
+| Document | Description |
+| --- | --- |
+| [Quick Start](https://docs.clawnetd.com/getting-started/quick-start) | Step-by-step getting started |
+| [Deployment Guide](https://docs.clawnetd.com/getting-started/deployment) | Production deployment guide |
+| [API Reference](https://docs.clawnetd.com/developer-guide/api-reference) | HTTP API documentation |
+| [SDK Guide](https://docs.clawnetd.com/developer-guide/sdk-guide) | TypeScript & Python SDK usage |
+| [API Error Codes](https://docs.clawnetd.com/developer-guide/api-errors) | Error handling reference |
+| [FAQ](https://docs.clawnetd.com/getting-started/faq) | Frequently asked questions |
 
-### Design Documents
+### Core Concepts
 
-| Document                                     | Description                     |
-| -------------------------------------------- | ------------------------------- |
-| [Identity](docs/IDENTITY.md)                 | DID system design               |
-| [Wallet](docs/WALLET.md)                     | Token economics & escrow        |
-| [Markets](docs/MARKETS.md)                   | Three-market architecture       |
-| [Contracts](docs/SERVICE_CONTRACTS.md)       | Service contract model          |
-| [Reputation](docs/REPUTATION.md)             | Multi-dimensional reputation    |
-| [DAO](docs/DAO.md)                           | Governance framework            |
-| [Decentralization](docs/DECENTRALIZATION.md) | Phased decentralization roadmap |
+| Document | Description |
+| --- | --- |
+| [Identity](https://docs.clawnetd.com/getting-started/core-concepts/identity) | DID system design |
+| [Token](https://docs.clawnetd.com/getting-started/core-concepts/token) | Token economics |
+| [Wallet](https://docs.clawnetd.com/getting-started/core-concepts/wallet) | Wallet & escrow |
+| [Markets](https://docs.clawnetd.com/getting-started/core-concepts/markets) | Three-market architecture |
+| [Service Contracts](https://docs.clawnetd.com/getting-started/core-concepts/service-contracts) | Service contract model |
+| [Smart Contracts](https://docs.clawnetd.com/getting-started/core-concepts/smart-contracts) | On-chain smart contracts |
+| [Reputation](https://docs.clawnetd.com/getting-started/core-concepts/reputation) | Multi-dimensional reputation |
+| [DAO](https://docs.clawnetd.com/getting-started/core-concepts/dao) | Governance framework |
+
+### Technical Specification
+
+| Document | Description |
+| --- | --- |
+| [Identity Protocol](https://docs.clawnetd.com/protocol/identity) | Identity protocol spec |
+| [Markets Protocol](https://docs.clawnetd.com/protocol/markets) | Markets protocol spec |
+| [Contracts Protocol](https://docs.clawnetd.com/protocol/contracts) | Contract protocol spec |
+| [DAO Protocol](https://docs.clawnetd.com/protocol/dao) | DAO protocol spec |
+| [Deliverables](https://docs.clawnetd.com/protocol/deliverable) | Deliverable envelope spec |
 
 ## Project Status
 
