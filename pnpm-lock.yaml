@@ -188,6 +188,9 @@ importers:
 
   packages/docs:
     dependencies:
+      '@orama/tokenizers':
+        specifier: ^3.1.18
+        version: 3.1.18
       fumadocs-core:
         specifier: ^15.2.6
         version: 15.8.5(@types/react@19.2.14)(lucide-react@0.473.0(react@19.2.4))(next@15.5.12(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -2049,6 +2052,10 @@ packages:
 
   '@orama/orama@3.1.18':
     resolution: {integrity: sha512-a61ljmRVVyG5MC/698C8/FfFDw5a8LOIvyOLW5fztgUXqUpc1jOfQzOitSCbge657OgXXThmY3Tk8fpiDb4UcA==}
+    engines: {node: '>= 20.0.0'}
+
+  '@orama/tokenizers@3.1.18':
+    resolution: {integrity: sha512-Ra4dFddWZ7hCGPAehnd/6QZjlzQvczYSt1y1Fq4HteJqRu2yvfR6fXvxiUnKi+HIgJYPxKhebJEjvJdF8LYQWg==}
     engines: {node: '>= 20.0.0'}
 
   '@pkgjs/parseargs@0.11.0':
@@ -9585,6 +9592,10 @@ snapshots:
       - supports-color
 
   '@orama/orama@3.1.18': {}
+
+  '@orama/tokenizers@3.1.18':
+    dependencies:
+      '@orama/orama': 3.1.18
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
