@@ -29,12 +29,31 @@ Located at `/etc/caddy/Caddyfile`, the `clawnetd.com` block:
 
 ```caddyfile
 clawnetd.com {
+	# Install/setup scripts served from /var/www/clawnetd
 	handle /install.sh {
 		header Content-Type "text/x-shellscript; charset=utf-8"
 		header Content-Disposition inline
 		file_server {
 			root /var/www/clawnetd
 		}
+	}
+
+	handle /setup.sh {
+		root * /var/www/clawnetd
+		header Content-Type "text/x-shellscript; charset=utf-8"
+		file_server
+	}
+
+	handle /setup.ps1 {
+		root * /var/www/clawnetd
+		header Content-Type "text/plain; charset=utf-8"
+		file_server
+	}
+
+	handle /setup.cmd {
+		root * /var/www/clawnetd
+		header Content-Type "text/plain; charset=utf-8"
+		file_server
 	}
 
 	handle {
@@ -52,7 +71,8 @@ clawnetd.com {
 ```
 
 Key points:
-- `/install.sh` is served from `/var/www/clawnetd/install.sh` (separate from the homepage)
+- `/install.sh` is served from `/var/www/clawnetd/install.sh` (production server installer)
+- `/setup.sh`, `/setup.ps1`, `/setup.cmd` are served from `/var/www/clawnetd/` (one-click local dev setup)
 - All other paths are served from the Vite build output at `packages/homepage/dist`
 - `try_files {path} /index.html` enables SPA client-side routing
 - Caddy auto-manages TLS certificates via Let's Encrypt
@@ -310,6 +330,16 @@ ssh root@66.94.125.242 "ls -la /var/www/clawnetd/install.sh"
 If missing, copy it:
 ```bash
 ssh root@66.94.125.242 "mkdir -p /var/www/clawnetd && cp /opt/clawnet/install.sh /var/www/clawnetd/install.sh"
+```
+
+### setup.sh / setup.ps1 / setup.cmd returns 404
+
+These scripts are also served from `/var/www/clawnetd/`. Verify and copy:
+
+```bash
+ssh root@66.94.125.242 "ls -la /var/www/clawnetd/setup.*"
+# If missing:
+ssh root@66.94.125.242 "cp /opt/clawnet/scripts/setup.sh /var/www/clawnetd/ && cp /opt/clawnet/scripts/setup.ps1 /var/www/clawnetd/ && cp /opt/clawnet/scripts/setup.cmd /var/www/clawnetd/"
 ```
 
 ### Caddy won't start or reload
