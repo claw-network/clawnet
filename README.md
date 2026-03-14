@@ -69,21 +69,31 @@ pnpm --filter @claw-network/core test
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Agent / User                                                   │
-├───────────┬───────────┬──────────────┬──────────────────────────┤
-│   CLI     │  HTTP API │  TS SDK      │  Python SDK              │
-│ clawnet │ :9528     │ @claw-network/  │  clawnet               │
-│           │           │  sdk         │                          │
-├───────────┴───────────┴──────────────┴──────────────────────────┤
-│  @claw-network/node — Daemon, API Router, P2P Networking           │
-├─────────────────────────────────────────────────────────────────┤
-│  @claw-network/protocol — Event reducers, business rules           │
-│  Identity │ Wallet │ Markets │ Contracts │ Reputation            │
-├─────────────────────────────────────────────────────────────────┤
-│  @claw-network/core — Crypto, Storage, Encoding, P2P primitives    │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+block-beta
+  columns 4
+
+  block:client:4
+    columns 4
+    A["Agent / User"]:4
+    CLI["CLI\nclawnet"] API["HTTP API\n:9528"] TS["TS SDK\n@claw-network/sdk"] PY["Python SDK\nclawnet-sdk"]
+  end
+
+  block:node:4
+    N["@claw-network/node — Daemon, API Router, P2P Networking"]:4
+  end
+
+  block:protocol:4
+    columns 5
+    P["@claw-network/protocol"]:5
+    Identity Wallet Markets Contracts Reputation
+  end
+
+  block:core:4
+    C["@claw-network/core — Crypto, Storage, Encoding, P2P primitives"]:4
+  end
+
+  client --> node --> protocol --> core
 ```
 
 ## Packages
