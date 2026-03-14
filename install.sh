@@ -22,6 +22,8 @@
 #   CLAWNET_CADDY_DOMAIN Domain for Caddy TLS      (optional)
 #   CLAWNET_SKIP_BUILD   Skip git clone & build    (default: false)
 #   CLAWNET_DATA_DIR     Data directory             (default: /var/lib/clawnet)
+#   CLAW_PRIVATE_KEY     EVM signer private key     (optional, for chain interaction)
+#   CLAW_FAUCET_URL      Faucet URL for auto-claim  (default: https://clawnetd.com)
 # ============================================================================
 set -euo pipefail
 
@@ -42,6 +44,8 @@ API_KEY="${CLAW_API_KEY:-}"
 SETUP_SYSTEMD=false
 CADDY_DOMAIN="${CLAWNET_CADDY_DOMAIN:-}"
 SKIP_BUILD="${CLAWNET_SKIP_BUILD:-false}"
+PRIVATE_KEY="${CLAW_PRIVATE_KEY:-}"
+FAUCET_URL="${CLAW_FAUCET_URL:-https://clawnetd.com}"
 REPO_URL="https://github.com/claw-network/clawnet.git"
 NODE_MAJOR=20
 PNPM_VERSION=10
@@ -57,6 +61,8 @@ while [ $# -gt 0 ]; do
     --systemd)       SETUP_SYSTEMD=true; shift ;;
     --caddy)         CADDY_DOMAIN="$2"; shift 2 ;;
     --skip-build)    SKIP_BUILD=true;   shift ;;
+    --private-key)   PRIVATE_KEY="$2"; shift 2 ;;
+    --faucet-url)    FAUCET_URL="$2";  shift 2 ;;
     --help|-h)
       sed -n '2,/^set -/{ /^#/s/^# \{0,1\}//p }' "$0"
       exit 0
@@ -232,7 +238,7 @@ if [ "$OS" = "linux" ] && { [ "$SETUP_SYSTEMD" = "true" ] || [ -d /run/systemd/s
 
   NODE_BIN="$(command -v node)"
 
-  $SUDO tee /etc/systemd/system/clawnet.service > /dev/null << SVCEOF
+  $SUDO tee /etc/systemd/system/clawnetd.service > /dev/null << SVCEOF
 [Unit]
 Description=ClawNet Node — Decentralized Agent Network
 Documentation=https://github.com/claw-network/clawnet
@@ -250,7 +256,9 @@ Environment=NODE_ENV=production
 Environment=CLAW_DATA_DIR=${DATA_DIR}
 Environment=CLAW_PASSPHRASE=${PASSPHRASE}
 Environment=CLAW_API_KEY=${API_KEY}
-Environment=CLAW_PRIVATE_KEY=\${CLAW_PRIVATE_KEY}
+Environment=CLAW_PRIVATE_KEY=${PRIVATE_KEY}
+# Faucet URL for auto-claiming initial Tokens on first startup (empty = disabled)
+Environment=CLAW_FAUCET_URL=${FAUCET_URL}
 LimitNOFILE=65536
 
 [Install]
@@ -258,8 +266,8 @@ WantedBy=multi-user.target
 SVCEOF
 
   $SUDO systemctl daemon-reload
-  $SUDO systemctl enable clawnet
-  $SUDO systemctl restart clawnet
+  $SUDO systemctl enable clawnetd
+  $SUDO systemctl restart clawnetd
   ok "systemd service installed and started"
 
   # Wait for node to come up
@@ -277,6 +285,10 @@ else
     echo ""
     echo "  export CLAW_PASSPHRASE=\"${PASSPHRASE}\""
     echo "  export CLAW_API_KEY=\"${API_KEY}\""
+    if [ -n "$PRIVATE_KEY" ]; then
+    echo "  export CLAW_PRIVATE_KEY=\"${PRIVATE_KEY}\""
+    fi
+    echo "  export CLAW_FAUCET_URL=\"${FAUCET_URL}\""
     echo "  cd ${INSTALL_DIR}"
     echo "  node packages/node/dist/daemon.js --data-dir ${DATA_DIR} --api-host 127.0.0.1 --api-port 9528"
     echo ""
@@ -372,5 +384,5 @@ echo "  Verify:  curl -s http://127.0.0.1:9528/api/node/status | python3 -m json
 if [ -n "$CADDY_DOMAIN" ]; then
 echo "  Public:  curl -s https://${CADDY_DOMAIN}/api/node/status"
 fi
-echo "  Logs:    journalctl -u clawnet -f"
+echo "  Logs:    journalctl -u clawnetd -f"
 echo ""

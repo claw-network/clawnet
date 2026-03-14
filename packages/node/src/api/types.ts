@@ -25,6 +25,7 @@ import type { MessagingService } from '../services/messaging-service.js';
 import type { RelayService } from '../services/relay-service.js';
 import type { RelayRewardService } from '../services/relay-reward-service.js';
 import type { ApiKeyStore } from './api-key-store.js';
+import type { IndexerQuery } from '../indexer/query.js';
 
 export {
   addressFromDid,
@@ -87,6 +88,8 @@ export interface RuntimeContext {
   relayScorer?: RelayScorer;
   /** Sign relay period proof data (returns base58 signature). F4. */
   signProof?: (data: Uint8Array) => Promise<string>;
+  /** Indexed chain data queries (for faucet claim tracking etc.). */
+  indexerQuery?: IndexerQuery;
 }
 
 // ─── Address & DID Helpers ──────────────────────────────────────

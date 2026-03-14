@@ -550,4 +550,73 @@ describe("ClawIdentity", function () {
       ).to.be.revertedWithCustomError(identity, "AccessControlUnauthorizedAccount");
     });
   });
+
+  // ─── selfRegisterDID ────────────────────────────────────────────────
+
+  describe("selfRegisterDID", function () {
+    it("should allow anyone to self-register (controller = msg.sender)", async function () {
+      await identity.connect(outsider).selfRegisterDID(DID_HASH_1, PUBKEY_1, KP_AUTH);
+
+      expect(await identity.isActive(DID_HASH_1)).to.be.true;
+      expect(await identity.getController(DID_HASH_1)).to.equal(outsider.address);
+      expect(await identity.getActiveKey(DID_HASH_1)).to.equal(PUBKEY_1);
+      expect(await identity.didCount()).to.equal(1);
+    });
+
+    it("should emit DIDRegistered event", async function () {
+      await expect(identity.connect(user1).selfRegisterDID(DID_HASH_1, PUBKEY_1, KP_AUTH))
+        .to.emit(identity, "DIDRegistered")
+        .withArgs(DID_HASH_1, user1.address);
+    });
+
+    it("should revert on duplicate DID", async function () {
+      await identity.connect(user1).selfRegisterDID(DID_HASH_1, PUBKEY_1, KP_AUTH);
+
+      await expect(
+        identity.connect(user2).selfRegisterDID(DID_HASH_1, PUBKEY_2, KP_AUTH),
+      ).to.be.revertedWithCustomError(identity, "DIDAlreadyExists");
+    });
+
+    it("should revert on invalid public key length", async function () {
+      const shortKey = ethers.hexlify(ethers.randomBytes(16));
+      await expect(
+        identity.connect(user1).selfRegisterDID(DID_HASH_1, shortKey, KP_AUTH),
+      ).to.be.revertedWithCustomError(identity, "InvalidPublicKey");
+    });
+
+    it("should revert when paused", async function () {
+      await identity.connect(admin).pause();
+      await expect(
+        identity.connect(user1).selfRegisterDID(DID_HASH_1, PUBKEY_1, KP_AUTH),
+      ).to.be.revertedWithCustomError(identity, "EnforcedPause");
+    });
+
+    it("self-registered DID can rotate key and revoke", async function () {
+      // Self-register
+      await identity.connect(user1).selfRegisterDID(DID_HASH_1, PUBKEY_1, KP_AUTH);
+
+      // Rotate key
+      const oldKeyHash = ethers.keccak256(PUBKEY_1);
+      const newKeyHash = ethers.keccak256(PUBKEY_2);
+      const rotSig = await signRotateKey(user1, DID_HASH_1, oldKeyHash, newKeyHash);
+      await identity.connect(user1).rotateKey(DID_HASH_1, PUBKEY_2, rotSig);
+
+      expect(await identity.getActiveKey(DID_HASH_1)).to.equal(PUBKEY_2);
+
+      // Revoke
+      await identity.connect(user1).revokeDID(DID_HASH_1);
+      expect(await identity.isActive(DID_HASH_1)).to.be.false;
+    });
+
+    it("multiple users can self-register different DIDs", async function () {
+      await identity.connect(user1).selfRegisterDID(DID_HASH_1, PUBKEY_1, KP_AUTH);
+      await identity.connect(user2).selfRegisterDID(DID_HASH_2, PUBKEY_2, KP_ASSERTION);
+      await identity.connect(outsider).selfRegisterDID(DID_HASH_3, PUBKEY_3, KP_KEY_AGR);
+
+      expect(await identity.didCount()).to.equal(3);
+      expect(await identity.getController(DID_HASH_1)).to.equal(user1.address);
+      expect(await identity.getController(DID_HASH_2)).to.equal(user2.address);
+      expect(await identity.getController(DID_HASH_3)).to.equal(outsider.address);
+    });
+  });
 });

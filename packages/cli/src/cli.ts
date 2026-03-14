@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -12,6 +12,7 @@ import {
 import type { NodeRuntimeConfig } from '@claw-network/node';
 import {
   addressFromDid,
+  bytesToHex,
   bytesToUtf8,
   createKeyRecord,
   decryptKeyRecord,
@@ -30,6 +31,7 @@ import {
   publicKeyFromPrivateKey,
   resolveStoragePaths,
   saveKeyRecord,
+  signBytes,
   utf8ToBytes,
   validateMnemonic,
   verifyCapabilityCredential,
@@ -353,6 +355,15 @@ async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
     }
     await runReputation(argv.slice(1));
     return;
+  }
+  if (command === 'faucet') {
+    const subcommand = argv[1];
+    const subArgs = argv.slice(2);
+    if (subcommand === 'claim') {
+      await runFaucetClaim(subArgs);
+      return;
+    }
+    fail(`unknown faucet subcommand: ${subcommand ?? ''}`);
   }
   if (command === 'escrow') {
     const subcommand = argv[1];
@@ -1312,6 +1323,59 @@ async function runBalance(rawArgs: string[]): Promise<void> {
   } finally {
     await store.close();
   }
+}
+
+async function runFaucetClaim(rawArgs: string[]): Promise<void> {
+  let apiUrl = 'http://127.0.0.1:9528';
+  let dataDir: string | undefined;
+  let passphrase: string | undefined;
+  for (let i = 0; i < rawArgs.length; i += 1) {
+    const arg = rawArgs[i];
+    if (arg === '--api' || arg === '--api-url') {
+      apiUrl = rawArgs[++i] ?? apiUrl;
+    } else if (arg === '--data-dir') {
+      dataDir = rawArgs[++i];
+    } else if (arg === '--passphrase') {
+      passphrase = rawArgs[++i];
+    } else {
+      fail(`unknown option: ${arg}`);
+    }
+  }
+
+  passphrase ??= process.env.CLAW_PASSPHRASE;
+  if (!passphrase) {
+    fail('missing --passphrase or CLAW_PASSPHRASE');
+  }
+
+  // Load identity key — find first key file in keystore
+  const paths = resolveStoragePaths(dataDir);
+  let keyFiles: string[] = [];
+  try {
+    keyFiles = (await readdir(paths.keys)).filter((f) => f.endsWith('.json'));
+  } catch { /* empty */ }
+  if (keyFiles.length === 0) {
+    fail('no identity key found — run "clawnet init" first');
+  }
+  const keyId = keyFiles[0].replace(/\.json$/, '');
+  const keyRecord = await loadKeyRecord(paths, keyId);
+  const privateKey = await decryptKeyRecord(keyRecord, passphrase!);
+  const publicKey = await publicKeyFromPrivateKey(privateKey);
+  const did = didFromPublicKey(publicKey);
+
+  // Sign faucet claim
+  const timestamp = Date.now();
+  const message = utf8ToBytes(`faucet:claim:${did}:${timestamp}`);
+  const sigBytes = await signBytes(message, privateKey);
+  const signature = bytesToHex(sigBytes);
+
+  // POST to faucet
+  const response = await fetchApiJsonWithBody(
+    apiUrl,
+    '/api/v1/faucet',
+    'POST',
+    { did, signature, timestamp },
+  );
+  console.log(JSON.stringify(response, null, 2));
 }
 
 async function runNonce(rawArgs: string[]): Promise<void> {

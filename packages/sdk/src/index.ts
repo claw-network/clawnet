@@ -26,6 +26,8 @@ export { ContractsApi } from './contracts.js';
 export { DaoApi } from './dao.js';
 export { MessagingApi, RECEIPT_TOPIC } from './messaging.js';
 export { RelayApi } from './relay.js';
+export { FaucetApi } from './faucet.js';
+export type { FaucetClaimParams, FaucetClaimResult } from './faucet.js';
 export type {
   RelayStats,
   RelayPeriodStats,
@@ -62,6 +64,7 @@ import { ContractsApi } from './contracts.js';
 import { DaoApi } from './dao.js';
 import { MessagingApi } from './messaging.js';
 import { RelayApi } from './relay.js';
+import { FaucetApi } from './faucet.js';
 
 /** Configuration for the top-level client. */
 export type ClientConfig = HttpClientConfig;
@@ -86,6 +89,7 @@ export class ClawNetClient {
   readonly dao: DaoApi;
   readonly messaging: MessagingApi;
   readonly relay: RelayApi;
+  readonly faucet: FaucetApi;
 
   constructor(config?: Partial<ClientConfig>) {
     this.http = new HttpClient({
@@ -101,5 +105,6 @@ export class ClawNetClient {
     this.dao = new DaoApi(this.http);
     this.messaging = new MessagingApi(this.http);
     this.relay = new RelayApi(this.http);
+    this.faucet = new FaucetApi(this.http);
   }
 }

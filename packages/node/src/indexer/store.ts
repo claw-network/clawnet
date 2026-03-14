@@ -203,6 +203,18 @@ CREATE TABLE IF NOT EXISTS relay_rewards (
   UNIQUE(relay_did_hash, period_id)
 );
 CREATE INDEX IF NOT EXISTS idx_relay_rewards_did ON relay_rewards(relay_did_hash);
+
+-- Public faucet claims (one-time per DID)
+CREATE TABLE IF NOT EXISTS faucet_claims (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  did        TEXT    NOT NULL UNIQUE,
+  address    TEXT    NOT NULL,
+  amount     INTEGER NOT NULL,
+  ip         TEXT,
+  tx_hash    TEXT,
+  claimed_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_faucet_claims_ip ON faucet_claims(ip);
 `;
 
 // ---------------------------------------------------------------------------

@@ -60,6 +60,8 @@ tags:
     description: 服务合约
   - name: Reputation
     description: 信誉系统
+  - name: Faucet
+    description: 公共 Token 水龙头（仅非 mainnet）
 
 # ============================================================================
 # PATHS
@@ -2935,6 +2937,90 @@ paths:
                 $ref: '#/components/schemas/Error'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # --------------------------------------------------------------------------
+  # Faucet
+  # --------------------------------------------------------------------------
+  /api/v1/faucet:
+    post:
+      tags: [Faucet]
+      summary: 领取初始 Token（一次性）
+      description: |
+        公共 faucet，新 DID 可一次性领取初始 Token。
+        需提供 Ed25519 签名证明 DID 所有权。
+        每个 DID 仅可领取一次，每个 IP 有每日请求限制。
+        仅在非 mainnet 网络上可用。
+      operationId: claimFaucet
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [did, signature, timestamp]
+              properties:
+                did:
+                  type: string
+                  description: 领取 Token 的 DID
+                  example: 'did:claw:zFy3Ed8bYu5SRHq5YK1YRz58iUpWxL27exCwngDwuH8gR'
+                signature:
+                  type: string
+                  description: '对 `faucet:claim:{did}:{timestamp}` 的 Ed25519 签名（hex 编码）'
+                  example: 'a1b2c3...'
+                timestamp:
+                  type: integer
+                  description: Unix 毫秒时间戳（须在服务器时间 ±5 分钟内）
+                  example: 1710403200000
+      responses:
+        '200':
+          description: 领取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      did:
+                        type: string
+                      address:
+                        type: string
+                        description: DID 对应的 EVM 地址
+                      amount:
+                        type: integer
+                        description: 领取的 Token 数量
+                      txHash:
+                        type: string
+                        nullable: true
+                        description: 链上交易哈希
+        '400':
+          description: 请求参数无效（DID 格式错误、时间戳过期等）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 签名验证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 该 DID 已领取过
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: IP 每日限额或全局预算用尽
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           $ref: '#/components/responses/InternalError'
 

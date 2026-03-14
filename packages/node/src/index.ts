@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, stat as fsStat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
@@ -8,6 +8,7 @@ import { privateKeyFromProtobuf } from '@libp2p/crypto/keys';
 import { createEd25519PeerId, createFromProtobuf, exportToProtobuf } from '@libp2p/peer-id-factory';
 import {
   bytesToUtf8,
+  bytesToHex,
   canonicalizeBytes,
   createKeyRecord,
   DEFAULT_P2P_CONFIG,
@@ -27,6 +28,7 @@ import {
   resolveRelayConfig,
   resolveStoragePaths,
   saveKeyRecord,
+  signBytes,
   signSnapshot,
   SnapshotRecord,
   SnapshotSchedulePolicy,
@@ -35,6 +37,7 @@ import {
   StoragePaths,
   TOPIC_EVENTS,
   TOPIC_MARKETS,
+  utf8ToBytes,
 } from '@claw-network/core';
 import {
   CONTENT_TYPE,
@@ -91,6 +94,8 @@ export interface NodeRuntimeConfig {
   indexer?: EventIndexerConfig;
   /** Network type override (mainnet|testnet|devnet). Overrides config.yaml value. */
   network?: 'mainnet' | 'testnet' | 'devnet';
+  /** URL of a faucet endpoint to claim initial Tokens from on first startup. */
+  faucetUrl?: string;
 }
 
 export const DEFAULT_SYNC_RUNTIME_CONFIG = {
@@ -372,9 +377,13 @@ export class ClawNetNode {
           relayRewardService: this.relayRewardService,
           p2pNode: this.p2p,
           relayScorer: this.relayScorer,
+          indexerQuery: this.indexerQuery,
         });
         await this.apiServer.start();
       }
+
+      // ── Auto-claim from faucet on first startup ────────────────────
+      void this.tryFaucetAutoClaim();
     } catch (error) {
       console.error('[clawnetd] Startup failed:', (error as Error)?.message ?? error);
       await this.stop();
@@ -447,6 +456,77 @@ export class ClawNetNode {
     this.peerId = undefined;
     this.peerPrivateKey = undefined;
     this.stopping = undefined;
+  }
+
+  // ── Faucet auto-claim ───────────────────────────────────────────────────
+
+  /**
+   * Attempt to claim initial Tokens from a public faucet on first startup.
+   * Non-blocking — failures are logged and swallowed.
+   */
+  private async tryFaucetAutoClaim(): Promise<void> {
+    const faucetUrl = this.config.faucetUrl ?? process.env.CLAW_FAUCET_URL;
+    if (!faucetUrl || !this.cachedDid || !this.peerPrivateKey) return;
+    if (this.config.network === 'mainnet') return;
+
+    const paths = resolveStoragePaths(this.config.dataDir);
+    const markerPath = join(paths.root, 'faucet-claimed');
+
+    // Skip if already claimed
+    try {
+      await fsStat(markerPath);
+      return; // marker exists
+    } catch {
+      // marker doesn't exist — proceed
+    }
+
+    // Skip if balance > 0
+    if (this.walletService) {
+      try {
+        const address = await this.walletService.resolveDidToAddress(this.cachedDid);
+        if (address) {
+          const result = await this.walletService.getBalance(address);
+          if (result && Number(result.balance) > 0) {
+            await writeFile(markerPath, new Date().toISOString(), 'utf-8');
+            return;
+          }
+        }
+      } catch {
+        // Can't check balance — try claiming anyway
+      }
+    }
+
+    try {
+      const timestamp = Date.now();
+      const message = utf8ToBytes(`faucet:claim:${this.cachedDid}:${timestamp}`);
+      const sigBytes = await signBytes(message, this.peerPrivateKey);
+      const signature = bytesToHex(sigBytes);
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+
+      const url = faucetUrl.replace(/\/+$/, '') + '/api/v1/faucet';
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ did: this.cachedDid, signature, timestamp }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        const data = (await res.json()) as { data?: { amount?: number } };
+        const amount = data?.data?.amount ?? '?';
+        console.log(`[clawnetd] Claimed ${amount} Token from faucet`);
+        await writeFile(markerPath, new Date().toISOString(), 'utf-8');
+      } else {
+        const text = await res.text().catch(() => '');
+        console.warn(`[clawnetd] Faucet claim failed (${res.status}): ${text.slice(0, 200)}`);
+      }
+    } catch (err) {
+      console.warn(`[clawnetd] Faucet auto-claim failed: ${(err as Error).message}`);
+    }
   }
 
   getPeerId(): string | null {

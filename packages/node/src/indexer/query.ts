@@ -480,6 +480,51 @@ export class IndexerQuery {
       .get(...params) as { cnt: number };
     return row.cnt;
   }
+
+  // ── Faucet claims ───────────────────────────────────────────────────────
+
+  /** Check whether a DID has already claimed from the public faucet. */
+  hasFaucetClaim(did: string): boolean {
+    const row = this.db
+      .prepare('SELECT 1 FROM faucet_claims WHERE did = ?')
+      .get(did) as { 1: number } | undefined;
+    return row !== undefined;
+  }
+
+  /** Count faucet claims from a given IP since the provided ISO timestamp. */
+  getIpFaucetClaimCount(ip: string, since: string): number {
+    const row = this.db
+      .prepare('SELECT COUNT(*) AS cnt FROM faucet_claims WHERE ip = ? AND claimed_at >= ?')
+      .get(ip, since) as { cnt: number };
+    return row.cnt;
+  }
+
+  /** Record a new faucet claim. */
+  insertFaucetClaim(claim: {
+    did: string;
+    address: string;
+    amount: number;
+    ip?: string;
+    txHash?: string;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO faucet_claims (did, address, amount, ip, tx_hash)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(claim.did, claim.address, claim.amount, claim.ip ?? null, claim.txHash ?? null);
+  }
+
+  /** Get total faucet Tokens distributed today (UTC). */
+  getFaucetDailyTotal(): number {
+    const row = this.db
+      .prepare(
+        `SELECT COALESCE(SUM(amount), 0) AS total FROM faucet_claims
+         WHERE claimed_at >= date('now')`,
+      )
+      .get() as { total: number };
+    return row.total;
+  }
 }
 
 // ---------------------------------------------------------------------------

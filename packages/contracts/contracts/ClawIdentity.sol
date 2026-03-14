@@ -172,6 +172,45 @@ contract ClawIdentity is
     }
 
     /**
+     * @notice Self-register a DID where controller = msg.sender.
+     * @dev No REGISTRAR_ROLE or ECDSA signature required — msg.sender is the proof.
+     *      This enables permissionless one-click node setup.
+     * @param didHash    SHA-256 hash of the full DID string.
+     * @param publicKey  Ed25519 public key (must be exactly 32 bytes).
+     * @param purpose    Key purpose enum.
+     */
+    function selfRegisterDID(
+        bytes32 didHash,
+        bytes calldata publicKey,
+        KeyPurpose purpose
+    ) external whenNotPaused {
+        if (dids[didHash].controller != address(0)) revert DIDAlreadyExists(didHash);
+        if (publicKey.length != 32) revert InvalidPublicKey();
+
+        bytes32 keyHash = keccak256(publicKey);
+
+        dids[didHash] = DIDRecord({
+            didHash: didHash,
+            activeKeyHash: keyHash,
+            controller: msg.sender,
+            createdAt: uint64(block.timestamp),
+            updatedAt: uint64(block.timestamp),
+            revoked: false
+        });
+
+        keys[didHash][keyHash] = KeyRecord({
+            publicKey: publicKey,
+            addedAt: uint64(block.timestamp),
+            revokedAt: 0,
+            purpose: purpose
+        });
+
+        didCount++;
+
+        emit DIDRegistered(didHash, msg.sender);
+    }
+
+    /**
      * @notice Batch-register DIDs (migration helper). Only callable by REGISTRAR_ROLE.
      * @param didHashes   Array of DID hashes.
      * @param publicKeys  Array of Ed25519 public keys (32 bytes each).

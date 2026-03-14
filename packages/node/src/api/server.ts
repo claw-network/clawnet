@@ -30,6 +30,7 @@ import { marketsCapabilityRoutes } from './routes/markets-capabilities.js';
 import { marketsDisputeRoutes } from './routes/markets-disputes.js';
 import { marketsSearchRoutes } from './routes/markets-search.js';
 import { devRoutes } from './routes/dev.js';
+import { faucetRoutes } from './routes/faucet.js';
 import { adminRoutes } from './routes/admin.js';
 import { nonceRoutes } from './routes/nonce.js';
 import { messagingRoutes } from './routes/messaging.js';
@@ -75,6 +76,11 @@ function buildRouter(ctx: RuntimeContext): Router {
     api.mount('/api/v1/dev', devRoutes(ctx));
   }
 
+  // Public faucet — one-time Token claim for new DIDs (non-mainnet only).
+  if (ctx.config.network !== 'mainnet' && process.env.CLAW_FAUCET_ENABLED !== 'false') {
+    api.mount('/api/v1/faucet', faucetRoutes(ctx));
+  }
+
   api.mount('/api/v1/admin', adminRoutes(ctx));
 
   return api;
@@ -114,6 +120,7 @@ export class ApiServer {
       p2pNode?: import('@claw-network/core').P2PNode;
       relayScorer?: import('@claw-network/core').RelayScorer;
       signProof?: (data: Uint8Array) => Promise<string>;
+      indexerQuery?: import('../indexer/query.js').IndexerQuery;
     },
   ) {
     // Build the RuntimeContext from constructor args
@@ -142,6 +149,7 @@ export class ApiServer {
       p2pNode: this.runtime.p2pNode,
       relayScorer: this.runtime.relayScorer,
       signProof: this.runtime.signProof,
+      indexerQuery: this.runtime.indexerQuery,
     };
 
     this.router = buildRouter(ctx);
