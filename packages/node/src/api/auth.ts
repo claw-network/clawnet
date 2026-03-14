@@ -48,6 +48,8 @@ const PUBLIC_ROUTES: Array<(url: string, method: string) => boolean> = [
   (url) => url === '/console' || url.startsWith('/console/'),
   // Passphrase verification for console login
   (url) => url === '/api/v1/auth/verify-passphrase',
+  // TOTP verify (uses pending token, not session) and status check
+  (url) => url === '/api/v1/auth/totp/verify' || url === '/api/v1/auth/totp/status',
   // OPTIONS (CORS preflight)
   (_url, method) => method === 'OPTIONS',
 ];

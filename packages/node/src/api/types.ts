@@ -97,6 +97,8 @@ export interface RuntimeContext {
   snapshotStore?: SnapshotStore;
   /** Trigger a manual snapshot and return the result. */
   takeSnapshot?: () => Promise<SnapshotRecord | null>;
+  /** TOTP 2FA secret store. */
+  totpStore?: import('./totp-store.js').TotpStore;
 }
 
 // ─── Address & DID Helpers ──────────────────────────────────────

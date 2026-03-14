@@ -42,6 +42,14 @@ export function authRoutes(ctx: RuntimeContext): Router {
       try {
         await decryptKeyRecord(record, passphrase);
         const did = `did:claw:${record.publicKey}`;
+
+        // If 2FA is enabled, issue a pending token that must be upgraded via TOTP
+        if (ctx.totpStore?.isEnabled()) {
+          const pendingToken = ctx.consoleSessionStore?.createPending();
+          ok(res, { valid: true, did, requireTotp: true, pendingToken }, { self: '/api/v1/auth/verify-passphrase' });
+          return;
+        }
+
         const sessionToken = ctx.consoleSessionStore?.create();
         ok(res, { valid: true, did, sessionToken }, { self: '/api/v1/auth/verify-passphrase' });
       } catch {

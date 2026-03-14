@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,8 +9,19 @@ import {
   FieldGroup,
   FieldLabel,
 } from '@/components/ui/field';
-import { verifyPassphrase, setAuthenticated } from '@/lib/auth';
-import { KeyRound, Loader2 } from 'lucide-react';
+import {
+  verifyPassphrase,
+  verifyTotp,
+  setAuthenticated,
+  setPendingToken,
+  clearPendingToken,
+} from '@/lib/auth';
+import { KeyRound, ShieldCheck, Loader2 } from 'lucide-react';
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from '@/components/ui/input-otp';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -18,7 +29,13 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
+  // 2FA state
+  const [totpStep, setTotpStep] = useState(false);
+  const [totpCode, setTotpCode] = useState('');
+  const [pendingToken, setPending] = useState('');
+  const [pendingDid, setPendingDid] = useState('');
+
+  const handlePassphrase = async (e: FormEvent) => {
     e.preventDefault();
     if (!passphrase.trim()) return;
 
@@ -27,7 +44,13 @@ export function LoginPage() {
 
     try {
       const result = await verifyPassphrase(passphrase);
-      if (result.valid && result.did && result.sessionToken) {
+      if (result.valid && result.requireTotp && result.pendingToken && result.did) {
+        // 2FA required — show TOTP input
+        setPending(result.pendingToken);
+        setPendingDid(result.did);
+        setPendingToken(result.pendingToken);
+        setTotpStep(true);
+      } else if (result.valid && result.did && result.sessionToken) {
         setAuthenticated(result.did, result.sessionToken);
         navigate('/console', { replace: true });
       } else {
@@ -40,10 +63,125 @@ export function LoginPage() {
     }
   };
 
+  const handleTotp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (totpCode.length !== 6) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const result = await verifyTotp(totpCode, pendingToken);
+      if (result.valid && result.sessionToken) {
+        clearPendingToken();
+        setAuthenticated(pendingDid, result.sessionToken);
+        navigate('/console', { replace: true });
+      } else {
+        setError('Invalid code. Please try again.');
+        setTotpCode('');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed');
+      setTotpCode('');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-submit when 6 digits entered
+  useEffect(() => {
+    if (totpStep && totpCode.length === 6 && !loading) {
+      handleTotp({ preventDefault: () => {} } as FormEvent);
+    }
+  }, [totpCode]);
+
+  if (totpStep) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="flex w-full max-w-sm flex-col gap-6">
+          <form onSubmit={handleTotp}>
+            <FieldGroup>
+              <div className="flex flex-col items-center gap-2 text-center">
+                <div className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                  <ShieldCheck className="size-5" />
+                </div>
+                <h1 className="text-xl font-bold">Two-Factor Authentication</h1>
+                <FieldDescription>
+                  Enter the 6-digit code from your authenticator app
+                </FieldDescription>
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Field>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={totpCode}
+                    onChange={setTotpCode}
+                    disabled={loading}
+                    autoFocus
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+              </Field>
+
+              <Field>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={loading || totpCode.length !== 6}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Verifying…
+                    </>
+                  ) : (
+                    'Verify Code'
+                  )}
+                </Button>
+              </Field>
+
+              <Field>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    setTotpStep(false);
+                    setTotpCode('');
+                    setPending('');
+                    clearPendingToken();
+                    setError('');
+                  }}
+                >
+                  Back to passphrase
+                </Button>
+              </Field>
+            </FieldGroup>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handlePassphrase}>
           <FieldGroup>
             <div className="flex flex-col items-center gap-2 text-center">
               <div className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">

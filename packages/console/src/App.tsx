@@ -9,7 +9,10 @@ import { ConfigPage } from '@/pages/config';
 import { RelayPage } from '@/pages/relay';
 import { FaucetPage } from '@/pages/faucet';
 import { StoragePage } from '@/pages/storage';
+import { SecurityPage } from '@/pages/security';
+import { TotpSetupPage } from '@/pages/totp-setup';
 import { AuthGuard } from '@/components/auth-guard';
+import { TotpGuard } from '@/components/totp-guard';
 
 export function App() {
   return (
@@ -19,10 +22,20 @@ export function App() {
           <Routes>
             <Route path="/console/login" element={<LoginPage />} />
             <Route
+              path="/console/totp-setup"
+              element={
+                <AuthGuard>
+                  <TotpSetupPage />
+                </AuthGuard>
+              }
+            />
+            <Route
               path="/console"
               element={
                 <AuthGuard>
-                  <AppLayout />
+                  <TotpGuard>
+                    <AppLayout />
+                  </TotpGuard>
                 </AuthGuard>
               }
             >
@@ -32,6 +45,7 @@ export function App() {
               <Route path="relay" element={<RelayPage />} />
               <Route path="faucet" element={<FaucetPage />} />
               <Route path="storage" element={<StoragePage />} />
+              <Route path="security" element={<SecurityPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/console" replace />} />
           </Routes>

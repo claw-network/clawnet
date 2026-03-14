@@ -41,6 +41,7 @@ import { deliverableRoutes } from './routes/deliverables.js';
 import { authRoutes } from './routes/auth.js';
 import { metricsRoutes } from './routes/metrics.js';
 import { snapshotRoutes } from './routes/snapshots.js';
+import { totpRoutes } from './routes/totp.js';
 
 export { ApiServerConfig } from './types.js';
 export type { RuntimeContext } from './types.js';
@@ -71,6 +72,7 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/messaging', messagingRoutes(ctx));
   api.mount('/api/v1/relay', relayRoutes(ctx));
   api.mount('/api/v1/auth', authRoutes(ctx));
+  api.mount('/api/v1/auth/totp', totpRoutes(ctx));
   api.mount('/api/v1/deliverables', deliverableRoutes(ctx));
   api.mount('/api/v1/metrics', metricsRoutes(ctx));
   api.mount('/api/v1/snapshots', snapshotRoutes(ctx));
@@ -129,6 +131,7 @@ export class ApiServer {
       indexerQuery?: import('../indexer/query.js').IndexerQuery;
       snapshotStore?: import('@claw-network/core').SnapshotStore;
       takeSnapshot?: () => Promise<import('@claw-network/core').SnapshotRecord | null>;
+      totpStore?: import('./totp-store.js').TotpStore;
     },
   ) {
     // Build the RuntimeContext from constructor args
@@ -162,6 +165,7 @@ export class ApiServer {
       indexerQuery: this.runtime.indexerQuery,
       snapshotStore: this.runtime.snapshotStore,
       takeSnapshot: this.runtime.takeSnapshot,
+      totpStore: this.runtime.totpStore,
       consoleSessionStore,
     };
 

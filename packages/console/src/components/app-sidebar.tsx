@@ -5,6 +5,7 @@ import {
   Radio,
   Droplets,
   Database,
+  ShieldCheck,
   Moon,
   Sun,
   LogOut,
@@ -43,6 +44,7 @@ const navItems: NavItem[] = [
   { title: 'Relay', icon: Radio, path: '/console/relay' },
   { title: 'Faucet', icon: Droplets, path: '/console/faucet', networks: ['testnet', 'mainnet'] },
   { title: 'Storage', icon: Database, path: '/console/storage' },
+  { title: 'Security', icon: ShieldCheck, path: '/console/security' },
 ];
 
 export function AppSidebar() {

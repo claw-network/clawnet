@@ -65,6 +65,7 @@ import { RelayRewardService } from './services/relay-reward-service.js';
 import { RelayScorer } from '@claw-network/core';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 import { ApiKeyStore } from './api/api-key-store.js';
+import { TotpStore } from './api/totp-store.js';
 
 export interface NodeRuntimeConfig {
   dataDir?: string;
@@ -146,6 +147,7 @@ export class ClawNetNode {
   private relayRewardService?: RelayRewardService;
   private relayScorer?: RelayScorer;
   private apiKeyStore?: ApiKeyStore;
+  private totpStore?: TotpStore;
   private peerId?: PeerIdWithPrivateKey;
   private peerPrivateKey?: Uint8Array;
   private startedAt?: number;
@@ -288,6 +290,7 @@ export class ClawNetNode {
           const storagePaths2 = resolveStoragePaths(this.config.dataDir);
           const apiKeysDbPath = join(storagePaths2.root, 'api-keys.sqlite');
           this.apiKeyStore = new ApiKeyStore(apiKeysDbPath);
+          this.totpStore = new TotpStore(apiKeysDbPath);
         }
 
         // ── Messaging service (P2P direct messaging) ─────────────────
@@ -388,6 +391,7 @@ export class ClawNetNode {
           indexerQuery: this.indexerQuery,
           snapshotStore: this.snapshotStore,
           takeSnapshot: () => this.forceSnapshot(),
+          totpStore: this.totpStore,
         });
         await this.apiServer.start();
       }
