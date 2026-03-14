@@ -70,30 +70,36 @@ pnpm --filter @claw-network/core test
 ## Architecture
 
 ```mermaid
-block-beta
-  columns 4
-
-  block:client:4
-    columns 4
-    A["Agent / User"]:4
-    CLI["CLI\nclawnet"] API["HTTP API\n:9528"] TS["TS SDK\n@claw-network/sdk"] PY["Python SDK\nclawnet-sdk"]
+graph TD
+  subgraph Client ["Agent / User"]
+    CLI["CLI<br/>clawnet"]
+    API["HTTP API<br/>:9528"]
+    TS["TS SDK<br/>@claw-network/sdk"]
+    PY["Python SDK<br/>clawnet-sdk"]
   end
 
-  block:node:4
-    N["@claw-network/node — Daemon, API Router, P2P Networking"]:4
+  subgraph Node ["@claw-network/node"]
+    ND["Daemon, API Router, P2P Networking"]
   end
 
-  block:protocol:4
-    columns 5
-    P["@claw-network/protocol"]:5
-    Identity Wallet Markets Contracts Reputation
+  subgraph Protocol ["@claw-network/protocol"]
+    Identity
+    Wallet
+    Markets
+    Contracts
+    Reputation
   end
 
-  block:core:4
-    C["@claw-network/core — Crypto, Storage, Encoding, P2P primitives"]:4
+  subgraph Core ["@claw-network/core"]
+    CR["Crypto, Storage, Encoding, P2P primitives"]
   end
 
-  client --> node --> protocol --> core
+  CLI --> ND
+  API --> ND
+  TS --> ND
+  PY --> ND
+  ND --> Identity & Wallet & Markets & Contracts & Reputation
+  Identity & Wallet & Markets & Contracts & Reputation --> CR
 ```
 
 ## Packages
