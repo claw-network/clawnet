@@ -1,10 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from '@/components/ui/field';
 import { verifyPassphrase, setAuthenticated } from '@/lib/auth';
 import { KeyRound, Loader2 } from 'lucide-react';
 
@@ -38,23 +42,27 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <KeyRound className="h-6 w-6" />
-          </div>
-          <CardTitle className="text-xl">ClawNet Console</CardTitle>
-          <CardDescription>Enter your node passphrase to continue</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="grid gap-4">
+      <div className="flex w-full max-w-sm flex-col gap-6">
+        <form onSubmit={handleSubmit}>
+          <FieldGroup>
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                <KeyRound className="size-5" />
+              </div>
+              <h1 className="text-xl font-bold">ClawNet Console</h1>
+              <FieldDescription>
+                Enter your node passphrase to unlock the console
+              </FieldDescription>
+            </div>
+
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <div className="grid gap-2">
-              <Label htmlFor="passphrase">Passphrase</Label>
+
+            <Field>
+              <FieldLabel htmlFor="passphrase">Passphrase</FieldLabel>
               <Input
                 id="passphrase"
                 type="password"
@@ -64,20 +72,33 @@ export function LoginPage() {
                 autoFocus
                 disabled={loading}
               />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading || !passphrase.trim()}>
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Verifying…
-                </>
-              ) : (
-                'Unlock Console'
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            </Field>
+
+            <Field>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={loading || !passphrase.trim()}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Verifying…
+                  </>
+                ) : (
+                  'Unlock Console'
+                )}
+              </Button>
+            </Field>
+          </FieldGroup>
+        </form>
+
+        <FieldDescription className="px-6 text-center text-xs">
+          The passphrase is the same one used to start the node via{' '}
+          <code className="font-mono text-foreground">CLAW_PASSPHRASE</code> or{' '}
+          <code className="font-mono text-foreground">--passphrase</code>.
+        </FieldDescription>
+      </div>
     </div>
   );
 }

@@ -26,13 +26,22 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useTheme } from '@/components/theme-provider';
 import { logout } from '@/lib/auth';
+import { useNode } from '@/lib/node-context';
 
-const navItems = [
+interface NavItem {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  path: string;
+  /** If set, only show on these networks. Omit to show always. */
+  networks?: string[];
+}
+
+const navItems: NavItem[] = [
   { title: 'Dashboard', icon: LayoutDashboard, path: '/console' },
   { title: 'API Keys', icon: KeyRound, path: '/console/api-keys' },
   { title: 'Config', icon: Settings, path: '/console/config' },
   { title: 'Relay', icon: Radio, path: '/console/relay' },
-  { title: 'Faucet', icon: Droplets, path: '/console/faucet' },
+  { title: 'Faucet', icon: Droplets, path: '/console/faucet', networks: ['testnet', 'mainnet'] },
   { title: 'Storage', icon: Database, path: '/console/storage' },
 ];
 
@@ -40,6 +49,11 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { network } = useNode();
+
+  const visibleItems = navItems.filter(
+    (item) => !item.networks || (network && item.networks.includes(network)),
+  );
 
   const handleLogout = () => {
     logout();
@@ -65,7 +79,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
+              {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
                     isActive={

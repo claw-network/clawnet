@@ -2,9 +2,11 @@ import { Outlet } from 'react-router-dom';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
 import { Separator } from '@/components/ui/separator';
+import { NodeProvider } from '@/lib/node-context';
 
 export function AppLayout() {
   return (
+    <NodeProvider>
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
@@ -18,5 +20,6 @@ export function AppLayout() {
         </main>
       </SidebarInset>
     </SidebarProvider>
+    </NodeProvider>
   );
 }
