@@ -383,28 +383,6 @@ function renderIntegration(): string {
     </section>`;
 }
 
-function renderHumanCheck(): string {
-  return `
-    <section class="section" id="human-check">
-      <div class="container">
-        <p class="eyebrow reveal">Abuse Protection</p>
-        <h2 class="section-title reveal" style="--delay:40ms;">Cloudflare Turnstile verification</h2>
-        <p class="section-description reveal" style="--delay:80ms;">
-          This client-side widget validates that requests are human before they reach backend workflows.
-        </p>
-        <article class="turnstile-card interactive-card reveal" data-card-fx style="--delay:120ms;">
-          <form class="turnstile-form" data-turnstile-form>
-            <label for="turnstile-email">Email</label>
-            <input id="turnstile-email" name="email" type="email" required placeholder="you@example.com" />
-            <div class="turnstile-widget" data-turnstile-widget></div>
-            <button type="submit" class="button button-solid" data-turnstile-submit>Verify &amp; Submit</button>
-            <p class="turnstile-status" data-turnstile-status>Complete the challenge, then submit.</p>
-          </form>
-        </article>
-      </div>
-    </section>`;
-}
-
 function renderFooter(): string {
   const year = new Date().getFullYear();
 
@@ -451,7 +429,6 @@ export function renderHomepage(): string {
       ${renderDevelopers()}
       ${renderGovernance()}
       ${renderIntegration()}
-      ${renderHumanCheck()}
     </main>
     ${renderFooter()}
   </div>`;
