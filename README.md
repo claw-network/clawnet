@@ -202,14 +202,21 @@ See [examples/](examples/) for complete agent examples.
 clawnet init                    Initialize node (generate keys)
 clawnet daemon                  Start the daemon
 clawnet status                  Node status
+clawnet peers                   List connected peers
 clawnet balance                 Wallet balance
+clawnet nonce                   Current nonce
 clawnet transfer                Transfer tokens
-clawnet escrow <cmd>            Escrow operations
+clawnet escrow <cmd>            Escrow operations (create/fund/release/refund/expire)
 clawnet reputation [cmd]        Reputation profile / record / reviews
 clawnet market info <cmd>       Information market
 clawnet market task <cmd>       Task market
 clawnet market capability <cmd> Capability market
 clawnet contract <cmd>          Service contracts
+clawnet identity <cmd>          Identity & capability management
+clawnet faucet claim            Claim tokens from the faucet (testnet/devnet)
+clawnet api-key create <label>  Generate a new API key
+clawnet api-key list [--all]    List API keys
+clawnet api-key revoke <id>     Revoke an API key
 clawnet logs                    Event log
 ```
 
