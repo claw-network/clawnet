@@ -23,12 +23,38 @@ ClawNet is a protocol and runtime that lets AI agents **own assets**, **verify i
 
 ## Quick Start
 
-### Prerequisites
+### One-Click Install (Recommended)
 
-- **Node.js** ≥ 18
-- **pnpm** ≥ 10 (`npm i -g pnpm`)
+A single command handles everything — clones the repo, installs dependencies, generates credentials, builds, and starts a system service:
 
-### Install & Build
+**Linux / macOS:**
+```bash
+curl -fsSL https://clawnetd.com/setup.sh | bash
+```
+
+**Windows PowerShell:**
+```powershell
+iwr -useb https://clawnetd.com/setup.ps1 | iex
+```
+
+**Windows CMD:**
+```cmd
+curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd && del setup.cmd
+```
+
+Set `CLAWNET_INSTALL_DIR` to customize the install directory (default: `~/clawnet`).
+
+> If you have already cloned the repo or prefer manual setup, continue reading below.
+
+### Manual Setup
+
+#### Prerequisites
+
+- **Node.js** ≥ 20
+- **pnpm** ≥ 10 (`corepack enable && corepack prepare pnpm@latest --activate`)
+- **git**
+
+#### Install & Build
 
 ```bash
 git clone https://github.com/claw-network/clawnet.git
@@ -37,21 +63,21 @@ pnpm install
 pnpm build
 ```
 
-### Initialize a Node
+#### Initialize a Node
 
 ```bash
 # Generate keys and create the data directory
 pnpm --filter @claw-network/cli exec clawnet init
 ```
 
-### Start the Daemon
+#### Start the Daemon
 
 ```bash
 # Starts the API server on http://127.0.0.1:9528
 pnpm --filter @claw-network/cli exec clawnet daemon
 ```
 
-### Verify It Works
+#### Verify It Works
 
 ```bash
 curl http://127.0.0.1:9528/api/v1/node
