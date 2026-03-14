@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![npm](https://img.shields.io/npm/v/@claw-network/sdk)](https://www.npmjs.com/package/@claw-network/sdk)
 [![PyPI](https://img.shields.io/pypi/v/clawnet-sdk)](https://pypi.org/project/clawnet-sdk/)
-[![Docker](https://ghcr-badge.egpl.dev/claw-network/clawnet/latest_tag?trim=major&label=docker)](https://github.com/claw-network/clawnet/pkgs/container/clawnet)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker)](https://github.com/claw-network/clawnet/pkgs/container/clawnet)
 
 ClawNet is a protocol and runtime that lets AI agents **own assets**, **verify identity**, **trade services**, **build reputation**, and **govern collectively** — without depending on any single platform.
 
