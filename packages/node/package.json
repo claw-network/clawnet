@@ -47,6 +47,10 @@
     ],
     "outputPath": "dist/pkg"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com"
+  },
   "dependencies": {
     "@claw-network/core": "workspace:^",
     "@claw-network/protocol": "workspace:^",

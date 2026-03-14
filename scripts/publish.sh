@@ -1,22 +1,32 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# ClawNet — Publish all packages to npm and PyPI
+# ClawNet — Publish all packages to npm, GitHub Packages, and PyPI
 #
 # Usage:
 #   ./scripts/publish.sh                 # dry-run (default)
-#   ./scripts/publish.sh --release       # actual publish
+#   ./scripts/publish.sh --release       # actual publish (npmjs + GPR + PyPI)
+#   ./scripts/publish.sh --npm           # publish to npmjs.org only
+#   ./scripts/publish.sh --gpr           # publish to GitHub Packages only
 #
 # Prerequisites:
-#   npm login                            # npm authenticated
+#   npm login                            # npm authenticated (for npmjs)
+#   ~/.npmrc with GPR token              # GitHub Packages auth
 #   pip install hatch                    # Python build tool
 #   export HATCH_INDEX_AUTH=pypi-token   # PyPI token
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
 DRY_RUN=true
-if [[ "${1:-}" == "--release" ]]; then
-  DRY_RUN=false
-fi
+PUBLISH_NPM=true
+PUBLISH_GPR=true
+
+for arg in "$@"; do
+  case "$arg" in
+    --release) DRY_RUN=false ;;
+    --npm)     DRY_RUN=false; PUBLISH_GPR=false ;;
+    --gpr)     DRY_RUN=false; PUBLISH_NPM=false ;;
+  esac
+done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -24,6 +34,7 @@ cd "$ROOT"
 echo "╔══════════════════════════════════════════╗"
 echo "║   ClawNet Package Publisher              ║"
 echo "║   Mode: $(if $DRY_RUN; then echo 'DRY-RUN'; else echo 'RELEASE'; fi)                          ║"
+echo "║   npm:  $(if $PUBLISH_NPM; then echo 'yes'; else echo 'skip'; fi)    GPR: $(if $PUBLISH_GPR; then echo 'yes'; else echo 'skip'; fi)                   ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
@@ -40,20 +51,30 @@ echo "  ✓ All tests passed"
 echo ""
 
 # ── Step 3: Publish npm packages (order matters) ────────────
-#    core → protocol → sdk  (dependency order)
+#    core → protocol → sdk → node (dependency order)
 NPM_PKGS=("packages/core" "packages/protocol" "packages/sdk" "packages/node")
+
+NPMJS_REGISTRY="https://registry.npmjs.org"
+GPR_REGISTRY="https://npm.pkg.github.com"
 
 for pkg_dir in "${NPM_PKGS[@]}"; do
   pkg_name=$(node -p "require('./$pkg_dir/package.json').name")
   pkg_version=$(node -p "require('./$pkg_dir/package.json').version")
-  echo "▸ Publishing $pkg_name@$pkg_version …"
 
   cd "$ROOT/$pkg_dir"
 
   if $DRY_RUN; then
+    echo "▸ [dry-run] $pkg_name@$pkg_version …"
     pnpm publish --dry-run --no-git-checks 2>&1 | sed 's/^/    /'
   else
-    pnpm publish --access public --no-git-checks 2>&1 | sed 's/^/    /'
+    if $PUBLISH_NPM; then
+      echo "▸ Publishing $pkg_name@$pkg_version → npmjs.org …"
+      pnpm publish --access public --no-git-checks --registry "$NPMJS_REGISTRY" 2>&1 | sed 's/^/    /' || true
+    fi
+    if $PUBLISH_GPR; then
+      echo "▸ Publishing $pkg_name@$pkg_version → GitHub Packages …"
+      pnpm publish --access public --no-git-checks --registry "$GPR_REGISTRY" 2>&1 | sed 's/^/    /' || true
+    fi
   fi
 
   cd "$ROOT"
@@ -100,5 +121,7 @@ echo "╚═══════════════════════�
 if $DRY_RUN; then
   echo ""
   echo "This was a DRY RUN. To publish for real:"
-  echo "  ./scripts/publish.sh --release"
+  echo "  ./scripts/publish.sh --release   # npmjs + GitHub Packages + PyPI"
+  echo "  ./scripts/publish.sh --npm       # npmjs + PyPI only"
+  echo "  ./scripts/publish.sh --gpr       # GitHub Packages only"
 fi
