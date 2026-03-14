@@ -40,6 +40,7 @@ import { relayRoutes } from './routes/relay.js';
 import { deliverableRoutes } from './routes/deliverables.js';
 import { authRoutes } from './routes/auth.js';
 import { metricsRoutes } from './routes/metrics.js';
+import { snapshotRoutes } from './routes/snapshots.js';
 
 export { ApiServerConfig } from './types.js';
 export type { RuntimeContext } from './types.js';
@@ -72,6 +73,7 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/auth', authRoutes(ctx));
   api.mount('/api/v1/deliverables', deliverableRoutes(ctx));
   api.mount('/api/v1/metrics', metricsRoutes(ctx));
+  api.mount('/api/v1/snapshots', snapshotRoutes(ctx));
 
   // Dev routes (faucet, etc.) are NOT available on mainnet — prevents unauthorized minting.
   if (ctx.config.network !== 'mainnet') {
@@ -125,6 +127,8 @@ export class ApiServer {
       relayScorer?: import('@claw-network/core').RelayScorer;
       signProof?: (data: Uint8Array) => Promise<string>;
       indexerQuery?: import('../indexer/query.js').IndexerQuery;
+      snapshotStore?: import('@claw-network/core').SnapshotStore;
+      takeSnapshot?: () => Promise<import('@claw-network/core').SnapshotRecord | null>;
     },
   ) {
     // Build the RuntimeContext from constructor args
@@ -156,6 +160,8 @@ export class ApiServer {
       relayScorer: this.runtime.relayScorer,
       signProof: this.runtime.signProof,
       indexerQuery: this.runtime.indexerQuery,
+      snapshotStore: this.runtime.snapshotStore,
+      takeSnapshot: this.runtime.takeSnapshot,
       consoleSessionStore,
     };
 

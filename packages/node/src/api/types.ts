@@ -26,6 +26,7 @@ import type { RelayService } from '../services/relay-service.js';
 import type { RelayRewardService } from '../services/relay-reward-service.js';
 import type { ApiKeyStore } from './api-key-store.js';
 import type { IndexerQuery } from '../indexer/query.js';
+import type { SnapshotStore, SnapshotRecord } from '@claw-network/core';
 
 export {
   addressFromDid,
@@ -92,6 +93,10 @@ export interface RuntimeContext {
   indexerQuery?: IndexerQuery;
   /** Console session store for passphrase-authenticated sessions. */
   consoleSessionStore?: import('./console-session.js').ConsoleSessionStore;
+  /** Snapshot store for event-sourced state snapshots. */
+  snapshotStore?: SnapshotStore;
+  /** Trigger a manual snapshot and return the result. */
+  takeSnapshot?: () => Promise<SnapshotRecord | null>;
 }
 
 // ─── Address & DID Helpers ──────────────────────────────────────

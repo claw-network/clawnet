@@ -104,7 +104,7 @@ interface PeerPeriodTraffic {
 const PERIOD_DURATION_SEC = 3600; // 1-hour periods
 
 export class RelayService {
-  private readonly config: RelayConfig;
+  private config: RelayConfig;
   private startedAt = 0;
   private rotateTimer?: ReturnType<typeof setInterval>;
 
@@ -204,9 +204,12 @@ export class RelayService {
 
   /**
    * Record a circuit being opened.
-   * Returns false if the circuit should be rejected (draining, rate-limit, or access denied).
+   * Returns false if the circuit should be rejected (disabled, draining, rate-limit, or access denied).
    */
   onCircuitOpen(peerId: string): boolean {
+    if (!this.config.enabled) {
+      return false;
+    }
     if (this._draining) {
       return false;
     }
@@ -432,6 +435,16 @@ export class RelayService {
   /** Set draining mode — stops accepting new circuits. */
   setDraining(draining: boolean): void {
     this._draining = draining;
+  }
+
+  /** Whether the relay is currently enabled. */
+  get enabled(): boolean {
+    return this.config.enabled;
+  }
+
+  /** Enable or disable the relay at runtime (soft toggle — does not restart libp2p). */
+  setEnabled(enabled: boolean): void {
+    this.config = { ...this.config, enabled };
   }
 
   // ── F4/F10: Period Proof & Co-sign Collection ─────────────

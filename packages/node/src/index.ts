@@ -341,6 +341,14 @@ export class ClawNetNode {
             // F5: Create relay scorer for quality assessment
             this.relayScorer = new RelayScorer(this.p2p);
           }
+
+          // Feed P2P listen addresses into relay health diagnostics
+          if (this.p2p) {
+            const addrs = this.p2p.getMultiaddrs();
+            const publicAddrs = addrs.filter(a => !a.includes('/127.0.0.1/') && !a.includes('/::1/'));
+            const natStatus = publicAddrs.length > 0 ? 'public' as const : 'private' as const;
+            this.relayService.updateNatStatus(natStatus, addrs);
+          }
         }
 
         const apiConfig: ApiServerConfig = {
@@ -378,6 +386,8 @@ export class ClawNetNode {
           p2pNode: this.p2p,
           relayScorer: this.relayScorer,
           indexerQuery: this.indexerQuery,
+          snapshotStore: this.snapshotStore,
+          takeSnapshot: () => this.forceSnapshot(),
         });
         await this.apiServer.start();
       }
@@ -604,6 +614,7 @@ export class ClawNetNode {
       p2pPort,
       apiPort,
       apiEnabled,
+      chainEnabled: Boolean(this.config.chain),
     };
   }
 
@@ -1074,6 +1085,34 @@ export class ClawNetNode {
     }
     const signed = await signSnapshot(base, this.peerId.toString(), this.peerPrivateKey);
     await this.snapshotStore.saveSnapshot(signed);
+  }
+
+  /**
+   * Force-create a snapshot regardless of scheduler policy.
+   * Used by the console snapshot API.
+   */
+  private async forceSnapshot(): Promise<SnapshotRecord | null> {
+    if (!this.snapshotStore || !this.eventStore) {
+      return null;
+    }
+    if (!this.config.snapshotBuilder) {
+      return null;
+    }
+    const lastSnapshot = await this.snapshotStore.loadLatestSnapshot();
+    const base = await this.config.snapshotBuilder({
+      eventStore: this.eventStore,
+      snapshotStore: this.snapshotStore,
+      lastSnapshot,
+    });
+    if (!base) {
+      return null;
+    }
+    if (!this.peerPrivateKey || !this.peerId) {
+      return null;
+    }
+    const signed = await signSnapshot(base, this.peerId.toString(), this.peerPrivateKey);
+    await this.snapshotStore.saveSnapshot(signed);
+    return signed;
   }
 
   private async loadOrCreatePeerId(keysDir: string): Promise<PeerIdWithPrivateKey> {

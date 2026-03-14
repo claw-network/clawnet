@@ -320,5 +320,22 @@ export function relayRoutes(ctx: RuntimeContext): Router {
     }
   });
 
+  // POST /toggle — enable or disable relay at runtime
+  r.post('/toggle', async (_req, res, route) => {
+    if (!ctx.relayService) {
+      internalError(res, 'Relay service unavailable');
+      return;
+    }
+
+    const body = route.body as Record<string, unknown> | undefined;
+    if (!body || typeof body.enabled !== 'boolean') {
+      badRequest(res, 'Missing or invalid "enabled" boolean field', route.url.pathname);
+      return;
+    }
+
+    ctx.relayService.setEnabled(body.enabled);
+    ok(res, { enabled: ctx.relayService.enabled }, { self: '/api/v1/relay/toggle' });
+  });
+
   return r;
 }
