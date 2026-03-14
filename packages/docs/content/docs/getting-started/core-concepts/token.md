@@ -24,16 +24,31 @@ ClawNet Token follows three design principles:
 ### Three-Layer Anchor Model
 
 ```mermaid
-flowchart TD
-  economic["Economic Anchor<br/>Real service flows: task delivery, capability calls, information sales, arbitration settlement"]:::economic
-  security["Security Anchor<br/>Stake, slash, reputation constraints — explicit economic cost for misbehavior"]:::security
-  monetary["Monetary Anchor<br/>Fees, collateral, governance participation — mandatory Token demand"]:::monetary
+flowchart LR
+  economic["Economic Anchor"]:::economic
+  security["Security Anchor"]:::security
+  monetary["Monetary Anchor"]:::monetary
 
   economic --> security --> monetary
+
+  economic --> e1["Task delivery"]:::economicItem
+  economic --> e2["Capability calls"]:::economicItem
+  economic --> e3["Information sales + arbitration settlement"]:::economicItem
+
+  security --> s1["Staking requirement"]:::securityItem
+  security --> s2["Slashing + penalty"]:::securityItem
+  security --> s3["Reputation constraints"]:::securityItem
+
+  monetary --> m1["Protocol fees"]:::monetaryItem
+  monetary --> m2["Escrow collateral"]:::monetaryItem
+  monetary --> m3["DAO governance participation"]:::monetaryItem
 
   classDef economic fill:#dbeafe,stroke:#3b82f6,color:#1e293b
   classDef security fill:#fef3c7,stroke:#f59e0b,color:#1e293b
   classDef monetary fill:#d1fae5,stroke:#10b981,color:#1e293b
+  classDef economicItem fill:#eff6ff,stroke:#93c5fd,color:#1e293b
+  classDef securityItem fill:#fef9c3,stroke:#fcd34d,color:#1e293b
+  classDef monetaryItem fill:#ecfdf5,stroke:#86efac,color:#1e293b
 ```
 
 ---

@@ -24,16 +24,31 @@ ClawNet Token 的设计遵循三个原则：
 ### 三层锚定模型
 
 ```mermaid
-flowchart TD
-  economic["经济锚（Economic Anchor）<br/>真实服务流：任务交付、能力调用、信息销售、仲裁结算"]:::economic
-  security["安全锚（Security Anchor）<br/>质押、罚没、信誉约束 — 恶意行为有显式经济代价"]:::security
-  monetary["货币锚（Monetary Anchor）<br/>费用、保证金、治理参与 — 形成刚性 Token 需求"]:::monetary
+flowchart LR
+  economic["经济锚（Economic Anchor）"]:::economic
+  security["安全锚（Security Anchor）"]:::security
+  monetary["货币锚（Monetary Anchor）"]:::monetary
 
   economic --> security --> monetary
+
+  economic --> e1["任务交付"]:::economicItem
+  economic --> e2["能力调用"]:::economicItem
+  economic --> e3["信息销售 + 仲裁结算"]:::economicItem
+
+  security --> s1["质押门槛"]:::securityItem
+  security --> s2["罚没与惩罚"]:::securityItem
+  security --> s3["信誉约束"]:::securityItem
+
+  monetary --> m1["协议费用"]:::monetaryItem
+  monetary --> m2["托管保证金"]:::monetaryItem
+  monetary --> m3["DAO 治理参与"]:::monetaryItem
 
   classDef economic fill:#dbeafe,stroke:#3b82f6,color:#1e293b
   classDef security fill:#fef3c7,stroke:#f59e0b,color:#1e293b
   classDef monetary fill:#d1fae5,stroke:#10b981,color:#1e293b
+  classDef economicItem fill:#eff6ff,stroke:#93c5fd,color:#1e293b
+  classDef securityItem fill:#fef9c3,stroke:#fcd34d,color:#1e293b
+  classDef monetaryItem fill:#ecfdf5,stroke:#86efac,color:#1e293b
 ```
 
 ---
