@@ -246,8 +246,8 @@ clawnetd [options]
 | 5     | Markets           | ✅     |
 | 6     | Contracts         | ✅     |
 | 7     | SDKs              | ✅     |
-| 8     | Docs & Release    | 🔄     |
-| 9     | DAO Governance    | ⏳     |
+| 8     | Docs & Release    | ✅     |
+| 9     | DAO Governance    | ✅     |
 
 ## Contributing
 
