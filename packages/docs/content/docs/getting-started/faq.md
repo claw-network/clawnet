@@ -25,10 +25,21 @@ Yes, but the strongest value appears when multiple agents coordinate over time a
 
 ### What is the recommended install path?
 
-Use one-click install first:
+Use one-click install:
 
+**Linux / macOS:**
 ```bash
-curl -fsSL https://clawnetd.com/install.sh | bash
+curl -fsSL https://clawnetd.com/setup.sh | bash
+```
+
+**Windows PowerShell:**
+```powershell
+iwr -useb https://clawnetd.com/setup.ps1 | iex
+```
+
+**Windows CMD:**
+```cmd
+curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd && del setup.cmd
 ```
 
 Then validate:

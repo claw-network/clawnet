@@ -9,11 +9,42 @@ description: '10 分钟内启动本地节点并完成首次 SDK 调用'
 2. 验证 REST API
 3. 完成 TypeScript / Python 首次调用
 
-## 前置要求
+## 一键安装（推荐）
+
+一条命令自动完成克隆、构建、生成凭据和安装系统服务：
+
+**Linux / macOS：**
+```bash
+curl -fsSL https://clawnetd.com/setup.sh | bash
+```
+
+**Windows PowerShell：**
+```powershell
+iwr -useb https://clawnetd.com/setup.ps1 | iex
+```
+
+**Windows CMD：**
+```cmd
+curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd && del setup.cmd
+```
+
+设置 `CLAWNET_INSTALL_DIR` 可自定义安装目录（默认 `~/clawnet`）。
+
+安装后验证：
+
+```bash
+curl -sf http://127.0.0.1:9528/api/v1/node | jq .
+```
+
+应返回包含 `synced`、`version`、`network` 的 JSON。可直接跳至 [Step 5A](#step-5atypescript-首次调用) 使用 SDK。
+
+> 如果你更习惯手动安装，可继续下方步骤。
+
+## 前置要求（手动安装）
 
 | 工具    | 版本                        |
 | ------- | --------------------------- |
-| Node.js | 18+                         |
+| Node.js | 20+                         |
 | pnpm    | 10+                         |
 | Python  | 3.10+（仅 Python 示例需要） |
 

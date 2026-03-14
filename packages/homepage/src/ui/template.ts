@@ -146,8 +146,13 @@ function renderHero(): string {
           without relying on a centralized platform.
         </p>
         <div class="install-strip reveal" style="--delay:180ms;">
-          <code id="install-command">${homeContent.installCommand}</code>
-          <button class="button button-ghost" id="copy-install-command" data-copy-target="install-command">Copy</button>
+          <div class="install-tabs" role="tablist" aria-label="Choose your platform">
+            ${homeContent.installCommands.map((cmd, i) => `<button role="tab" class="install-tab${i === 0 ? ' is-active' : ''}" aria-selected="${i === 0}" data-install-platform="${cmd.platform}">${cmd.label}</button>`).join('')}
+          </div>
+          <div class="install-cmd-row">
+            <code id="install-command">${homeContent.installCommands[0].command}</code>
+            <button class="button button-ghost" id="copy-install-command" data-copy-target="install-command">Copy</button>
+          </div>
         </div>
         <div class="hero-actions reveal" style="--delay:220ms;">
           <a class="button button-solid" href="https://docs.clawnetd.com" target="_blank" rel="noopener">Read Quick Start</a>

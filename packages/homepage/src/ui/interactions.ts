@@ -158,6 +158,50 @@ function initNavOnScroll(): void {
   window.addEventListener('scroll', sync, { passive: true });
 }
 
+function initInstallTabs(): void {
+  const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-install-platform]'));
+  const codeEl = document.getElementById('install-command');
+  if (tabs.length === 0 || !codeEl) return;
+
+  const commands: Record<string, string> = {};
+  tabs.forEach((tab) => {
+    const platform = tab.dataset.installPlatform ?? '';
+    commands[platform] = '';
+  });
+
+  // Import commands from content at build time — they're embedded in the tabs' data
+  // We read them from the homeContent via template, so store initial command
+  const importedCommands: Record<string, string> = {
+    bash: 'curl -fsSL https://clawnetd.com/setup.sh | bash',
+    powershell: 'iwr -useb https://clawnetd.com/setup.ps1 | iex',
+    cmd: 'curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd',
+  };
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const platform = tab.dataset.installPlatform ?? '';
+
+      // Update active tab
+      tabs.forEach((t) => {
+        t.classList.remove('is-active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('is-active');
+      tab.setAttribute('aria-selected', 'true');
+
+      // Update command text
+      codeEl.textContent = importedCommands[platform] ?? '';
+
+      // Reset copy button state
+      const copyBtn = document.getElementById('copy-install-command');
+      if (copyBtn) {
+        copyBtn.textContent = 'Copy';
+        copyBtn.classList.remove('is-copied');
+      }
+    });
+  });
+}
+
 function initCopyButton(): void {
   const copyButtons = Array.from(
     document.querySelectorAll<HTMLButtonElement>('[data-copy-target]'),
@@ -251,5 +295,6 @@ export function bindHomepageInteractions(): void {
   initRevealAnimations();
   initNavOnScroll();
   initCopyButton();
+  initInstallTabs();
   initCardEffects();
 }

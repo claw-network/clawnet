@@ -453,10 +453,49 @@ button {
   border-radius: var(--radius-md);
   padding: 0.65rem;
   display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow: var(--shadow-card);
+}
+
+.install-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  margin-bottom: 0.5rem;
+}
+
+.install-tab {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(148, 163, 184, 0.7);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.install-tab:hover,
+.install-tab:focus-visible {
+  color: #e2e8f0;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.install-tab.is-active {
+  color: #f8fafc;
+  background: rgba(0, 84, 233, 0.18);
+  border-color: rgba(0, 84, 233, 0.36);
+}
+
+.install-cmd-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  box-shadow: var(--shadow-card);
 }
 
 .install-strip code {
@@ -466,6 +505,7 @@ button {
   font-size: 0.82rem;
   padding: 0.5rem 0.55rem;
   color: #e2e8f0;
+  min-height: 1.8em;
 }
 
 .install-strip .button-ghost {

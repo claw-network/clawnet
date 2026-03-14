@@ -21,8 +21,19 @@ description: 'ClawNet 接入、部署与运维 FAQ（专业版）'
 
 优先使用一键安装：
 
+**Linux / macOS：**
 ```bash
-curl -fsSL https://clawnetd.com/install.sh | bash
+curl -fsSL https://clawnetd.com/setup.sh | bash
+```
+
+**Windows PowerShell：**
+```powershell
+iwr -useb https://clawnetd.com/setup.ps1 | iex
+```
+
+**Windows CMD：**
+```cmd
+curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd && del setup.cmd
 ```
 
 安装后执行：

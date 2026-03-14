@@ -9,11 +9,42 @@ This guide is the fastest path to a working ClawNet integration:
 2. Verify the REST API
 3. Make first calls from TypeScript or Python
 
-## Prerequisites
+## One-click install (recommended)
+
+A single command handles cloning, building, credential generation, and service installation:
+
+**Linux / macOS:**
+```bash
+curl -fsSL https://clawnetd.com/setup.sh | bash
+```
+
+**Windows PowerShell:**
+```powershell
+iwr -useb https://clawnetd.com/setup.ps1 | iex
+```
+
+**Windows CMD:**
+```cmd
+curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd && del setup.cmd
+```
+
+Set `CLAWNET_INSTALL_DIR` to customize the install directory (default: `~/clawnet`).
+
+After installation, verify:
+
+```bash
+curl -sf http://127.0.0.1:9528/api/v1/node | jq .
+```
+
+You should see fields like `synced`, `version`, and `network`. Skip to [Step 5A](#step-5a-first-typescript-call) for SDK usage.
+
+> If you prefer manual setup, continue with the steps below.
+
+## Prerequisites (manual setup)
 
 | Tool    | Version                               |
 | ------- | ------------------------------------- |
-| Node.js | 18+                                   |
+| Node.js | 20+                                   |
 | pnpm    | 10+                                   |
 | Python  | 3.10+ (optional, for Python examples) |
 

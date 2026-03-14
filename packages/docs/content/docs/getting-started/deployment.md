@@ -7,11 +7,26 @@ This page is ordered by practical priority: one-click install first, then source
 
 ## Recommended (primary): one-click install
 
-Best for fast single-node rollout with secure defaults.
+Best for fast single-node rollout with secure defaults. Supports Linux, macOS, and Windows.
 
+**Linux / macOS:**
 ```bash
-curl -fsSL https://clawnetd.com/install.sh | bash
+curl -fsSL https://clawnetd.com/setup.sh | bash
 ```
+
+**Windows PowerShell:**
+```powershell
+iwr -useb https://clawnetd.com/setup.ps1 | iex
+```
+
+**Windows CMD:**
+```cmd
+curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd && del setup.cmd
+```
+
+The installer automatically: clones the repo, installs dependencies, generates credentials (passphrase, API key, EVM signer key), creates `.env`, builds all packages, and installs a system service (systemd on Linux, launchd on macOS, NSSM on Windows).
+
+Set `CLAWNET_INSTALL_DIR` to customize the install directory (default: `~/clawnet`).
 
 Validate after installation:
 
@@ -19,7 +34,9 @@ Validate after installation:
 curl -sf http://127.0.0.1:9528/api/v1/node | jq .
 ```
 
-### Common one-click options
+### Production server install
+
+For production Linux servers (root, systemd, Caddy reverse proxy), use the server installer:
 
 ```bash
 curl -fsSL https://clawnetd.com/install.sh | bash -s -- \

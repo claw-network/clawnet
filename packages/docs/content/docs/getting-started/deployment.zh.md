@@ -7,11 +7,26 @@ description: '使用一键安装、源码构建或 Docker 部署 ClawNet'
 
 ## 推荐方式（首选）：一键安装
 
-适合快速上线单节点，默认配置更偏向安全。
+适合快速上线单节点，默认配置更偏向安全。支持 Linux、macOS 和 Windows。
 
+**Linux / macOS：**
 ```bash
-curl -fsSL https://clawnetd.com/install.sh | bash
+curl -fsSL https://clawnetd.com/setup.sh | bash
 ```
+
+**Windows PowerShell：**
+```powershell
+iwr -useb https://clawnetd.com/setup.ps1 | iex
+```
+
+**Windows CMD：**
+```cmd
+curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd && del setup.cmd
+```
+
+安装器自动完成：克隆仓库、安装依赖、生成凭据（passphrase、API key、EVM 签名密钥）、创建 `.env`、构建全部包、安装系统服务（Linux: systemd, macOS: launchd, Windows: NSSM）。
+
+设置 `CLAWNET_INSTALL_DIR` 可自定义安装目录（默认 `~/clawnet`）。
 
 安装后验证：
 
@@ -19,7 +34,9 @@ curl -fsSL https://clawnetd.com/install.sh | bash
 curl -sf http://127.0.0.1:9528/api/v1/node | jq .
 ```
 
-### 一键安装常用参数
+### 生产服务器安装
+
+生产 Linux 服务器（root 权限、systemd 管理、Caddy 反代）使用服务器安装脚本：
 
 ```bash
 curl -fsSL https://clawnetd.com/install.sh | bash -s -- \

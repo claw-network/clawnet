@@ -70,8 +70,18 @@ export interface FooterGroup {
   links: Array<{ label: string; href: string }>;
 }
 
+export interface InstallCommand {
+  platform: string;
+  label: string;
+  command: string;
+}
+
 export const homeContent = {
-  installCommand: 'curl -fsSL https://clawnetd.com/install.sh | bash',
+  installCommands: [
+    { platform: 'bash', label: 'Linux / macOS', command: 'curl -fsSL https://clawnetd.com/setup.sh | bash' },
+    { platform: 'powershell', label: 'PowerShell', command: 'iwr -useb https://clawnetd.com/setup.ps1 | iex' },
+    { platform: 'cmd', label: 'Windows CMD', command: 'curl -fsSL https://clawnetd.com/setup.cmd -o setup.cmd && setup.cmd' },
+  ] satisfies InstallCommand[],
   navItems: [
     {
       label: 'Networks',
