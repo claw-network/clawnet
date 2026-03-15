@@ -14,6 +14,9 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Field, FieldLabel } from '@/components/ui/field';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { api } from '@/lib/api';
 import {
   Users,
@@ -453,42 +456,49 @@ export function AccountsPage() {
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <Field>
               <FieldLabel>Action</FieldLabel>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                value={roleAction}
-                onChange={(e) => setRoleAction(e.target.value as 'grant' | 'revoke')}
-              >
-                <option value="grant">Grant</option>
-                <option value="revoke">Revoke</option>
-              </select>
+              <Select value={roleAction} onValueChange={(v) => setRoleAction(v as 'grant' | 'revoke')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="grant">Grant</SelectItem>
+                    <SelectItem value="revoke">Revoke</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel>Contract</FieldLabel>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                value={roleContract}
-                onChange={(e) => setRoleContract(e.target.value)}
-              >
-                <option value="">Select…</option>
-                {roles.map((c) => (
-                  <option key={c.contract} value={c.contract}>{formatContractName(c.contract)}</option>
-                ))}
-              </select>
+              <Select value={roleContract} onValueChange={setRoleContract}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {roles.map((c) => (
+                      <SelectItem key={c.contract} value={c.contract}>{formatContractName(c.contract)}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel>Role</FieldLabel>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                value={roleName}
-                onChange={(e) => setRoleName(e.target.value)}
-              >
-                <option value="">Select…</option>
-                {roles
-                  .filter((c) => !roleContract || c.contract === roleContract)
-                  .flatMap((c) => c.roles.map((r) => (
-                    <option key={`${c.contract}-${r.name}`} value={r.name}>{r.name}</option>
-                  )))}
-              </select>
+              <Select value={roleName} onValueChange={setRoleName}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {roles
+                      .filter((c) => !roleContract || c.contract === roleContract)
+                      .flatMap((c) => c.roles.map((r) => (
+                        <SelectItem key={`${c.contract}-${r.name}`} value={r.name}>{r.name}</SelectItem>
+                      )))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
             <Field>
               <FieldLabel>Address</FieldLabel>
@@ -527,14 +537,17 @@ export function AccountsPage() {
               </Field>
               <Field>
                 <FieldLabel>Vote</FieldLabel>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                  value={valVote}
-                  onChange={(e) => setValVote(e.target.value as 'add' | 'remove')}
-                >
-                  <option value="add">Add Validator</option>
-                  <option value="remove">Remove Validator</option>
-                </select>
+                <Select value={valVote} onValueChange={(v) => setValVote(v as 'add' | 'remove')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="add">Add Validator</SelectItem>
+                      <SelectItem value="remove">Remove Validator</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </Field>
               <Button
                 onClick={handleValidatorPropose}

@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, FieldLabel } from '@/components/ui/field';
 import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -667,16 +670,18 @@ export function GovernancePage() {
             <div className="grid gap-3 md:grid-cols-3">
               <Field>
                 <FieldLabel>Contract</FieldLabel>
-                <select
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                  value={upgradeContract}
-                  onChange={(e) => setUpgradeContract(e.target.value)}
-                >
-                  <option value="">Select contract…</option>
-                  {['token', 'identity', 'escrow', 'staking', 'reputation', 'dao', 'contracts', 'router', 'relayReward', 'paramRegistry'].map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                <Select value={upgradeContract} onValueChange={setUpgradeContract}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select contract…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {['token', 'identity', 'escrow', 'staking', 'reputation', 'dao', 'contracts', 'router', 'relayReward', 'paramRegistry'].map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </Field>
               <Field>
                 <FieldLabel>New Implementation Address</FieldLabel>
