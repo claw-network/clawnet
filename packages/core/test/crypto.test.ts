@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
@@ -27,8 +27,7 @@ import {
 import { randomBytes } from 'node:crypto';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(__dirname, '../../..');
-const vectorsDir = join(repoRoot, 'docs', 'implementation', 'test-vectors');
+const vectorsDir = join(__dirname, 'vectors');
 
 function readJson<T>(name: string): T {
   return JSON.parse(readFileSync(join(vectorsDir, name), 'utf8')) as T;
