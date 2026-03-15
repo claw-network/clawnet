@@ -69,18 +69,23 @@ interface AccountsData {
   contracts?: Record<string, string>;
 }
 
-interface RoleEntry {
-  contract: string;
-  role: string;
-  roleHash: string;
+interface RoleItem {
+  name: string;
+  hash: string;
   signerHasRole: boolean;
+}
+
+interface ContractRoles {
+  contract: string;
+  address: string;
+  roles: RoleItem[];
 }
 
 /* ── Component ─────────────────────────────────────────────────── */
 
 export function AccountsPage() {
   const [data, setData] = useState<AccountsData | null>(null);
-  const [roles, setRoles] = useState<RoleEntry[]>([]);
+  const [roles, setRoles] = useState<ContractRoles[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -107,10 +112,10 @@ export function AccountsPage() {
     try {
       const [accountsRes, rolesRes] = await Promise.all([
         api.get<AccountsData>('/accounts'),
-        api.get<RoleEntry[]>('/accounts/roles').catch(() => []),
+        api.get<{ contracts: ContractRoles[] }>('/accounts/roles').catch(() => null),
       ]);
       setData(accountsRes);
-      setRoles(rolesRes ?? []);
+      setRoles(rolesRes?.contracts ?? []);
     } catch {
       // service might not be available
     } finally {
@@ -423,22 +428,17 @@ export function AccountsPage() {
           {/* Current roles overview */}
           {roles.length > 0 && (
             <div className="space-y-2">
-              {Object.entries(
-                roles.reduce<Record<string, RoleEntry[]>>((acc, r) => {
-                  (acc[r.contract] ??= []).push(r);
-                  return acc;
-                }, {}),
-              ).map(([contract, contractRoles]) => (
-                <div key={contract} className="border rounded-lg p-3">
-                  <p className="text-sm font-medium mb-2">{formatContractName(contract)}</p>
+              {roles.map((c) => (
+                <div key={c.contract} className="border rounded-lg p-3">
+                  <p className="text-sm font-medium mb-2">{formatContractName(c.contract)}</p>
                   <div className="flex flex-wrap gap-1">
-                    {contractRoles.map((r) => (
+                    {c.roles.map((r) => (
                       <Badge
-                        key={`${r.contract}-${r.role}`}
+                        key={`${c.contract}-${r.name}`}
                         variant={r.signerHasRole ? 'default' : 'outline'}
                         className="text-xs"
                       >
-                        {r.role}{r.signerHasRole && ' ✓'}
+                        {r.name}{r.signerHasRole && ' ✓'}
                       </Badge>
                     ))}
                   </div>
@@ -470,8 +470,8 @@ export function AccountsPage() {
                 onChange={(e) => setRoleContract(e.target.value)}
               >
                 <option value="">Select…</option>
-                {[...new Set(roles.map((r) => r.contract))].map((c) => (
-                  <option key={c} value={c}>{formatContractName(c)}</option>
+                {roles.map((c) => (
+                  <option key={c.contract} value={c.contract}>{formatContractName(c.contract)}</option>
                 ))}
               </select>
             </div>
@@ -484,10 +484,10 @@ export function AccountsPage() {
               >
                 <option value="">Select…</option>
                 {roles
-                  .filter((r) => !roleContract || r.contract === roleContract)
-                  .map((r) => (
-                    <option key={`${r.contract}-${r.role}`} value={r.role}>{r.role}</option>
-                  ))}
+                  .filter((c) => !roleContract || c.contract === roleContract)
+                  .flatMap((c) => c.roles.map((r) => (
+                    <option key={`${c.contract}-${r.name}`} value={r.name}>{r.name}</option>
+                  )))}
               </select>
             </div>
             <div>
