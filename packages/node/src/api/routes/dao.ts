@@ -23,6 +23,8 @@ import {
   DaoTimelockCancelSchema,
   DaoTreasuryDepositSchema,
 } from '../schemas/dao.js';
+import { z } from 'zod';
+import { keccak256, toUtf8Bytes, AbiCoder } from 'ethers';
 import type { RuntimeContext } from '../types.js';
 import { resolvePrivateKey } from '../types.js';
 import {
@@ -622,6 +624,116 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     }
   });
 
+  // ── POST /proposals/param-change — parameter change proposal ──
+  r.post('/proposals/param-change', async (_req, res, route) => {
+    if (!ctx.daoService) {
+      internalError(res, 'DAO service unavailable');
+      return;
+    }
+    const schema = z.object({
+      paramName: z.string().min(1),
+      newValue: z.number().int().nonnegative(),
+      description: z.string().min(1),
+    });
+    const v = validate(schema, route.body);
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
+    try {
+      const { paramName, newValue, description } = v.data;
+      const keyHash = keccak256(toUtf8Bytes(paramName));
+      const abi = new AbiCoder();
+      const callData = '0x' +
+        keccak256(toUtf8Bytes('setParam(bytes32,uint256)')).slice(0, 10).slice(2) +
+        abi.encode(['bytes32', 'uint256'], [keyHash, newValue]).slice(2);
+      const target = await ctx.walletService?.['contracts'].paramRegistry.getAddress() ?? '';
+      const result = await ctx.daoService.propose('parameter_change', description, target, callData);
+      created(
+        res,
+        { proposalId: result.proposalId, txHash: result.txHash, paramName, newValue, status: 'created' },
+        { self: `/api/v1/dao/proposals/${result.proposalId}` },
+      );
+    } catch (err) {
+      internalError(res, (err as Error).message);
+    }
+  });
+
+  // ── POST /proposals/treasury-transfer — treasury spend proposal ─
+  r.post('/proposals/treasury-transfer', async (_req, res, route) => {
+    if (!ctx.daoService) {
+      internalError(res, 'DAO service unavailable');
+      return;
+    }
+    const schema = z.object({
+      to: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid EVM address'),
+      amount: z.number().int().positive(),
+      description: z.string().min(1),
+    });
+    const v = validate(schema, route.body);
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
+    try {
+      const { to, amount, description } = v.data;
+      const abi = new AbiCoder();
+      const callData = '0x' +
+        keccak256(toUtf8Bytes('transfer(address,uint256)')).slice(0, 10).slice(2) +
+        abi.encode(['address', 'uint256'], [to, amount]).slice(2);
+      const target = await ctx.walletService?.['contracts'].token.getAddress() ?? '';
+      const result = await ctx.daoService.propose('treasury_spend', description, target, callData);
+      created(
+        res,
+        { proposalId: result.proposalId, txHash: result.txHash, to, amount, status: 'created' },
+        { self: `/api/v1/dao/proposals/${result.proposalId}` },
+      );
+    } catch (err) {
+      internalError(res, (err as Error).message);
+    }
+  });
+
+  // ── POST /proposals/upgrade — contract upgrade proposal ─────────
+  r.post('/proposals/upgrade', async (_req, res, route) => {
+    if (!ctx.daoService) {
+      internalError(res, 'DAO service unavailable');
+      return;
+    }
+    const schema = z.object({
+      contract: z.string().min(1),
+      newImplementation: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid EVM address'),
+      description: z.string().min(1),
+    });
+    const v = validate(schema, route.body);
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
+    try {
+      const { contract: contractKey, newImplementation, description } = v.data;
+      const contracts = ctx.walletService?.['contracts'];
+      if (!contracts) throw new Error('Contracts unavailable');
+      const accessorMap: Record<string, string> = { contracts: 'serviceContracts' };
+      const accessor = (accessorMap as Record<string, string>)[contractKey] ?? contractKey;
+      const c = (contracts as unknown as Record<string, unknown>)[accessor] as
+        { getAddress: () => Promise<string> } | undefined;
+      if (!c) throw new Error(`Contract "${contractKey}" not available`);
+      const target = await c.getAddress();
+
+      const abi = new AbiCoder();
+      const callData = '0x' +
+        keccak256(toUtf8Bytes('upgradeToAndCall(address,bytes)')).slice(0, 10).slice(2) +
+        abi.encode(['address', 'bytes'], [newImplementation, '0x']).slice(2);
+      const result = await ctx.daoService.propose('protocol_upgrade', description, target, callData);
+      created(
+        res,
+        { proposalId: result.proposalId, txHash: result.txHash, contract: contractKey, newImplementation, status: 'created' },
+        { self: `/api/v1/dao/proposals/${result.proposalId}` },
+      );
+    } catch (err) {
+      internalError(res, (err as Error).message);
+    }
+  });
   // ══════════════════════════════════════════════════════════════�?  //  Parameters
   // ══════════════════════════════════════════════════════════════�?
   // ── GET /params �?current DAO parameters ──────────────────────

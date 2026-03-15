@@ -24,7 +24,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { api } from '@/lib/api';
-import { Vote, RefreshCw, Coins, Settings, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Vote, RefreshCw, Coins, Settings, ChevronLeft, ChevronRight, Plus, ArrowUpCircle } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -92,7 +92,7 @@ const TYPE_LABELS: Record<number, string> = {
 /* ── Component ─────────────────────────────────────────────────── */
 
 export function GovernancePage() {
-  const [tab, setTab] = useState<'proposals' | 'treasury' | 'parameters'>('proposals');
+  const [tab, setTab] = useState<'proposals' | 'treasury' | 'parameters' | 'upgrades'>('proposals');
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [treasury, setTreasury] = useState<Treasury | null>(null);
   const [params, setParams] = useState<GovParam[]>([]);
@@ -117,6 +117,33 @@ export function GovernancePage() {
   });
 
   const perPage = 20;
+
+  // Parameter change dialog
+  const [paramDialogOpen, setParamDialogOpen] = useState(false);
+  const [paramKey, setParamKey] = useState('');
+  const [paramNewValue, setParamNewValue] = useState('');
+  const [paramDesc, setParamDesc] = useState('');
+  const [paramSubmitting, setParamSubmitting] = useState(false);
+  const [paramResult, setParamResult] = useState('');
+
+  // Treasury transfer proposal
+  const [treasuryTo, setTreasuryTo] = useState('');
+  const [treasuryAmount, setTreasuryAmount] = useState('');
+  const [treasuryDesc, setTreasuryDesc] = useState('');
+  const [treasurySubmitting, setTreasurySubmitting] = useState(false);
+  const [treasuryResult, setTreasuryResult] = useState('');
+
+  // Treasury deposit
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositing, setDepositing] = useState(false);
+  const [depositResult, setDepositResult] = useState('');
+
+  // Upgrade proposal
+  const [upgradeContract, setUpgradeContract] = useState('');
+  const [upgradeImpl, setUpgradeImpl] = useState('');
+  const [upgradeDesc, setUpgradeDesc] = useState('');
+  const [upgradeSubmitting, setUpgradeSubmitting] = useState(false);
+  const [upgradeResult, setUpgradeResult] = useState('');
 
   const fetchData = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -202,14 +229,93 @@ export function GovernancePage() {
   };
 
   const openProposeChange = (key: string, currentValue: string) => {
-    setCreateForm({
-      type: 'parameter_change',
-      title: `Change parameter: ${key}`,
-      description: `Propose changing parameter "${key}" from "${currentValue}" to a new value.`,
-      target: '',
-      callData: '',
-    });
-    setCreateOpen(true);
+    setParamKey(key);
+    setParamNewValue('');
+    setParamDesc(`Change parameter "${key}" from ${currentValue}`);
+    setParamResult('');
+    setParamDialogOpen(true);
+  };
+
+  const handleParamChange = async () => {
+    if (!paramKey || !paramNewValue || !paramDesc) return;
+    setParamSubmitting(true);
+    setParamResult('');
+    try {
+      const result = await api.post<{ proposalId?: number; txHash?: string }>('/dao/proposals/param-change', {
+        paramName: paramKey,
+        newValue: parseInt(paramNewValue, 10),
+        description: paramDesc,
+      });
+      setParamResult(`Proposal #${result?.proposalId} created! TX: ${result?.txHash ?? 'success'}`);
+      setParamDialogOpen(false);
+      fetchData(true);
+    } catch (err) {
+      setParamResult(err instanceof Error ? err.message : 'Failed to create param change proposal');
+    } finally {
+      setParamSubmitting(false);
+    }
+  };
+
+  const handleTreasuryTransfer = async () => {
+    if (!treasuryTo || !treasuryAmount || !treasuryDesc) return;
+    setTreasurySubmitting(true);
+    setTreasuryResult('');
+    try {
+      const result = await api.post<{ proposalId?: number; txHash?: string }>('/dao/proposals/treasury-transfer', {
+        to: treasuryTo,
+        amount: parseInt(treasuryAmount, 10),
+        description: treasuryDesc,
+      });
+      setTreasuryResult(`Proposal #${result?.proposalId} created! TX: ${result?.txHash ?? 'success'}`);
+      setTreasuryTo('');
+      setTreasuryAmount('');
+      setTreasuryDesc('');
+      fetchData(true);
+    } catch (err) {
+      setTreasuryResult(err instanceof Error ? err.message : 'Failed to create treasury proposal');
+    } finally {
+      setTreasurySubmitting(false);
+    }
+  };
+
+  const handleDeposit = async () => {
+    if (!depositAmount) return;
+    setDepositing(true);
+    setDepositResult('');
+    try {
+      const result = await api.post<{ txHash?: string }>('/dao/treasury/deposits', {
+        amount: parseInt(depositAmount, 10),
+      });
+      setDepositResult(`Deposited! TX: ${result?.txHash ?? 'success'}`);
+      setDepositAmount('');
+      fetchData(true);
+    } catch (err) {
+      setDepositResult(err instanceof Error ? err.message : 'Deposit failed');
+    } finally {
+      setDepositing(false);
+    }
+  };
+
+  const handleUpgradeProposal = async () => {
+    if (!upgradeContract || !upgradeImpl || !upgradeDesc) return;
+    setUpgradeSubmitting(true);
+    setUpgradeResult('');
+    try {
+      const result = await api.post<{ proposalId?: number; txHash?: string }>('/dao/proposals/upgrade', {
+        contract: upgradeContract,
+        newImplementation: upgradeImpl,
+        description: upgradeDesc,
+      });
+      setUpgradeResult(`Proposal #${result?.proposalId} created! TX: ${result?.txHash ?? 'success'}`);
+      setUpgradeContract('');
+      setUpgradeImpl('');
+      setUpgradeDesc('');
+      fetchData(true);
+    } catch (err) {
+      setUpgradeResult(err instanceof Error ? err.message : 'Failed to create upgrade proposal');
+    } finally {
+      setUpgradeSubmitting(false);
+    }
   };
 
   const formatDate = (ts: number) => {
@@ -294,7 +400,7 @@ export function GovernancePage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b pb-2">
-        {(['proposals', 'treasury', 'parameters'] as const).map((t) => (
+        {(['proposals', 'treasury', 'parameters', 'upgrades'] as const).map((t) => (
           <Button
             key={t}
             variant={tab === t ? 'default' : 'ghost'}
@@ -304,6 +410,7 @@ export function GovernancePage() {
             {t === 'proposals' && <Vote className="mr-1 h-4 w-4" />}
             {t === 'treasury' && <Coins className="mr-1 h-4 w-4" />}
             {t === 'parameters' && <Settings className="mr-1 h-4 w-4" />}
+            {t === 'upgrades' && <ArrowUpCircle className="mr-1 h-4 w-4" />}
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </Button>
         ))}
@@ -435,15 +542,47 @@ export function GovernancePage() {
 
       {/* Treasury Tab */}
       {tab === 'treasury' && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Treasury Balance</CardTitle>
+                <Coins className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{treasury?.balance ?? '—'} Token</div>
+                <p className="text-xs text-muted-foreground mt-1 font-mono">{treasury?.daoAddress ?? '—'}</p>
+              </CardContent>
+            </Card>
+
+            {/* Deposit */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Deposit to Treasury</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div><Label>Amount</Label><Input type="number" placeholder="1000" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} /></div>
+                <Button onClick={handleDeposit} disabled={depositing || !depositAmount}>{depositing ? 'Depositing…' : 'Deposit'}</Button>
+                {depositResult && <p className="text-xs text-muted-foreground">{depositResult}</p>}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Treasury Transfer Proposal */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Treasury Balance</CardTitle>
-              <Coins className="h-4 w-4 text-muted-foreground" />
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Propose Treasury Transfer (via DAO)</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{treasury?.balance ?? '—'} Token</div>
-              <p className="text-xs text-muted-foreground mt-1 font-mono">{treasury?.daoAddress ?? '—'}</p>
+            <CardContent className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div><Label>To Address</Label><Input placeholder="0x…" value={treasuryTo} onChange={(e) => setTreasuryTo(e.target.value)} /></div>
+                <div><Label>Amount</Label><Input type="number" placeholder="500" value={treasuryAmount} onChange={(e) => setTreasuryAmount(e.target.value)} /></div>
+                <div><Label>Description</Label><Input placeholder="Payment for…" value={treasuryDesc} onChange={(e) => setTreasuryDesc(e.target.value)} /></div>
+              </div>
+              <Button onClick={handleTreasuryTransfer} disabled={treasurySubmitting || !treasuryTo || !treasuryAmount || !treasuryDesc}>
+                {treasurySubmitting ? 'Creating…' : 'Create Treasury Proposal'}
+              </Button>
+              {treasuryResult && <p className="text-xs text-muted-foreground">{treasuryResult}</p>}
             </CardContent>
           </Card>
         </div>
@@ -451,34 +590,107 @@ export function GovernancePage() {
 
       {/* Parameters Tab */}
       {tab === 'parameters' && (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Parameter</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead className="w-48">Key Hash</TableHead>
-                  <TableHead className="w-32">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {params.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No parameters configured</TableCell></TableRow>
-                ) : params.map((p) => (
-                  <TableRow key={p.keyHash}>
-                    <TableCell className="font-medium">{p.key}</TableCell>
-                    <TableCell className="font-mono">{p.value}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{truncateAddr(p.keyHash)}</TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="ghost" onClick={() => openProposeChange(p.key, p.value)}>
-                        Propose Change
-                      </Button>
-                    </TableCell>
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Parameter</TableHead>
+                    <TableHead>Value</TableHead>
+                    <TableHead className="w-48">Key Hash</TableHead>
+                    <TableHead className="w-32">Action</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {params.length === 0 ? (
+                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No parameters configured</TableCell></TableRow>
+                  ) : params.map((p) => (
+                    <TableRow key={p.keyHash}>
+                      <TableCell className="font-medium">{p.key}</TableCell>
+                      <TableCell className="font-mono">{p.value}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">{truncateAddr(p.keyHash)}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => openProposeChange(p.key, p.value)}>
+                          Propose Change
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Param Change Dialog */}
+          <Dialog open={paramDialogOpen} onOpenChange={setParamDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Propose Parameter Change</DialogTitle>
+                <DialogDescription>Create a DAO proposal to change "{paramKey}"</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label>Parameter</Label>
+                  <Input value={paramKey} disabled />
+                </div>
+                <div className="space-y-2">
+                  <Label>New Value</Label>
+                  <Input type="number" placeholder="Enter new value" value={paramNewValue} onChange={(e) => setParamNewValue(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Input placeholder="Reason for change" value={paramDesc} onChange={(e) => setParamDesc(e.target.value)} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setParamDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleParamChange} disabled={paramSubmitting || !paramNewValue || !paramDesc}>
+                  {paramSubmitting ? 'Creating…' : 'Create Proposal'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          {paramResult && <Alert><AlertDescription>{paramResult}</AlertDescription></Alert>}
+        </div>
+      )}
+
+      {/* Upgrades Tab */}
+      {tab === 'upgrades' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowUpCircle className="h-4 w-4" /> Propose Contract Upgrade
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div>
+                <Label>Contract</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                  value={upgradeContract}
+                  onChange={(e) => setUpgradeContract(e.target.value)}
+                >
+                  <option value="">Select contract…</option>
+                  {['token', 'identity', 'escrow', 'staking', 'reputation', 'dao', 'contracts', 'router', 'relayReward', 'paramRegistry'].map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>New Implementation Address</Label>
+                <Input placeholder="0x…" value={upgradeImpl} onChange={(e) => setUpgradeImpl(e.target.value)} />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Input placeholder="Upgrade reason" value={upgradeDesc} onChange={(e) => setUpgradeDesc(e.target.value)} />
+              </div>
+            </div>
+            <Button onClick={handleUpgradeProposal} disabled={upgradeSubmitting || !upgradeContract || !upgradeImpl || !upgradeDesc}>
+              {upgradeSubmitting ? 'Creating…' : 'Create Upgrade Proposal'}
+            </Button>
+            {upgradeResult && <p className="text-xs text-muted-foreground">{upgradeResult}</p>}
           </CardContent>
         </Card>
       )}

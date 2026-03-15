@@ -11,6 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import {
   Users,
@@ -22,6 +25,10 @@ import {
   RefreshCw,
   Landmark,
   FileCheck,
+  Shield,
+  UserPlus,
+  UserMinus,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -62,19 +69,48 @@ interface AccountsData {
   contracts?: Record<string, string>;
 }
 
+interface RoleEntry {
+  contract: string;
+  role: string;
+  roleHash: string;
+  signerHasRole: boolean;
+}
+
 /* ── Component ─────────────────────────────────────────────────── */
 
 export function AccountsPage() {
   const [data, setData] = useState<AccountsData | null>(null);
+  const [roles, setRoles] = useState<RoleEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Role management
+  const [roleContract, setRoleContract] = useState('');
+  const [roleName, setRoleName] = useState('');
+  const [roleAddress, setRoleAddress] = useState('');
+  const [roleAction, setRoleAction] = useState<'grant' | 'revoke'>('grant');
+  const [roleSubmitting, setRoleSubmitting] = useState(false);
+  const [roleResult, setRoleResult] = useState('');
+
+  // Validator management
+  const [valAddress, setValAddress] = useState('');
+  const [valVote, setValVote] = useState<'add' | 'remove'>('add');
+  const [valSubmitting, setValSubmitting] = useState(false);
+  const [valResult, setValResult] = useState('');
+  const [discardAddress, setDiscardAddress] = useState('');
+  const [discarding, setDiscarding] = useState(false);
+  const [discardResult, setDiscardResult] = useState('');
+
   const fetchData = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
     try {
-      const result = await api.get<AccountsData>('/accounts');
-      setData(result);
+      const [accountsRes, rolesRes] = await Promise.all([
+        api.get<AccountsData>('/accounts'),
+        api.get<RoleEntry[]>('/accounts/roles').catch(() => []),
+      ]);
+      setData(accountsRes);
+      setRoles(rolesRes ?? []);
     } catch {
       // service might not be available
     } finally {
@@ -84,6 +120,63 @@ export function AccountsPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleRoleAction = async () => {
+    if (!roleContract || !roleName || !roleAddress) return;
+    setRoleSubmitting(true);
+    setRoleResult('');
+    try {
+      const endpoint = roleAction === 'grant' ? '/accounts/roles/grant' : '/accounts/roles/revoke';
+      const result = await api.post<{ txHash?: string }>(endpoint, {
+        contract: roleContract,
+        role: roleName,
+        address: roleAddress,
+      });
+      setRoleResult(`${roleAction === 'grant' ? 'Granted' : 'Revoked'}! TX: ${result?.txHash ?? 'success'}`);
+      setRoleAddress('');
+      fetchData(true);
+    } catch (err) {
+      setRoleResult(err instanceof Error ? err.message : `Role ${roleAction} failed`);
+    } finally {
+      setRoleSubmitting(false);
+    }
+  };
+
+  const handleValidatorPropose = async () => {
+    if (!valAddress) return;
+    setValSubmitting(true);
+    setValResult('');
+    try {
+      const result = await api.post<{ result?: boolean }>('/accounts/validators/propose', {
+        address: valAddress,
+        vote: valVote,
+      });
+      setValResult(`Validator ${valVote} vote proposed for ${valAddress.slice(0, 10)}…`);
+      setValAddress('');
+      fetchData(true);
+    } catch (err) {
+      setValResult(err instanceof Error ? err.message : 'Validator proposal failed');
+    } finally {
+      setValSubmitting(false);
+    }
+  };
+
+  const handleValidatorDiscard = async () => {
+    if (!discardAddress) return;
+    setDiscarding(true);
+    setDiscardResult('');
+    try {
+      await api.post<{ result?: boolean }>('/accounts/validators/discard', {
+        address: discardAddress,
+      });
+      setDiscardResult(`Discarded pending vote for ${discardAddress.slice(0, 10)}…`);
+      setDiscardAddress('');
+    } catch (err) {
+      setDiscardResult(err instanceof Error ? err.message : 'Discard failed');
+    } finally {
+      setDiscarding(false);
+    }
+  };
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -315,6 +408,165 @@ export function AccountsPage() {
           </CardContent>
         </Card>
       )}
+
+      <Separator />
+
+      {/* Role Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-4 w-4" /> Role Management
+          </CardTitle>
+          <CardDescription>View and manage OpenZeppelin AccessControl roles across contracts</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Current roles overview */}
+          {roles.length > 0 && (
+            <div className="space-y-2">
+              {Object.entries(
+                roles.reduce<Record<string, RoleEntry[]>>((acc, r) => {
+                  (acc[r.contract] ??= []).push(r);
+                  return acc;
+                }, {}),
+              ).map(([contract, contractRoles]) => (
+                <div key={contract} className="border rounded-lg p-3">
+                  <p className="text-sm font-medium mb-2">{formatContractName(contract)}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {contractRoles.map((r) => (
+                      <Badge
+                        key={`${r.contract}-${r.role}`}
+                        variant={r.signerHasRole ? 'default' : 'outline'}
+                        className="text-xs"
+                      >
+                        {r.role}{r.signerHasRole && ' ✓'}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Grant / Revoke form */}
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <Label>Action</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                value={roleAction}
+                onChange={(e) => setRoleAction(e.target.value as 'grant' | 'revoke')}
+              >
+                <option value="grant">Grant</option>
+                <option value="revoke">Revoke</option>
+              </select>
+            </div>
+            <div>
+              <Label>Contract</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                value={roleContract}
+                onChange={(e) => setRoleContract(e.target.value)}
+              >
+                <option value="">Select…</option>
+                {[...new Set(roles.map((r) => r.contract))].map((c) => (
+                  <option key={c} value={c}>{formatContractName(c)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Role</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                value={roleName}
+                onChange={(e) => setRoleName(e.target.value)}
+              >
+                <option value="">Select…</option>
+                {roles
+                  .filter((r) => !roleContract || r.contract === roleContract)
+                  .map((r) => (
+                    <option key={`${r.contract}-${r.role}`} value={r.role}>{r.role}</option>
+                  ))}
+              </select>
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Input placeholder="0x…" value={roleAddress} onChange={(e) => setRoleAddress(e.target.value)} />
+            </div>
+          </div>
+          <Button
+            onClick={handleRoleAction}
+            disabled={roleSubmitting || !roleContract || !roleName || !roleAddress}
+            variant={roleAction === 'revoke' ? 'destructive' : 'default'}
+          >
+            {roleSubmitting ? 'Submitting…' : roleAction === 'grant' ? 'Grant Role' : 'Revoke Role'}
+          </Button>
+          {roleResult && <p className="text-xs text-muted-foreground">{roleResult}</p>}
+        </CardContent>
+      </Card>
+
+      {/* Validator Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" /> Validator Management
+          </CardTitle>
+          <CardDescription>Propose adding or removing consensus validators (QBFT/Clique voting)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Propose vote */}
+            <div className="space-y-3 border rounded-lg p-4">
+              <p className="text-sm font-medium flex items-center gap-2">
+                <UserPlus className="h-4 w-4" /> Propose Validator Vote
+              </p>
+              <div>
+                <Label>Validator Address</Label>
+                <Input placeholder="0x…" value={valAddress} onChange={(e) => setValAddress(e.target.value)} />
+              </div>
+              <div>
+                <Label>Vote</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                  value={valVote}
+                  onChange={(e) => setValVote(e.target.value as 'add' | 'remove')}
+                >
+                  <option value="add">Add Validator</option>
+                  <option value="remove">Remove Validator</option>
+                </select>
+              </div>
+              <Button
+                onClick={handleValidatorPropose}
+                disabled={valSubmitting || !valAddress}
+                variant={valVote === 'remove' ? 'destructive' : 'default'}
+              >
+                {valSubmitting ? 'Proposing…' : 'Submit Vote'}
+              </Button>
+              {valResult && <p className="text-xs text-muted-foreground">{valResult}</p>}
+            </div>
+
+            {/* Discard vote */}
+            <div className="space-y-3 border rounded-lg p-4">
+              <p className="text-sm font-medium flex items-center gap-2">
+                <XCircle className="h-4 w-4" /> Discard Pending Vote
+              </p>
+              <div>
+                <Label>Validator Address</Label>
+                <Input placeholder="0x…" value={discardAddress} onChange={(e) => setDiscardAddress(e.target.value)} />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleValidatorDiscard}
+                disabled={discarding || !discardAddress}
+              >
+                {discarding ? 'Discarding…' : 'Discard Vote'}
+              </Button>
+              {discardResult && <p className="text-xs text-muted-foreground">{discardResult}</p>}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

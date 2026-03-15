@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { api } from '@/lib/api';
-import { Coins, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet } from 'lucide-react';
+import { Coins, RefreshCw, ArrowUpRight, ArrowDownRight, Wallet, Send } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -39,6 +39,13 @@ export function TokenPage() {
   const [mintMemo, setMintMemo] = useState('');
   const [minting, setMinting] = useState(false);
   const [mintResult, setMintResult] = useState('');
+
+  // Transfer form
+  const [transferTo, setTransferTo] = useState('');
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferMemo, setTransferMemo] = useState('');
+  const [transferring, setTransferring] = useState(false);
+  const [transferResult, setTransferResult] = useState('');
 
   // Burn form
   const [burnFrom, setBurnFrom] = useState('');
@@ -85,6 +92,28 @@ export function TokenPage() {
       setMintResult(err instanceof Error ? err.message : 'Mint failed');
     } finally {
       setMinting(false);
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!transferTo || !transferAmount) return;
+    setTransferring(true);
+    setTransferResult('');
+    try {
+      const result = await api.post<{ txHash?: string }>('/token/transfer', {
+        to: transferTo,
+        amount: parseInt(transferAmount, 10),
+        memo: transferMemo || undefined,
+      });
+      setTransferResult(`Transferred! TX: ${result?.txHash ?? 'success'}`);
+      setTransferTo('');
+      setTransferAmount('');
+      setTransferMemo('');
+      fetchData(true);
+    } catch (err) {
+      setTransferResult(err instanceof Error ? err.message : 'Transfer failed');
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -184,6 +213,24 @@ export function TokenPage() {
           </Card>
         </div>
       )}
+
+      <Separator />
+
+      {/* Transfer */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Send className="h-4 w-4" /> Transfer Tokens</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div><Label>To Address</Label><Input placeholder="0x..." value={transferTo} onChange={(e) => setTransferTo(e.target.value)} /></div>
+            <div><Label>Amount</Label><Input type="number" placeholder="100" value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} /></div>
+            <div><Label>Memo (optional)</Label><Input placeholder="Payment for service" value={transferMemo} onChange={(e) => setTransferMemo(e.target.value)} /></div>
+          </div>
+          <Button onClick={handleTransfer} disabled={transferring || !transferTo || !transferAmount}>{transferring ? 'Transferring…' : 'Transfer'}</Button>
+          {transferResult && <p className="text-xs text-muted-foreground">{transferResult}</p>}
+        </CardContent>
+      </Card>
 
       <Separator />
 

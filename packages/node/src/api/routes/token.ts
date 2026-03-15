@@ -25,6 +25,12 @@ const BurnSchema = z.object({
   memo: z.string().optional(),
 });
 
+const TransferSchema = z.object({
+  to: z.string().regex(/^0x[0-9a-fA-F]{40}$/, 'Invalid EVM address'),
+  amount: z.number().int().positive(),
+  memo: z.string().optional(),
+});
+
 // ── Route module ────────────────────────────────────────────────
 
 export function tokenRoutes(ctx: RuntimeContext): Router {
@@ -93,6 +99,31 @@ export function tokenRoutes(ctx: RuntimeContext): Router {
           balance: signerBalance.toString(),
         },
       }, { self: '/api/v1/token/distribution' });
+    } catch (err) {
+      internalError(res, (err as Error).message);
+    }
+  });
+
+  // ── POST /transfer — transfer tokens from node signer ──────────
+  r.post('/transfer', async (_req, res, route) => {
+    if (!ctx.walletService) {
+      internalError(res, 'Token service unavailable');
+      return;
+    }
+    const v = validate(TransferSchema, route.body);
+    if (!v.success) {
+      badRequest(res, v.error, route.url.pathname);
+      return;
+    }
+    try {
+      const signerAddress = ctx.walletService['contracts'].signerAddress;
+      const result = await ctx.walletService.transfer(
+        signerAddress,
+        v.data.to,
+        v.data.amount,
+        v.data.memo,
+      );
+      ok(res, result, { self: '/api/v1/token/transfer' });
     } catch (err) {
       internalError(res, (err as Error).message);
     }
