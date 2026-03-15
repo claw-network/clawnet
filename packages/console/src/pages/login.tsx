@@ -10,6 +10,14 @@ import {
   FieldLabel,
 } from '@/components/ui/field';
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
   verifyPassphrase,
   verifyTotp,
   setAuthenticated,
@@ -20,6 +28,7 @@ import { KeyRound, ShieldCheck, Loader2 } from 'lucide-react';
 import {
   InputOTP,
   InputOTPGroup,
+  InputOTPSeparator,
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 
@@ -98,46 +107,47 @@ export function LoginPage() {
   if (totpStep) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="flex w-full max-w-sm flex-col gap-6">
-          <form onSubmit={handleTotp}>
-            <FieldGroup>
-              <div className="flex flex-col items-center gap-2 text-center">
-                <div className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <ShieldCheck className="size-5" />
-                </div>
-                <h1 className="text-xl font-bold">Two-Factor Authentication</h1>
-                <FieldDescription>
-                  Enter the 6-digit code from your authenticator app
-                </FieldDescription>
-              </div>
-
+        <form onSubmit={handleTotp} className="w-full">
+          <Card className="mx-auto max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShieldCheck className="size-5" /> Two-Factor Authentication
+              </CardTitle>
+              <CardDescription>
+                Enter the 6-digit code from your authenticator app to verify your identity.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               {error && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" className="mb-4">
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-
               <Field>
-                <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    value={totpCode}
-                    onChange={setTotpCode}
-                    disabled={loading}
-                    autoFocus
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
+                <FieldLabel htmlFor="totp-code">Verification code</FieldLabel>
+                <InputOTP
+                  id="totp-code"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={setTotpCode}
+                  disabled={loading}
+                  autoFocus
+                >
+                  <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
+                    <InputOTPSlot index={0} />
+                    <InputOTPSlot index={1} />
+                    <InputOTPSlot index={2} />
+                  </InputOTPGroup>
+                  <InputOTPSeparator className="mx-2" />
+                  <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
+                    <InputOTPSlot index={3} />
+                    <InputOTPSlot index={4} />
+                    <InputOTPSlot index={5} />
+                  </InputOTPGroup>
+                </InputOTP>
               </Field>
-
+            </CardContent>
+            <CardFooter>
               <Field>
                 <Button
                   type="submit"
@@ -145,35 +155,31 @@ export function LoginPage() {
                   disabled={loading || totpCode.length !== 6}
                 >
                   {loading ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Verifying…
-                    </>
+                    <><Loader2 className="size-4 animate-spin" /> Verifying…</>
                   ) : (
                     'Verify Code'
                   )}
                 </Button>
+                <div className="text-sm text-muted-foreground">
+                  Wrong account?{' '}
+                  <button
+                    type="button"
+                    className="underline underline-offset-4 transition-colors hover:text-primary"
+                    onClick={() => {
+                      setTotpStep(false);
+                      setTotpCode('');
+                      setPending('');
+                      clearPendingToken();
+                      setError('');
+                    }}
+                  >
+                    Back to passphrase
+                  </button>
+                </div>
               </Field>
-
-              <Field>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => {
-                    setTotpStep(false);
-                    setTotpCode('');
-                    setPending('');
-                    clearPendingToken();
-                    setError('');
-                  }}
-                >
-                  Back to passphrase
-                </Button>
-              </Field>
-            </FieldGroup>
-          </form>
-        </div>
+            </CardFooter>
+          </Card>
+        </form>
       </div>
     );
   }

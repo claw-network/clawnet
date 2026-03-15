@@ -4,13 +4,23 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
   Field,
   FieldDescription,
   FieldGroup,
+  FieldLabel,
 } from '@/components/ui/field';
 import {
   InputOTP,
   InputOTPGroup,
+  InputOTPSeparator,
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { api } from '@/lib/api';
@@ -172,66 +182,74 @@ export function TotpSetupPage() {
           )}
 
           {step === 'verify' && (
-            <form onSubmit={handleVerify}>
-              <FieldGroup>
-                <p className="text-sm text-muted-foreground text-center">
-                  Enter the 6-digit code from your authenticator app to confirm setup
-                </p>
-
-                <Field>
-                  <div className="flex justify-center">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="size-5" /> Confirm Setup
+                </CardTitle>
+                <CardDescription>
+                  Enter the 6-digit code from your authenticator app to complete 2FA setup.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {error && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <form onSubmit={handleVerify}>
+                  <Field>
+                    <FieldLabel htmlFor="setup-otp">Verification code</FieldLabel>
                     <InputOTP
+                      id="setup-otp"
                       maxLength={6}
                       value={code}
                       onChange={setCode}
                       disabled={loading}
                       autoFocus
                     >
-                      <InputOTPGroup>
+                      <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
                         <InputOTPSlot index={0} />
                         <InputOTPSlot index={1} />
                         <InputOTPSlot index={2} />
+                      </InputOTPGroup>
+                      <InputOTPSeparator className="mx-2" />
+                      <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
                         <InputOTPSlot index={3} />
                         <InputOTPSlot index={4} />
                         <InputOTPSlot index={5} />
                       </InputOTPGroup>
                     </InputOTP>
-                  </div>
-                </Field>
-
+                  </Field>
+                </form>
+              </CardContent>
+              <CardFooter>
                 <Field>
                   <Button
-                    type="submit"
+                    type="button"
                     className="w-full"
                     disabled={loading || code.length !== 6}
+                    onClick={(e) => handleVerify(e as unknown as FormEvent)}
                   >
                     {loading ? (
-                      <>
-                        <Loader2 className="size-4 animate-spin" />
-                        Verifying…
-                      </>
+                      <><Loader2 className="size-4 animate-spin" /> Verifying…</>
                     ) : (
                       'Confirm & Enable 2FA'
                     )}
                   </Button>
+                  <div className="text-sm text-muted-foreground">
+                    Need to re-scan?{' '}
+                    <button
+                      type="button"
+                      className="underline underline-offset-4 transition-colors hover:text-primary"
+                      onClick={() => { setStep('scan'); setCode(''); setError(''); }}
+                    >
+                      Back to QR code
+                    </button>
+                  </div>
                 </Field>
-
-                <Field>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="w-full"
-                    onClick={() => {
-                      setStep('scan');
-                      setCode('');
-                      setError('');
-                    }}
-                  >
-                    Back to QR code
-                  </Button>
-                </Field>
-              </FieldGroup>
-            </form>
+              </CardFooter>
+            </Card>
           )}
         </FieldGroup>
       </div>
