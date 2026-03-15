@@ -17,6 +17,7 @@ import { TokenPage } from '@/pages/token';
 import { ContractsPage } from '@/pages/contracts';
 import { EscrowPage } from '@/pages/escrow';
 import { EcosystemPage } from '@/pages/ecosystem';
+import { AccountsPage } from '@/pages/accounts';
 import { AuthGuard } from '@/components/auth-guard';
 import { TotpGuard } from '@/components/totp-guard';
 
@@ -58,6 +59,7 @@ export function App() {
               <Route path="contracts" element={<ContractsPage />} />
               <Route path="escrow" element={<EscrowPage />} />
               <Route path="ecosystem" element={<EcosystemPage />} />
+              <Route path="accounts" element={<AccountsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

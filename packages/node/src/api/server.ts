@@ -44,6 +44,7 @@ import { snapshotRoutes } from './routes/snapshots.js';
 import { totpRoutes } from './routes/totp.js';
 import { stakingRoutes } from './routes/staking.js';
 import { tokenRoutes } from './routes/token.js';
+import { accountsRoutes } from './routes/accounts.js';
 
 export { ApiServerConfig } from './types.js';
 export type { RuntimeContext } from './types.js';
@@ -80,6 +81,7 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/snapshots', snapshotRoutes(ctx));
   api.mount('/api/v1/staking', stakingRoutes(ctx));
   api.mount('/api/v1/token', tokenRoutes(ctx));
+  api.mount('/api/v1/accounts', accountsRoutes(ctx));
 
   // Dev routes (faucet, etc.) are NOT available on mainnet — prevents unauthorized minting.
   if (ctx.config.network !== 'mainnet') {

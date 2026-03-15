@@ -15,6 +15,7 @@ import {
   FileCheck,
   Lock,
   PieChart,
+  UserCog,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -60,6 +61,7 @@ const blockchainItems: NavItem[] = [
   { title: 'Escrow', icon: Lock, path: '/escrow', networks: ['testnet', 'mainnet'] },
   { title: 'Faucet', icon: Droplets, path: '/faucet', networks: ['testnet', 'mainnet'] },
   { title: 'Ecosystem', icon: PieChart, path: '/ecosystem', networks: ['testnet', 'mainnet'] },
+  { title: 'Accounts', icon: UserCog, path: '/accounts', networks: ['testnet', 'mainnet'] },
 ];
 
 export function AppSidebar() {
