@@ -96,8 +96,8 @@ export class StakingService {
       address,
       staked: info.amount.toString(),
       nodeType: Number(info.nodeType),
-      pendingRewards: info.pendingRewards.toString(),
-      unstakeRequestTime: Number(info.unstakeRequestTime),
+      pendingRewards: info.rewards.toString(),
+      unstakeRequestTime: Number(info.unstakeRequestAt),
       isActive,
     };
   }
