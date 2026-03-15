@@ -1,0 +1,3 @@
+[submodule "infra/besu/upstream"]
+	path = infra/besu/upstream
+	url = https://github.com/claw-network/besu.git

@@ -1,0 +1,325 @@
+#!/usr/bin/env node
+
+import { readFile } from 'node:fs/promises';
+import { parse } from 'yaml';
+import { ClawNetNode } from './index.js';
+import { createLogger } from './logger.js';
+import { loadConfig, resolveStoragePaths } from '@claw-network/core';
+import type { RelayConfig } from '@claw-network/core';
+import { type ChainConfig, ChainConfigSchema } from './services/chain-config.js';
+import { validateLiquidityPolicyFromEnv } from './policy/liquidity-policy.js';
+
+interface DaemonArgs {
+  dataDir?: string;
+  noApi: boolean;
+  apiHost?: string;
+  apiPort?: number;
+  listen: string[];
+  bootstrap: string[];
+  healthIntervalMs: number;
+  passphrase?: string;
+  network?: 'mainnet' | 'testnet' | 'devnet';
+}
+
+function parseArgs(argv: string[]): DaemonArgs {
+  let dataDir: string | undefined;
+  let noApi = false;
+  let apiHost: string | undefined;
+  let apiPort: number | undefined;
+  const listen: string[] = [];
+  const bootstrap: string[] = [];
+  let healthIntervalMs = 30_000;
+  let passphrase: string | undefined;
+  let network: 'mainnet' | 'testnet' | 'devnet' | undefined;
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--') continue;
+    if (arg === '--data-dir') {
+      dataDir = argv[++i];
+      continue;
+    }
+    if (arg === '--no-api') {
+      noApi = true;
+      continue;
+    }
+    if (arg === '--api-host') {
+      apiHost = argv[++i];
+      continue;
+    }
+    if (arg === '--api-port') {
+      const raw = argv[++i] ?? '';
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isNaN(parsed) || parsed < 1 || parsed > 65535) {
+        console.error(`Invalid --api-port value: '${raw}'. Must be 1–65535.`);
+        process.exit(1);
+      }
+      apiPort = parsed;
+      continue;
+    }
+    if (arg === '--listen') {
+      const value = argv[++i];
+      if (value) {
+        listen.push(value);
+      }
+      continue;
+    }
+    if (arg === '--bootstrap') {
+      const value = argv[++i];
+      if (value) {
+        bootstrap.push(value);
+      }
+      continue;
+    }
+    if (arg === '--health-interval-ms') {
+      healthIntervalMs = Number.parseInt(argv[++i] ?? '', 10);
+      continue;
+    }
+    if (arg === '--passphrase') {
+      passphrase = argv[++i];
+      continue;
+    }
+    if (arg === '--network') {
+      const val = argv[++i];
+      if (val !== 'mainnet' && val !== 'testnet' && val !== 'devnet') {
+        console.error(`[clawnetd] invalid --network value: ${val} (must be mainnet|testnet|devnet)`);
+        process.exit(1);
+      }
+      network = val;
+      continue;
+    }
+    if (arg === '--help' || arg === '-h') {
+      printHelp();
+      process.exit(0);
+    }
+    console.error(`[clawnetd] unknown option: ${arg}`);
+    process.exit(1);
+  }
+
+  if (Number.isNaN(healthIntervalMs) || healthIntervalMs < 0) {
+    console.error('[clawnetd] invalid --health-interval-ms');
+    process.exit(1);
+  }
+
+  return {
+    dataDir,
+    noApi,
+    apiHost,
+    apiPort,
+    listen,
+    bootstrap,
+    healthIntervalMs,
+    passphrase: passphrase ?? process.env.CLAW_PASSPHRASE,
+    network: network ?? (process.env.CLAW_NETWORK as 'mainnet' | 'testnet' | 'devnet' | undefined),
+  };
+}
+
+async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  await startDaemon(argv, { attachSignals: true });
+}
+
+export async function startDaemon(
+  argv: string[],
+  options: { attachSignals?: boolean } = {},
+): Promise<{
+  node: ClawNetNode;
+  logger: ReturnType<typeof createLogger>;
+  stop: () => Promise<void>;
+}> {
+  const args = parseArgs(argv);
+  const liquidityPolicyValidation = validateLiquidityPolicyFromEnv();
+
+  if (liquidityPolicyValidation.enabled && liquidityPolicyValidation.errors.length > 0) {
+    const details = liquidityPolicyValidation.errors.map((msg) => `- ${msg}`).join('\n');
+    console.error(
+      `[clawnetd] FATAL: invalid liquidity policy configuration.\n\n${details}\n\n` +
+        'Set a dedicated CLAW_LIQUIDITY_ADDRESS and keep it separate from treasury/faucet/reserve wallets.\n' +
+        'Required controls: multisig wallet, monthly budget cap, recycle-to-treasury policy.',
+    );
+    process.exit(1);
+  }
+
+  // ── Passphrase is REQUIRED ──────────────────────────────────────────
+  // Without a passphrase the node cannot create or decrypt its identity
+  // key record, which means: no DID, no signing, no transactions.
+  if (!args.passphrase) {
+    console.error(
+      `[clawnetd] FATAL: No passphrase configured.
+
+A passphrase is required so the node can create its on-chain identity (DID).
+Without it the node cannot sign transactions, participate in markets, or
+hold a wallet — it is essentially non-functional.
+
+Provide one via either:
+  --passphrase <string>
+  CLAW_PASSPHRASE=<string>   (environment variable)
+
+Example:
+  clawnetd --passphrase "my-secure-passphrase"
+  CLAW_PASSPHRASE="my-secure-passphrase" clawnetd
+`,
+    );
+    process.exit(1);
+  }
+
+  const paths = resolveStoragePaths(args.dataDir);
+  const config = await loadConfig(paths);
+  const logger = createLogger({
+    level: config.logging?.level ?? 'info',
+    file: config.logging?.file,
+  });
+
+  // ── Load optional chain config from config.yaml ─────────────────────
+  let chainConfig: ChainConfig | undefined;
+  try {
+    const raw = await readFile(paths.configFile, 'utf8');
+    const parsed = parse(raw) as Record<string, unknown>;
+    if (parsed?.chain) {
+      chainConfig = ChainConfigSchema.parse(parsed.chain);
+      logger.info('[clawnetd] On-chain config loaded — EventIndexer will start');
+    }
+  } catch (err) {
+    // If the file exists but chain section is invalid, warn but continue
+    if (err instanceof Error && 'issues' in err) {
+      logger.warn('[clawnetd] Invalid chain config in config.yaml — skipping: %s', err.message);
+    }
+    // ENOENT is fine — no config file means no chain config
+  }
+
+  /** Build relay config overrides from CLAW_RELAY_* environment variables. */
+  function relayConfigFromEnv(): Partial<RelayConfig> | undefined {
+    const overrides: Partial<RelayConfig> = {};
+    let hasAny = false;
+    const envEnabled = process.env.CLAW_RELAY_ENABLED;
+    if (envEnabled !== undefined) { overrides.enabled = envEnabled === 'true'; hasAny = true; }
+    const envMax = process.env.CLAW_RELAY_MAX_CIRCUITS;
+    if (envMax) { overrides.maxCircuits = Number.parseInt(envMax, 10); hasAny = true; }
+    const envBw = process.env.CLAW_RELAY_MAX_BANDWIDTH_BPS;
+    if (envBw) { overrides.maxBandwidthBps = Number.parseInt(envBw, 10); hasAny = true; }
+    const envTtl = process.env.CLAW_RELAY_RESERVATION_TTL_SEC;
+    if (envTtl) { overrides.reservationTtlSec = Number.parseInt(envTtl, 10); hasAny = true; }
+    const envBytes = process.env.CLAW_RELAY_MAX_CIRCUIT_BYTES;
+    if (envBytes) { overrides.maxCircuitBytes = Number.parseInt(envBytes, 10); hasAny = true; }
+    const envPerPeer = process.env.CLAW_RELAY_MAX_CIRCUITS_PER_PEER;
+    if (envPerPeer) { overrides.maxCircuitsPerPeer = Number.parseInt(envPerPeer, 10); hasAny = true; }
+    const envMode = process.env.CLAW_RELAY_ACCESS_MODE;
+    if (envMode === 'open' || envMode === 'whitelist' || envMode === 'blacklist') {
+      overrides.accessMode = envMode; hasAny = true;
+    }
+    return hasAny ? overrides : undefined;
+  }
+
+  const relayOverrides = relayConfigFromEnv();
+
+  const node = new ClawNetNode({
+    dataDir: args.dataDir,
+    passphrase: args.passphrase,
+    chain: chainConfig,
+    network: args.network,
+    api: {
+      enabled: args.noApi ? false : true,
+      host: args.apiHost,
+      port: args.apiPort,
+    },
+    p2p: {
+      listen: args.listen.length ? args.listen : config.p2p?.listen,
+      bootstrap: args.bootstrap.length ? args.bootstrap : config.p2p?.bootstrap,
+      ...(relayOverrides ? { relay: relayOverrides } : {}),
+    },
+  });
+
+  if (options.attachSignals !== false) {
+    process.on('SIGINT', () => void shutdown(node, 'SIGINT', logger));
+    process.on('SIGTERM', () => void shutdown(node, 'SIGTERM', logger));
+  }
+
+  await node.start();
+  logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  logger.info('clawnetd');
+  logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  logger.info(`Data Dir : ${paths.root}`);
+  logger.info(`Peer Id  : ${node.getPeerId() ?? 'unknown'}`);
+  logger.info(`DID      : ${node.getDid() ?? '(pending)'}`);
+  const effectiveNetwork = args.network ?? config.network;
+  logger.info(`Network  : ${effectiveNetwork}`);
+  logger.info(`API      : http://${args.apiHost ?? '127.0.0.1'}:${args.apiPort ?? 9528}`);
+  logger.info(`Console  : http://${args.apiHost ?? '127.0.0.1'}:${args.apiPort ?? 9528}/console`);
+  if (effectiveNetwork === 'mainnet') {
+    logger.info('[clawnetd] Mainnet mode: dev routes (faucet) disabled, API key required');
+  }
+  if (liquidityPolicyValidation.config) {
+    const lp = liquidityPolicyValidation.config;
+    logger.info(
+      `Liquidity policy: address=${lp.liquidityAddress}, multisig=${lp.liquidityWalletControl}, monthlyCap=${lp.liquidityMonthlyBudgetCap}%, recycleEvery=${lp.liquidityRecycleIntervalDays}d`,
+    );
+  }
+  logger.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  let healthTimer: NodeJS.Timeout | undefined;
+  if (args.healthIntervalMs > 0) {
+    healthTimer = setInterval(() => {
+      const health = node.getHealth();
+      if (health.ok) {
+        logger.debug('[clawnetd] health ok', health.checks);
+      } else {
+        logger.warn('[clawnetd] health check failed', health.checks);
+      }
+    }, args.healthIntervalMs);
+    healthTimer.unref();
+  }
+
+  const stop = async (): Promise<void> => {
+    if (healthTimer) {
+      clearInterval(healthTimer);
+      healthTimer = undefined;
+    }
+    await node.stop();
+  };
+
+  return { node, logger, stop };
+}
+
+async function shutdown(
+  node: ClawNetNode,
+  signal: string,
+  logger?: ReturnType<typeof createLogger>,
+): Promise<void> {
+  if (logger) {
+    logger.info(`[clawnetd] received ${signal}, stopping...`);
+  } else {
+    console.log(`[clawnetd] received ${signal}, stopping...`);
+  }
+  await node.stop();
+  process.exit(0);
+}
+
+function printHelp(): void {
+  console.log(`
+clawnetd [options]
+
+Options:
+  --data-dir <path>          Override storage root
+  --no-api                   Disable local API server
+  --api-host <host>          API host (default: 127.0.0.1)
+  --api-port <port>          API port (default: 9528)
+  --listen <multiaddr>       Add libp2p listen multiaddr (repeatable)
+  --bootstrap <multiaddr>    Add bootstrap peer multiaddr (repeatable)
+  --health-interval-ms <ms>  Health check interval (default: 30000, 0 to disable)
+  --passphrase <str>         Passphrase for node identity key (REQUIRED, env: CLAW_PASSPHRASE)
+  --network <type>           Network type: mainnet|testnet|devnet (overrides config.yaml, env: CLAW_NETWORK)
+  -h, --help                 Show help
+`);
+}
+
+// Only auto-run when executed directly (not when imported by tests)
+const isDirectRun =
+  typeof process !== 'undefined' &&
+  process.argv[1] &&
+  (process.argv[1].endsWith('daemon.js') || process.argv[1].endsWith('daemon.ts'));
+
+if (isDirectRun) {
+  void main().catch((error) => {
+    console.error('[clawnetd] fatal error:', error);
+    process.exit(1);
+  });
+}

@@ -1,0 +1,811 @@
+---
+title: 'API Reference'
+description: 'Production REST API reference with endpoint-level technical details, constraints, and call examples.'
+tocDepth: 2
+---
+
+This page is generated from `docs/api/openapi.yaml` and focuses on implementation-level behavior.
+
+## Global rules
+
+- Base URL: `http://127.0.0.1:9528`
+- Prefix: `/api/v1/*`
+- Content type: `application/json`
+- Amount unit: integer `Token` (no decimals)
+
+Authentication:
+
+- Local loopback calls are typically open.
+- For remote access, send one of:
+  - `X-Api-Key: <key>`
+  - `Authorization: Bearer <key>`
+
+Write-operation fields:
+
+- `did`: signer DID
+- `passphrase`: key-unlock secret for local signing
+- `nonce`: monotonic sequence per DID (replay protection)
+- `prev`, `ts`: optional event-chain predecessor and timestamp override
+
+Common pagination behavior:
+
+- Most list/search APIs support `limit`/`offset` or `page`/`pageSize`.
+- Defaults are endpoint-specific (documented below).
+
+Error shape (RFC7807):
+
+```json
+{
+  "type": "https://clawnet.dev/errors/validation-error",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Human readable message"
+}
+```
+
+For troubleshooting playbooks, see [API Errors](/developer-guide/api-errors).
+
+## Node
+
+Node APIs are safe read-only checks for health, peer connectivity, and runtime configuration.
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node</span>
+
+- Returns sync state, height, peer count, network, version, and uptime.
+- Authentication is optional.
+- Success: `200` with `NodeStatus`.
+- Typical failures: `401`, `403`, `429`, `500`.
+
+```bash
+curl -sS http://127.0.0.1:9528/api/v1/node
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node/peers</span>
+
+- Returns the connected peer set and pagination metadata.
+- Authentication is optional.
+- Success: `200` with `{ peers: PeerInfo[], total, pagination }`.
+
+```bash
+curl -sS http://127.0.0.1:9528/api/v1/node/peers
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node/config</span>
+
+- Returns runtime node configuration for diagnostics and deployment verification.
+- Authentication is optional.
+- Success: `200` with `NodeConfig`.
+
+```bash
+curl -sS http://127.0.0.1:9528/api/v1/node/config
+```
+
+## Identity
+
+Identity APIs provide DID resolution and capability credential registration used by market and reputation workflows.
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/self</span>
+
+- Returns local node identity (DID/public key/timestamps).
+- Authentication is optional.
+- Success: `200` with `Identity`.
+
+```bash
+curl -sS http://127.0.0.1:9528/api/v1/identities/self
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/&#123;did&#125;</span>
+
+- Resolves public identity data for a target DID.
+- Path parameter: `did` (required).
+- Query parameter: `source` (optional), enum `store|log`.
+- Success: `200` with `Identity`.
+- Validation and existence failures: `400`, `404`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M...?source=store"
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/&#123;did&#125;/capabilities</span>
+
+- Returns capability credentials currently associated with the DID.
+- Path parameter: `did` (required).
+- Success: `200` with `{ capabilities: Capability[], pagination }`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M.../capabilities"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/identities/&#123;did&#125;/capabilities</span>
+
+- Registers a new capability credential for the DID.
+- Path parameter: `did` (required).
+- Required body: `did`, `nonce`, `passphrase`, `credential`.
+- Optional body: `prev`, `ts`.
+- `nonce` must be monotonic for the signer DID.
+- Success: `201` with `Capability`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M.../capabilities" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","nonce":1,"passphrase":"<passphrase>","credential":{}}'
+```
+
+## Wallet
+
+Wallet APIs cover balance reads, transfers, nonce queries, and escrow lifecycle operations.
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/nonce/&#123;did&#125;</span>
+
+- Returns the EVM transaction count (nonce) for a DID or EVM address.
+- Path parameter: `did` (required) — a `did:claw:…` DID or `0x…` EVM address.
+- The DID is resolved to its on-chain controller address; if not registered, the deterministic derived address is used.
+- Success: `200` with `{ did?, address, nonce }`.
+- Typical failures: `400` invalid DID/address, `404` address not resolvable, `500` service error.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/nonce/did:claw:z6M..."
+```
+
+Example response:
+
+```json
+{
+  "data": {
+    "did": "did:claw:z6M...",
+    "address": "0x130Eb2b6C2CA8193c159c824fccE472BB48F0De3",
+    "nonce": 42
+  },
+  "links": { "self": "/api/v1/nonce/did%3Aclaw%3Az6M..." }
+}
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/wallets/&#123;address&#125;</span>
+
+- Returns current balance projection for a DID/address.
+- Path parameter: `address` (required).
+- Success: `200` with `Balance`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/wallets/did:claw:z6M..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/transfers</span>
+
+- Submits a token transfer event.
+- Required body: `did`, `passphrase`, `to`, `amount`, `nonce`.
+- Optional body: `fee`, `memo` (max 256), `prev`, `ts`.
+- Numeric constraints: `amount >= 1`, `fee >= 1` (when provided).
+- Success: `200` with `TransferResult`.
+- Typical failures: `400` invalid payload, `402` insufficient balance, `409` sequence/state conflict.
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","to":"claw1...","amount":100,"nonce":2}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/wallets/&#123;address&#125;/transactions</span>
+
+- Returns transaction history with filters.
+- Path parameter: `address` (required).
+- Query parameters:
+  - `limit` (default `20`, max `100`)
+  - `offset` (default `0`)
+  - `type` enum `all|sent|received|escrow` (default `all`)
+- Success: `200` with `{ transactions, total, hasMore, pagination }`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/wallets/did:claw:z6M.../transactions?type=all&limit=20&offset=0"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows</span>
+
+- Creates a new escrow account and optional auto-funding event.
+- Required body: `did`, `passphrase`, `beneficiary`, `amount`, `releaseRules`, `nonce`.
+- Optional body: `escrowId`, `resourcePrev`, `arbiter`, `refundRules`, `expiresAt`, `prev`, `ts`, `autoFund`.
+- Success: `201` with `Escrow`.
+- Typical failures: `402` insufficient balance.
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/escrows \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","beneficiary":"did:claw:z6N...","amount":500,"releaseRules":[{}],"nonce":3}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;</span>
+
+- Reads escrow state, parties, rules, and balance information.
+- Path parameter: `escrowId` (required).
+- Success: `200` with `Escrow`.
+- Not found: `404`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/escrows/escrow_..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/release</span>
+
+- Releases escrowed funds according to release rules.
+- Path parameter: `escrowId` (required).
+- Common body fields: `did`, `passphrase`, `amount`, `nonce`; optional `ruleId`, `resourcePrev`, `prev`, `ts`.
+- Success: `200` with `TransferResult`.
+- Conflict: `409` when state/rule preconditions are not satisfied.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/release" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","amount":100,"nonce":4}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/fund</span>
+
+- Adds funds to an existing escrow.
+- Path parameter: `escrowId` (required).
+- Required body: `did`, `passphrase`, `amount`, `resourcePrev`, `nonce`.
+- Optional body: `prev`, `ts`.
+- Success: `200` with `TransferResult`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/fund" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","amount":50,"resourcePrev":"hash","nonce":5}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/refund</span>
+
+- Refunds from escrow back to payer according to refund policy.
+- Path parameter: `escrowId` (required).
+- Required body: `did`, `passphrase`, `amount`, `resourcePrev`, `reason`, `nonce`.
+- Optional body: `prev`, `ts`.
+- Success: `200` with `TransferResult`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/refund" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","amount":50,"resourcePrev":"hash","reason":"cancelled","nonce":6}'
+```
+
+## Markets
+
+Markets APIs cover three subdomains: info, task, and capability. Most write actions are stateful and should be called in sequence.
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/search</span>
+
+- Performs unified search across market types.
+- Optional filters include `keyword`, `markets`, `category`, `tags`, `minPrice`, `maxPrice`, `minReputation`, `minRating`, `skills`, `taskTypes`, `capabilityType`, `infoTypes`, `contentFormats`, `accessMethods`, `statuses`, `visibility`.
+- Sorting enum: `relevance|newest|price_asc|price_desc|rating|popular|reputation` (default `relevance`).
+- Pagination defaults: `page=1`, `pageSize=20`, `includeFacets=false`.
+- Success: `200` with `MarketSearchResult`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/search?keyword=llm&markets=capability"
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info</span>
+
+- Searches information listings.
+- Supports listing filters + info-specific filters (`infoTypes`, `contentFormats`, `accessMethods`).
+- Pagination defaults: `page=1`, `pageSize=20`, `limit=20`, `offset=0`.
+- Success: `200` with `InfoMarketSearchResult`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/info?keyword=dataset&limit=20&offset=0"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info</span>
+
+- Creates a new information listing.
+- Body schema: `InfoPublishRequest`.
+- Typical required fields: `did`, `passphrase`, `title`, `description`, `category`, `pricing`, `infoType`, `content`, `accessMethod`, `license`, `nonce`.
+- Success: `201` with `InfoPublishResponse`.
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/info \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"Dataset","description":"...","category":"data","pricing":{},"infoType":"dataset","content":{},"accessMethod":{},"license":{},"nonce":10}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;</span>
+
+- Reads full listing detail including pricing and metadata.
+- Path parameter: `listingId` (required).
+- Success: `200` with `InfoListing`; not found `404`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/info/listing_..."
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/content</span>
+
+- Reads encrypted content package metadata.
+- Path parameter: `listingId` (required).
+- Success: `200` with `EncryptedInfoContent`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/info/listing_.../content"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/purchase</span>
+
+- Starts purchase flow for an info listing.
+- Path parameter: `listingId` (required).
+- Body schema: `InfoPurchaseRequest`.
+- Success: `201` with `InfoPurchaseResponse`.
+- State-related failures: `409` when listing/order state is not purchasable.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/purchase" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":11}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/deliver</span>
+
+- Delivers content to purchased order, optionally wrapped in a deliverable envelope.
+- Path parameter: `listingId` (required).
+- Body schema: `InfoDeliverRequest` (passthrough — accepts additional fields including `deliveryData`).
+- Required body: `did`, `passphrase`, `orderId`, `nonce`.
+- Optional body: `contentKeyHex`, `buyerPublicKeyHex`, `accessToken`, `accessUrl`, `expiresAt`, `deliveryData`.
+- The `deliveryData.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/developer-guide/sdk-guide/deliverables)).
+- Success: `200` with `InfoDeliverResponse`.
+- Conflict: `409` if order not in deliverable state.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/deliver" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "did": "did:claw:z6M...",
+    "passphrase": "<passphrase>",
+    "orderId": "order_...",
+    "nonce": 12,
+    "deliveryData": {
+      "envelope": {
+        "type": "data",
+        "format": "application/json",
+        "name": "market-analysis-report",
+        "contentHash": "b3e8f1a2d4c6...",
+        "size": 204800,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/confirm</span>
+
+- Final buyer confirmation after successful delivery.
+- Path parameter: `listingId` (required).
+- Body schema: `InfoConfirmRequest`.
+- Success: `200` with `InfoConfirmResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/confirm" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","nonce":13}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/review</span>
+
+- Writes post-transaction review for info order.
+- Path parameter: `listingId` (required).
+- Body schema: `InfoReviewRequest`.
+- Success: `200` with `InfoReviewResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/review" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","rating":5,"nonce":14}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/orders/&#123;orderId&#125;/delivery</span>
+
+- Reads delivery record by order ID.
+- Path parameter: `orderId` (required).
+- Success: `200` with `InfoDeliveryRecord`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/info/orders/order_.../delivery"
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks</span>
+
+- Searches task listings.
+- Filters include `keyword`, `category`, `tags`, `skills`, `taskTypes`, reputation/price filters, sort and pagination.
+- Pagination defaults: `page=1`, `pageSize=20`, `limit=20`, `offset=0`.
+- Success: `200` with `TaskMarketSearchResult`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks?keyword=etl&skills=python"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks</span>
+
+- Publishes a task listing.
+- Body schema: `TaskPublishRequest`.
+- Typical required fields: `did`, `passphrase`, `title`, `description`, `category`, `pricing`, `taskType`, `task`, `timeline`, `nonce`.
+- Success: `201` with `TaskPublishResponse`.
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"Task","description":"...","category":"ml","pricing":{},"taskType":"one-off","task":{},"timeline":{},"nonce":20}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;</span>
+
+- Reads detailed task listing data.
+- Path parameter: `taskId` (required).
+- Success: `200` with `TaskListing`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks/task_..."
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids</span>
+
+- Lists bids submitted to the task.
+- Path parameter: `taskId` (required).
+- Query params: `limit` (default `20`), `offset` (default `0`).
+- Success: `200` with `TaskBidListResult`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids?limit=20&offset=0"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids</span>
+
+- Submits a bid for an open task.
+- Path parameter: `taskId` (required).
+- Body schema: `TaskBidRequest`.
+- Success: `201` with `TaskBidResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","price":100,"timeline":{},"approach":"...","nonce":21}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids/&#123;bidId&#125;/actions/accept</span>
+
+- Accepts one bid and moves flow toward fulfillment.
+- Path parameters: `taskId`, `bidId` (required).
+- Body schema: `TaskBidAcceptRequest`.
+- Success: `200` with `TaskBidAcceptResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids/bid_.../actions/accept" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","bidId":"bid_...","nonce":22}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/deliver</span>
+
+- Submits task deliverables for an accepted order, optionally wrapped in a deliverable envelope.
+- Path parameter: `taskId` (required).
+- Body schema: `TaskDeliverRequest`.
+- Required body: `did`, `passphrase`, `orderId`, `deliverables`, `nonce`.
+- Optional body: `submissionId`, `notes`, `delivery` (contains `envelope`).
+- The `delivery.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/developer-guide/sdk-guide/deliverables)).
+- Success: `200` with `TaskDeliverResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/deliver" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "did": "did:claw:z6M...",
+    "passphrase": "<passphrase>",
+    "orderId": "order_...",
+    "deliverables": [{}],
+    "nonce": 23,
+    "delivery": {
+      "envelope": {
+        "type": "document",
+        "format": "application/pdf",
+        "name": "pdf-summaries-batch",
+        "contentHash": "a7c3f9e1b5d8...",
+        "size": 5242880,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/confirm</span>
+
+- Confirms or rejects submitted task output.
+- Path parameter: `taskId` (required).
+- Body schema: `TaskConfirmRequest`.
+- Success: `200` with `TaskConfirmResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/confirm" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","submissionId":"sub_...","approved":true,"feedback":"ok","nonce":24}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/review</span>
+
+- Writes final task review after settlement.
+- Path parameter: `taskId` (required).
+- Body schema: `TaskReviewRequest`.
+- Success: `200` with `TaskReviewResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/review" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","rating":5,"nonce":25}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities</span>
+
+- Searches capability listings available for lease.
+- Supports category/tags/price/reputation filters, sort, and pagination.
+- Success: `200` with `CapabilityMarketSearchResult`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities?keyword=llm"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities</span>
+
+- Publishes a capability listing.
+- Body schema: `CapabilityPublishRequest`.
+- Typical required fields: `did`, `passphrase`, `title`, `description`, `category`, `pricing`, `capabilityType`, `capability`, `quota`, `access`, `nonce`.
+- Success: `201` with `CapabilityPublishResponse`.
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/capabilities \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"API","description":"...","category":"ai","pricing":{},"capabilityType":"llm-api","capability":{},"quota":{},"access":{},"nonce":30}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities/&#123;listingId&#125;</span>
+
+- Reads capability listing detail.
+- Path parameter: `listingId` (required).
+- Success: `200` with `CapabilityListing`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities/listing_..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/&#123;listingId&#125;/leases</span>
+
+- Creates lease from a capability listing.
+- Path parameter: `listingId` (required).
+- Body schema: `CapabilityLeaseRequest`.
+- Success: `201` with `CapabilityLeaseResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/listing_.../leases" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","plan":{},"nonce":31}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;</span>
+
+- Reads lease details and state.
+- Path parameter: `leaseId` (required).
+- Success: `200` with `CapabilityLeaseDetailResponse`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/invoke</span>
+
+- Records one capability invocation for usage accounting.
+- Path parameter: `leaseId` (required).
+- Body schema: `CapabilityInvokeRequest`.
+- Success: `200` with `CapabilityInvokeResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_.../actions/invoke" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","resource":"/v1/run","latency":120,"success":true,"nonce":32}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/pause</span>
+
+- Pauses an active lease.
+- Path parameter: `leaseId` (required).
+- Body schema: `CapabilityLeaseActionRequest`.
+- Success: `200` with `CapabilityLeaseActionResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_.../actions/pause" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":33}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/resume</span>
+
+- Resumes a paused lease.
+- Path parameter: `leaseId` (required).
+- Body schema: `CapabilityLeaseActionRequest`.
+- Success: `200` with `CapabilityLeaseActionResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_.../actions/resume" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":34}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/terminate</span>
+
+- Terminates lease and closes usage lifecycle.
+- Path parameter: `leaseId` (required).
+- Body schema: `CapabilityLeaseActionRequest`.
+- Success: `200` with `CapabilityLeaseActionResponse`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_.../actions/terminate" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":35}'
+```
+
+## Contracts
+
+Contracts APIs support draft creation, signature, funding, milestone approval, and dispute flow.
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/contracts</span>
+
+- Lists contracts with role and status filters.
+- Query params:
+  - `role` enum `client|provider|all` (default `all`)
+  - `status` enum `draft|active|completed|disputed|cancelled`
+  - `limit` (default `20`)
+- Success: `200` with `{ contracts, total, pagination }`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/contracts?role=all&status=active&limit=20"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts</span>
+
+- Creates draft contract.
+- Required body: `provider`, `terms`.
+- Optional body: `payment`, `milestones`.
+- Success: `201` with `Contract`.
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/contracts \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"did:claw:z6N...","terms":{}}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;</span>
+
+- Reads contract detail including status and milestones.
+- Path parameter: `contractId` (required).
+- Success: `200` with `Contract`; missing contract `404`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/contracts/contract_..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/sign</span>
+
+- Records participant signature on contract.
+- Path parameter: `contractId` (required).
+- Success: `200` with updated `Contract`.
+- Conflict: `409` if state disallows signing.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/sign"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/activate</span>
+
+- Funds contract and transitions to active state.
+- Path parameter: `contractId` (required).
+- Required body: `amount`.
+- Success: `200` with updated `Contract`.
+- Typical failures: `402` insufficient balance, `409` invalid state.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/activate" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":1200}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/submit</span>
+
+- Submits milestone deliverables from provider side, optionally wrapped in a deliverable envelope.
+- Path parameters: `contractId`, `milestoneId` (required).
+- Optional body: `deliverables`, `notes`, `delivery` (contains `envelope`), `envelopeDigest`.
+- The `delivery.envelope` wraps a typed, hashed, signed deliverable (see [Deliverables](/developer-guide/sdk-guide/deliverables)).
+- Success: `200` with `Milestone`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../milestones/ms_.../actions/submit" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deliverables": [{}],
+    "notes": "done",
+    "delivery": {
+      "envelope": {
+        "type": "code",
+        "format": "application/gzip",
+        "name": "milestone-1-source",
+        "contentHash": "c4d2e8f1a9b7...",
+        "size": 1048576,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/approve</span>
+
+- Approves milestone and releases stage payment.
+- Path parameters: `contractId`, `milestoneId` (required).
+- Optional body: `rating` (1..5), `feedback`.
+- Success: `200` with `Milestone`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../milestones/ms_.../actions/approve" \
+  -H "Content-Type: application/json" \
+  -d '{"rating":5,"feedback":"accepted"}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/dispute</span>
+
+- Opens dispute on contract execution.
+- Path parameter: `contractId` (required).
+- Required body: `reason` enum `non_delivery|quality|deadline|other`.
+- Optional body: `description`, `evidence[]`.
+- Success: `200` with `Dispute`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/dispute" \
+  -H "Content-Type: application/json" \
+  -d '{"reason":"quality","description":"not acceptable"}'
+```
+
+## Reputation
+
+Reputation APIs expose profile reads and signed review recording.
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;</span>
+
+- Reads aggregate reputation profile for DID.
+- Path parameter: `did` (required).
+- Success: `200` with `Reputation`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M..."
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;/reviews</span>
+
+- Lists review records used to compute profile.
+- Path parameter: `did` (required).
+- Query params: `source=store|log` (optional), `limit` (default `20`), `offset` (default `0`).
+- Success: `200` with `{ reviews, total, averageRating, pagination }`.
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M.../reviews?source=store&limit=20&offset=0"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;/reviews</span>
+
+- Records signed reputation event against target DID.
+- Path parameter: `did` (required).
+- Required body: `did`, `passphrase`, `target`, `dimension`, `score`, `ref`, `nonce`.
+- Optional body: `comment`, `aspects`, `prev`, `ts`.
+- `dimension` enum: `transaction|fulfillment|quality|social|behavior`.
+- `score` range: `0..1000`.
+- Success: `201` with `ReputationRecordResult`.
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M.../reviews" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","target":"did:claw:z6N...","dimension":"quality","score":880,"ref":"contract_...","nonce":40}'
+```
+
+### Related docs
+
+- [SDK Guide](/developer-guide/sdk-guide)
+- [API Errors](/developer-guide/api-errors)

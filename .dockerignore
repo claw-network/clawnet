@@ -1,0 +1,17 @@
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.git
+.github
+*.md
+!README.md
+docs/
+issues/
+examples/
+packages/sdk-python/
+*.test.ts
+*.test.js
+vitest.config.*
+.eslintrc*
+.prettier*
+.vscode
