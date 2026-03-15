@@ -12,6 +12,8 @@ infra/mainnet/
 infra/shared/
 infra/besu/
 infra/README.md
+infra/TOKEN_DISTRIBUTION.md
+infra/ARCHITECTURE_OVERVIEW.md
 
 # Deployment skills (contain server-specific procedures)
 skills/

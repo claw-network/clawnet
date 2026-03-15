@@ -30,6 +30,7 @@ jobs:
           # 2. Remove private directories and files
           rm -rf docs skills issues temp
           rm -rf infra/testnet infra/mainnet infra/shared infra/besu infra/README.md
+          rm -f infra/TOKEN_DISTRIBUTION.md infra/ARCHITECTURE_OVERVIEW.md
           rm -f .public-sync-ignore
           rm -f .github/copilot-instructions.md
 
