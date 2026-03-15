@@ -1,0 +1,131 @@
+name: Sync to Public Repo
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Prepare public content
+        run: |
+          set -euo pipefail
+
+          # Read exclusion list and remove private paths
+          while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ -z "$line" || "$line" == \#* ]] && continue
+            # Skip negation lines (handled separately)
+            [[ "$line" == \!* ]] && continue
+            echo "Removing: $line"
+            rm -rf $line
+          done < .public-sync-ignore
+
+          # Re-include negated paths by restoring them from git
+          while IFS= read -r line; do
+            [[ "$line" != \!* ]] && continue
+            path="${line#!}"
+            echo "Restoring: $path"
+            git checkout HEAD -- "$path" 2>/dev/null || true
+          done < .public-sync-ignore
+
+          # Replace copilot instructions with public version
+          if [[ -f .github/copilot-instructions.public.md ]]; then
+            cp .github/copilot-instructions.public.md .github/copilot-instructions.md
+            rm .github/copilot-instructions.public.md
+          fi
+
+          # Remove the sync-ignore file itself (not needed in public repo)
+          rm -f .public-sync-ignore
+
+          # Remove this workflow (not needed in public repo)
+          rm -f .github/workflows/sync-public.yml
+
+          echo "=== Public content prepared ==="
+          echo "Remaining top-level dirs:"
+          ls -d */ .github/ 2>/dev/null || true
+
+      - name: Verify no secrets leaked
+        run: |
+          set -euo pipefail
+          LEAKED=0
+
+          # Check for known secret patterns (partial matches to avoid false positives)
+          for pattern in \
+            "G66tdTcmvBz" \
+            "401ca444cbe821f7" \
+            "b82233d82380d025" \
+            "47853887d009" \
+            "60f6c6e78e61" \
+            "d862dbdcbc54" \
+            "b6dc8fbb1fec" \
+            "EozRApYGFxDx" \
+            "VLwttmyiMnzZ" \
+            "clawnet-86a288c9"; do
+            if grep -rq "$pattern" . --include='*.md' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.ts' --include='*.js' --include='*.sh' --include='*.env' 2>/dev/null; then
+              echo "LEAK DETECTED: pattern '$pattern' found in public content!"
+              grep -rl "$pattern" . --include='*.md' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.ts' --include='*.js' --include='*.sh' --include='*.env' 2>/dev/null
+              LEAKED=1
+            fi
+          done
+
+          if [[ $LEAKED -eq 1 ]]; then
+            echo "::error::Secret leak detected! Aborting sync."
+            exit 1
+          fi
+          echo "✅ No secrets detected in public content."
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "ClawNet Bot"
+          git config --global user.email "bot@clawnetd.com"
+
+      - name: Push to public repo
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.PUBLIC_REPO_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$SSH_DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+
+          PUBLIC_REPO="git@github.com:claw-network/clawnet.git"
+
+          # Create a fresh commit with only public content
+          rm -rf .git
+          git init -b main
+          git add -A
+          git commit -m "sync: $(git log -1 --format='%H %s' 2>/dev/null || echo 'initial')"
+
+          # Force push to public repo (single-commit history)
+          git remote add public "$PUBLIC_REPO"
+          git push public main --force
+
+          # Sync tag if this is a tag push
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            git tag "$TAG"
+            git push public "$TAG" --force
+          fi
+
+          echo "✅ Synced to public repo"
+
+          # Cleanup
+          rm -f ~/.ssh/deploy_key
