@@ -5,7 +5,7 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: process.env.VITE_BASE_PATH || '/console/',
+  base: process.env.VITE_BASE_PATH || '/',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
