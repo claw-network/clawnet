@@ -14,7 +14,7 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { api } from '@/lib/api';
-import { ShieldCheck, Loader2, Copy, Check } from 'lucide-react';
+import { ShieldCheck, Loader2, Copy, Check, X } from 'lucide-react';
 
 interface SetupResponse {
   secret: string;
@@ -90,6 +90,18 @@ export function TotpSetupPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="flex w-full max-w-md flex-col gap-6">
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground"
+            onClick={() => navigate(-1)}
+            title="Close"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
         <FieldGroup>
           <div className="flex flex-col items-center gap-2 text-center">
             <div className="flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
