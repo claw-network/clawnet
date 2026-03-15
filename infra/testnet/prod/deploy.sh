@@ -232,12 +232,29 @@ systemctl restart clawnetd"
   echo "  [$host] clawnetd active."
 }
 
-# Deploy docs site (Next.js + Fumadocs) as a systemd service on the primary server
-install_docs_service() {
+# Deploy Caddy reverse proxy config and all web apps (homepage, wallet, console, docs)
+install_caddy_and_webapps() {
   local host="$1"
-  local docs_domain="$2"
 
-  echo "  [$host] Building docs site..."
+  # 1. Deploy the full Caddyfile from repo
+  echo "  [$host] Deploying Caddyfile..."
+  scp_to "$SCRIPT_DIR/../../testnet/Caddyfile" "$host" "/etc/caddy/Caddyfile"
+  run_remote "$host" "mkdir -p /var/log/caddy && chown caddy:caddy /var/log/caddy"
+
+  # 2. Build homepage
+  echo "  [$host] Building homepage..."
+  run_remote "$host" "cd /opt/clawnet && pnpm --filter @claw-network/homepage build"
+
+  # 3. Build wallet
+  echo "  [$host] Building wallet..."
+  run_remote "$host" "cd /opt/clawnet && pnpm --filter @claw-network/wallet build"
+
+  # 4. Build console (standalone mode — served at root of console.clawnetd.com)
+  echo "  [$host] Building console (standalone mode)..."
+  run_remote "$host" "cd /opt/clawnet && VITE_BASE_PATH=/ pnpm --filter @claw-network/console build"
+
+  # 5. Build and deploy docs (Next.js — needs systemd service, not just static files)
+  echo "  [$host] Building docs..."
   run_remote "$host" "cd /opt/clawnet && pnpm --filter docs build"
 
   echo "  [$host] Installing clawnet-docs.service..."
@@ -267,48 +284,14 @@ systemctl restart clawnet-docs"
   run_remote "$host" "sleep 3 && curl -sf -o /dev/null http://localhost:3001"
   echo "  [$host] clawnet-docs active on port 3001."
 
-  # Add docs reverse proxy block to Caddyfile if not already present
-  local HAS_DOCS_BLOCK
-  HAS_DOCS_BLOCK=$(run_remote "$host" "grep -c '$docs_domain' /etc/caddy/Caddyfile 2>/dev/null || echo 0")
-  if [[ "$HAS_DOCS_BLOCK" == "0" ]]; then
-    echo "  [$host] Adding $docs_domain to Caddyfile..."
-    run_remote "$host" "cat >> /etc/caddy/Caddyfile << 'CADDYEOF'
+  # 6. Ensure install.sh directory exists for homepage
+  run_remote "$host" "mkdir -p /var/www/clawnetd"
 
-# ── Documentation Site ───────────────────────────────────────────────────────
-$docs_domain {
-    reverse_proxy localhost:3001 {
-        transport http {
-            read_timeout  30s
-            write_timeout 30s
-        }
-    }
-
-    header {
-        Strict-Transport-Security \"max-age=63072000; includeSubDomains\"
-        X-Content-Type-Options    nosniff
-        X-Frame-Options           SAMEORIGIN
-        Referrer-Policy           strict-origin-when-cross-origin
-        -Server
-    }
-
-    log {
-        output file /var/log/caddy/docs-access.log {
-            roll_size 50mb
-            roll_keep 5
-        }
-    }
-}
-CADDYEOF"
-  else
-    echo "  [$host] Caddyfile already contains $docs_domain, skipping."
-  fi
-
-  # Ensure log file has correct ownership
-  run_remote "$host" "touch /var/log/caddy/docs-access.log && chown caddy:caddy /var/log/caddy/docs-access.log"
-
+  # 7. Reload Caddy
   echo "  [$host] Reloading Caddy..."
-  run_remote "$host" "systemctl reload caddy || systemctl restart caddy"
-  echo "  [$host] Docs deployment complete ($docs_domain → localhost:3001)."
+  run_remote "$host" "caddy fmt --overwrite /etc/caddy/Caddyfile && systemctl reload caddy || systemctl restart caddy"
+
+  echo "  [$host] Caddy + all web apps deployed."
 }
 
 echo ">>> Phase 0: Preflight checks..."
@@ -864,11 +847,11 @@ echo "  Server B/C clawnetd deployed and managed by systemd."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
-# Phase 15: Deploy documentation site on Server A
+# Phase 15: Deploy Caddy + all web apps on Server A
 # ══════════════════════════════════════════════════════════════════
-echo ">>> Phase 15: Deploying documentation site on Server A..."
-install_docs_service "$SERVER_A" "docs.clawnetd.com"
-echo "  Documentation site deployed."
+echo ">>> Phase 15: Deploying Caddy + web apps (homepage, wallet, console, docs) on Server A..."
+install_caddy_and_webapps "$SERVER_A"
+echo "  All web apps deployed."
 echo ""
 
 # ══════════════════════════════════════════════════════════════════
