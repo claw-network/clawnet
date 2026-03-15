@@ -128,6 +128,18 @@ export class EventIndexer {
     const latest = await this.contracts.provider.getBlockNumber();
     let from = this.store.lastIndexedBlock + 1;
 
+    // If the stored pointer is ahead of the chain (e.g. chain was reset),
+    // reset to block 0 so we don't miss any events.
+    if (this.store.lastIndexedBlock > latest) {
+      this.log.warn(
+        'Indexer pointer (%d) is ahead of chain (%d) — chain reset detected, rewinding to block 0',
+        this.store.lastIndexedBlock,
+        latest,
+      );
+      this.store.lastIndexedBlock = 0;
+      from = 0;
+    }
+
     if (from > latest) return;
 
     this.log.debug('Catching up: blocks %d → %d', from, latest);
