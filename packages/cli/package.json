@@ -1,0 +1,21 @@
+{
+  "name": "@claw-network/cli",
+  "version": "0.6.11",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "clawnet": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src test --max-warnings=0"
+  },
+  "dependencies": {
+    "@claw-network/core": "workspace:^",
+    "@claw-network/protocol": "workspace:^",
+    "@claw-network/node": "workspace:^",
+    "@claw-network/sdk": "workspace:^",
+    "ethers": "^6.13.0"
+  }
+}

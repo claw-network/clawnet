@@ -1,0 +1,204 @@
+# ClawNet Relay Reward Integration Test — Docker Compose
+# ============================================================================
+# Extends the base testnet with a Besu dev chain for full e2e relay reward
+# testing (Layer 4 verification).
+#
+# Usage:
+#   # 1. Start chain + nodes
+#   docker compose -f docker-compose.relay-test.yml up --build -d
+#
+#   # 2. Deploy contracts (from host, after chain is healthy)
+#   ./scripts/setup-relay-test.sh
+#
+#   # 3. Run relay reward integration test
+#   node scripts/scenario-relay-reward.mjs --verbose
+#
+#   # 4. Tear down
+#   docker compose -f docker-compose.relay-test.yml down -v
+#
+# Network topology:
+#   besu-dev (chain) ← bootstrap ← peer1, peer2
+#   All nodes share the same chain via besu-dev:8545
+#
+# API endpoints:
+#   bootstrap: http://localhost:9528
+#   peer1:     http://localhost:9530
+#   peer2:     http://localhost:9532
+#   chain RPC: http://localhost:8545
+# ============================================================================
+
+services:
+  # ── Besu Dev Chain ─────────────────────────────────────────────────────
+  besu-dev:
+    image: hyperledger/besu:24.12.2
+    container_name: claw-besu-dev
+    hostname: besu-dev
+    ports:
+      - "8545:8545"
+    environment:
+      JAVA_OPTS: "-Xmx2g"
+    entrypoint:
+      - besu
+      - --network=dev
+      - --data-path=/data
+      - --miner-enabled
+      - --miner-coinbase=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - --rpc-http-enabled
+      - --rpc-http-host=0.0.0.0
+      - --rpc-http-port=8545
+      - --rpc-http-api=ETH,NET,WEB3,TXPOOL,DEBUG,ADMIN
+      - --rpc-http-cors-origins=*
+      - --host-allowlist=*
+      - --min-gas-price=0
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8545'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - besu-dev-data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+          cpus: '2.0'
+    networks:
+      - clawnet
+
+  # ── Bootstrap / Seed Node ──────────────────────────────────────────────
+  bootstrap:
+    build: .
+    container_name: claw-bootstrap
+    hostname: bootstrap
+    ports:
+      - "9528:9528"
+      - "9529:9527"
+    volumes:
+      - bootstrap-data:/data
+      - ./localdev/relay-test-config:/config:ro
+      - ./packages/contracts/artifacts:/app/packages/contracts/artifacts:ro
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=testnet-dev-passphrase
+      - CLAW_RELAY_ENABLED=true
+      - DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+      - NODE_ENV=development
+    command:
+      - sh
+      - -c
+      - |
+        if [ -f /config/config.yaml ]; then
+          mkdir -p /data && cp /config/config.yaml /data/config.yaml;
+        fi
+        exec node packages/node/dist/daemon.js --data-dir /data --api-host 0.0.0.0 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527 --health-interval-ms 10000
+    depends_on:
+      besu-dev:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/v1/node"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - clawnet
+
+  # ── Peer Node 1 ────────────────────────────────────────────────────────
+  peer1:
+    build: .
+    container_name: claw-peer1
+    hostname: peer1
+    ports:
+      - "9530:9528"
+      - "9531:9527"
+    volumes:
+      - peer1-data:/data
+      - ./localdev/relay-test-config:/config:ro
+      - ./packages/contracts/artifacts:/app/packages/contracts/artifacts:ro
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=testnet-dev-passphrase
+      - CLAW_RELAY_ENABLED=true
+      - DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+      - NODE_ENV=development
+    command:
+      - sh
+      - -c
+      - |
+        if [ -f /config/config.yaml ]; then
+          mkdir -p /data && cp /config/config.yaml /data/config.yaml;
+        fi
+        exec entrypoint-peer.sh --bootstrap-api http://bootstrap:9528 --data-dir /data --api-host 0.0.0.0 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527 --health-interval-ms 10000
+    depends_on:
+      bootstrap:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/v1/node"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - clawnet
+
+  # ── Peer Node 2 ────────────────────────────────────────────────────────
+  peer2:
+    build: .
+    container_name: claw-peer2
+    hostname: peer2
+    ports:
+      - "9532:9528"
+      - "9533:9527"
+    volumes:
+      - peer2-data:/data
+      - ./localdev/relay-test-config:/config:ro
+      - ./packages/contracts/artifacts:/app/packages/contracts/artifacts:ro
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      - CLAW_DATA_DIR=/data
+      - CLAW_PASSPHRASE=testnet-dev-passphrase
+      - CLAW_RELAY_ENABLED=true
+      - DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+      - NODE_ENV=development
+    command:
+      - sh
+      - -c
+      - |
+        if [ -f /config/config.yaml ]; then
+          mkdir -p /data && cp /config/config.yaml /data/config.yaml;
+        fi
+        exec entrypoint-peer.sh --bootstrap-api http://bootstrap:9528 --data-dir /data --api-host 0.0.0.0 --api-port 9528 --listen /ip4/0.0.0.0/tcp/9527 --health-interval-ms 10000
+    depends_on:
+      bootstrap:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9528/api/v1/node"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - clawnet
+
+volumes:
+  besu-dev-data:
+    driver: local
+  bootstrap-data:
+    driver: local
+  peer1-data:
+    driver: local
+  peer2-data:
+    driver: local
+
+networks:
+  clawnet:
+    driver: bridge

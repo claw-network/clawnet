@@ -1,0 +1,24 @@
+services:
+  besu:
+    image: ${CLAWNET_BESU_IMAGE:-clawnet/besu-ed25519:dev}
+    container_name: clawnet-besu-ed25519-dev
+    restart: unless-stopped
+    ports:
+      - "${BESU_HTTP_PORT:-8545}:8545/tcp"
+      - "30303:30303/tcp"
+      - "30303:30303/udp"
+    volumes:
+      - ./data:/data
+    entrypoint:
+      - besu
+      - --network=dev
+      - --data-path=/data
+      - --rpc-http-enabled
+      - --rpc-http-host=0.0.0.0
+      - --rpc-http-port=8545
+      - --rpc-http-api=ETH,NET,WEB3,TXPOOL,DEBUG,ADMIN,QBFT
+      - --rpc-http-cors-origins=*
+      - --host-allowlist=*
+      - --min-gas-price=0
+      - --miner-enabled
+      - --miner-coinbase=0x0000000000000000000000000000000000000000

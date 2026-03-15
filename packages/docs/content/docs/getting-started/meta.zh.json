@@ -1,0 +1,5 @@
+{
+  "title": "快速上手",
+  "defaultOpen": true,
+  "pages": ["quick-start", "deployment", "core-concepts", "faq"]
+}

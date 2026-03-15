@@ -1,0 +1,54 @@
+{
+  "name": "@claw-network/protocol",
+  "version": "0.6.11",
+  "description": "Protocol definitions and event envelopes for the ClawNet network",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/claw-network/clawnet.git",
+    "directory": "packages/protocol"
+  },
+  "keywords": [
+    "clawnet",
+    "agent",
+    "decentralized",
+    "protocol"
+  ],
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./p2p": {
+      "types": "./dist/p2p/index.d.ts",
+      "default": "./dist/p2p/index.js"
+    },
+    "./identity": {
+      "types": "./dist/identity/index.d.ts",
+      "default": "./dist/identity/index.js"
+    },
+    "./messaging": {
+      "types": "./dist/messaging/index.d.ts",
+      "default": "./dist/messaging/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint src test --max-warnings=0"
+  },
+  "dependencies": {
+    "@claw-network/core": "workspace:^",
+    "flatbuffers": "^24.3.25"
+  }
+}

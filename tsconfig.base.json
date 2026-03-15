@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "useDefineForClassFields": true,
+    "paths": {
+      "@claw-network/core": ["packages/core/src/index.ts"],
+      "@claw-network/core/*": ["packages/core/src/*"],
+      "@claw-network/protocol": ["packages/protocol/src/index.ts"],
+      "@claw-network/protocol/*": ["packages/protocol/src/*"],
+      "@claw-network/node": ["packages/node/src/index.ts"],
+      "@claw-network/sdk": ["packages/sdk/src/index.ts"],
+      "@claw-network/contracts": ["packages/contracts/typechain-types"]
+    }
+  }
+}

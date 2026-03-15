@@ -1,0 +1,15 @@
+{
+  "title": "核心概念",
+  "defaultOpen": true,
+  "pages": [
+    "identity",
+    "token",
+    "wallet",
+    "markets",
+    "deliverables",
+    "service-contracts",
+    "smart-contracts",
+    "reputation",
+    "dao"
+  ]
+}

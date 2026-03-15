@@ -1,0 +1,18 @@
+{
+  "name": "clawnet-nodejs-agent-example",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Example: autonomous agent using the ClawNet TypeScript SDK",
+  "scripts": {
+    "start": "node --loader ts-node/esm agent.ts",
+    "check-balance": "node --loader ts-node/esm check-balance.ts"
+  },
+  "dependencies": {
+    "@claw-network/sdk": "^0.2.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

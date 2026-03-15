@@ -1,0 +1,218 @@
+#!/bin/bash
+#
+# pre-push hook — block push unless build + tests pass
+#
+# Skip:  git push --no-verify
+#        SKIP_TESTS=1 git push
+#
+
+# ── allow skipping ──────────────────────────────────────────────
+if [ "${SKIP_TESTS:-0}" = "1" ]; then
+  echo "⚠️  SKIP_TESTS=1 — skipping pre-push tests"
+  exit 0
+fi
+
+# ── colours (disabled when not a tty) ──────────────────────────
+if [ -t 1 ]; then
+  BOLD="\033[1m"
+  DIM="\033[2m"
+  RED="\033[31m"
+  GREEN="\033[32m"
+  YELLOW="\033[33m"
+  CYAN="\033[36m"
+  RESET="\033[0m"
+else
+  BOLD="" DIM="" RED="" GREEN="" YELLOW="" CYAN="" RESET=""
+fi
+
+# ── package list (keep in dependency order) ─────────────────────
+PACKAGES=(
+  "core"
+  "protocol"
+  "contracts"
+  "node"
+  "sdk"
+  "cli"
+)
+
+TOTAL=${#PACKAGES[@]}
+PASSED=0
+FAILED=0
+FAILED_NAMES=""
+TOTAL_START=$(date +%s)
+
+# ── banner ──────────────────────────────────────────────────────
+echo ""
+echo -e "${BOLD}🔒 Pre-push: lint + build + test + contracts + integration${RESET}"
+echo -e "${DIM}   Skip with: git push --no-verify${RESET}"
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+
+# ── phase 1: lint ───────────────────────────────────────────────
+echo -e "${BOLD}🔍 Phase 1/4 — Lint${RESET}"
+LINT_START=$(date +%s)
+LINT_LOG=$(mktemp)
+
+printf "  %-28s " "pnpm lint"
+
+pnpm lint > "$LINT_LOG" 2>&1
+LINT_EC=$?
+LINT_END=$(date +%s)
+LINT_SECS=$((LINT_END - LINT_START))
+
+if [ $LINT_EC -eq 0 ]; then
+  echo -e "${GREEN}✅ passed${RESET} ${DIM}(${LINT_SECS}s)${RESET}"
+else
+  echo -e "${RED}❌ LINT FAILED${RESET} ${DIM}(${LINT_SECS}s)${RESET}"
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  tail -40 "$LINT_LOG" | sed 's/^/    /'
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  rm -f "$LINT_LOG"
+  echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${RED}${BOLD}❌ Lint failed${RESET}"
+  echo -e "   Push aborted. Fix lint errors and try again."
+  echo ""
+  exit 1
+fi
+rm -f "$LINT_LOG"
+echo ""
+
+# ── phase 2: build ──────────────────────────────────────────────
+BUILD_FAILED=0
+BUILD_FAILED_NAMES=""
+echo -e "${BOLD}📦 Phase 2/4 — Build${RESET}"
+
+BUILD_IDX=0
+for PKG in "${PACKAGES[@]}"; do
+  BUILD_IDX=$((BUILD_IDX + 1))
+  FILTER="@claw-network/${PKG}"
+  BUILD_START=$(date +%s)
+
+  printf "  ${DIM}[%d/%d]${RESET} %-28s " "$BUILD_IDX" "$TOTAL" "$FILTER"
+
+  BUILD_LOG=$(mktemp)
+
+  # contracts uses "compile" (hardhat); others use "build" (tsc)
+  if [ "$PKG" = "contracts" ]; then
+    BUILD_CMD="compile"
+  else
+    BUILD_CMD="build"
+  fi
+
+  pnpm --filter "$FILTER" "$BUILD_CMD" > "$BUILD_LOG" 2>&1
+  BUILD_EC=$?
+  BUILD_END=$(date +%s)
+  BUILD_SECS=$((BUILD_END - BUILD_START))
+
+  if [ $BUILD_EC -eq 0 ]; then
+    echo -e "${GREEN}✅ built${RESET} ${DIM}(${BUILD_SECS}s)${RESET}"
+  else
+    BUILD_FAILED=$((BUILD_FAILED + 1))
+    BUILD_FAILED_NAMES="${BUILD_FAILED_NAMES}  • ${FILTER}\n"
+    echo -e "${RED}❌ BUILD FAILED${RESET} ${DIM}(${BUILD_SECS}s)${RESET}"
+    echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+    tail -30 "$BUILD_LOG" | sed 's/^/    /'
+    echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  fi
+  rm -f "$BUILD_LOG"
+done
+
+if [ $BUILD_FAILED -gt 0 ]; then
+  TOTAL_END=$(date +%s)
+  TOTAL_SECS=$((TOTAL_END - TOTAL_START))
+  echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${RED}${BOLD}❌ ${BUILD_FAILED} package(s) failed to build${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+  echo -e "${RED}${BUILD_FAILED_NAMES}${RESET}"
+  echo -e "   Push aborted. Fix the build errors and try again."
+  echo ""
+  exit 1
+fi
+
+echo ""
+
+# ── phase 3: test ───────────────────────────────────────────────
+echo -e "${BOLD}🧪 Phase 3/4 — Test${RESET}"
+IDX=0
+for PKG in "${PACKAGES[@]}"; do
+  IDX=$((IDX + 1))
+  FILTER="@claw-network/${PKG}"
+  PKG_START=$(date +%s)
+
+  # Print progress header (no newline — will append result)
+  printf "  ${DIM}[%d/%d]${RESET} %-28s " "$IDX" "$TOTAL" "$FILTER"
+
+  # Run test, capture output and exit code
+  LOG=$(mktemp)
+  pnpm --filter "$FILTER" test > "$LOG" 2>&1
+  EC=$?
+  PKG_END=$(date +%s)
+  PKG_SECS=$((PKG_END - PKG_START))
+
+  if [ $EC -eq 0 ]; then
+    PASSED=$((PASSED + 1))
+    echo -e "${GREEN}✅ passed${RESET} ${DIM}(${PKG_SECS}s)${RESET}"
+  else
+    FAILED=$((FAILED + 1))
+    FAILED_NAMES="${FAILED_NAMES}  • ${FILTER}\n"
+    echo -e "${RED}❌ FAILED${RESET} ${DIM}(${PKG_SECS}s)${RESET}"
+    # Show last 30 lines of failed output for diagnosis
+    echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+    tail -30 "$LOG" | sed 's/^/    /'
+    echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  fi
+  rm -f "$LOG"
+done
+
+# ── summary ─────────────────────────────────────────────────────
+TOTAL_END=$(date +%s)
+TOTAL_SECS=$((TOTAL_END - TOTAL_START))
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+
+if [ $FAILED -gt 0 ]; then
+  echo -e "${RED}${BOLD}❌ ${FAILED} package(s) failed tests${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+  echo -e "${RED}${FAILED_NAMES}${RESET}"
+  echo -e "   Push aborted. Fix the failing tests and try again."
+  echo ""
+  exit 1
+fi
+
+echo ""
+
+# ── phase 4: integration test ───────────────────────────────────
+TESTNET_URL="${CLAWNET_TESTNET_URL:-https://api.clawnetd.com}"
+TESTNET_API_KEY="${CLAW_API_KEY:-401ca444cbe821f7799e505c26df7f9ee3226f9082f9da2c464236b0b2034ae2}"
+echo -e "${BOLD}🌐 Phase 4/4 — Integration Test${RESET}"
+echo -e "  ${DIM}target: ${TESTNET_URL}${RESET}"
+INT_START=$(date +%s)
+INT_LOG=$(mktemp)
+
+printf "  %-28s " "integration-test.mjs"
+
+node scripts/integration-test.mjs --nodes="${TESTNET_URL}" --api-key="${TESTNET_API_KEY}" > "$INT_LOG" 2>&1
+INT_EC=$?
+INT_END=$(date +%s)
+INT_SECS=$((INT_END - INT_START))
+
+if [ $INT_EC -eq 0 ]; then
+  echo -e "${GREEN}✅ passed${RESET} ${DIM}(${INT_SECS}s)${RESET}"
+else
+  echo -e "${RED}❌ FAILED${RESET} ${DIM}(${INT_SECS}s)${RESET}"
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  tail -30 "$INT_LOG" | sed 's/^/    /'
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  rm -f "$INT_LOG"
+  echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${RED}${BOLD}❌ Integration tests failed${RESET} ${DIM}(${INT_SECS}s)${RESET}"
+  echo -e "   Push aborted. Fix the integration test failures and try again."
+  echo ""
+  exit 1
+fi
+rm -f "$INT_LOG"
+
+# ── summary ─────────────────────────────────────────────────────
+TOTAL_END=$(date +%s)
+TOTAL_SECS=$((TOTAL_END - TOTAL_START))
+echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "${GREEN}${BOLD}✅ All 4 phases passed (lint + build + test + integration)${RESET} ${DIM}(${TOTAL_SECS}s total)${RESET}"
+echo -e "   Pushing..."
+echo ""
+exit 0

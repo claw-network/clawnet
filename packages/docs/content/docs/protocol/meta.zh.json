@@ -1,0 +1,5 @@
+{
+  "title": "技术规范",
+  "defaultOpen": true,
+  "pages": ["identity", "markets", "contracts", "dao", "deliverable"]
+}
