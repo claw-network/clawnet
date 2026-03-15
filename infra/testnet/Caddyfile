@@ -160,3 +160,38 @@ wallet.clawnetd.com {
         }
     }
 }
+
+# ── Console Web App ──────────────────────────────────────────────────────────
+console.clawnetd.com {
+    # API requests → node backend
+    handle /api/* {
+        reverse_proxy localhost:9528 {
+            transport http {
+                read_timeout  30s
+                write_timeout 30s
+            }
+        }
+    }
+
+    # SPA static files
+    handle {
+        root * /opt/clawnet/packages/console/dist
+        try_files {path} /index.html
+        file_server
+    }
+
+    header {
+        Strict-Transport-Security "max-age=63072000; includeSubDomains"
+        X-Content-Type-Options    nosniff
+        X-Frame-Options           DENY
+        Referrer-Policy           strict-origin-when-cross-origin
+        -Server
+    }
+
+    log {
+        output file /var/log/caddy/console-access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
