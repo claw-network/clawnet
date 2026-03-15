@@ -76,14 +76,14 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       }
     }
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoProposalCreateEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         proposalId,
         proposalType: body.type,
@@ -95,7 +95,7 @@ export function daoRoutes(ctx: RuntimeContext): Router {
         votingPeriod: body.votingPeriod ?? 0,
         timelockDelay: body.timelockDelay ?? 0,
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
@@ -204,20 +204,20 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       }
     }
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoProposalAdvanceEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         proposalId: body.proposalId ?? id,
         newStatus: body.newStatus,
         resourcePrev: body.resourcePrev ?? '',
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
@@ -292,21 +292,21 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       }
     }
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoVoteCastEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         proposalId: body.proposalId ?? id,
         option: body.option,
         power: String(body.power),
         reason: body.reason,
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
@@ -348,21 +348,21 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     }
     const body = v.data;
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoDelegateSetEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         delegate: body.delegate,
         scope: (body.scope ?? { all: true }) as DelegationScope,
         percentage: body.percentage ?? 100,
         expiresAt: body.expiresAt,
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
@@ -386,18 +386,18 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     }
     const body = v.data;
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoDelegateRevokeEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         delegate: body.delegate ?? delegate,
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
@@ -417,18 +417,18 @@ export function daoRoutes(ctx: RuntimeContext): Router {
     }
     const body = v.data;
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoDelegateRevokeEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         delegate: body.delegate ?? delegate,
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
@@ -489,19 +489,19 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       }
     }
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoTreasuryDepositEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         amount: String(body.amount),
         source: body.source,
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
@@ -552,18 +552,18 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       }
     }
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoTimelockExecuteEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         actionId: body.actionId ?? actionId,
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);
@@ -598,19 +598,19 @@ export function daoRoutes(ctx: RuntimeContext): Router {
       }
     }
 
-    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did, body.passphrase);
+    const privateKey = await resolvePrivateKey(ctx.config.dataDir, body.did ?? '', body.passphrase ?? '');
     if (!privateKey) {
       badRequest(res, 'Key unavailable', route.url.pathname);
       return;
     }
     try {
       const envelope = await createDaoTimelockCancelEnvelope({
-        issuer: body.did,
+        issuer: body.did ?? '',
         privateKey,
         actionId: body.actionId ?? actionId,
         reason: body.reason,
         ts: body.ts ?? Date.now(),
-        nonce: body.nonce,
+        nonce: body.nonce ?? 1,
         prev: body.prev,
       });
       const hash = await ctx.publishEvent(envelope);

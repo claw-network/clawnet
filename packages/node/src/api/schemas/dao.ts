@@ -5,9 +5,19 @@
 import { z } from 'zod';
 import { AmountSchema, SignedRequestBase } from './common.js';
 
+// For endpoints that have an on-chain daoService path, did/passphrase/nonce
+// are not required — they are only used in the event-sourced fallback path.
+const SignedRequestBaseOptional = {
+  did: SignedRequestBase.did.optional(),
+  passphrase: SignedRequestBase.passphrase.optional(),
+  nonce: SignedRequestBase.nonce.optional(),
+  prev: SignedRequestBase.prev,
+  ts: SignedRequestBase.ts,
+};
+
 export const DaoProposalCreateSchema = z
   .object({
-    ...SignedRequestBase,
+    ...SignedRequestBaseOptional,
     proposalId: z.string().min(1).optional(),
     type: z.enum(['parameter_change', 'treasury_spend', 'protocol_upgrade', 'emergency', 'signal']),
     title: z.string().min(1),
@@ -22,7 +32,7 @@ export const DaoProposalCreateSchema = z
 
 export const DaoProposalAdvanceSchema = z
   .object({
-    ...SignedRequestBase,
+    ...SignedRequestBaseOptional,
     proposalId: z.string().min(1),
     newStatus: z.string().min(1),
     resourcePrev: z.string().optional().default(''),
@@ -31,7 +41,7 @@ export const DaoProposalAdvanceSchema = z
 
 export const DaoVoteCastSchema = z
   .object({
-    ...SignedRequestBase,
+    ...SignedRequestBaseOptional,
     proposalId: z.string().min(1),
     option: z.enum(['for', 'against', 'abstain']),
     power: AmountSchema,
@@ -64,14 +74,14 @@ export const DaoDelegateRevokeSchema = z
 
 export const DaoTimelockExecuteSchema = z
   .object({
-    ...SignedRequestBase,
+    ...SignedRequestBaseOptional,
     actionId: z.string().min(1),
   })
   .passthrough();
 
 export const DaoTimelockCancelSchema = z
   .object({
-    ...SignedRequestBase,
+    ...SignedRequestBaseOptional,
     actionId: z.string().min(1),
     reason: z.string().min(1),
   })
@@ -79,7 +89,7 @@ export const DaoTimelockCancelSchema = z
 
 export const DaoTreasuryDepositSchema = z
   .object({
-    ...SignedRequestBase,
+    ...SignedRequestBaseOptional,
     amount: AmountSchema,
     source: z.string().min(1),
   })
