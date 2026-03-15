@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
 import {
   Dialog,
   DialogContent,
@@ -213,15 +213,15 @@ export function StakingPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label htmlFor="stakeAmount">Amount (Token)</Label>
+                <Field>
+                  <FieldLabel htmlFor="stakeAmount">Amount (Token)</FieldLabel>
                   <Input id="stakeAmount" type="number" min="1" placeholder="Enter amount" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nodeType">Node Type</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="nodeType">Node Type</FieldLabel>
                   <Input id="nodeType" type="number" min="0" placeholder="0" value={stakeNodeType} onChange={(e) => setStakeNodeType(e.target.value)} />
-                  <p className="text-xs text-muted-foreground">0 = standard, 1 = relay, 2 = validator</p>
-                </div>
+                  <FieldDescription>0 = standard, 1 = relay, 2 = validator</FieldDescription>
+                </Field>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setStakeOpen(false)}>Cancel</Button>

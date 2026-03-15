@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import {
   Dialog,
   DialogContent,
@@ -358,8 +358,8 @@ export function GovernancePage() {
                 <DialogDescription>Submit a new governance proposal to the DAO.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label>Type</Label>
+                <Field>
+                  <FieldLabel>Type</FieldLabel>
                   <div className="flex flex-wrap gap-1">
                     {(['parameter_change', 'treasury_spend', 'protocol_upgrade', 'emergency', 'signal'] as const).map((t) => (
                       <Button key={t} size="sm" variant={createForm.type === t ? 'default' : 'outline'} onClick={() => setCreateForm({ ...createForm, type: t })}>
@@ -367,19 +367,19 @@ export function GovernancePage() {
                       </Button>
                     ))}
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="propTitle">Title</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="propTitle">Title</FieldLabel>
                   <Input id="propTitle" placeholder="Proposal title" value={createForm.title} onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="propDesc">Description</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="propDesc">Description</FieldLabel>
                   <Input id="propDesc" placeholder="Proposal description" value={createForm.description} onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="propTarget">Target Address (optional)</Label>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="propTarget">Target Address (optional)</FieldLabel>
                   <Input id="propTarget" placeholder="0x..." value={createForm.target} onChange={(e) => setCreateForm({ ...createForm, target: e.target.value })} />
-                </div>
+                </Field>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -561,7 +561,7 @@ export function GovernancePage() {
                 <CardTitle className="text-sm font-medium">Deposit to Treasury</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div><Label>Amount</Label><Input type="number" placeholder="1000" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} /></div>
+                <Field><FieldLabel>Amount</FieldLabel><Input type="number" placeholder="1000" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} /></Field>
                 <Button onClick={handleDeposit} disabled={depositing || !depositAmount}>{depositing ? 'Depositing…' : 'Deposit'}</Button>
                 {depositResult && <p className="text-xs text-muted-foreground">{depositResult}</p>}
               </CardContent>
@@ -575,9 +575,9 @@ export function GovernancePage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid gap-3 md:grid-cols-3">
-                <div><Label>To Address</Label><Input placeholder="0x…" value={treasuryTo} onChange={(e) => setTreasuryTo(e.target.value)} /></div>
-                <div><Label>Amount</Label><Input type="number" placeholder="500" value={treasuryAmount} onChange={(e) => setTreasuryAmount(e.target.value)} /></div>
-                <div><Label>Description</Label><Input placeholder="Payment for…" value={treasuryDesc} onChange={(e) => setTreasuryDesc(e.target.value)} /></div>
+                <Field><FieldLabel>To Address</FieldLabel><Input placeholder="0x…" value={treasuryTo} onChange={(e) => setTreasuryTo(e.target.value)} /></Field>
+                <Field><FieldLabel>Amount</FieldLabel><Input type="number" placeholder="500" value={treasuryAmount} onChange={(e) => setTreasuryAmount(e.target.value)} /></Field>
+                <Field><FieldLabel>Description</FieldLabel><Input placeholder="Payment for…" value={treasuryDesc} onChange={(e) => setTreasuryDesc(e.target.value)} /></Field>
               </div>
               <Button onClick={handleTreasuryTransfer} disabled={treasurySubmitting || !treasuryTo || !treasuryAmount || !treasuryDesc}>
                 {treasurySubmitting ? 'Creating…' : 'Create Treasury Proposal'}
@@ -630,18 +630,18 @@ export function GovernancePage() {
                 <DialogDescription>Create a DAO proposal to change "{paramKey}"</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label>Parameter</Label>
+                <Field>
+                  <FieldLabel>Parameter</FieldLabel>
                   <Input value={paramKey} disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label>New Value</Label>
+                </Field>
+                <Field>
+                  <FieldLabel>New Value</FieldLabel>
                   <Input type="number" placeholder="Enter new value" value={paramNewValue} onChange={(e) => setParamNewValue(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
+                </Field>
+                <Field>
+                  <FieldLabel>Description</FieldLabel>
                   <Input placeholder="Reason for change" value={paramDesc} onChange={(e) => setParamDesc(e.target.value)} />
-                </div>
+                </Field>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setParamDialogOpen(false)}>Cancel</Button>
@@ -665,8 +665,8 @@ export function GovernancePage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-3 md:grid-cols-3">
-              <div>
-                <Label>Contract</Label>
+              <Field>
+                <FieldLabel>Contract</FieldLabel>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                   value={upgradeContract}
@@ -677,15 +677,15 @@ export function GovernancePage() {
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <Label>New Implementation Address</Label>
+              </Field>
+              <Field>
+                <FieldLabel>New Implementation Address</FieldLabel>
                 <Input placeholder="0x…" value={upgradeImpl} onChange={(e) => setUpgradeImpl(e.target.value)} />
-              </div>
-              <div>
-                <Label>Description</Label>
+              </Field>
+              <Field>
+                <FieldLabel>Description</FieldLabel>
                 <Input placeholder="Upgrade reason" value={upgradeDesc} onChange={(e) => setUpgradeDesc(e.target.value)} />
-              </div>
+              </Field>
             </div>
             <Button onClick={handleUpgradeProposal} disabled={upgradeSubmitting || !upgradeContract || !upgradeImpl || !upgradeDesc}>
               {upgradeSubmitting ? 'Creating…' : 'Create Upgrade Proposal'}

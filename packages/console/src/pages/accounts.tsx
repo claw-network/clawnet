@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { api } from '@/lib/api';
 import {
   Users,
@@ -451,8 +451,8 @@ export function AccountsPage() {
 
           {/* Grant / Revoke form */}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <Label>Action</Label>
+            <Field>
+              <FieldLabel>Action</FieldLabel>
               <select
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 value={roleAction}
@@ -461,9 +461,9 @@ export function AccountsPage() {
                 <option value="grant">Grant</option>
                 <option value="revoke">Revoke</option>
               </select>
-            </div>
-            <div>
-              <Label>Contract</Label>
+            </Field>
+            <Field>
+              <FieldLabel>Contract</FieldLabel>
               <select
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 value={roleContract}
@@ -474,9 +474,9 @@ export function AccountsPage() {
                   <option key={c.contract} value={c.contract}>{formatContractName(c.contract)}</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <Label>Role</Label>
+            </Field>
+            <Field>
+              <FieldLabel>Role</FieldLabel>
               <select
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                 value={roleName}
@@ -489,11 +489,11 @@ export function AccountsPage() {
                     <option key={`${c.contract}-${r.name}`} value={r.name}>{r.name}</option>
                   )))}
               </select>
-            </div>
-            <div>
-              <Label>Address</Label>
+            </Field>
+            <Field>
+              <FieldLabel>Address</FieldLabel>
               <Input placeholder="0x…" value={roleAddress} onChange={(e) => setRoleAddress(e.target.value)} />
-            </div>
+            </Field>
           </div>
           <Button
             onClick={handleRoleAction}
@@ -521,12 +521,12 @@ export function AccountsPage() {
               <p className="text-sm font-medium flex items-center gap-2">
                 <UserPlus className="h-4 w-4" /> Propose Validator Vote
               </p>
-              <div>
-                <Label>Validator Address</Label>
+              <Field>
+                <FieldLabel>Validator Address</FieldLabel>
                 <Input placeholder="0x…" value={valAddress} onChange={(e) => setValAddress(e.target.value)} />
-              </div>
-              <div>
-                <Label>Vote</Label>
+              </Field>
+              <Field>
+                <FieldLabel>Vote</FieldLabel>
                 <select
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
                   value={valVote}
@@ -535,7 +535,7 @@ export function AccountsPage() {
                   <option value="add">Add Validator</option>
                   <option value="remove">Remove Validator</option>
                 </select>
-              </div>
+              </Field>
               <Button
                 onClick={handleValidatorPropose}
                 disabled={valSubmitting || !valAddress}
@@ -551,10 +551,10 @@ export function AccountsPage() {
               <p className="text-sm font-medium flex items-center gap-2">
                 <XCircle className="h-4 w-4" /> Discard Pending Vote
               </p>
-              <div>
-                <Label>Validator Address</Label>
+              <Field>
+                <FieldLabel>Validator Address</FieldLabel>
                 <Input placeholder="0x…" value={discardAddress} onChange={(e) => setDiscardAddress(e.target.value)} />
-              </div>
+              </Field>
               <Button
                 variant="outline"
                 onClick={handleValidatorDiscard}
