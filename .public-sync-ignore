@@ -3,15 +3,15 @@
 # Syntax: one path per line, glob patterns supported.
 # Negation with ! to re-include a sub-path of an excluded parent.
 
-# Internal documentation (except public API spec)
+# Internal documentation (except public API spec — preserved separately)
 docs/*
-!docs/api/
 
 # Production infrastructure (except devnet for local development)
 infra/testnet/
 infra/mainnet/
 infra/shared/
 infra/besu/
+infra/README.md
 
 # Deployment skills (contain server-specific procedures)
 skills/

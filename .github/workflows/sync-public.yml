@@ -23,23 +23,23 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Read exclusion list and remove private paths
-          while IFS= read -r line; do
-            # Skip comments and empty lines
-            [[ -z "$line" || "$line" == \#* ]] && continue
-            # Skip negation lines (handled separately)
-            [[ "$line" == \!* ]] && continue
-            echo "Removing: $line"
-            rm -rf $line
-          done < .public-sync-ignore
+          # Save paths that should be preserved before bulk removal
+          mkdir -p /tmp/preserve
+          cp -r docs/api /tmp/preserve/docs_api 2>/dev/null || true
 
-          # Re-include negated paths by restoring them from git
+          # Read exclusion list and remove private paths
+          # (copy ignore file first since it may delete itself)
+          cp .public-sync-ignore /tmp/_sync_ignore
           while IFS= read -r line; do
-            [[ "$line" != \!* ]] && continue
-            path="${line#!}"
-            echo "Restoring: $path"
-            git checkout HEAD -- "$path" 2>/dev/null || true
-          done < .public-sync-ignore
+            [[ -z "$line" || "$line" == \#* || "$line" == \!* ]] && continue
+            echo "Removing: $line"
+            rm -rf $line 2>/dev/null || true
+          done < /tmp/_sync_ignore
+
+          # Restore preserved paths
+          mkdir -p docs
+          cp -r /tmp/preserve/docs_api docs/api 2>/dev/null || true
+          rm -rf /tmp/preserve /tmp/_sync_ignore
 
           # Replace copilot instructions with public version
           if [[ -f .github/copilot-instructions.public.md ]]; then
@@ -47,10 +47,8 @@ jobs:
             rm .github/copilot-instructions.public.md
           fi
 
-          # Remove the sync-ignore file itself (not needed in public repo)
+          # Remove files that only exist in the private repo
           rm -f .public-sync-ignore
-
-          # Remove this workflow (not needed in public repo)
           rm -f .github/workflows/sync-public.yml
 
           echo "=== Public content prepared ==="
@@ -94,25 +92,21 @@ jobs:
 
       - name: Push to public repo
         env:
-          SSH_DEPLOY_KEY: ${{ secrets.PUBLIC_REPO_DEPLOY_KEY }}
+          PUBLIC_REPO_PAT: ${{ secrets.PUBLIC_REPO_PAT }}
         run: |
           set -euo pipefail
 
-          # Setup SSH key
-          mkdir -p ~/.ssh
-          echo "$SSH_DEPLOY_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          PUBLIC_REPO="https://x-access-token:${PUBLIC_REPO_PAT}@github.com/claw-network/clawnet.git"
 
-          export GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
-
-          PUBLIC_REPO="git@github.com:claw-network/clawnet.git"
+          # Save original commit info before resetting git
+          ORIG_MSG="$(git log -1 --format='%s' 2>/dev/null || echo 'initial sync')"
+          ORIG_SHA="$(git log -1 --format='%h' 2>/dev/null || echo 'unknown')"
 
           # Create a fresh commit with only public content
           rm -rf .git
           git init -b main
           git add -A
-          git commit -m "sync: $(git log -1 --format='%H %s' 2>/dev/null || echo 'initial')"
+          git commit -m "sync: ${ORIG_SHA} ${ORIG_MSG}"
 
           # Force push to public repo (single-commit history)
           git remote add public "$PUBLIC_REPO"
@@ -126,6 +120,3 @@ jobs:
           fi
 
           echo "✅ Synced to public repo"
-
-          # Cleanup
-          rm -f ~/.ssh/deploy_key
