@@ -52,12 +52,11 @@ export function FaucetPage() {
   const fetchData = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
     try {
-      const [statusRes, statsRes, claimsRes] = await Promise.all([
-        api.get<FaucetStatus>('/faucet/status').catch(() => null),
+      const [statsRes, claimsRes] = await Promise.all([
         api.get<FaucetStats>('/faucet/stats').catch(() => null),
         api.get<FaucetClaim[] | { data?: FaucetClaim[]; meta?: { total?: number } }>(`/faucet/claims?page=${page}&perPage=${perPage}`).catch(() => []),
       ]);
-      setStatus(statusRes);
+      setStatus(statsRes ? { enabled: true, totalClaims: statsRes.totalClaims } : null);
       setStats(statsRes);
       if (claimsRes && typeof claimsRes === 'object' && 'data' in claimsRes) {
         const envelope = claimsRes as { data?: FaucetClaim[]; meta?: { total?: number } };
