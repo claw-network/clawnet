@@ -40,6 +40,15 @@ clawnetd.com {
 
 # ── clawnetd REST API ────────────────────────────────────────────────────────
 api.clawnetd.com {
+    # Public faucet endpoint — uses Ed25519 signature auth, no API key needed
+    @faucet_post {
+        method POST
+        path /api/v1/faucet
+    }
+    handle @faucet_post {
+        reverse_proxy localhost:9528
+    }
+
     @write_ops {
         method POST PUT DELETE PATCH
         not header X-API-Key {env.CLAW_API_KEY}
