@@ -326,6 +326,17 @@ export function GovernancePage() {
     return new Date(ts * 1000).toLocaleString();
   };
 
+  const formatRelative = (ts: number) => {
+    if (!ts) return '';
+    const diffSec = ts - Math.floor(Date.now() / 1000);
+    const abs = Math.abs(diffSec);
+    if (abs < 60) return diffSec > 0 ? 'in <1 min' : 'just elapsed';
+    const h = Math.floor(abs / 3600);
+    const m = Math.floor((abs % 3600) / 60);
+    const parts = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return diffSec > 0 ? `in ${parts}` : `${parts} ago`;
+  };
+
   const truncateAddr = (addr: string) => {
     if (!addr || addr.length < 12) return addr ?? '—';
     return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -505,7 +516,7 @@ export function GovernancePage() {
                 <div><span className="text-muted-foreground">Target:</span> <span className="font-mono">{truncateAddr(selectedProposal.target)}</span></div>
                 <div><span className="text-muted-foreground">Snapshot Block:</span> {selectedProposal.snapshotBlock}</div>
                 <div><span className="text-muted-foreground">Created:</span> {formatDate(selectedProposal.createdAt)}</div>
-                <div><span className="text-muted-foreground">Discussion End:</span> {formatDate(selectedProposal.discussionEndAt)}</div>
+                <div><span className="text-muted-foreground">Discussion End:</span>{' '}{formatDate(selectedProposal.discussionEndAt)}{' '}<span className="text-xs text-muted-foreground">({formatRelative(selectedProposal.discussionEndAt)})</span></div>
                 <div><span className="text-muted-foreground">Voting End:</span> {formatDate(selectedProposal.votingEndAt)}</div>
                 <div><span className="text-muted-foreground">Timelock End:</span> {formatDate(selectedProposal.timelockEndAt)}</div>
               </div>
@@ -523,9 +534,17 @@ export function GovernancePage() {
                   <div className="text-xs text-muted-foreground">Abstain</div>
                 </div>
               </div>
-              <div className="flex gap-2 pt-3 border-t">
-                {selectedProposal.status === 1 && (
+              <div className="flex flex-wrap gap-2 pt-3 border-t">
+                {selectedProposal.status === 0 && selectedProposal.discussionEndAt > 0 && Math.floor(Date.now() / 1000) < selectedProposal.discussionEndAt && (
+                  <p className="w-full text-xs text-muted-foreground">
+                    Voting opens {formatRelative(selectedProposal.discussionEndAt)} — discussion period must elapse first.
+                  </p>
+                )}
+                {(selectedProposal.status === 1 || (selectedProposal.status === 0 && selectedProposal.discussionEndAt > 0 && Math.floor(Date.now() / 1000) >= selectedProposal.discussionEndAt)) && (
                   <>
+                    {selectedProposal.status === 0 && (
+                      <p className="w-full text-xs text-amber-600">Discussion period elapsed — your vote will advance this proposal to Voting.</p>
+                    )}
                     <Button size="sm" onClick={() => castVote(selectedProposal.proposalId, 'for')}>Vote For</Button>
                     <Button size="sm" variant="outline" onClick={() => castVote(selectedProposal.proposalId, 'against')}>Vote Against</Button>
                     <Button size="sm" variant="ghost" onClick={() => castVote(selectedProposal.proposalId, 'abstain')}>Abstain</Button>
