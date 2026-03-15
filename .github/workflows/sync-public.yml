@@ -23,36 +23,28 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Save paths that should be preserved before bulk removal
+          # 1. Preserve docs/api/ before removing docs/
           mkdir -p /tmp/preserve
-          cp -r docs/api /tmp/preserve/docs_api 2>/dev/null || true
+          cp -r docs/api /tmp/preserve/docs_api
 
-          # Read exclusion list and remove private paths
-          # (copy ignore file first since it may delete itself)
-          cp .public-sync-ignore /tmp/_sync_ignore
-          while IFS= read -r line; do
-            [[ -z "$line" || "$line" == \#* || "$line" == \!* ]] && continue
-            echo "Removing: $line"
-            rm -rf $line 2>/dev/null || true
-          done < /tmp/_sync_ignore
-
-          # Restore preserved paths
-          mkdir -p docs
-          cp -r /tmp/preserve/docs_api docs/api 2>/dev/null || true
-          rm -rf /tmp/preserve /tmp/_sync_ignore
-
-          # Replace copilot instructions with public version
-          if [[ -f .github/copilot-instructions.public.md ]]; then
-            cp .github/copilot-instructions.public.md .github/copilot-instructions.md
-            rm .github/copilot-instructions.public.md
-          fi
-
-          # Remove files that only exist in the private repo
+          # 2. Remove private directories and files
+          rm -rf docs skills issues temp
+          rm -rf infra/testnet infra/mainnet infra/shared infra/besu infra/README.md
           rm -f .public-sync-ignore
+          rm -f .github/copilot-instructions.md
+
+          # 3. Restore preserved public docs
+          mkdir -p docs
+          cp -r /tmp/preserve/docs_api docs/api
+          rm -rf /tmp/preserve
+
+          # 4. Replace copilot instructions with sanitized public version
+          mv .github/copilot-instructions.public.md .github/copilot-instructions.md
+
+          # 5. Remove this workflow (not needed in public repo)
           rm -f .github/workflows/sync-public.yml
 
           echo "=== Public content prepared ==="
-          echo "Remaining top-level dirs:"
           ls -d */ .github/ 2>/dev/null || true
 
       - name: Verify no secrets leaked
