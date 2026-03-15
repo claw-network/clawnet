@@ -525,6 +525,47 @@ export class IndexerQuery {
       .get() as { total: number };
     return row.total;
   }
+
+  /** List faucet claims with pagination. */
+  listFaucetClaims(opts: PaginationOpts = {}): PaginatedResult<{
+    did: string;
+    address: string;
+    amount: number;
+    txHash: string | null;
+    claimedAt: string;
+  }> {
+    const { limit, offset } = normalisePagination(opts);
+    const total = (
+      this.db.prepare('SELECT COUNT(*) AS cnt FROM faucet_claims').get() as { cnt: number }
+    ).cnt;
+    const rows = this.db
+      .prepare(
+        `SELECT did, address, amount, tx_hash AS txHash, claimed_at AS claimedAt
+         FROM faucet_claims ORDER BY id DESC LIMIT ? OFFSET ?`,
+      )
+      .all(limit, offset) as Array<{
+        did: string;
+        address: string;
+        amount: number;
+        txHash: string | null;
+        claimedAt: string;
+      }>;
+    return { items: rows, total, limit, offset };
+  }
+
+  /** Faucet stats: total claims count and total distributed. */
+  getFaucetStats(): { totalClaims: number; totalDistributed: number; todayDistributed: number } {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS totalClaims, COALESCE(SUM(amount), 0) AS totalDistributed FROM faucet_claims`,
+      )
+      .get() as { totalClaims: number; totalDistributed: number };
+    return {
+      totalClaims: row.totalClaims,
+      totalDistributed: row.totalDistributed,
+      todayDistributed: this.getFaucetDailyTotal(),
+    };
+  }
 }
 
 // ---------------------------------------------------------------------------

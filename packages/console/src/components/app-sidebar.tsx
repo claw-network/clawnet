@@ -9,6 +9,12 @@ import {
   Moon,
   Sun,
   LogOut,
+  Vote,
+  Layers,
+  Coins,
+  FileCheck,
+  Lock,
+  PieChart,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -37,14 +43,23 @@ interface NavItem {
   networks?: string[];
 }
 
-const navItems: NavItem[] = [
-  { title: 'Dashboard', icon: LayoutDashboard, path: '/console' },
-  { title: 'API Keys', icon: KeyRound, path: '/console/api-keys' },
-  { title: 'Config', icon: Settings, path: '/console/config' },
-  { title: 'Relay', icon: Radio, path: '/console/relay' },
-  { title: 'Faucet', icon: Droplets, path: '/console/faucet', networks: ['testnet', 'mainnet'] },
-  { title: 'Storage', icon: Database, path: '/console/storage' },
-  { title: 'Security', icon: ShieldCheck, path: '/console/security' },
+const nodeItems: NavItem[] = [
+  { title: 'Dashboard', icon: LayoutDashboard, path: '/' },
+  { title: 'API Keys', icon: KeyRound, path: '/api-keys' },
+  { title: 'Config', icon: Settings, path: '/config' },
+  { title: 'Relay', icon: Radio, path: '/relay' },
+  { title: 'Storage', icon: Database, path: '/storage' },
+  { title: 'Security', icon: ShieldCheck, path: '/security' },
+];
+
+const blockchainItems: NavItem[] = [
+  { title: 'Governance', icon: Vote, path: '/governance', networks: ['testnet', 'mainnet'] },
+  { title: 'Staking', icon: Layers, path: '/staking', networks: ['testnet', 'mainnet'] },
+  { title: 'Token', icon: Coins, path: '/token', networks: ['testnet', 'mainnet'] },
+  { title: 'Contracts', icon: FileCheck, path: '/contracts', networks: ['testnet', 'mainnet'] },
+  { title: 'Escrow', icon: Lock, path: '/escrow', networks: ['testnet', 'mainnet'] },
+  { title: 'Faucet', icon: Droplets, path: '/faucet', networks: ['testnet', 'mainnet'] },
+  { title: 'Ecosystem', icon: PieChart, path: '/ecosystem', networks: ['testnet', 'mainnet'] },
 ];
 
 export function AppSidebar() {
@@ -53,13 +68,20 @@ export function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
   const { network } = useNode();
 
-  const visibleItems = navItems.filter(
-    (item) => !item.networks || (network && item.networks.includes(network)),
-  );
+  const filterItems = (items: NavItem[]) =>
+    items.filter((item) => !item.networks || (network && item.networks.includes(network)));
+
+  const visibleNodeItems = filterItems(nodeItems);
+  const visibleBlockchainItems = filterItems(blockchainItems);
+
+  const isActive = (path: string) =>
+    path === '/'
+      ? location.pathname === '/'
+      : location.pathname.startsWith(path);
 
   const handleLogout = () => {
     logout();
-    navigate('/console/login');
+    navigate('/login');
   };
 
   return (
@@ -78,19 +100,12 @@ export function AppSidebar() {
       <Separator />
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>Node Management</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleItems.map((item) => (
+              {visibleNodeItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton
-                    isActive={
-                      item.path === '/console'
-                        ? location.pathname === '/console' || location.pathname === '/console/'
-                        : location.pathname.startsWith(item.path)
-                    }
-                    onClick={() => navigate(item.path)}
-                  >
+                  <SidebarMenuButton isActive={isActive(item.path)} onClick={() => navigate(item.path)}>
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>
                   </SidebarMenuButton>
@@ -99,6 +114,23 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {visibleBlockchainItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Blockchain</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleBlockchainItems.map((item) => (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton isActive={isActive(item.path)} onClick={() => navigate(item.path)}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="p-2">
         <div className="flex items-center gap-1">

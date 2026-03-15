@@ -42,6 +42,8 @@ import { authRoutes } from './routes/auth.js';
 import { metricsRoutes } from './routes/metrics.js';
 import { snapshotRoutes } from './routes/snapshots.js';
 import { totpRoutes } from './routes/totp.js';
+import { stakingRoutes } from './routes/staking.js';
+import { tokenRoutes } from './routes/token.js';
 
 export { ApiServerConfig } from './types.js';
 export type { RuntimeContext } from './types.js';
@@ -76,6 +78,8 @@ function buildRouter(ctx: RuntimeContext): Router {
   api.mount('/api/v1/deliverables', deliverableRoutes(ctx));
   api.mount('/api/v1/metrics', metricsRoutes(ctx));
   api.mount('/api/v1/snapshots', snapshotRoutes(ctx));
+  api.mount('/api/v1/staking', stakingRoutes(ctx));
+  api.mount('/api/v1/token', tokenRoutes(ctx));
 
   // Dev routes (faucet, etc.) are NOT available on mainnet — prevents unauthorized minting.
   if (ctx.config.network !== 'mainnet') {
@@ -125,6 +129,7 @@ export class ApiServer {
       messagingService?: import('../services/messaging-service.js').MessagingService;
       relayService?: import('../services/relay-service.js').RelayService;
       relayRewardService?: import('../services/relay-reward-service.js').RelayRewardService;
+      stakingService?: import('../services/staking-service.js').StakingService;
       p2pNode?: import('@claw-network/core').P2PNode;
       relayScorer?: import('@claw-network/core').RelayScorer;
       signProof?: (data: Uint8Array) => Promise<string>;
@@ -159,6 +164,7 @@ export class ApiServer {
       messagingService: this.runtime.messagingService,
       relayService: this.runtime.relayService,
       relayRewardService: this.runtime.relayRewardService,
+      stakingService: this.runtime.stakingService,
       p2pNode: this.runtime.p2pNode,
       relayScorer: this.runtime.relayScorer,
       signProof: this.runtime.signProof,

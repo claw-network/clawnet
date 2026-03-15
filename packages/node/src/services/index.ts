@@ -84,6 +84,13 @@ export type {
   VoteListResult,
 } from './dao-service.js';
 
+export { StakingService } from './staking-service.js';
+export type {
+  StakingInfo,
+  StakerView,
+  StakeTxResult,
+} from './staking-service.js';
+
 export { RelayService } from './relay-service.js';
 export type {
   RelayStats,

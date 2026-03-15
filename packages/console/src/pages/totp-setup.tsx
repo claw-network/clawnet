@@ -67,7 +67,7 @@ export function TotpSetupPage() {
         code,
       });
       if (result.success) {
-        navigate('/console', { replace: true });
+        navigate('/', { replace: true });
       } else {
         setError('Invalid code. Please try again.');
         setCode('');

@@ -52,7 +52,7 @@ export function LoginPage() {
         setTotpStep(true);
       } else if (result.valid && result.did && result.sessionToken) {
         setAuthenticated(result.did, result.sessionToken);
-        navigate('/console', { replace: true });
+        navigate('/', { replace: true });
       } else {
         setError('Invalid passphrase. Please try again.');
       }
@@ -75,7 +75,7 @@ export function LoginPage() {
       if (result.valid && result.sessionToken) {
         clearPendingToken();
         setAuthenticated(pendingDid, result.sessionToken);
-        navigate('/console', { replace: true });
+        navigate('/', { replace: true });
       } else {
         setError('Invalid code. Please try again.');
         setTotpCode('');

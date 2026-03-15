@@ -58,6 +58,7 @@ import { IdentityService } from './services/identity-service.js';
 import { ReputationService } from './services/reputation-service.js';
 import { ContractsService } from './services/contracts-service.js';
 import { DaoService } from './services/dao-service.js';
+import { StakingService } from './services/staking-service.js';
 import { MessagingService } from './services/messaging-service.js';
 import { MessageStore } from './services/message-store.js';
 import { RelayService } from './services/relay-service.js';
@@ -141,6 +142,7 @@ export class ClawNetNode {
   private reputationService?: ReputationService;
   private contractsService?: ContractsService;
   private daoService?: DaoService;
+  private stakingService?: StakingService;
   private messagingService?: MessagingService;
   private messageStore?: MessageStore;
   private relayService?: RelayService;
@@ -273,6 +275,7 @@ export class ClawNetNode {
           this.reputationService = new ReputationService(this.contractProvider, this.indexerQuery);
           this.contractsService = new ContractsService(this.contractProvider, this.indexerQuery);
           this.daoService = new DaoService(this.contractProvider, this.indexerQuery);
+          this.stakingService = new StakingService(this.contractProvider);
 
           // RelayRewardService — needs chain + relay + DID
           // Will be finalized after relayService is created below
@@ -386,6 +389,7 @@ export class ClawNetNode {
           messagingService: this.messagingService,
           relayService: this.relayService,
           relayRewardService: this.relayRewardService,
+          stakingService: this.stakingService,
           p2pNode: this.p2p,
           relayScorer: this.relayScorer,
           indexerQuery: this.indexerQuery,

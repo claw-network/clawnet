@@ -28,6 +28,10 @@ import {
   RefreshCw,
   Fingerprint,
   Link2,
+  Vote,
+  Layers,
+  Coins,
+  Landmark,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -71,6 +75,13 @@ interface RelayStats {
   totalMessagesRelayed?: number;
 }
 
+interface ChainSummary {
+  treasuryBalance?: number;
+  activeProposals?: number;
+  totalStaked?: number;
+  tokenSupply?: number;
+}
+
 interface IdentityInfo {
   did?: string;
   publicKey?: string;
@@ -86,6 +97,7 @@ export function DashboardPage() {
   const [wallet, setWallet] = useState<WalletBalance | null>(null);
   const [relay, setRelay] = useState<RelayStats | null>(null);
   const [identity, setIdentity] = useState<IdentityInfo | null>(null);
+  const [chain, setChain] = useState<ChainSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -112,6 +124,25 @@ export function DashboardPage() {
           setWallet(w);
         } catch {
           // wallet might not be available if no chain config
+        }
+      }
+
+      // Fetch chain summary for testnet/mainnet
+      const net = s?.network || s?.config?.network;
+      if (net === 'testnet' || net === 'mainnet') {
+        try {
+          const [treasury, staking, supply] = await Promise.all([
+            api.get<{ balance?: number }>('/dao/treasury').catch(() => null),
+            api.get<{ totalStaked?: number }>('/staking').catch(() => null),
+            api.get<{ totalSupply?: number }>('/token/supply').catch(() => null),
+          ]);
+          setChain({
+            treasuryBalance: treasury?.balance,
+            totalStaked: staking?.totalStaked,
+            tokenSupply: supply?.totalSupply,
+          });
+        } catch {
+          // chain endpoints might not be available
         }
       }
     } catch {
@@ -260,6 +291,54 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Chain Summary (testnet/mainnet only) */}
+      {chain && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Treasury</CardTitle>
+              <Landmark className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{chain.treasuryBalance?.toLocaleString() ?? '—'}</div>
+              <p className="text-xs text-muted-foreground">Tokens</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Total Staked</CardTitle>
+              <Layers className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{chain.totalStaked?.toLocaleString() ?? '—'}</div>
+              <p className="text-xs text-muted-foreground">Tokens</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Token Supply</CardTitle>
+              <Coins className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{chain.tokenSupply?.toLocaleString() ?? '—'}</div>
+              <p className="text-xs text-muted-foreground">Total supply</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Blockchain</CardTitle>
+              <Vote className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <Badge variant="default" className="bg-blue-600 text-white">
+                {status?.network ?? 'unknown'}
+              </Badge>
+              <p className="mt-1 text-xs text-muted-foreground">Chain ID 7625</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Identity + Wallet */}
       <div className="grid gap-4 lg:grid-cols-2">

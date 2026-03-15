@@ -189,7 +189,7 @@ export function SecurityPage() {
               </div>
               <Button
                 size="sm"
-                onClick={() => navigate('/console/totp-setup')}
+                onClick={() => navigate('/totp-setup')}
               >
                 <ShieldCheck className="size-4" />
                 Enable 2FA

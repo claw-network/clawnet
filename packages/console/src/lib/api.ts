@@ -43,7 +43,7 @@ async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   if (res.status === 401) {
     sessionStorage.removeItem('console-token');
     sessionStorage.removeItem('console-did');
-    window.location.href = '/console/login';
+    window.location.href = `${import.meta.env.BASE_URL}login`;
     throw new ApiError(401, 'Unauthorized');
   }
 

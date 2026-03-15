@@ -9,7 +9,7 @@ interface TotpStatus {
 }
 
 /**
- * On testnet/mainnet, redirects to /console/totp-setup if 2FA is not configured.
+ * On testnet/mainnet, redirects to /totp-setup if 2FA is not configured.
  * On devnet, does nothing (2FA is optional).
  */
 export function TotpGuard({ children }: { children: ReactNode }) {
@@ -40,7 +40,7 @@ export function TotpGuard({ children }: { children: ReactNode }) {
 
   // On testnet/mainnet, force 2FA setup if not configured
   if (status && !status.configured && network !== 'devnet') {
-    return <Navigate to="/console/totp-setup" replace />;
+    return <Navigate to="/totp-setup" replace />;
   }
 
   return <>{children}</>;

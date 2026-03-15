@@ -4,7 +4,7 @@ import { isAuthenticated } from '@/lib/auth';
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   if (!isAuthenticated()) {
-    return <Navigate to="/console/login" replace />;
+    return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 }

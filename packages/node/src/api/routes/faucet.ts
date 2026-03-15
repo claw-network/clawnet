@@ -6,7 +6,7 @@
  */
 
 import { Router } from '../router.js';
-import { ok, badRequest, unauthorized, conflict, tooManyRequests, internalError } from '../response.js';
+import { ok, badRequest, unauthorized, conflict, tooManyRequests, internalError, paginated, parsePagination } from '../response.js';
 import { validate } from '../schemas/common.js';
 import { z } from 'zod';
 import type { RuntimeContext } from '../types.js';
@@ -80,6 +80,32 @@ const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
 export function faucetRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
   const config = readFaucetConfig();
+
+  // ── GET /claims — paginated faucet claim history ───────────────
+  r.get('/claims', async (_req, res, route) => {
+    if (!ctx.indexerQuery) {
+      internalError(res, 'Indexer unavailable');
+      return;
+    }
+    const { page, perPage, offset } = parsePagination(route.query);
+    const result = ctx.indexerQuery.listFaucetClaims({ limit: perPage, offset });
+    paginated(res, result.items, {
+      page,
+      perPage,
+      total: result.total,
+      basePath: '/api/v1/faucet/claims',
+    });
+  });
+
+  // ── GET /stats — faucet statistics ─────────────────────────────
+  r.get('/stats', async (_req, res) => {
+    if (!ctx.indexerQuery) {
+      internalError(res, 'Indexer unavailable');
+      return;
+    }
+    const stats = ctx.indexerQuery.getFaucetStats();
+    ok(res, stats, { self: '/api/v1/faucet/stats' });
+  });
 
   r.post('/', async (req, res, route) => {
     if (!ctx.walletService || !ctx.identityService || !ctx.indexerQuery) {
