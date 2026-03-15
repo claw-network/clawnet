@@ -4,6 +4,12 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -92,6 +98,7 @@ export function AccountsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [selectedAddr, setSelectedAddr] = useState<{ title: string; address: string; subtitle?: string } | null>(null);
 
   // Role management
   const [roleContract, setRoleContract] = useState('');
@@ -337,7 +344,11 @@ export function AccountsPage() {
                 </TableHeader>
                 <TableBody>
                   {data.validators.addresses.map((addr, i) => (
-                    <TableRow key={addr}>
+                    <TableRow
+                      key={addr}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedAddr({ title: `Validator #${i + 1}`, address: addr })}
+                    >
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-mono text-sm">{truncateAddr(addr)}</TableCell>
                       <TableCell>
@@ -403,7 +414,11 @@ export function AccountsPage() {
               </TableHeader>
               <TableBody>
                 {Object.entries(data.contracts).map(([name, addr]) => (
-                  <TableRow key={name}>
+                  <TableRow
+                    key={name}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setSelectedAddr({ title: formatContractName(name), address: addr, subtitle: name })}
+                  >
                     <TableCell className="font-medium capitalize">{formatContractName(name)}</TableCell>
                     <TableCell className="font-mono text-sm">{truncateAddr(addr)}</TableCell>
                     <TableCell>
@@ -580,6 +595,38 @@ export function AccountsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Address Detail Dialog */}
+      <Dialog open={!!selectedAddr} onOpenChange={(open) => { if (!open) setSelectedAddr(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedAddr?.title}</DialogTitle>
+          </DialogHeader>
+          {selectedAddr && (
+            <div className="space-y-3">
+              {selectedAddr.subtitle && (
+                <p className="text-xs text-muted-foreground">{selectedAddr.subtitle}</p>
+              )}
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Proxy Address</p>
+                <div className="flex items-center gap-2 bg-muted rounded px-3 py-2">
+                  <span className="font-mono text-xs break-all flex-1">{selectedAddr.address}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => copyToClipboard(selectedAddr.address, 'dialog-addr')}
+                  >
+                    {copied === 'dialog-addr'
+                      ? <Check className="h-3.5 w-3.5 text-green-500" />
+                      : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -12,8 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { api } from '@/lib/api';
-import { PieChart, RefreshCw, Wallet, Landmark, Layers } from 'lucide-react';
+import { PieChart, RefreshCw, Wallet, Landmark, Layers, Copy, Check, ExternalLink } from 'lucide-react';
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -52,6 +58,14 @@ export function EcosystemPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [selectedMovement, setSelectedMovement] = useState<FundMovement | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+  };
 
   const fetchData = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -215,7 +229,7 @@ export function EcosystemPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recent Fund Movements</CardTitle>
-            <CardDescription>Recent transactions involving treasury and ecosystem funds</CardDescription>
+            <CardDescription>Click a row to see full transaction details</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -230,7 +244,11 @@ export function EcosystemPage() {
               </TableHeader>
               <TableBody>
                 {movements.map((m, i) => (
-                  <TableRow key={m.txHash || i}>
+                  <TableRow
+                    key={m.txHash || i}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setSelectedMovement(m)}
+                  >
                     <TableCell className="font-mono text-xs">{truncateAddr(m.txHash ?? '')}</TableCell>
                     <TableCell className="font-mono text-xs">{truncateAddr(m.from)}</TableCell>
                     <TableCell className="font-mono text-xs">{truncateAddr(m.to)}</TableCell>
@@ -245,6 +263,62 @@ export function EcosystemPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Fund Movement Detail Dialog */}
+      <Dialog open={!!selectedMovement} onOpenChange={(open) => { if (!open) setSelectedMovement(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ExternalLink className="h-4 w-4" />
+              Transaction Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedMovement && (
+            <div className="space-y-3 text-sm">
+              {([
+                { label: 'Tx Hash', value: selectedMovement.txHash ?? '—' },
+                { label: 'From',    value: selectedMovement.from },
+                { label: 'To',      value: selectedMovement.to },
+              ] as { label: string; value: string }[]).map(({ label, value }) => (
+                <div key={label}>
+                  <p className="text-xs text-muted-foreground mb-1">{label}</p>
+                  <div className="flex items-center gap-2 bg-muted rounded px-3 py-2">
+                    <span className="font-mono text-xs break-all flex-1">{value}</span>
+                    <button
+                      className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => copyToClipboard(value, `mv-${label}`)}
+                    >
+                      {copied === `mv-${label}`
+                        ? <Check className="h-3.5 w-3.5 text-green-500" />
+                        : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <div className="grid grid-cols-3 gap-3 pt-1">
+                <div className="bg-muted rounded px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-1">Amount</p>
+                  <p className="font-semibold">{selectedMovement.amount} Token</p>
+                </div>
+                <div className="bg-muted rounded px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-1">Type</p>
+                  <Badge variant="outline">{selectedMovement.type ?? 'transfer'}</Badge>
+                </div>
+                <div className="bg-muted rounded px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-1">Block</p>
+                  <p className="font-mono text-xs">{selectedMovement.blockNumber ?? '—'}</p>
+                </div>
+              </div>
+              {selectedMovement.timestamp && (
+                <div className="bg-muted rounded px-3 py-2">
+                  <p className="text-xs text-muted-foreground mb-1">Timestamp</p>
+                  <p className="text-xs">{new Date(selectedMovement.timestamp * 1000).toLocaleString()}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
