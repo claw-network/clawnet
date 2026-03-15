@@ -205,13 +205,13 @@ print(resp.json())
 
 ```bash
 # systemd service 环境变量
-Environment=CLAW_FAUCET_URL=https://clawnetd.com
+Environment=CLAW_FAUCET_URL=https://api.clawnetd.com
 
 # 或手动启动时
-export CLAW_FAUCET_URL=https://clawnetd.com
+export CLAW_FAUCET_URL=https://api.clawnetd.com
 ```
 
-安装脚本 `install.sh` 支持通过 `--faucet-url` flag 或 `CLAW_FAUCET_URL` 环境变量传入，默认值为 `https://clawnetd.com`。
+安装脚本 `install.sh` 支持通过 `--faucet-url` flag 或 `CLAW_FAUCET_URL` 环境变量传入，默认值为 `https://api.clawnetd.com`。
 
 ---
 

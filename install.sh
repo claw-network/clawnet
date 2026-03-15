@@ -23,7 +23,7 @@
 #   CLAWNET_SKIP_BUILD   Skip git clone & build    (default: false)
 #   CLAWNET_DATA_DIR     Data directory             (default: /var/lib/clawnet)
 #   CLAW_PRIVATE_KEY     EVM signer private key     (optional, for chain interaction)
-#   CLAW_FAUCET_URL      Faucet URL for auto-claim  (default: https://clawnetd.com)
+#   CLAW_FAUCET_URL      Faucet URL for auto-claim  (default: https://api.clawnetd.com)
 # ============================================================================
 set -euo pipefail
 
