@@ -559,6 +559,17 @@ export class ClawNetNode {
     return this.cachedDid ?? null;
   }
 
+  /**
+   * Create an API key programmatically.
+   * For use by embedding applications that need to bootstrap auth
+   * without going through the HTTP layer.
+   */
+  createApiKey(label: string): { key: string; id: number; label: string } | null {
+    if (!this.apiKeyStore) return null;
+    const record = this.apiKeyStore.create(label);
+    return { key: record.key, id: record.id, label: record.label };
+  }
+
   getHealth(): {
     ok: boolean;
     checks: { p2p: boolean; sync: boolean; eventStore: boolean; api: boolean };

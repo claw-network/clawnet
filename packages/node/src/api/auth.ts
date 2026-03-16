@@ -50,6 +50,8 @@ const PUBLIC_ROUTES: Array<(url: string, method: string) => boolean> = [
   (url) => url === '/api/v1/auth/verify-passphrase',
   // TOTP verify (uses pending token, not session) and status check
   (url) => url === '/api/v1/auth/totp/verify' || url === '/api/v1/auth/totp/status',
+  // Admin endpoints — guarded by isLocalhost() + CSRF checks in the route handler
+  (url) => url.startsWith('/api/v1/admin/'),
   // OPTIONS (CORS preflight)
   (_url, method) => method === 'OPTIONS',
 ];

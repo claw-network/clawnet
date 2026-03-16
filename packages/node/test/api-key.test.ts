@@ -194,6 +194,26 @@ describe('auth middleware', () => {
     expect(res.status).toBe(401);
   });
 
+  it('allows POST /api/v1/admin/api-keys on zero-key node from localhost (no deadlock)', async () => {
+    // Regression: v0.6.13 shipped a zero-key 401 that also blocked the admin
+    // route used to create the first key, making fresh nodes unusable.
+    expect(store.activeCount()).toBe(0);
+
+    const res = await fetch(`${baseUrl}/api/v1/admin/api-keys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: 'bootstrap' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { key: string; label: string } };
+    expect(body.data.key).toMatch(/^[a-f0-9]{64}$/);
+    expect(body.data.label).toBe('bootstrap');
+
+    // After creating the first key, protected routes should still require it
+    const protectedRes = await fetch(`${baseUrl}/api/v1/wallets/did:claw:test/balance`);
+    expect(protectedRes.status).toBe(401);
+  });
+
   it('allows CORS preflight without key', async () => {
     store.create('test');
 
