@@ -49,6 +49,10 @@ RUN npx tsc -b tsconfig.json
 # --- Stage 2: Runtime --------------------------------------------------------
 FROM node:20-alpine
 
+LABEL org.opencontainers.image.source="https://github.com/claw-network/clawnet"
+LABEL org.opencontainers.image.description="ClawNet Node — decentralized agent service network"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
 RUN apk add --no-cache tini
 RUN npm install -g pnpm@10
 
