@@ -95,15 +95,10 @@ export function apiKeyAuth(store: ApiKeyStore | undefined, network?: NetworkType
       }
     }
 
-    // If no keys have been created yet:
-    //  - mainnet: still enforce 401 (must create keys before API is usable)
-    //  - testnet/devnet: open access (fresh node, backwards-compatible)
+    // If no keys have been created yet, enforce 401 on all networks.
+    // Operators must create a key via the localhost admin API first.
     if (store.activeCount() === 0) {
-      if (network === 'mainnet') {
-        unauthorized(res, 'No API keys configured. Create a key with `clawnet api-key create <label>` before using mainnet API.', pathname);
-        return;
-      }
-      await next();
+      unauthorized(res, 'No API keys configured. Create a key via POST /api/v1/admin/api-keys from localhost, or `clawnet api-key create <label>`.', pathname);
       return;
     }
 

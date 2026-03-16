@@ -187,11 +187,11 @@ describe('auth middleware', () => {
     expect(res.status).toBe(401);
   });
 
-  it('skips auth entirely when no keys exist (backwards compatible)', async () => {
+  it('returns 401 when no keys exist (zero-key enforcement)', async () => {
     // No keys created — store.activeCount() === 0
+    // Zero-key nodes must create a key via localhost admin API first
     const res = await fetch(`${baseUrl}/api/v1/wallets/did:claw:test/balance`);
-    // Should not be 401 — auth is skipped
-    expect(res.status).not.toBe(401);
+    expect(res.status).toBe(401);
   });
 
   it('allows CORS preflight without key', async () => {

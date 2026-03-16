@@ -160,6 +160,30 @@ export function contractRoutes(ctx: RuntimeContext): Router {
     const party = route.query.get('party') ?? route.query.get('did');
     const status = route.query.get('status');
 
+    // Prefer chain-backed service (indexer) for read consistency with writes
+    if (ctx.contractsService) {
+      try {
+        const statusNum = status != null ? Number(status) : undefined;
+        const result = ctx.contractsService.listContracts({
+          address: party ?? undefined,
+          status: Number.isFinite(statusNum) ? statusNum : undefined,
+          limit: perPage,
+          offset,
+        });
+        if (result) {
+          paginated(res, result.contracts, {
+            page,
+            perPage,
+            total: result.total,
+            basePath: '/api/v1/contracts',
+          });
+          return;
+        }
+      } catch {
+        /* fall through to event-sourced store */
+      }
+    }
+
     if (ctx.contractStore) {
       try {
         const all = await ctx.contractStore.listContracts();
@@ -190,6 +214,20 @@ export function contractRoutes(ctx: RuntimeContext): Router {
   // ── GET /:id — single contract ────────────────────────────────
   r.get('/:id', async (_req, res, route) => {
     const { id } = route.params;
+
+    // Prefer chain-backed service for read consistency with writes
+    if (ctx.contractsService) {
+      try {
+        const view = await ctx.contractsService.getContract(id);
+        if (view) {
+          ok(res, view, { self: `/api/v1/contracts/${id}` });
+          return;
+        }
+      } catch {
+        /* fall through to event-sourced store */
+      }
+    }
+
     const contract = await getContractFromStore(id);
     if (!contract) {
       notFound(res, `Contract ${id} not found`);
@@ -559,6 +597,17 @@ export function contractRoutes(ctx: RuntimeContext): Router {
   // ── GET /:id/milestones — list milestones ─────────────────────
   r.get('/:id/milestones', async (_req, res, route) => {
     const { id } = route.params;
+
+    if (ctx.contractsService) {
+      try {
+        const milestones = await ctx.contractsService.getMilestones(id);
+        ok(res, milestones, { self: `/api/v1/contracts/${id}/milestones` });
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+
     const contract = await getContractFromStore(id);
     if (!contract) {
       notFound(res, `Contract ${id} not found`);
@@ -571,6 +620,22 @@ export function contractRoutes(ctx: RuntimeContext): Router {
   r.get('/:id/milestones/:idx', async (_req, res, route) => {
     const { id, idx } = route.params;
     const index = Number(idx);
+
+    if (ctx.contractsService) {
+      try {
+        const milestones = await ctx.contractsService.getMilestones(id);
+        const ms = milestones[index];
+        if (!ms) {
+          notFound(res, `Milestone ${idx} not found`);
+          return;
+        }
+        ok(res, ms, { self: `/api/v1/contracts/${id}/milestones/${idx}` });
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+
     const contract = await getContractFromStore(id);
     if (!contract) {
       notFound(res, `Contract ${id} not found`);

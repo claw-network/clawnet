@@ -93,18 +93,7 @@ export function attachDeliveryStreamHandler(
     }
 
     // Auth
-    if (apiKeyStore && apiKeyStore.activeCount() > 0) {
-      const apiKey =
-        url.searchParams.get('apiKey') ??
-        (req.headers['x-api-key'] as string | undefined) ??
-        extractBearerToken(req.headers.authorization);
-
-      if (!apiKey || !apiKeyStore.validate(apiKey)) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-    }
+    if (!requireWsAuth(apiKeyStore, req, socket)) return;
 
     wss.handleUpgrade(req, socket, head, (ws) => {
       handleStreamConnection(ws, deliverableId, sessions, blobDir);
@@ -229,4 +218,36 @@ function extractBearerToken(header: string | undefined): string | undefined {
     return parts[1];
   }
   return undefined;
+}
+
+/**
+ * Shared WS auth check. Returns `true` if the connection is allowed to
+ * proceed, `false` if it was rejected (socket destroyed).
+ */
+function requireWsAuth(
+  apiKeyStore: ApiKeyStore | undefined,
+  req: IncomingMessage,
+  socket: import('node:stream').Duplex,
+): boolean {
+  if (!apiKeyStore) return true;
+
+  if (apiKeyStore.activeCount() === 0) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return false;
+  }
+
+  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  const apiKey =
+    url.searchParams.get('apiKey') ??
+    (req.headers['x-api-key'] as string | undefined) ??
+    extractBearerToken(req.headers.authorization);
+
+  if (!apiKey || !apiKeyStore.validate(apiKey)) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return false;
+  }
+
+  return true;
 }

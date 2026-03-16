@@ -1,5 +1,5 @@
 import { Level } from 'level';
-import { KVStore } from './kv.js';
+import { KVStore, type BatchOp } from './kv.js';
 
 export interface LevelStoreOptions {
   path: string;
@@ -65,5 +65,15 @@ export class LevelStore implements KVStore {
 
   async close(): Promise<void> {
     await this.db.close();
+  }
+
+  async batch(ops: BatchOp[]): Promise<void> {
+    await this.db.batch(
+      ops.map((op) =>
+        op.type === 'put'
+          ? { type: 'put' as const, key: op.key, value: op.value }
+          : { type: 'del' as const, key: op.key },
+      ),
+    );
   }
 }

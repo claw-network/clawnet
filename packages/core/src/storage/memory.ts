@@ -1,4 +1,4 @@
-import { KVStore } from './kv.js';
+import { KVStore, type BatchOp } from './kv.js';
 
 export class MemoryStore implements KVStore {
   private store = new Map<string, Uint8Array>();
@@ -19,6 +19,16 @@ export class MemoryStore implements KVStore {
     for (const [key, value] of this.store.entries()) {
       if (!prefix || key.startsWith(prefix)) {
         yield { key, value };
+      }
+    }
+  }
+
+  async batch(ops: BatchOp[]): Promise<void> {
+    for (const op of ops) {
+      if (op.type === 'put') {
+        this.store.set(op.key, op.value);
+      } else {
+        this.store.delete(op.key);
       }
     }
   }

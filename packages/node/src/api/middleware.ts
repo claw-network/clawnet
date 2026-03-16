@@ -10,18 +10,18 @@ import { internalError } from './response.js';
 // ---------------------------------------------------------------------------
 
 export interface CorsOptions {
-  /** Allowed origins. `['*']` (default) permits all origins. */
+  /** Allowed origins. Defaults to `[]` (deny all cross-origin). Pass `['*']` to permit all. */
   origins?: string[];
 }
 
 /**
  * Create a CORS middleware.
  *
- * By default, allows all origins (`*`). Pass specific origins for
- * production deployments to restrict cross-origin access.
+ * By default, denies all cross-origin requests (`[]`). Pass specific origins
+ * or `['*']` to allow cross-origin access.
  */
 export function createCors(options?: CorsOptions): Middleware {
-  const allowed = options?.origins ?? ['*'];
+  const allowed = options?.origins ?? [];
   const allowAll = allowed.includes('*');
 
   return async (req, res, next) => {
@@ -116,6 +116,13 @@ export interface RateLimitOptions {
   windowMs?: number;
   /** Max number of tracked clients before oldest entries are evicted. Default: 10_000. */
   maxClients?: number;
+  /**
+   * Trusted reverse-proxy IPs. When the request originates from one of
+   * these addresses, the first `X-Forwarded-For` value is used as the
+   * client IP. Otherwise, `req.socket.remoteAddress` is used directly.
+   * Default: `[]` (trust no proxy — use socket address).
+   */
+  trustedProxies?: string[];
 }
 
 interface ClientBucket {
@@ -136,6 +143,7 @@ export function createRateLimiter(options?: RateLimitOptions): Middleware {
   const writeLimit = options?.writeLimit ?? 60;
   const windowMs = options?.windowMs ?? 60_000;
   const maxClients = options?.maxClients ?? 10_000;
+  const trustedProxies = new Set(options?.trustedProxies ?? []);
 
   // Separate buckets for read vs write per client IP
   const readBuckets = new Map<string, ClientBucket>();
@@ -156,12 +164,16 @@ export function createRateLimiter(options?: RateLimitOptions): Middleware {
   cleanupInterval.unref();
 
   function getClientIp(req: import('node:http').IncomingMessage): string {
-    // Trust X-Forwarded-For from reverse proxy (Caddy)
-    const forwarded = req.headers['x-forwarded-for'];
-    if (typeof forwarded === 'string') {
-      return forwarded.split(',')[0].trim();
+    // Only trust X-Forwarded-For when the direct connection is from a
+    // configured trusted proxy (e.g. Caddy on 127.0.0.1).
+    const socketIp = req.socket.remoteAddress ?? 'unknown';
+    if (trustedProxies.size > 0 && trustedProxies.has(socketIp)) {
+      const forwarded = req.headers['x-forwarded-for'];
+      if (typeof forwarded === 'string') {
+        return forwarded.split(',')[0].trim();
+      }
     }
-    return req.socket.remoteAddress ?? 'unknown';
+    return socketIp;
   }
 
   function isExempt(req: import('node:http').IncomingMessage): boolean {

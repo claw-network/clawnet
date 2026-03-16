@@ -84,6 +84,9 @@ function validateEventBytes(
 }
 
 export class EventStore {
+  /** In-process mutex to serialise appendEvent() calls. */
+  private appendLock: Promise<void> = Promise.resolve();
+
   constructor(private readonly store: KVStore) {}
 
   async putEvent(hash: string, eventBytes: Uint8Array): Promise<void> {
@@ -100,6 +103,22 @@ export class EventStore {
   }
 
   async appendEvent(hash: string, eventBytes: Uint8Array): Promise<boolean> {
+    // Serialise concurrent callers through an in-process lock so that two
+    // callers cannot read the same nextLogSeq before either has written.
+    let resolve!: () => void;
+    const next = new Promise<void>((r) => { resolve = r; });
+    const prev = this.appendLock;
+    this.appendLock = next;
+
+    await prev; // wait for any in-flight append to finish
+    try {
+      return await this.appendEventInner(hash, eventBytes);
+    } finally {
+      resolve();
+    }
+  }
+
+  private async appendEventInner(hash: string, eventBytes: Uint8Array): Promise<boolean> {
     validateEventBytes(hash, eventBytes);
     const existingSeq = await this.store.get(`${PREFIX_LOG_HASH}${hash}`);
     if (existingSeq) {
@@ -111,9 +130,22 @@ export class EventStore {
     }
     const seq = await this.nextLogSeq();
     const seqKey = `${PREFIX_LOG_SEQ}${encodeSeq(seq)}`;
-    await this.store.put(seqKey, utf8ToBytes(hash));
-    await this.store.put(`${PREFIX_LOG_HASH}${hash}`, utf8ToBytes(encodeSeq(seq)));
-    await this.store.put(KEY_LOG_SEQ, encodeJson(seq + 1));
+
+    // Atomic batch write: sequence entry + hash→seq index + counter bump.
+    // If the store supports batch(), this is a single atomic WriteBatch;
+    // otherwise fall back to sequential puts (existing behaviour).
+    const ops = [
+      { type: 'put' as const, key: seqKey, value: utf8ToBytes(hash) },
+      { type: 'put' as const, key: `${PREFIX_LOG_HASH}${hash}`, value: utf8ToBytes(encodeSeq(seq)) },
+      { type: 'put' as const, key: KEY_LOG_SEQ, value: encodeJson(seq + 1) },
+    ];
+    if (this.store.batch) {
+      await this.store.batch(ops);
+    } else {
+      for (const op of ops) {
+        await this.store.put(op.key, op.value);
+      }
+    }
     return true;
   }
 

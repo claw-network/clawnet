@@ -135,25 +135,39 @@ describe('createRateLimiter', () => {
     expect(res._headers['x-ratelimit-reset']).toBeTruthy();
   });
 
-  it('respects X-Forwarded-For header for client IP', async () => {
-    const limiter = createRateLimiter({ readLimit: 1, windowMs: 60_000 });
+  it('respects X-Forwarded-For header only with trustedProxies', async () => {
+    // Without trustedProxies, X-Forwarded-For is ignored → all reqs use socket IP
+    const limiterNoTrust = createRateLimiter({ readLimit: 1, windowMs: 60_000 });
     const next = vi.fn();
 
     const req1 = mockReq();
     req1.headers['x-forwarded-for'] = '203.0.113.1';
-    await limiter(req1, mockRes(), next);
+    await limiterNoTrust(req1, mockRes(), next);
 
-    // Same forwarded IP → blocked
+    // Same socket IP → blocked even though X-Forwarded-For differs
     const req2 = mockReq();
-    req2.headers['x-forwarded-for'] = '203.0.113.1';
+    req2.headers['x-forwarded-for'] = '203.0.113.2';
     const res2 = mockRes();
-    await limiter(req2, res2, next);
+    await limiterNoTrust(req2, res2, next);
     expect(next).toHaveBeenCalledTimes(1);
 
-    // Different forwarded IP → allowed
+    // With trustedProxies including the socket IP, X-Forwarded-For is trusted
+    const next2 = vi.fn();
+    const limiterTrust = createRateLimiter({
+      readLimit: 1,
+      windowMs: 60_000,
+      trustedProxies: ['127.0.0.1'],
+    });
+
     const req3 = mockReq();
-    req3.headers['x-forwarded-for'] = '203.0.113.2';
-    await limiter(req3, mockRes(), next);
-    expect(next).toHaveBeenCalledTimes(2);
+    req3.headers['x-forwarded-for'] = '203.0.113.1';
+    await limiterTrust(req3, mockRes(), next2);
+    expect(next2).toHaveBeenCalledTimes(1);
+
+    // Different forwarded IP → allowed
+    const req4 = mockReq();
+    req4.headers['x-forwarded-for'] = '203.0.113.2';
+    await limiterTrust(req4, mockRes(), next2);
+    expect(next2).toHaveBeenCalledTimes(2);
   });
 });

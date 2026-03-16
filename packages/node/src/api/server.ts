@@ -188,7 +188,7 @@ export class ApiServer {
     const authMiddleware = apiKeyAuth(this.runtime.apiKeyStore, this.config.network, this.consoleSessionStore);
     const isMainnet = this.config.network === 'mainnet';
     const corsMiddleware = createCors({
-      origins: this.config.corsOrigins ?? (isMainnet ? [] : ['*']),
+      origins: this.config.corsOrigins ?? [],
     });
     const errorMiddleware = createErrorBoundary({ hideDetails: isMainnet });
     const rateLimitMiddleware = createRateLimiter(this.config.rateLimit);

@@ -95,18 +95,7 @@ export function attachWebSocketHandler(
 
     // ── Delegated subscription endpoint ────────────────────────────
     if (url.pathname === WS_DELEGATED_PATH) {
-      if (apiKeyStore && apiKeyStore.activeCount() > 0) {
-        const apiKey =
-          url.searchParams.get('apiKey') ??
-          (req.headers['x-api-key'] as string | undefined) ??
-          extractBearerToken(req.headers.authorization);
-
-        if (!apiKey || !apiKeyStore.validate(apiKey)) {
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
-          return;
-        }
-      }
+      if (!requireWsAuth(apiKeyStore, req, socket)) return;
 
       const delegationId = url.searchParams.get('delegationId');
       if (!delegationId) {
@@ -126,19 +115,8 @@ export function attachWebSocketHandler(
       return;
     }
 
-    // Auth check: apiKey query param or X-Api-Key header
-    if (apiKeyStore && apiKeyStore.activeCount() > 0) {
-      const apiKey =
-        url.searchParams.get('apiKey') ??
-        (req.headers['x-api-key'] as string | undefined) ??
-        extractBearerToken(req.headers.authorization);
-
-      if (!apiKey || !apiKeyStore.validate(apiKey)) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
-        return;
-      }
-    }
+    // Auth check: apiKey query param, X-Api-Key header, or Bearer token
+    if (!requireWsAuth(apiKeyStore, req, socket)) return;
 
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit('connection', ws, req);
@@ -305,4 +283,40 @@ function extractBearerToken(header: string | undefined): string | undefined {
   if (!header) return undefined;
   const match = /^Bearer\s+(.+)$/i.exec(header);
   return match?.[1];
+}
+
+/**
+ * Shared WS auth check. Returns `true` if the connection is allowed to
+ * proceed, `false` if it was rejected (socket destroyed).
+ *
+ * When an ApiKeyStore is configured, a valid key is always required —
+ * including when zero keys exist (fresh node). This mirrors the HTTP
+ * auth middleware behaviour and prevents unauthenticated WS access.
+ */
+function requireWsAuth(
+  apiKeyStore: ApiKeyStore | undefined,
+  req: IncomingMessage,
+  socket: import('node:stream').Duplex,
+): boolean {
+  if (!apiKeyStore) return true; // No store configured — open access
+
+  if (apiKeyStore.activeCount() === 0) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return false;
+  }
+
+  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  const apiKey =
+    url.searchParams.get('apiKey') ??
+    (req.headers['x-api-key'] as string | undefined) ??
+    extractBearerToken(req.headers.authorization);
+
+  if (!apiKey || !apiKeyStore.validate(apiKey)) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return false;
+  }
+
+  return true;
 }

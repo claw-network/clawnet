@@ -58,7 +58,7 @@ export interface ApiServerConfig {
   dataDir?: string;
   /** Network type — controls dev route availability and auth strictness. */
   network?: NetworkType;
-  /** Allowed CORS origins. Defaults to `['*']`. Set explicitly for mainnet. */
+  /** Allowed CORS origins. Defaults to `[]` (deny cross-origin). Set explicitly for browser access. */
   corsOrigins?: string[];
   /** Rate limiting options. Applied per-IP with separate read/write limits. */
   rateLimit?: import('./middleware.js').RateLimitOptions;

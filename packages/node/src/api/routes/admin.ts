@@ -38,6 +38,24 @@ function isLocalhost(req: IncomingMessage): boolean {
   );
 }
 
+/**
+ * Block cross-origin requests to admin endpoints.
+ * Browsers always send an `Origin` header on cross-origin POSTs;
+ * if present and not a localhost URL, the request is CSRF and must be rejected.
+ * CLI / SDK callers (curl, fetch from Node) do not send Origin.
+ */
+function isCsrfSafe(req: IncomingMessage): boolean {
+  const origin = req.headers.origin;
+  if (!origin) return true; // No Origin → not a cross-origin browser request
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+    return host === '127.0.0.1' || host === '::1' || host === 'localhost';
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
@@ -49,6 +67,10 @@ export function adminRoutes(ctx: RuntimeContext): Router {
   r.post('/api-keys', async (req, res, route) => {
     if (!isLocalhost(req)) {
       forbidden(res, 'Admin API is only accessible from localhost', route.url.pathname);
+      return;
+    }
+    if (!isCsrfSafe(req)) {
+      forbidden(res, 'Cross-origin admin requests are not allowed', route.url.pathname);
       return;
     }
 
@@ -97,6 +119,10 @@ export function adminRoutes(ctx: RuntimeContext): Router {
   r.post('/api-keys/:id/revoke', async (req, res, route) => {
     if (!isLocalhost(req)) {
       forbidden(res, 'Admin API is only accessible from localhost', route.url.pathname);
+      return;
+    }
+    if (!isCsrfSafe(req)) {
+      forbidden(res, 'Cross-origin admin requests are not allowed', route.url.pathname);
       return;
     }
 

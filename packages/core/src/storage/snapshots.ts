@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { canonicalizeBytes } from '../crypto/jcs.js';
 import { sha256Hex } from '../crypto/hash.js';
@@ -108,13 +108,18 @@ export class SnapshotStore {
   async saveSnapshot(snapshot: SnapshotRecord): Promise<void> {
     await mkdir(this.dir, { recursive: true });
     const path = this.snapshotPath(snapshot.hash);
-    await writeFile(path, JSON.stringify(snapshot), 'utf8');
-    await writeFile(this.latestFile, snapshot.hash, 'utf8');
+    // Atomic writes: write to a temp file, then rename.
+    // rename() is atomic on POSIX, preventing partial/corrupt files on crash.
+    await writeFile(path + '.tmp', JSON.stringify(snapshot), 'utf8');
+    await rename(path + '.tmp', path);
+    await writeFile(this.latestFile + '.tmp', snapshot.hash, 'utf8');
+    await rename(this.latestFile + '.tmp', this.latestFile);
     const meta = {
       hash: snapshot.hash,
       createdAt: new Date().toISOString(),
     };
-    await writeFile(this.latestMetaFile, JSON.stringify(meta), 'utf8');
+    await writeFile(this.latestMetaFile + '.tmp', JSON.stringify(meta), 'utf8');
+    await rename(this.latestMetaFile + '.tmp', this.latestMetaFile);
   }
 
   async loadSnapshot(hash: string): Promise<SnapshotRecord | null> {
@@ -216,6 +221,14 @@ export class SnapshotStore {
       let latestMtime = 0;
       for (const entry of entries) {
         if (!entry.endsWith('.json')) {
+          continue;
+        }
+        // Exclude metadata files — only real snapshot files are <hash>.json
+        if (entry === 'latest.meta.json') {
+          continue;
+        }
+        // Skip temp files from interrupted saves
+        if (entry.endsWith('.tmp')) {
           continue;
         }
         const path = join(this.dir, entry);
