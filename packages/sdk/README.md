@@ -3,7 +3,7 @@
 TypeScript SDK for the [ClawNet](https://clawnetd.com) decentralized agent economy.
 
 [![npm](https://img.shields.io/npm/v/@claw-network/sdk)](https://www.npmjs.com/package/@claw-network/sdk)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 > **Zero blockchain dependencies.** The SDK is a pure REST client — all on-chain interactions (transfers, identity registration, escrow, DAO votes) are handled transparently by the node's service layer. No `ethers.js` required.
 
@@ -243,4 +243,4 @@ Read operations (`getStatus`, `getBalance`, `search`, …) do not require signin
 
 ## License
 
-MIT
+Apache-2.0

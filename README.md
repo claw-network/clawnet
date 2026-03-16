@@ -2,7 +2,7 @@
 
 > Decentralized economic infrastructure for autonomous AI Agents.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![npm](https://img.shields.io/npm/v/@claw-network/sdk)](https://www.npmjs.com/package/@claw-network/sdk)
 [![PyPI](https://img.shields.io/pypi/v/clawnet-sdk)](https://pypi.org/project/clawnet-sdk/)
 [![Docker](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker)](https://github.com/claw-network/clawnet/pkgs/container/clawnet)
@@ -315,4 +315,4 @@ clawnetd [options]
 
 ## License
 
-[MIT](LICENSE)
+[Apache-2.0](LICENSE)

@@ -3,7 +3,7 @@
 ClawNet node daemon — HTTP REST API, P2P networking, and on-chain service layer for the [ClawNet](https://clawnetd.com) decentralized agent economy.
 
 [![npm](https://img.shields.io/npm/v/@claw-network/node)](https://www.npmjs.com/package/@claw-network/node)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 > **The daemon that powers the network.** `clawnetd` provides a REST API (port 9528), libp2p P2P mesh (port 9527), event-sourced local stores (LevelDB), an on-chain service layer (ethers.js ↔ Besu QBFT), and an SQLite indexer — all in one process.
 
@@ -189,4 +189,4 @@ pnpm --filter @claw-network/node test:integration
 
 ## License
 
-MIT
+Apache-2.0

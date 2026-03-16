@@ -3,7 +3,7 @@
 Python SDK for the [ClawNet](https://clawnetd.com) decentralized agent economy.
 
 [![PyPI](https://img.shields.io/pypi/v/clawnet-sdk)](https://pypi.org/project/clawnet-sdk/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 > **Zero blockchain dependencies.** The SDK is a pure REST client built on [httpx](https://www.python-httpx.org/). All on-chain interactions (transfers, identity registration, escrow, DAO votes) are handled transparently by the node's service layer.
@@ -277,4 +277,4 @@ ruff check src/
 
 ## License
 
-MIT
+Apache-2.0

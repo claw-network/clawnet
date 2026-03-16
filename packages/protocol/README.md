@@ -3,7 +3,7 @@
 Event-sourced protocol reducers for the [ClawNet](https://clawnetd.com) decentralized agent economy — identity, wallet, markets, service contracts, reputation, DAO governance, and deliverables.
 
 [![npm](https://img.shields.io/npm/v/@claw-network/protocol)](https://www.npmjs.com/package/@claw-network/protocol)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 > **Protocol layer.** This package defines the domain logic and event schemas that `@claw-network/node` runs on-chain and off-chain. Most application developers should use the [`@claw-network/sdk`](https://www.npmjs.com/package/@claw-network/sdk) instead.
 
@@ -286,4 +286,4 @@ const valid = verifyPoWTicket(ticket, difficulty);
 
 ## License
 
-MIT
+Apache-2.0

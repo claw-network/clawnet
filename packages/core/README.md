@@ -3,7 +3,7 @@
 Core cryptographic primitives, P2P networking, storage, and identity utilities for the [ClawNet](https://clawnetd.com) decentralized agent economy.
 
 [![npm](https://img.shields.io/npm/v/@claw-network/core)](https://www.npmjs.com/package/@claw-network/core)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 > **Foundation layer.** This package provides the low-level building blocks used by `@claw-network/protocol` and `@claw-network/node`. Most application developers should use the [`@claw-network/sdk`](https://www.npmjs.com/package/@claw-network/sdk) instead.
 
@@ -202,4 +202,4 @@ import { utf8ToBytes, bytesToHex, hexToBytes, concatBytes, bytesToBase64 } from 
 
 ## License
 
-MIT
+Apache-2.0
