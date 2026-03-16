@@ -171,7 +171,9 @@ export function contractRoutes(ctx: RuntimeContext): Router {
           offset,
         });
         if (result) {
-          paginated(res, result.contracts, {
+          // Normalise: SDK expects `id` field alongside `contractId`
+          const items = result.contracts.map((c) => ({ ...c, id: c.contractId }));
+          paginated(res, items, {
             page,
             perPage,
             total: result.total,
@@ -220,7 +222,8 @@ export function contractRoutes(ctx: RuntimeContext): Router {
       try {
         const view = await ctx.contractsService.getContract(id);
         if (view) {
-          ok(res, view, { self: `/api/v1/contracts/${id}` });
+          // Normalise: SDK expects `id` field alongside `contractId`
+          ok(res, { ...view, id }, { self: `/api/v1/contracts/${id}` });
           return;
         }
       } catch {
