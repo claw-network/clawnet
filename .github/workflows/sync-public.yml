@@ -119,12 +119,18 @@ jobs:
           echo "=== Incremental sync complete ==="
           ls -d */ .github/ 2>/dev/null || true
 
-      - name: Verify no secrets leaked
+      - name: Scan source repo for secrets
         if: steps.timecheck.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          cd /tmp/public-repo
+          cd "$GITHUB_WORKSPACE"
           LEAKED=0
+          GREP_OPTS=(
+            --exclude-dir='.git' --exclude-dir='node_modules' --exclude-dir='.venv'
+            --include='*.md' --include='*.yml' --include='*.yaml'
+            --include='*.json' --include='*.ts' --include='*.js' --include='*.mjs'
+            --include='*.sh' --include='*.env' --include='*.toml'
+          )
 
           for pattern in \
             "G66tdTcmvBz" \
@@ -137,9 +143,46 @@ jobs:
             "EozRApYGFxDx" \
             "VLwttmyiMnzZ" \
             "clawnet-86a288c9"; do
-            if grep -rq "$pattern" . --include='*.md' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.ts' --include='*.js' --include='*.sh' --include='*.env' 2>/dev/null; then
+            if grep -rq "$pattern" . "${GREP_OPTS[@]}" 2>/dev/null; then
+              echo "LEAK IN SOURCE: pattern '$pattern' found in clawnet-dev!"
+              grep -rl "$pattern" . "${GREP_OPTS[@]}" 2>/dev/null
+              LEAKED=1
+            fi
+          done
+
+          if [[ $LEAKED -eq 1 ]]; then
+            echo "::error::Secret found in clawnet-dev source! Aborting sync."
+            exit 1
+          fi
+          echo "✅ No secrets detected in clawnet-dev source."
+
+      - name: Verify no secrets leaked
+        if: steps.timecheck.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          cd /tmp/public-repo
+          LEAKED=0
+          GREP_OPTS=(
+            --exclude-dir='.git' --exclude-dir='node_modules'
+            --include='*.md' --include='*.yml' --include='*.yaml'
+            --include='*.json' --include='*.ts' --include='*.js' --include='*.mjs'
+            --include='*.sh' --include='*.env' --include='*.toml'
+          )
+
+          for pattern in \
+            "G66tdTcmvBz" \
+            "401ca444cbe821f7" \
+            "b82233d82380d025" \
+            "47853887d009" \
+            "60f6c6e78e61" \
+            "d862dbdcbc54" \
+            "b6dc8fbb1fec" \
+            "EozRApYGFxDx" \
+            "VLwttmyiMnzZ" \
+            "clawnet-86a288c9"; do
+            if grep -rq "$pattern" . "${GREP_OPTS[@]}" 2>/dev/null; then
               echo "LEAK DETECTED: pattern '$pattern' found in public content!"
-              grep -rl "$pattern" . --include='*.md' --include='*.yml' --include='*.yaml' --include='*.json' --include='*.ts' --include='*.js' --include='*.sh' --include='*.env' 2>/dev/null
+              grep -rl "$pattern" . "${GREP_OPTS[@]}" 2>/dev/null
               LEAKED=1
             fi
           done
