@@ -14,46 +14,118 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Check sync window
+        id: timecheck
+        run: |
+          set -euo pipefail
+
+          # Always sync: manual dispatch, tag push
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "Manual dispatch — syncing regardless of time."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "Tag push — syncing regardless of time."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Time gate: skip during 08:00-18:59 CST (Asia/Shanghai)
+          HOUR=$(TZ='Asia/Shanghai' date +%H)
+          echo "Current hour (Asia/Shanghai): $HOUR"
+          if [[ "$HOUR" -ge 8 && "$HOUR" -lt 19 ]]; then
+            echo "Daytime (08:00-19:00 CST) — skipping sync."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "After hours — proceeding with sync."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.timecheck.outputs.skip != 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Prepare public content
+      - name: Save commit message
+        if: steps.timecheck.outputs.skip != 'true'
+        id: commitmsg
+        run: |
+          MSG="$(git log -1 --format='%s' 2>/dev/null || echo 'update')"
+          echo "msg=$MSG" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Git
+        if: steps.timecheck.outputs.skip != 'true'
+        run: |
+          git config --global user.name "ClawNet Bot"
+          git config --global user.email "bot@clawnetd.com"
+
+      - name: Clone public repo
+        if: steps.timecheck.outputs.skip != 'true'
+        env:
+          PUBLIC_REPO_PAT: ${{ secrets.PUBLIC_REPO_PAT }}
+        run: |
+          set -euo pipefail
+          PUBLIC_REPO="https://x-access-token:${PUBLIC_REPO_PAT}@github.com/claw-network/clawnet.git"
+
+          if ! git clone --depth 1 "$PUBLIC_REPO" /tmp/public-repo 2>/dev/null; then
+            echo "Public repo empty or unreachable — initializing fresh."
+            mkdir -p /tmp/public-repo
+            cd /tmp/public-repo
+            git init -b main
+          fi
+
+      - name: Incremental sync via rsync
+        if: steps.timecheck.outputs.skip != 'true'
         run: |
           set -euo pipefail
 
-          # 1. Preserve docs/api/ before removing docs/
-          mkdir -p /tmp/preserve
-          cp -r docs/api /tmp/preserve/docs_api
+          # Main rsync: sync everything except private paths
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='docs' \
+            --exclude='skills' \
+            --exclude='issues' \
+            --exclude='temp' \
+            --exclude='infra/testnet' \
+            --exclude='infra/mainnet' \
+            --exclude='infra/shared' \
+            --exclude='infra/besu' \
+            --exclude='infra/README.md' \
+            --exclude='infra/TOKEN_DISTRIBUTION.md' \
+            --exclude='infra/ARCHITECTURE_OVERVIEW.md' \
+            --exclude='.public-sync-ignore' \
+            --exclude='.github/copilot-instructions.md' \
+            --exclude='.github/copilot-instructions.public.md' \
+            --exclude='.github/workflows/sync-public.yml' \
+            ./ /tmp/public-repo/
 
-          # 2. Remove private directories and files
-          rm -rf docs skills issues temp
-          rm -rf infra/testnet infra/mainnet infra/shared infra/besu infra/README.md
-          rm -f infra/TOKEN_DISTRIBUTION.md infra/ARCHITECTURE_OVERVIEW.md
-          rm -f .public-sync-ignore
-          rm -f .github/copilot-instructions.md
+          # Sync docs/api/ separately (only public part of docs/)
+          mkdir -p /tmp/public-repo/docs
+          rsync -a --delete docs/api/ /tmp/public-repo/docs/api/
 
-          # 3. Restore preserved public docs
-          mkdir -p docs
-          cp -r /tmp/preserve/docs_api docs/api
-          rm -rf /tmp/preserve
+          # Replace copilot instructions with sanitized public version
+          cp .github/copilot-instructions.public.md /tmp/public-repo/.github/copilot-instructions.md
 
-          # 4. Replace copilot instructions with sanitized public version
-          mv .github/copilot-instructions.public.md .github/copilot-instructions.md
-
-          # 5. Remove this workflow (not needed in public repo)
+          # Defensive cleanup: ensure no private paths leaked into public repo
+          cd /tmp/public-repo
+          rm -rf skills issues temp .public-sync-ignore
+          rm -rf infra/testnet infra/mainnet infra/shared infra/besu
+          rm -f infra/README.md infra/TOKEN_DISTRIBUTION.md infra/ARCHITECTURE_OVERVIEW.md
+          rm -f .github/copilot-instructions.public.md
           rm -f .github/workflows/sync-public.yml
 
-          echo "=== Public content prepared ==="
+          echo "=== Incremental sync complete ==="
           ls -d */ .github/ 2>/dev/null || true
 
       - name: Verify no secrets leaked
+        if: steps.timecheck.outputs.skip != 'true'
         run: |
           set -euo pipefail
+          cd /tmp/public-repo
           LEAKED=0
 
-          # Check for known secret patterns (partial matches to avoid false positives)
           for pattern in \
             "G66tdTcmvBz" \
             "401ca444cbe821f7" \
@@ -78,38 +150,36 @@ jobs:
           fi
           echo "✅ No secrets detected in public content."
 
-      - name: Configure Git
-        run: |
-          git config --global user.name "ClawNet Bot"
-          git config --global user.email "bot@clawnetd.com"
-
-      - name: Push to public repo
+      - name: Commit and push
+        if: steps.timecheck.outputs.skip != 'true'
         env:
           PUBLIC_REPO_PAT: ${{ secrets.PUBLIC_REPO_PAT }}
         run: |
           set -euo pipefail
+          cd /tmp/public-repo
 
           PUBLIC_REPO="https://x-access-token:${PUBLIC_REPO_PAT}@github.com/claw-network/clawnet.git"
 
-          # Save original commit info before resetting git
-          ORIG_MSG="$(git log -1 --format='%s' 2>/dev/null || echo 'initial sync')"
-          ORIG_SHA="$(git log -1 --format='%h' 2>/dev/null || echo 'unknown')"
-
-          # Create a fresh commit with only public content
-          rm -rf .git
-          git init -b main
           git add -A
-          git commit -m "sync: ${ORIG_SHA} ${ORIG_MSG}"
 
-          # Force push to public repo (single-commit history)
-          git remote add public "$PUBLIC_REPO"
-          git push public main --force
+          # Skip if nothing changed
+          if git diff --staged --quiet; then
+            echo "✅ No changes to sync."
+            exit 0
+          fi
+
+          ORIG_MSG="${{ steps.commitmsg.outputs.msg }}"
+          git commit -m "$ORIG_MSG"
+
+          # Ensure remote URL is set (for fresh init case)
+          git remote set-url origin "$PUBLIC_REPO" 2>/dev/null || git remote add origin "$PUBLIC_REPO"
+          git push origin main
 
           # Sync tag if this is a tag push
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
             git tag "$TAG"
-            git push public "$TAG" --force
+            git push origin "$TAG" --force
           fi
 
           echo "✅ Synced to public repo"
