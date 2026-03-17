@@ -142,7 +142,8 @@ jobs:
             "b6dc8fbb1fec" \
             "EozRApYGFxDx" \
             "VLwttmyiMnzZ" \
-            "clawnet-86a288c9"; do
+            "clawnet-86a288c9" \
+            "clawnet-dev"; do
             if grep -rq "$pattern" . "${GREP_OPTS[@]}" 2>/dev/null; then
               echo "LEAK IN SOURCE: pattern '$pattern' found in clawnet-dev!"
               grep -rl "$pattern" . "${GREP_OPTS[@]}" 2>/dev/null
@@ -179,7 +180,8 @@ jobs:
             "b6dc8fbb1fec" \
             "EozRApYGFxDx" \
             "VLwttmyiMnzZ" \
-            "clawnet-86a288c9"; do
+            "clawnet-86a288c9" \
+            "clawnet-dev"; do
             if grep -rq "$pattern" . "${GREP_OPTS[@]}" 2>/dev/null; then
               echo "LEAK DETECTED: pattern '$pattern' found in public content!"
               grep -rl "$pattern" . "${GREP_OPTS[@]}" 2>/dev/null
