@@ -1,0 +1,12 @@
+{
+  "title": "Event Schemas",
+  "pages": [
+    "overview",
+    "identity-events",
+    "wallet-events",
+    "markets-events",
+    "contracts-events",
+    "reputation-events",
+    "changelog"
+  ]
+}

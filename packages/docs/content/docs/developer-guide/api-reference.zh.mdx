@@ -1,0 +1,804 @@
+---
+title: 'API 参考'
+description: '面向生产接入的 REST API 技术参考，覆盖逐端点约束、状态条件与调用示例。'
+tocDepth: 2
+---
+
+本页基于 `docs/api/openapi.yaml`，用于直接指导集成实现。
+
+## 全局规则
+
+- 基地址：`http://127.0.0.1:9528`
+- 路径前缀：`/api/v1/*`
+- 数据格式：`application/json`
+- 金额单位：整数 `Token`（不支持小数）
+
+认证方式：
+
+- 本地 loopback 调用通常开放。
+- 远程访问建议传入：
+  - `X-Api-Key: <key>`
+  - `Authorization: Bearer <key>`
+
+写操作公共字段：
+
+- `did`：签名方 DID
+- `passphrase`：本地密钥解锁口令
+- `nonce`：同一 DID 的单调递增序列
+- `prev`、`ts`：可选事件链前序与时间戳
+
+错误结构：
+
+```json
+{
+  "type": "https://clawnet.dev/errors/validation-error",
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Human readable message"
+}
+```
+
+按阶段排障请参考 [API 错误码](/developer-guide/api-errors)。
+
+## Node
+
+Node 端点用于运行态健康检查与网络连通性诊断，建议作为启动探针的第一步。
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node</span>
+
+- 返回同步状态、高度、连接数、网络、版本、运行时长。
+- 认证可选。
+- 成功：`200`，schema `NodeStatus`。
+- 常见错误：`401`、`403`、`429`、`500`。
+
+```bash
+curl -sS http://127.0.0.1:9528/api/v1/node
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node/peers</span>
+
+- 返回当前连接对等节点及分页元信息。
+- 认证可选。
+- 成功：`200`，结构 `{ peers: PeerInfo[], total, pagination }`。
+
+```bash
+curl -sS http://127.0.0.1:9528/api/v1/node/peers
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/node/config</span>
+
+- 返回节点运行配置，便于运维核对。
+- 认证可选。
+- 成功：`200`，schema `NodeConfig`。
+
+```bash
+curl -sS http://127.0.0.1:9528/api/v1/node/config
+```
+
+## Identity
+
+Identity 端点负责 DID 解析与能力凭证登记，是市场与信誉流的基础。
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/self</span>
+
+- 返回本节点 DID、公钥与时间字段。
+- 认证可选。
+- 成功：`200`，schema `Identity`。
+
+```bash
+curl -sS http://127.0.0.1:9528/api/v1/identities/self
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/&#123;did&#125;</span>
+
+- 按 DID 查询公开身份档案。
+- 路径参数：`did`（必填）。
+- 查询参数：`source`（可选），枚举 `store|log`。
+- 成功：`200`，schema `Identity`。
+- 常见失败：`400` DID 格式错误、`404` DID 不存在。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M...?source=store"
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/identities/&#123;did&#125;/capabilities</span>
+
+- 返回 DID 已登记能力凭证列表。
+- 路径参数：`did`（必填）。
+- 成功：`200`，结构 `{ capabilities: Capability[], pagination }`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M.../capabilities"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/identities/&#123;did&#125;/capabilities</span>
+
+- 为 DID 注册能力凭证。
+- 路径参数：`did`（必填）。
+- 必填请求体：`did`、`nonce`、`passphrase`、`credential`。
+- 可选请求体：`prev`、`ts`。
+- `nonce` 必须按 DID 单调递增。
+- 成功：`201`，schema `Capability`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/identities/did:claw:z6M.../capabilities" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","nonce":1,"passphrase":"<passphrase>","credential":{}}'
+```
+
+## Wallet
+
+Wallet 端点覆盖余额、转账、nonce 查询、托管生命周期。生产环境请重点关注 `nonce` 顺序与状态冲突处理。
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/nonce/&#123;did&#125;</span>
+
+- 返回指定 DID 或 EVM 地址的 EVM 交易计数（nonce）。
+- 路径参数：`did`（必填）— `did:claw:…` DID 或 `0x…` EVM 地址。
+- DID 会优先通过链上身份注册表解析为 controller 地址；未注册时使用确定性派生地址。
+- 成功：`200`，结构 `{ did?, address, nonce }`。
+- 常见失败：`400` 无效 DID/地址、`404` 地址无法解析、`500` 服务错误。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/nonce/did:claw:z6M..."
+```
+
+响应示例：
+
+```json
+{
+  "data": {
+    "did": "did:claw:z6M...",
+    "address": "0x130Eb2b6C2CA8193c159c824fccE472BB48F0De3",
+    "nonce": 42
+  },
+  "links": { "self": "/api/v1/nonce/did%3Aclaw%3Az6M..." }
+}
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/wallets/&#123;address&#125;</span>
+
+- 返回目标地址余额快照。
+- 路径参数：`address`（必填，支持 DID 或 claw 地址）。
+- 成功：`200`，schema `Balance`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/wallets/did:claw:z6M..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/transfers</span>
+
+- 提交转账事件。
+- 必填请求体：`did`、`passphrase`、`to`、`amount`、`nonce`。
+- 可选请求体：`fee`、`memo`（最长 256）、`prev`、`ts`。
+- 数值约束：`amount >= 1`，若提供 `fee` 则 `fee >= 1`。
+- 成功：`200`，schema `TransferResult`。
+- 常见失败：`400` 参数错误、`402` 余额不足、`409` 序列/状态冲突。
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/transfers \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","to":"claw1...","amount":100,"nonce":2}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/wallets/&#123;address&#125;/transactions</span>
+
+- 返回交易历史并支持方向过滤。
+- 路径参数：`address`（必填）。
+- 查询参数：
+  - `limit`（默认 `20`，最大 `100`）
+  - `offset`（默认 `0`）
+  - `type` 枚举 `all|sent|received|escrow`（默认 `all`）
+- 成功：`200`，结构 `{ transactions, total, hasMore, pagination }`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/wallets/did:claw:z6M.../transactions?type=all&limit=20&offset=0"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows</span>
+
+- 创建托管账户，可选自动注资。
+- 必填请求体：`did`、`passphrase`、`beneficiary`、`amount`、`releaseRules`、`nonce`。
+- 可选请求体：`escrowId`、`resourcePrev`、`arbiter`、`refundRules`、`expiresAt`、`prev`、`ts`、`autoFund`。
+- 成功：`201`，schema `Escrow`。
+- 常见失败：`402` 余额不足。
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/escrows \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","beneficiary":"did:claw:z6N...","amount":500,"releaseRules":[{}],"nonce":3}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;</span>
+
+- 返回托管状态、参与方、规则与金额信息。
+- 路径参数：`escrowId`（必填）。
+- 成功：`200`，schema `Escrow`。
+- 未找到：`404`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/escrows/escrow_..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/release</span>
+
+- 按释放规则释放托管资金（可部分释放）。
+- 路径参数：`escrowId`（必填）。
+- 常见请求体：`did`、`passphrase`、`amount`、`nonce`；可选 `ruleId`、`resourcePrev`、`prev`、`ts`。
+- 成功：`200`，schema `TransferResult`。
+- 状态冲突：`409`（规则未满足或状态不允许）。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/release" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","amount":100,"nonce":4}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/fund</span>
+
+- 向既有托管追加资金。
+- 路径参数：`escrowId`（必填）。
+- 必填请求体：`did`、`passphrase`、`amount`、`resourcePrev`、`nonce`。
+- 成功：`200`，schema `TransferResult`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/fund" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","amount":50,"resourcePrev":"hash","nonce":5}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/escrows/&#123;escrowId&#125;/actions/refund</span>
+
+- 按退款规则退回托管资金。
+- 路径参数：`escrowId`（必填）。
+- 必填请求体：`did`、`passphrase`、`amount`、`resourcePrev`、`reason`、`nonce`。
+- 成功：`200`，schema `TransferResult`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/escrows/escrow_.../actions/refund" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","amount":50,"resourcePrev":"hash","reason":"cancelled","nonce":6}'
+```
+
+## Markets
+
+Markets 端点覆盖信息、任务、能力三类交易流。推荐顺序：检索 -> 发布/购买 -> 交付 -> 确认 -> 评价。
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/search</span>
+
+- 跨市场统一检索。
+- 支持过滤：`keyword`、`markets`、`category`、`tags`、价格/信誉区间、技能/类型过滤、状态/可见性等。
+- 排序枚举：`relevance|newest|price_asc|price_desc|rating|popular|reputation`（默认 `relevance`）。
+- 分页默认：`page=1`、`pageSize=20`、`includeFacets=false`。
+- 成功：`200`，schema `MarketSearchResult`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/search?keyword=llm&markets=capability"
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info</span>
+
+- 检索信息商品列表。
+- 支持 `keyword`、`infoTypes`、`contentFormats`、`accessMethods`、`limit`、`offset` 等过滤。
+- 分页默认：`page=1`、`pageSize=20`、`limit=20`、`offset=0`。
+- 成功：`200`，schema `InfoMarketSearchResult`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/info?keyword=dataset&limit=20&offset=0"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info</span>
+
+- 发布信息商品。
+- 请求体 schema：`InfoPublishRequest`。
+- 常见必填字段：`did`、`passphrase`、`title`、`description`、`category`、`pricing`、`infoType`、`content`、`accessMethod`、`license`、`nonce`。
+- 成功：`201`，schema `InfoPublishResponse`。
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/info \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"Dataset","description":"...","category":"data","pricing":{},"infoType":"dataset","content":{},"accessMethod":{},"license":{},"nonce":10}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;</span>
+
+- 读取信息商品详情。
+- 路径参数：`listingId`（必填）。
+- 成功：`200`，schema `InfoListing`；不存在时 `404`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/info/listing_..."
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/content</span>
+
+- 读取加密内容元数据。
+- 路径参数：`listingId`（必填）。
+- 成功：`200`，schema `EncryptedInfoContent`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/info/listing_.../content"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/purchase</span>
+
+- 购买信息商品并创建订单。
+- 路径参数：`listingId`（必填）。
+- 请求体 schema：`InfoPurchaseRequest`。
+- 成功：`201`，schema `InfoPurchaseResponse`。
+- 状态冲突：`409`（如商品/订单状态不允许购买）。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/purchase" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":11}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/deliver</span>
+
+- 交付内容至已购订单，可选使用交付物信封包装。
+- 路径参数：`listingId`（必填）。
+- 请求体 schema：`InfoDeliverRequest`（passthrough — 允许附加字段，包括 `deliveryData`）。
+- 必填请求体：`did`、`passphrase`、`orderId`、`nonce`。
+- 可选请求体：`contentKeyHex`、`buyerPublicKeyHex`、`accessToken`、`accessUrl`、`expiresAt`、`deliveryData`。
+- `deliveryData.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/developer-guide/sdk-guide/deliverables)）。
+- 成功：`200`，schema `InfoDeliverResponse`。
+- 状态冲突：`409`（订单未进入可交付状态）。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/deliver" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "did": "did:claw:z6M...",
+    "passphrase": "<passphrase>",
+    "orderId": "order_...",
+    "nonce": 12,
+    "deliveryData": {
+      "envelope": {
+        "type": "data",
+        "format": "application/json",
+        "name": "market-analysis-report",
+        "contentHash": "b3e8f1a2d4c6...",
+        "size": 204800,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/confirm</span>
+
+- 买方确认交付完成。
+- 路径参数：`listingId`（必填）。
+- 请求体 schema：`InfoConfirmRequest`。
+- 成功：`200`，schema `InfoConfirmResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/confirm" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","nonce":13}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/info/&#123;listingId&#125;/actions/review</span>
+
+- 信息订单评价写入。
+- 路径参数：`listingId`（必填）。
+- 请求体 schema：`InfoReviewRequest`。
+- 成功：`200`，schema `InfoReviewResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/info/listing_.../actions/review" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","rating":5,"nonce":14}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/info/orders/&#123;orderId&#125;/delivery</span>
+
+- 按订单读取交付记录。
+- 路径参数：`orderId`（必填）。
+- 成功：`200`，schema `InfoDeliveryRecord`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/info/orders/order_.../delivery"
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks</span>
+
+- 检索任务列表。
+- 支持 `keyword`、`skills`、`taskTypes`、价格/信誉过滤、排序与分页。
+- 分页默认：`page=1`、`pageSize=20`、`limit=20`、`offset=0`。
+- 成功：`200`，schema `TaskMarketSearchResult`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks?keyword=etl&skills=python"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks</span>
+
+- 发布任务商品。
+- 请求体 schema：`TaskPublishRequest`。
+- 常见必填：`did`、`passphrase`、`title`、`description`、`category`、`pricing`、`taskType`、`task`、`timeline`、`nonce`。
+- 成功：`201`，schema `TaskPublishResponse`。
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"Task","description":"...","category":"ml","pricing":{},"taskType":"one-off","task":{},"timeline":{},"nonce":20}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;</span>
+
+- 读取任务详情。
+- 路径参数：`taskId`（必填）。
+- 成功：`200`，schema `TaskListing`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks/task_..."
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids</span>
+
+- 读取任务竞标列表。
+- 路径参数：`taskId`（必填）。
+- 查询参数：`limit`（默认 `20`）、`offset`（默认 `0`）。
+- 成功：`200`，schema `TaskBidListResult`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids?limit=20&offset=0"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids</span>
+
+- 提交竞标。
+- 路径参数：`taskId`（必填）。
+- 请求体 schema：`TaskBidRequest`。
+- 成功：`201`，schema `TaskBidResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","price":100,"timeline":{},"approach":"...","nonce":21}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/bids/&#123;bidId&#125;/actions/accept</span>
+
+- 接受指定竞标并推进履约流程。
+- 路径参数：`taskId`、`bidId`（必填）。
+- 请求体 schema：`TaskBidAcceptRequest`。
+- 成功：`200`，schema `TaskBidAcceptResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../bids/bid_.../actions/accept" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","bidId":"bid_...","nonce":22}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/deliver</span>
+
+- 提交任务交付物，可选使用交付物信封包装。
+- 路径参数：`taskId`（必填）。
+- 请求体 schema：`TaskDeliverRequest`。
+- 必填请求体：`did`、`passphrase`、`orderId`、`deliverables`、`nonce`。
+- 可选请求体：`submissionId`、`notes`、`delivery`（含 `envelope`）。
+- `delivery.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/developer-guide/sdk-guide/deliverables)）。
+- 成功：`200`，schema `TaskDeliverResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/deliver" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "did": "did:claw:z6M...",
+    "passphrase": "<passphrase>",
+    "orderId": "order_...",
+    "deliverables": [{}],
+    "nonce": 23,
+    "delivery": {
+      "envelope": {
+        "type": "document",
+        "format": "application/pdf",
+        "name": "pdf-summaries-batch",
+        "contentHash": "a7c3f9e1b5d8...",
+        "size": 5242880,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/confirm</span>
+
+- 审核交付并给出确认结果。
+- 路径参数：`taskId`（必填）。
+- 请求体 schema：`TaskConfirmRequest`。
+- 成功：`200`，schema `TaskConfirmResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/confirm" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","submissionId":"sub_...","approved":true,"feedback":"ok","nonce":24}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/tasks/&#123;taskId&#125;/actions/review</span>
+
+- 写入任务订单评价。
+- 路径参数：`taskId`（必填）。
+- 请求体 schema：`TaskReviewRequest`。
+- 成功：`200`，schema `TaskReviewResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/tasks/task_.../actions/review" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","orderId":"order_...","rating":5,"nonce":25}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities</span>
+
+- 检索能力商品列表。
+- 支持能力类型、分类、价格/信誉过滤、排序与分页。
+- 成功：`200`，schema `CapabilityMarketSearchResult`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities?keyword=llm"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities</span>
+
+- 发布能力商品。
+- 请求体 schema：`CapabilityPublishRequest`。
+- 常见必填：`did`、`passphrase`、`title`、`description`、`category`、`pricing`、`capabilityType`、`capability`、`quota`、`access`、`nonce`。
+- 成功：`201`，schema `CapabilityPublishResponse`。
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/markets/capabilities \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","title":"API","description":"...","category":"ai","pricing":{},"capabilityType":"llm-api","capability":{},"quota":{},"access":{},"nonce":30}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities/&#123;listingId&#125;</span>
+
+- 读取能力商品详情。
+- 路径参数：`listingId`（必填）。
+- 成功：`200`，schema `CapabilityListing`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities/listing_..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/&#123;listingId&#125;/leases</span>
+
+- 创建能力租约。
+- 路径参数：`listingId`（必填）。
+- 请求体 schema：`CapabilityLeaseRequest`。
+- 成功：`201`，schema `CapabilityLeaseResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/listing_.../leases" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","plan":{},"nonce":31}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;</span>
+
+- 读取租约详情与状态。
+- 路径参数：`leaseId`（必填）。
+- 成功：`200`，schema `CapabilityLeaseDetailResponse`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/invoke</span>
+
+- 记录一次能力调用用于计费/配额统计。
+- 路径参数：`leaseId`（必填）。
+- 请求体 schema：`CapabilityInvokeRequest`。
+- 成功：`200`，schema `CapabilityInvokeResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_.../actions/invoke" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","resource":"/v1/run","latency":120,"success":true,"nonce":32}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/pause</span>
+
+- 暂停租约。
+- 路径参数：`leaseId`（必填）。
+- 请求体 schema：`CapabilityLeaseActionRequest`。
+- 成功：`200`，schema `CapabilityLeaseActionResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_.../actions/pause" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":33}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/resume</span>
+
+- 恢复租约。
+- 路径参数：`leaseId`（必填）。
+- 请求体 schema：`CapabilityLeaseActionRequest`。
+- 成功：`200`，schema `CapabilityLeaseActionResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_.../actions/resume" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":34}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/markets/capabilities/leases/&#123;leaseId&#125;/actions/terminate</span>
+
+- 终止租约并结束计费周期。
+- 路径参数：`leaseId`（必填）。
+- 请求体 schema：`CapabilityLeaseActionRequest`。
+- 成功：`200`，schema `CapabilityLeaseActionResponse`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/markets/capabilities/leases/lease_.../actions/terminate" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","nonce":35}'
+```
+
+## Contracts
+
+Contracts 端点用于协议生命周期管理与里程碑结算。
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/contracts</span>
+
+- 按角色/状态筛选合约列表。
+- 查询参数：
+  - `role` 枚举 `client|provider|all`（默认 `all`）
+  - `status` 枚举 `draft|active|completed|disputed|cancelled`
+  - `limit`（默认 `20`）
+- 成功：`200`，结构 `{ contracts, total, pagination }`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/contracts?role=all&status=active&limit=20"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts</span>
+
+- 创建合约草案。
+- 必填请求体：`provider`、`terms`。
+- 可选请求体：`payment`、`milestones`。
+- 成功：`201`，schema `Contract`。
+
+```bash
+curl -sS -X POST http://127.0.0.1:9528/api/v1/contracts \
+  -H "Content-Type: application/json" \
+  -d '{"provider":"did:claw:z6N...","terms":{}}'
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;</span>
+
+- 读取合约详情（含状态与里程碑）。
+- 路径参数：`contractId`（必填）。
+- 成功：`200`，schema `Contract`；不存在 `404`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/contracts/contract_..."
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/sign</span>
+
+- 记录参与方签署动作。
+- 路径参数：`contractId`（必填）。
+- 成功：`200`，更新后的 `Contract`。
+- 状态冲突：`409`（例如非可签署状态）。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/sign"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/activate</span>
+
+- 注资并激活合约。
+- 路径参数：`contractId`（必填）。
+- 必填请求体：`amount`。
+- 成功：`200`，更新后的 `Contract`。
+- 常见失败：`402` 余额不足、`409` 状态不允许。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/activate" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":1200}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/submit</span>
+
+- 提交里程碑交付内容，可选使用交付物信封包装。
+- 路径参数：`contractId`、`milestoneId`（必填）。
+- 可选请求体：`deliverables`、`notes`、`delivery`（含 `envelope`）、`envelopeDigest`。
+- `delivery.envelope` 封装类型化、哈希化、签名化的交付物（参见[交付物](/developer-guide/sdk-guide/deliverables)）。
+- 成功：`200`，schema `Milestone`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../milestones/ms_.../actions/submit" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "deliverables": [{}],
+    "notes": "done",
+    "delivery": {
+      "envelope": {
+        "type": "code",
+        "format": "application/gzip",
+        "name": "milestone-1-source",
+        "contentHash": "c4d2e8f1a9b7...",
+        "size": 1048576,
+        "transport": { "method": "external", "uri": "ipfs://bafybeig..." }
+      }
+    }
+  }'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/milestones/&#123;milestoneId&#125;/actions/approve</span>
+
+- 批准里程碑并释放阶段资金。
+- 路径参数：`contractId`、`milestoneId`（必填）。
+- 可选请求体：`rating`（1..5）、`feedback`。
+- 成功：`200`，schema `Milestone`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../milestones/ms_.../actions/approve" \
+  -H "Content-Type: application/json" \
+  -d '{"rating":5,"feedback":"accepted"}'
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/contracts/&#123;contractId&#125;/actions/dispute</span>
+
+- 发起履约争议。
+- 路径参数：`contractId`（必填）。
+- 必填请求体：`reason`，枚举 `non_delivery|quality|deadline|other`。
+- 可选请求体：`description`、`evidence[]`。
+- 成功：`200`，schema `Dispute`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/contracts/contract_.../actions/dispute" \
+  -H "Content-Type: application/json" \
+  -d '{"reason":"quality","description":"not acceptable"}'
+```
+
+## Reputation
+
+Reputation 端点用于读取信誉画像与写入签名评价事件。
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;</span>
+
+- 读取 DID 的信誉总览。
+- 路径参数：`did`（必填）。
+- 成功：`200`，schema `Reputation`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M..."
+```
+
+#### <span className="api-method api-get">GET</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;/reviews</span>
+
+- 读取评价记录列表。
+- 路径参数：`did`（必填）。
+- 查询参数：`source=store|log`（可选）、`limit`（默认 `20`）、`offset`（默认 `0`）。
+- 成功：`200`，结构 `{ reviews, total, averageRating, pagination }`。
+
+```bash
+curl -sS "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M.../reviews?source=store&limit=20&offset=0"
+```
+
+#### <span className="api-method api-post">POST</span> <span className="api-path">/api/v1/reputations/&#123;did&#125;/reviews</span>
+
+- 写入签名信誉事件。
+- 路径参数：`did`（必填）。
+- 必填请求体：`did`、`passphrase`、`target`、`dimension`、`score`、`ref`、`nonce`。
+- 可选请求体：`comment`、`aspects`、`prev`、`ts`。
+- `dimension` 枚举：`transaction|fulfillment|quality|social|behavior`。
+- `score` 约束：`0..1000`。
+- 成功：`201`，schema `ReputationRecordResult`。
+
+```bash
+curl -sS -X POST "http://127.0.0.1:9528/api/v1/reputations/did:claw:z6M.../reviews" \
+  -H "Content-Type: application/json" \
+  -d '{"did":"did:claw:z6M...","passphrase":"<passphrase>","target":"did:claw:z6N...","dimension":"quality","score":880,"ref":"contract_...","nonce":40}'
+```
+
+### 相关文档
+
+- [SDK 指南](/developer-guide/sdk-guide)
+- [API 错误码](/developer-guide/api-errors)

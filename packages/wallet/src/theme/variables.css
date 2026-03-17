@@ -1,0 +1,111 @@
+/**
+ * Ionic CSS variables — ClawNet dark theme.
+ * Adapts the original wallet dark palette to Ionic's CSS variable system.
+ */
+
+:root {
+  /* ClawNet brand palette */
+  --ion-color-primary: #0054e9;
+  --ion-color-primary-rgb: 0, 84, 233;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #004acd;
+  --ion-color-primary-tint: #1a65eb;
+
+  --ion-color-secondary: #60a5fa;
+  --ion-color-secondary-rgb: 96, 165, 250;
+  --ion-color-secondary-contrast: #000000;
+  --ion-color-secondary-contrast-rgb: 0, 0, 0;
+  --ion-color-secondary-shade: #5491dc;
+  --ion-color-secondary-tint: #70aefb;
+
+  --ion-color-success: #22c55e;
+  --ion-color-success-rgb: 34, 197, 94;
+  --ion-color-success-contrast: #000000;
+  --ion-color-success-contrast-rgb: 0, 0, 0;
+  --ion-color-success-shade: #1ead53;
+  --ion-color-success-tint: #38cb6e;
+
+  --ion-color-warning: #eab308;
+  --ion-color-warning-rgb: 234, 179, 8;
+  --ion-color-warning-contrast: #000000;
+  --ion-color-warning-contrast-rgb: 0, 0, 0;
+  --ion-color-warning-shade: #ce9e07;
+  --ion-color-warning-tint: #ecbb21;
+
+  --ion-color-danger: #ef4444;
+  --ion-color-danger-rgb: 239, 68, 68;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #d23c3c;
+  --ion-color-danger-tint: #f15757;
+
+  --ion-color-dark: #0a0a0f;
+  --ion-color-dark-rgb: 10, 10, 15;
+  --ion-color-dark-contrast: #f0f2f5;
+  --ion-color-dark-contrast-rgb: 240, 242, 245;
+  --ion-color-dark-shade: #09090d;
+  --ion-color-dark-tint: #232327;
+
+  --ion-color-medium: #94a3b8;
+  --ion-color-medium-rgb: 148, 163, 184;
+  --ion-color-medium-contrast: #000000;
+  --ion-color-medium-contrast-rgb: 0, 0, 0;
+  --ion-color-medium-shade: #828fa2;
+  --ion-color-medium-tint: #9facbf;
+
+  --ion-color-light: #f0f2f5;
+  --ion-color-light-rgb: 240, 242, 245;
+  --ion-color-light-contrast: #0a0a0f;
+  --ion-color-light-contrast-rgb: 10, 10, 15;
+  --ion-color-light-shade: #d3d5d8;
+  --ion-color-light-tint: #f2f4f6;
+}
+
+/* ─────── Force dark mode — Ocean navy (matches docs.clawnetd.com) ── */
+
+body {
+  /* hsl(220, 60%, 8%) — deep navy from fumadocs ocean dark */
+  --ion-background-color: #081020;
+  --ion-background-color-rgb: 8, 16, 32;
+
+  /* hsl(220, 60%, 94.5%) — bluish white */
+  --ion-text-color: #e2eaf5;
+  --ion-text-color-rgb: 226, 234, 245;
+
+  /* hsla(220, 50%, 50%, 0.15) — blue-tinted border */
+  --ion-border-color: rgba(60, 100, 190, 0.15);
+
+  /* Navy-tinted step palette (8% → 66% lightness, hue ≈220°) */
+  --ion-color-step-50:  #0c1526;
+  --ion-color-step-100: #101a2e;
+  --ion-color-step-150: #141f37;
+  --ion-color-step-200: #192540;
+  --ion-color-step-250: #1d2b49;
+  --ion-color-step-300: #213152;
+  --ion-color-step-350: #26375c;
+  --ion-color-step-400: #2a3d65;
+  --ion-color-step-450: #2f436e;
+  --ion-color-step-500: #334a78;
+  --ion-color-step-550: #3b5282;
+  --ion-color-step-600: #435a8b;
+  --ion-color-step-650: #4b6294;
+  --ion-color-step-700: #536a9d;
+  --ion-color-step-750: #5b72a6;
+  --ion-color-step-800: #637aaf;
+  --ion-color-step-850: #6b82b8;
+  --ion-color-step-900: #738ac1;
+  --ion-color-step-950: #7b92ca;
+
+  --ion-toolbar-background: #0a1328;
+  --ion-tab-bar-background: #0a1328;
+  --ion-tab-bar-color: #4a6088;
+  --ion-tab-bar-color-selected: #60a5fa;
+
+  --ion-item-background: #0d1629;
+  --ion-card-background: #0f1a30;
+}
+
+ion-modal {
+  --ion-background-color: #0d1629;
+}

@@ -1,0 +1,8 @@
+{
+  "network": "clawnetTestnet",
+  "chainId": 7625,
+  "deployer": "0xA9b95A4fDCD673f6aE0D2a873E0f4771CA7D0119",
+  "timestamp": "2026-02-25T12:06:31.340Z",
+  "safeSingleton": "0xF9c35ae1A50c890aeED60C19C6838642278e27DF",
+  "safeProxyFactory": "0xd9046ef83f8c910e4c828a1F8bEDDcD618fE3A73"
+}

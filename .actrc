@@ -1,0 +1,5 @@
+# act configuration — run GitHub Actions locally via Docker
+# Docs: https://nektosact.com/
+#
+# Medium image has Node, Python, etc. pre-installed (good balance of size vs compat)
+-P ubuntu-latest=catthehacker/ubuntu:act-latest

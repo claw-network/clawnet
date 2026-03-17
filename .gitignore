@@ -1,0 +1,35 @@
+.DS_Store
+node_modules
+dist
+.turbo
+.cache
+.next
+.source
+package-lock.json
+*.tsbuildinfo
+localdev
+/.idea
+scripts/liquidity-bot/logs/
+scripts/liquidity-bot/reports/
+scripts/liquidity-bot/schedule.env
+scripts/liquidity-bot/config.local.json
+scripts/liquidity-bot/state.local.json
+temp/
+infra/mail/
+infra/cloudflare
+packages/sdk-python/.pytest_cache/
+packages/sdk-python/tests/__pycache__/
+
+# ── Server runtime data (NEVER delete with git clean) ────────────────────────
+# These directories are created by deploy.sh on production servers.
+# They are NOT part of the git repo but live in the same working tree.
+chain-data/
+config/
+clawnetd-data/
+node-data/
+docker-compose.chain.yml
+docker-compose.sync.yml
+.env
+*.key
+*.pem
+packages/sdk-python/src/clawnet/__pycache__/

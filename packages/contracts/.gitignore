@@ -1,0 +1,21 @@
+# Artifacts
+artifacts/
+cache/
+typechain-types/
+
+# Coverage
+coverage/
+coverage.json
+
+# Gas
+gas-report.txt
+
+# Security tools
+slither-report.json
+
+# Environment
+.env
+
+# Node
+node_modules/
+dist/

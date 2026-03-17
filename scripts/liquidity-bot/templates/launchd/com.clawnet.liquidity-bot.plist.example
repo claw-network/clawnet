@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.clawnet.liquidity-bot</string>
+
+  <!-- Update this env file path only -->
+  <!-- The env file should define ROOT and related variables. -->
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>LIQUIDITY_BOT_ENV_FILE</key>
+    <string>/Users/yourname/workspace/private-repo/Bots/clawnet/scripts/liquidity-bot/schedule.env</string>
+  </dict>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-lc</string>
+    <string>source "$LIQUIDITY_BOT_ENV_FILE" &amp;&amp; "$ROOT/scripts/liquidity-bot/run/run-scheduled.sh" --count 1 --cycles 2</string>
+  </array>
+
+  <!-- Every hour at minute 10 -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Minute</key>
+    <integer>10</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+</dict>
+</plist>

@@ -1,0 +1,14 @@
+{
+  "name": "@claw-network/homepage",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ClawNet official homepage — economic infrastructure for autonomous AI agents",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

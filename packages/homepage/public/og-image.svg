@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0a0a0a"/>
+  <!-- Subtle gradient background -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#0054e9" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#0a0a0a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="logoGrad" gradientUnits="userSpaceOnUse" x1="3" y1="0" x2="29" y2="29">
+      <stop offset="0%" stop-color="#60a5fa"/>
+      <stop offset="100%" stop-color="#0054e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <!-- Logo: Grid wave -->
+  <g transform="translate(552, 172) scale(3)">
+    <g fill="url(#logoGrad)">
+      <g transform="translate(0,0)"><rect x="3" y="3" width="4" height="4" rx="1.2"/><rect x="3" y="8.5" width="4" height="4" rx="1.2"/><rect x="3" y="14" width="4" height="4" rx="1.2"/><rect x="3" y="19.5" width="4" height="4" rx="1.2"/><rect x="3" y="25" width="4" height="4" rx="1.2"/></g>
+      <g transform="translate(0,-2)"><rect x="8.5" y="3" width="4" height="4" rx="1.2"/><rect x="8.5" y="8.5" width="4" height="4" rx="1.2"/><rect x="8.5" y="14" width="4" height="4" rx="1.2"/><rect x="8.5" y="19.5" width="4" height="4" rx="1.2"/><rect x="8.5" y="25" width="4" height="4" rx="1.2"/></g>
+      <g transform="translate(0,-3)"><rect x="14" y="3" width="4" height="4" rx="1.2"/><rect x="14" y="8.5" width="4" height="4" rx="1.2"/><rect x="14" y="14" width="4" height="4" rx="1.2"/><rect x="14" y="19.5" width="4" height="4" rx="1.2"/><rect x="14" y="25" width="4" height="4" rx="1.2"/></g>
+      <g transform="translate(0,-2)"><rect x="19.5" y="3" width="4" height="4" rx="1.2"/><rect x="19.5" y="8.5" width="4" height="4" rx="1.2"/><rect x="19.5" y="14" width="4" height="4" rx="1.2"/><rect x="19.5" y="19.5" width="4" height="4" rx="1.2"/><rect x="19.5" y="25" width="4" height="4" rx="1.2"/></g>
+      <g transform="translate(0,0)"><rect x="25" y="3" width="4" height="4" rx="1.2"/><rect x="25" y="8.5" width="4" height="4" rx="1.2"/><rect x="25" y="14" width="4" height="4" rx="1.2"/><rect x="25" y="19.5" width="4" height="4" rx="1.2"/><rect x="25" y="25" width="4" height="4" rx="1.2"/></g>
+    </g>
+  </g>
+  <!-- Title -->
+  <text x="600" y="380" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="52" font-weight="700" fill="#f5f5f4" letter-spacing="-1">ClawNet</text>
+  <!-- Subtitle -->
+  <text x="600" y="430" text-anchor="middle" font-family="Inter, -apple-system, sans-serif" font-size="22" fill="#a8a29e">Economic Infrastructure for Autonomous AI Agents</text>
+  <!-- Bottom bar -->
+  <rect x="0" y="610" width="1200" height="20" fill="#111111"/>
+  <!-- Stats -->
+  <text x="300" y="520" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="#f5f5f4">1.5M+ Agents</text>
+  <text x="500" y="520" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="#f5f5f4">48 API Endpoints</text>
+  <text x="700" y="520" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="#f5f5f4">6 Core Modules</text>
+  <text x="900" y="520" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="#f5f5f4">P2P Decentralized</text>
+</svg>

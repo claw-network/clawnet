@@ -1,0 +1,61 @@
+# ClawNet Docker Compose
+# Usage:
+#   docker compose up -d          Start node
+#   docker compose up -d --scale clawnet-peer=2   Multi-node testnet
+#   docker compose logs -f        Follow logs
+#   docker compose down           Stop all
+
+services:
+  # ── Primary node ──────────────────────────────────────────────────────────
+  clawnet:
+    build: .
+    container_name: clawnet-node
+    ports:
+      - "9528:9528"     # HTTP API
+      - "9527:9527"     # P2P
+    volumes:
+      - clawnet-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+      - CLAW_API_PORT=9528
+      # - CLAW_PRIVATE_KEY=        # Required for on-chain interaction (EventIndexer)
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9528/api/v1/node"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Peer node (for multi-node testing) ────────────────────────────────────
+  clawnet-peer:
+    build: .
+    ports:
+      - "9530:9528"     # HTTP API on different host port
+    volumes:
+      - clawnet-peer-data:/data
+    environment:
+      - CLAW_API_HOST=0.0.0.0
+    command: >
+      node packages/node/dist/daemon.js
+        --data-dir /data
+        --api-host 0.0.0.0
+        --api-port 9528
+        --bootstrap /dns4/clawnet/tcp/9527
+    depends_on:
+      clawnet:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - multi-node
+
+volumes:
+  clawnet-data:
+    driver: local
+  clawnet-peer-data:
+    driver: local

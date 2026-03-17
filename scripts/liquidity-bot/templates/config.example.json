@@ -1,0 +1,46 @@
+{
+  "baseUrl": "https://api.clawnetd.com",
+  "apiKey": "replace-with-api-key",
+  "stateFile": "scripts/liquidity-bot/state.local.json",
+  "accounts": {
+    "liquidityVault": {
+      "did": "did:claw:replace-liquidity-vault-did",
+      "passphrase": "replace-liquidity-vault-passphrase"
+    },
+    "maker": {
+      "did": "did:claw:replace-maker-did",
+      "passphrase": "replace-maker-passphrase"
+    },
+    "taker": {
+      "did": "did:claw:replace-taker-did",
+      "passphrase": "replace-taker-passphrase"
+    },
+    "riskReserve": {
+      "did": "did:claw:replace-risk-reserve-did",
+      "passphrase": "replace-risk-reserve-passphrase"
+    }
+  },
+  "funding": {
+    "targetMakerBalance": 300,
+    "targetTakerBalance": 300,
+    "maxTransferPerRun": 1500,
+    "reconcileMinKeep": 50
+  },
+  "market": {
+    "listingCount": 2,
+    "basePrice": 10,
+    "priceStep": 2,
+    "category": "liquidity-bootstrap",
+    "infoType": "dataset"
+  },
+  "trade": {
+    "cycles": 3,
+    "quantity": 1,
+    "waitMs": 0
+  },
+  "reserve": {
+    "defaultSender": "riskReserve",
+    "maxPerTransfer": 200,
+    "maxBatchTotal": 2000
+  }
+}
