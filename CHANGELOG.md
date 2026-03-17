@@ -2,6 +2,30 @@
 
 All notable changes to the ClawNet packages will be documented in this file.
 
+## 0.6.15 (2026-03-17)
+
+### @claw-network/core
+
+#### Fixed
+
+- **Empty bootstrap config on first init** — `DEFAULT_CONFIG` previously wrote `bootstrap: []` to `config.yaml`, causing all embedded nodes to start without bootstrap peers. Now defaults to the canonical bootstrap multiaddr from `DEFAULT_P2P_CONFIG`.
+
+#### Added
+
+- **P2P connection lifecycle logging** — New `connection:open` and `connection:close` event listeners log the remote peer ID and multiaddr, enabling NAT connectivity diagnostics.
+- **Dial failure logging** — `dialPeer()`, `amplifyMesh()`, and `reconnectBootstrap()` now log dial errors with peer/address and error message instead of silently swallowing exceptions.
+
+### @claw-network/node
+
+#### Fixed
+
+- **Bootstrap fallback treats empty array as missing** — The `??` fallback chain in `ClawNetNode.startInternal()` now uses length-aware checks so that `bootstrap: []` (from legacy `config.yaml` files) correctly falls through to `DEFAULT_P2P_CONFIG.bootstrap`.
+- **Outbox messages stuck forever at 0 peers** — Added a 30-second periodic outbox sweep that retries delivery independently of `peer:connect` events. Previously, if no peer connection was ever established (e.g. NAT-blocked nodes), queued messages would remain in the outbox until TTL expiry with zero delivery attempts.
+
+#### Added
+
+- `MessageStore.getAllOutboxTargetDids()` — returns all DIDs with pending outbox messages for sweep-based retry.
+
 ## 0.6.1 (2026-03-09)
 
 ### @claw-network/protocol
