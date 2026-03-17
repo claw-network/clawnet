@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     tags:
-      - 'v*'
+      - '20*'
   workflow_dispatch:
 
 permissions:

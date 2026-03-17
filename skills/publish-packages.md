@@ -68,21 +68,20 @@ PAT needs `write:packages` scope. **Not needed for CI** — CI uses `GITHUB_TOKE
 
 Use the unified bump script. It reads the current version from `packages/core/package.json` and applies the new version to all synced packages (including Python SDK's `pyproject.toml`).
 
+Version format: CalVer `YEAR.SEQ` (release) or `YEAR.SEQ.PATCH` (patch, starts from 1).
+
 ```bash
 # Preview what will change (no files modified)
 pnpm bump:dry
 
-# Bump patch: 0.5.1 → 0.5.2
+# Bump release: 2026.1 → 2026.2
+pnpm bump:release
+
+# Bump patch: 2026.1 → 2026.1.1 (patch starts from 1)
 pnpm bump:patch
 
-# Bump minor: 0.5.1 → 0.6.0
-pnpm bump:minor
-
-# Bump major: 0.5.1 → 1.0.0
-pnpm bump:major
-
 # Or set an explicit version
-node scripts/bump-version.mjs 1.2.3
+node scripts/bump-version.mjs 2026.3
 ```
 
 **Always run `pnpm bump:dry` first** to preview version changes before applying.
@@ -99,19 +98,19 @@ All 217+ tests must pass before publishing.
 
 ```bash
 git add -A
-git commit -m "chore: bump to v<VERSION>"
-git tag v<VERSION>
+git commit -m "chore: bump to <VERSION>"
+git tag <VERSION>
 git push --no-verify
-git push origin v<VERSION> --no-verify
+git push origin <VERSION> --no-verify
 ```
 
-Pushing a `v*` tag triggers the **`publish-packages`** CI workflow automatically.
+Pushing a CalVer tag (e.g. `2026.1`) triggers the **`publish-packages`** CI workflow automatically.
 
 ### Step 4: Publish (two options)
 
 #### Option A: CI Auto-Publish (Recommended)
 
-Pushing the `v*` tag in Step 3 triggers `.github/workflows/publish-packages.yml`, which:
+Pushing the CalVer tag in Step 3 triggers `.github/workflows/publish-packages.yml`, which:
 1. Publishes npm packages to **npmjs.org** (core → protocol → sdk → node)
 2. Publishes npm packages to **GitHub Packages**
 3. Builds and uploads the Python SDK to **PyPI** via hatch
@@ -149,7 +148,7 @@ When you only need to push updated npm packages without PyPI:
 ```bash
 pnpm bump:patch
 pnpm build && pnpm test
-git add -A && git commit -m "chore: bump to v<VERSION>"
+git add -A && git commit -m "chore: bump to <VERSION>"
 
 # Publish to npmjs.org
 for pkg in packages/core packages/protocol packages/sdk packages/node; do
@@ -161,7 +160,7 @@ for pkg in packages/core packages/protocol packages/sdk packages/node; do
   cd "$pkg" && pnpm publish --access public --no-git-checks --registry https://npm.pkg.github.com && cd ../..
 done
 
-git tag v<VERSION> && git push --no-verify && git push origin v<VERSION> --no-verify
+git tag <VERSION> && git push --no-verify && git push origin <VERSION> --no-verify
 ```
 
 ---
@@ -177,7 +176,7 @@ rm -rf dist/
 python -m hatch build
 python -m hatch publish
 cd ../..
-git add -A && git commit -m "chore: bump to v<VERSION>"
+git add -A && git commit -m "chore: bump to <VERSION>"
 git push
 ```
 
@@ -197,7 +196,7 @@ git push
 ### Scenario B: New feature across core + protocol + SDK
 
 1. Implement changes across packages
-2. `pnpm bump:minor`
+2. `pnpm bump:release`
 3. `pnpm build && pnpm test`
 4. `git add -A && git commit -m "feat: <description>"`
 5. `pnpm publish:release`
@@ -220,7 +219,8 @@ See `skills/upgrade-clawnetd-server.md` for full server deployment details.
 - **Version source of truth**: `packages/core/package.json` — the bump script reads from here.
 - **npm publish order matters**: core → protocol → sdk → node (dependency chain).
 - **Dual registry**: always use `--registry` flag when publishing locally to specify the target. Without it, the default npm registry is used.
-- **CI is the recommended publish path**: push a `v*` tag and let `publish-packages` workflow handle everything.
+- **CI is the recommended publish path**: push a CalVer tag (e.g. `2026.1`) and let `publish-packages` workflow handle everything.
+- **Tag format**: CalVer without `v` prefix — `2026.1`, `2026.1.1`, NOT `v2026.1`.
 - **cli is private**: not published to any registry, but its version is synced for consistency.
 - **Python SDK pyproject.toml**: automatically updated by the bump script.
 - **Never manually edit version fields** — always use the bump script to keep packages in sync.

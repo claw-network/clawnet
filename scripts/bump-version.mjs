@@ -2,24 +2,24 @@
 /**
  * ClawNet — Unified version bump for all packages in the monorepo.
  *
+ * CalVer format: YEAR.SEQ (release) or YEAR.SEQ.PATCH (patch).
+ * Patch numbers start from 1.
+ *
  * Usage:
- *   node scripts/bump-version.mjs patch          # 0.5.1 → 0.5.2
- *   node scripts/bump-version.mjs minor          # 0.5.1 → 0.6.0
- *   node scripts/bump-version.mjs major          # 0.5.1 → 1.0.0
- *   node scripts/bump-version.mjs 0.6.0          # explicit version
- *   node scripts/bump-version.mjs patch --dry    # preview only
+ *   node scripts/bump-version.mjs release        # 2026.1 → 2026.2
+ *   node scripts/bump-version.mjs patch          # 2026.1 → 2026.1.1
+ *   node scripts/bump-version.mjs 2026.3         # explicit version
+ *   node scripts/bump-version.mjs release --dry  # preview only
  *
- * Bumps all non-private packages (core, protocol, sdk, node) to the
- * same version. Private packages (cli, contracts, docs, homepage,
- * wallet) are also bumped to keep the monorepo in sync.
+ * Bumps all synced packages (core, protocol, sdk, node, cli) to the
+ * same version. Also updates the Python SDK's pyproject.toml.
  *
- * Excludes: packages with a fixed version (docs@1.0.0, homepage@1.0.0,
- * wallet@2.0.0, contracts@0.1.0) — these have independent versioning.
+ * Excludes: packages with independent versioning (docs, homepage,
+ * wallet, contracts, console).
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { execSync } from 'node:child_process';
 
 const ROOT = resolve(import.meta.dirname, '..');
 
@@ -32,20 +32,17 @@ const SYNCED_PACKAGES = [
   'packages/cli',
 ];
 
-// ── Packages with independent versioning (not bumped) ──────────
-// packages/contracts, packages/docs, packages/homepage, packages/wallet
-
 // ── Parse arguments ────────────────────────────────────────────
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry');
 const bumpArg = args.find((a) => a !== '--dry');
 
 if (!bumpArg) {
-  console.error('Usage: bump-version.mjs <patch|minor|major|x.y.z> [--dry]');
+  console.error('Usage: bump-version.mjs <release|patch|YEAR.SEQ[.PATCH]> [--dry]');
   process.exit(1);
 }
 
-// ── Read current version from the first synced package ─────────
+// ── Read/write helpers ─────────────────────────────────────────
 function readPkg(dir) {
   const path = join(ROOT, dir, 'package.json');
   return JSON.parse(readFileSync(path, 'utf-8'));
@@ -58,21 +55,46 @@ function writePkg(dir, pkg) {
 
 const currentVersion = readPkg(SYNCED_PACKAGES[0]).version;
 
-// ── Calculate next version ─────────────────────────────────────
+// ── CalVer version calculation ─────────────────────────────────
+function parseCalVer(version) {
+  const parts = version.split('.').map(Number);
+  if (parts.length === 2) return { year: parts[0], seq: parts[1], patch: null };
+  if (parts.length === 3) return { year: parts[0], seq: parts[1], patch: parts[2] };
+  return null;
+}
+
 function bumpVersion(current, type) {
-  const [major, minor, patch] = current.split('.').map(Number);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const parsed = parseCalVer(current);
+
   switch (type) {
-    case 'patch':
-      return `${major}.${minor}.${patch + 1}`;
-    case 'minor':
-      return `${major}.${minor + 1}.0`;
-    case 'major':
-      return `${major + 1}.0.0`;
-    default:
-      // Explicit version — validate semver-like format
-      if (/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(type)) return type;
+    case 'release': {
+      if (!parsed) {
+        // Migrating from semver — start fresh
+        return `${currentYear}.1`;
+      }
+      if (currentYear > parsed.year) {
+        return `${currentYear}.1`;
+      }
+      return `${parsed.year}.${parsed.seq + 1}`;
+    }
+    case 'patch': {
+      if (!parsed) {
+        console.error(`Cannot patch non-CalVer version: "${current}"`);
+        process.exit(1);
+      }
+      // Append or increment PATCH (starts from 1)
+      const nextPatch = parsed.patch == null ? 1 : parsed.patch + 1;
+      return `${parsed.year}.${parsed.seq}.${nextPatch}`;
+    }
+    default: {
+      // Explicit version — validate CalVer format
+      if (/^\d{4}\.\d+(\.\d+)?$/.test(type)) return type;
       console.error(`Invalid version or bump type: "${type}"`);
+      console.error('Valid types: release, patch, or explicit YEAR.SEQ[.PATCH]');
       process.exit(1);
+    }
   }
 }
 
@@ -118,9 +140,9 @@ console.log('');
 if (dryRun) {
   console.log('  Dry run — no files modified.\n');
 } else {
-  console.log(`  Done. All synced packages are now at v${nextVersion}.`);
+  console.log(`  Done. All synced packages are now at ${nextVersion}.`);
   console.log('  Next steps:');
   console.log('    pnpm build && pnpm test');
-  console.log('    git add -A && git commit -m "chore: bump to v' + nextVersion + '"');
-  console.log('    pnpm publish:release\n');
+  console.log('    git add -A && git commit -m "chore: bump to ' + nextVersion + '"');
+  console.log('    git tag ' + nextVersion + ' && git push && git push origin ' + nextVersion + '\n');
 }

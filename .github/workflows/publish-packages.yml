@@ -3,7 +3,7 @@ name: publish-packages
 on:
   push:
     tags:
-      - 'v*'
+      - '20*'
   workflow_dispatch:
 
 permissions:

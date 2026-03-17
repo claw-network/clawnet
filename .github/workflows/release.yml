@@ -9,7 +9,7 @@ on:
         default: 'main'
   push:
     tags:
-      - 'v*'
+      - '20*'
 
 permissions:
   contents: write
@@ -81,7 +81,7 @@ jobs:
 
       - name: Extract version from tag
         id: meta
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
