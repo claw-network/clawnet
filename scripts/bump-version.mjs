@@ -5,6 +5,10 @@
  * CalVer format: YEAR.SEQ (release) or YEAR.SEQ.PATCH (patch).
  * Patch numbers start from 1.
  *
+ * package.json always stores 3-segment form (e.g. 2026.1.0) for npm
+ * compatibility. Git tags and human-facing output use the minimal
+ * CalVer form (e.g. 2026.1). Python pyproject.toml also uses minimal form.
+ *
  * Usage:
  *   node scripts/bump-version.mjs release        # 2026.1 → 2026.2
  *   node scripts/bump-version.mjs patch          # 2026.1 → 2026.1.1
@@ -84,8 +88,8 @@ function bumpVersion(current, type) {
         console.error(`Cannot patch non-CalVer version: "${current}"`);
         process.exit(1);
       }
-      // Append or increment PATCH (starts from 1)
-      const nextPatch = parsed.patch == null ? 1 : parsed.patch + 1;
+      // Append or increment PATCH (starts from 1; .0 in npm form = no patch)
+      const nextPatch = (parsed.patch == null || parsed.patch === 0) ? 1 : parsed.patch + 1;
       return `${parsed.year}.${parsed.seq}.${nextPatch}`;
     }
     default: {
@@ -100,20 +104,31 @@ function bumpVersion(current, type) {
 
 const nextVersion = bumpVersion(currentVersion, bumpArg);
 
+// npm needs 3-segment versions; CalVer display uses minimal segments
+function toNpmVersion(ver) {
+  return ver.split('.').length === 2 ? `${ver}.0` : ver;
+}
+function toDisplayVersion(ver) {
+  return ver.replace(/\.0$/, '');
+}
+
+const npmVersion = toNpmVersion(nextVersion);
+const displayVersion = toDisplayVersion(nextVersion);
+
 console.log(`\n  ClawNet Version Bump`);
-console.log(`  ${currentVersion} → ${nextVersion}${dryRun ? '  (dry run)' : ''}\n`);
+console.log(`  ${toDisplayVersion(currentVersion)} → ${displayVersion}${dryRun ? '  (dry run)' : ''}\n`);
 
 // ── Apply version to all synced packages ───────────────────────
 for (const dir of SYNCED_PACKAGES) {
   const pkg = readPkg(dir);
-  const oldVersion = pkg.version;
-  pkg.version = nextVersion;
+  const oldDisplay = toDisplayVersion(pkg.version);
+  pkg.version = npmVersion;
 
   if (dryRun) {
-    console.log(`  [dry] ${pkg.name}  ${oldVersion} → ${nextVersion}`);
+    console.log(`  [dry] ${pkg.name}  ${oldDisplay} → ${displayVersion}`);
   } else {
     writePkg(dir, pkg);
-    console.log(`  ✓ ${pkg.name}  ${oldVersion} → ${nextVersion}`);
+    console.log(`  ✓ ${pkg.name}  ${oldDisplay} → ${displayVersion}`);
   }
 }
 
@@ -124,11 +139,11 @@ try {
   const match = toml.match(/^version\s*=\s*"([^"]+)"/m);
   if (match) {
     if (dryRun) {
-      console.log(`  [dry] clawnet-sdk (PyPI)  ${match[1]} → ${nextVersion}`);
+      console.log(`  [dry] clawnet-sdk (PyPI)  ${match[1]} → ${displayVersion}`);
     } else {
-      toml = toml.replace(/^(version\s*=\s*")([^"]+)(")/m, `$1${nextVersion}$3`);
+      toml = toml.replace(/^(version\s*=\s*")([^"]+)(")/m, `$1${displayVersion}$3`);
       writeFileSync(pyprojectPath, toml);
-      console.log(`  ✓ clawnet-sdk (PyPI)  ${match[1]} → ${nextVersion}`);
+      console.log(`  ✓ clawnet-sdk (PyPI)  ${match[1]} → ${displayVersion}`);
     }
   }
 } catch {
@@ -140,9 +155,11 @@ console.log('');
 if (dryRun) {
   console.log('  Dry run — no files modified.\n');
 } else {
-  console.log(`  Done. All synced packages are now at ${nextVersion}.`);
+  console.log(`  Done. All synced packages are now at ${displayVersion}.`);
+  console.log(`         package.json: ${npmVersion}  (3-segment for npm)`);
+  console.log(`         pyproject.toml / git tag: ${displayVersion}`);
   console.log('  Next steps:');
   console.log('    pnpm build && pnpm test');
-  console.log('    git add -A && git commit -m "chore: bump to ' + nextVersion + '"');
-  console.log('    git tag ' + nextVersion + ' && git push && git push origin ' + nextVersion + '\n');
+  console.log('    git add -A && git commit -m "chore: bump to ' + displayVersion + '"');
+  console.log('    git tag ' + displayVersion + ' && git push && git push origin ' + displayVersion + '\n');
 }
