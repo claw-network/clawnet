@@ -365,6 +365,20 @@ export class P2PNode {
       const detail = (event as { detail?: { id?: { toString?: () => string } } })?.detail;
       console.log(`[p2p] peer:discovery ${detail?.id?.toString?.() ?? 'unknown'}`);
     });
+
+    // Connection lifecycle logging for NAT/connectivity diagnostics
+    this.node.addEventListener?.('connection:open', (event: unknown) => {
+      const conn = (event as { detail?: { remotePeer?: { toString?: () => string }; remoteAddr?: { toString?: () => string } } })?.detail;
+      const remotePeer = conn?.remotePeer?.toString?.() ?? 'unknown';
+      const remoteAddr = conn?.remoteAddr?.toString?.() ?? 'unknown';
+      console.log(`[p2p] connection:open peer=${remotePeer.slice(0, 16)}… addr=${remoteAddr}`);
+    });
+    this.node.addEventListener?.('connection:close', (event: unknown) => {
+      const conn = (event as { detail?: { remotePeer?: { toString?: () => string }; remoteAddr?: { toString?: () => string } } })?.detail;
+      const remotePeer = conn?.remotePeer?.toString?.() ?? 'unknown';
+      const remoteAddr = conn?.remoteAddr?.toString?.() ?? 'unknown';
+      console.log(`[p2p] connection:close peer=${remotePeer.slice(0, 16)}… addr=${remoteAddr}`);
+    });
   }
 
   async stop(): Promise<void> {
@@ -469,7 +483,9 @@ export class P2PNode {
       // Fallback: try dialling the raw string (works for multiaddr-encoded IDs)
       await this.node.dial(peerId);
       return true;
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[p2p] dial failed for ${peerId.slice(0, 16)}…: ${msg}`);
       return false;
     }
   }
@@ -512,8 +528,9 @@ export class P2PNode {
             await this.node.dial?.(peer.id);
             newPeers++;
             currentPeers.add(pid);
-          } catch {
-            // peer may not be reachable yet
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.debug(`[p2p] amplify dial failed for ${pid.slice(0, 16)}…: ${msg}`);
           }
         }
       }
@@ -657,8 +674,9 @@ export class P2PNode {
         }
         await this.node.dial(multiaddr(addr));
         connected++;
-      } catch {
-        // bootstrap peer may be temporarily unreachable
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[p2p] bootstrap dial failed for ${addr.slice(0, 40)}…: ${msg}`);
       }
     }
     return connected;

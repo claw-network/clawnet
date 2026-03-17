@@ -104,6 +104,9 @@ const ATTACHMENT_STREAM_TIMEOUT_MS = 30_000;
 /** Cleanup interval for expired messages (5 minutes). */
 const CLEANUP_INTERVAL_MS = 5 * 60_000;
 
+/** Outbox sweep interval: attempt re-delivery of queued messages (30 seconds). */
+const OUTBOX_SWEEP_INTERVAL_MS = 30_000;
+
 /** Max attempts before giving up on an outbox message. */
 const MAX_DELIVERY_ATTEMPTS = 50;
 
@@ -315,6 +318,7 @@ export class MessagingService {
   /** Directory for deliverable content blobs (delivery-external protocol). */
   private readonly deliverableDataDir: string;
   private cleanupTimer?: NodeJS.Timeout;
+  private outboxSweepTimer?: NodeJS.Timeout;
 
   /**
    * DID → PeerId mapping. Populated via the did-announce protocol when
@@ -436,6 +440,9 @@ export class MessagingService {
       }
     }, CLEANUP_INTERVAL_MS);
 
+    // Periodic outbox sweep: retry delivery for all queued messages
+    this.startOutboxSweep();
+
     this.log.info('[messaging] service started', { localDid: this.localDid });
   }
 
@@ -444,6 +451,7 @@ export class MessagingService {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = undefined;
     }
+    this.stopOutboxSweep();
     try {
       await this.p2p.unhandleProtocol(PROTO_DM);
     } catch { /* ignore */ }
@@ -687,6 +695,42 @@ export class MessagingService {
   /** Return the current DID→PeerId mapping (for debugging/status). */
   getDidPeerMap(): Record<string, string> {
     return Object.fromEntries(this.didToPeerId);
+  }
+
+  // ── Outbox Sweep ────────────────────────────────────────────────
+
+  /**
+   * Start a periodic sweep that attempts to deliver all queued outbox messages.
+   * Runs every 30 s independently of peer:connect events, so messages are
+   * retried even when no new connections are established.
+   */
+  private startOutboxSweep(): void {
+    this.outboxSweepTimer = setInterval(() => void this.sweepOutbox(), OUTBOX_SWEEP_INTERVAL_MS);
+  }
+
+  private stopOutboxSweep(): void {
+    if (this.outboxSweepTimer) {
+      clearInterval(this.outboxSweepTimer);
+      this.outboxSweepTimer = undefined;
+    }
+  }
+
+  private async sweepOutbox(): Promise<void> {
+    try {
+      const targetDids = this.store.getAllOutboxTargetDids();
+      if (targetDids.length === 0) return;
+
+      let totalDelivered = 0;
+      for (const did of targetDids) {
+        const delivered = await this.flushOutboxForDid(did);
+        totalDelivered += delivered;
+      }
+      if (totalDelivered > 0) {
+        this.log.info('[messaging] outbox sweep delivered', { delivered: totalDelivered, targets: targetDids.length });
+      }
+    } catch (err) {
+      this.log.warn('[messaging] outbox sweep failed', { error: (err as Error).message });
+    }
   }
 
   // ── Subscriber Management (WebSocket push) ─────────────────────

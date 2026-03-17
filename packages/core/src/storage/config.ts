@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { parse, stringify } from 'yaml';
+import { DEFAULT_P2P_CONFIG } from '../p2p/config.js';
 import { ensureStorageDirs, StoragePaths } from './paths.js';
 
 export interface NodeConfig {
@@ -23,7 +24,7 @@ export const DEFAULT_CONFIG: NodeConfig = {
   network: 'devnet',
   p2p: {
     listen: ['/ip4/0.0.0.0/tcp/9527'],
-    bootstrap: [],
+    bootstrap: DEFAULT_P2P_CONFIG.bootstrap,
   },
   logging: {
     level: 'info',

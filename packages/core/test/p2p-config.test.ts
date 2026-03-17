@@ -1,5 +1,49 @@
 import { describe, expect, it } from 'vitest';
-import { BOOTSTRAP_P2P_CONFIG, DEFAULT_P2P_CONFIG } from '../src/p2p/config.js';
+import { BOOTSTRAP_P2P_CONFIG, DEFAULT_P2P_CONFIG, BOOTSTRAP_MULTIADDR } from '../src/p2p/config.js';
+import { DEFAULT_CONFIG } from '../src/storage/config.js';
+
+describe('DEFAULT_CONFIG bootstrap', () => {
+  it('includes non-empty bootstrap list by default', () => {
+    expect(DEFAULT_CONFIG.p2p?.bootstrap).toBeDefined();
+    expect(DEFAULT_CONFIG.p2p!.bootstrap!.length).toBeGreaterThan(0);
+  });
+
+  it('uses the same bootstrap multiaddr as DEFAULT_P2P_CONFIG', () => {
+    expect(DEFAULT_CONFIG.p2p!.bootstrap).toEqual(DEFAULT_P2P_CONFIG.bootstrap);
+  });
+
+  it('contains the canonical BOOTSTRAP_MULTIADDR', () => {
+    expect(DEFAULT_CONFIG.p2p!.bootstrap).toContain(BOOTSTRAP_MULTIADDR);
+  });
+});
+
+describe('bootstrap fallback treats empty array as missing', () => {
+  it('empty array from config should fallback to DEFAULT_P2P_CONFIG.bootstrap', () => {
+    const configBootstrap: string[] = [];
+    const persistedBootstrap: string[] = [];
+
+    // Replicate the fixed fallback logic from ClawNetNode.startInternal()
+    const resolved =
+      (configBootstrap.length ? configBootstrap : undefined)
+      ?? (persistedBootstrap.length ? persistedBootstrap : undefined)
+      ?? DEFAULT_P2P_CONFIG.bootstrap;
+
+    expect(resolved).toEqual(DEFAULT_P2P_CONFIG.bootstrap);
+    expect(resolved.length).toBeGreaterThan(0);
+  });
+
+  it('non-empty config bootstrap takes precedence', () => {
+    const custom = ['/ip4/1.2.3.4/tcp/9527/p2p/QmTest'];
+    const persisted: string[] = [];
+
+    const resolved =
+      (custom.length ? custom : undefined)
+      ?? (persisted.length ? persisted : undefined)
+      ?? DEFAULT_P2P_CONFIG.bootstrap;
+
+    expect(resolved).toEqual(custom);
+  });
+});
 
 describe('BOOTSTRAP_P2P_CONFIG', () => {
   it('disables floodPublish for amplification protection', () => {

@@ -211,7 +211,9 @@ export class ClawNetNode {
       ...this.config.p2p,
       listen: this.config.p2p?.listen ?? persisted.p2p?.listen ?? DEFAULT_P2P_CONFIG.listen,
       bootstrap:
-        this.config.p2p?.bootstrap ?? persisted.p2p?.bootstrap ?? DEFAULT_P2P_CONFIG.bootstrap,
+        (this.config.p2p?.bootstrap?.length ? this.config.p2p.bootstrap : undefined)
+        ?? (persisted.p2p?.bootstrap?.length ? persisted.p2p.bootstrap : undefined)
+        ?? DEFAULT_P2P_CONFIG.bootstrap,
     };
 
     try {

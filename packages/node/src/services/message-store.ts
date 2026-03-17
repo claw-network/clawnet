@@ -467,6 +467,15 @@ export class MessageStore {
     return result.changes > 0;
   }
 
+  /** Get all distinct target DIDs that have pending outbox messages (not yet expired). */
+  getAllOutboxTargetDids(): string[] {
+    const now = Date.now();
+    const rows = this.db.prepare(
+      'SELECT DISTINCT target_did FROM outbox WHERE (sent_at_ms + ttl_sec * 1000) > ?',
+    ).all(now) as Array<{ target_did: string }>;
+    return rows.map((r) => r.target_did);
+  }
+
   /** Clean up expired outbox entries in batches. */
   cleanupOutbox(): number {
     const now = Date.now();
