@@ -110,5 +110,5 @@ await node.start();
 # 3. 验证 config.yaml
 cat ~/.telagent/clawnet/config.yaml
 # 期望 bootstrap 字段包含:
-#   - /dns4/clawnetd.com/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW
+#   - /dns4/clawnetd.com/tcp/9527/p2p/12D3KooWQnQQNGBG5yhuhiaxwcHmksDYy9ZbMiC8uoJp4D6oB5QM
 ```

@@ -70,7 +70,7 @@
 |------|----|
 | **内容类型** | `application/clawnet-stream` |
 | **序列化** | FlatBuffers |
-| **引导节点** | `/dns4/clawnetd.com/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW` |
+| **引导节点** | `/dns4/clawnetd.com/tcp/9527/p2p/12D3KooWQnQQNGBG5yhuhiaxwcHmksDYy9ZbMiC8uoJp4D6oB5QM` |
 
 ---
 

@@ -2,6 +2,29 @@
 
 All notable changes to the ClawNet packages will be documented in this file.
 
+## 0.6.16 (2026-03-17)
+
+### @claw-network/core
+
+#### Fixed
+
+- **Bootstrap PeerId mismatch** — `BOOTSTRAP_MULTIADDR` had the wrong hardcoded PeerId (`12D3KooWRTEtx4rD…`), causing every Noise handshake to the bootstrap node to fail with "identity verification failed". The constant is now a PeerId-free base address (`/dns4/clawnetd.com/tcp/9527`); the live PeerId is resolved at runtime.
+
+#### Added
+
+- `resolveBootstrapMultiaddrs()` — fetches the bootstrap node's live PeerId from its HTTP API and returns the fully-qualified multiaddr. Throws on 3s timeout — node refuses to start without a valid bootstrap.
+- Constants: `BOOTSTRAP_HOST`, `BOOTSTRAP_PORT`, `BOOTSTRAP_API_URL`.
+
+### @claw-network/node
+
+#### Changed
+
+- `ClawNetNode.startInternal()` now calls `resolveBootstrapMultiaddrs()` when the default bootstrap host is detected, replacing the PeerId-less base address with the resolved full multiaddr. Custom bootstrap addresses are passed through unchanged.
+
+#### Added
+
+- `--no-bootstrap` CLI flag — explicitly starts with zero bootstrap peers, used by bootstrap/seed nodes to prevent chicken-and-egg self-resolution.
+
 ## 0.6.15 (2026-03-17)
 
 ### @claw-network/core

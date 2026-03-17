@@ -60,7 +60,7 @@ p2p:
   listen:
     - /ip4/0.0.0.0/tcp/9527
   bootstrap:
-    - /dns4/clawnetd.com/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW
+    - /dns4/clawnetd.com/tcp/9527/p2p/12D3KooWQnQQNGBG5yhuhiaxwcHmksDYy9ZbMiC8uoJp4D6oB5QM
 ```
 
 ---

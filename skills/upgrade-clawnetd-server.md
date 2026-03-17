@@ -166,7 +166,7 @@ Expected output (example):
 ```json
 {
   "did": "did:claw:zGdsjCwGWZagTeXN4xyV13L8eDzUVGbVZhqJhChRXFuea",
-  "peerId": "12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW",
+  "peerId": "12D3KooWQnQQNGBG5yhuhiaxwcHmksDYy9ZbMiC8uoJp4D6oB5QM",
   "synced": true,
   "blockHeight": 0,
   "peers": 0,
@@ -210,7 +210,7 @@ Look for the startup banner:
 [INFO] clawnetd
 [INFO] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 [INFO] Data Dir : /var/lib/clawnet
-[INFO] Peer Id  : 12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW
+[INFO] Peer Id  : 12D3KooWQnQQNGBG5yhuhiaxwcHmksDYy9ZbMiC8uoJp4D6oB5QM
 [INFO] DID      : did:claw:zGdsjCwGWZagTeXN4xyV13L8eDzUVGbVZhqJhChRXFuea
 [INFO] Network  : devnet
 [INFO] ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

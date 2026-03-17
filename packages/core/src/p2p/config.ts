@@ -78,13 +78,58 @@ export function resolveRelayConfig(config: P2PConfig): RelayConfig {
   return { ...DEFAULT_RELAY_CONFIG, ...base, enabled };
 }
 
+/** Bootstrap node hostname (dns4). */
+export const BOOTSTRAP_HOST = 'clawnetd.com';
+/** Bootstrap node P2P port. */
+export const BOOTSTRAP_PORT = 9527;
+/** Bootstrap node HTTP API (used to discover its live PeerId). */
+export const BOOTSTRAP_API_URL = 'https://api.clawnetd.com/api/v1/node';
+
 /**
- * Official devnet bootstrap node.
+ * Official devnet bootstrap node base address (without PeerId).
  * New nodes connect here first to discover the rest of the network via Kademlia DHT.
  * Uses dns4 so the address survives IP changes — only the DNS A record needs updating.
+ *
+ * The PeerId is intentionally omitted — at startup `resolveBootstrapMultiaddrs()`
+ * fetches the live PeerId from the bootstrap node HTTP API to build the full
+ * multiaddr. This avoids hardcoding a PeerId that can go stale after key rotation.
  */
 export const BOOTSTRAP_MULTIADDR =
-  '/dns4/clawnetd.com/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW';
+  `/dns4/${BOOTSTRAP_HOST}/tcp/${BOOTSTRAP_PORT}`;
+
+/**
+ * Fetch the live PeerId from the bootstrap node's HTTP API and return
+ * the fully-qualified multiaddr(s).
+ *
+ * Throws if the fetch fails or times out (default 3 s) — the caller
+ * should treat this as a fatal startup error.
+ */
+export async function resolveBootstrapMultiaddrs(
+  apiUrl: string = BOOTSTRAP_API_URL,
+  timeoutMs: number = 3_000,
+): Promise<string[]> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(apiUrl, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(`Bootstrap API returned HTTP ${res.status}`);
+    }
+    const json = (await res.json()) as { data?: { peerId?: string } };
+    const peerId = json?.data?.peerId;
+    if (!peerId) {
+      throw new Error('Bootstrap API response missing peerId');
+    }
+    return [`/dns4/${BOOTSTRAP_HOST}/tcp/${BOOTSTRAP_PORT}/p2p/${peerId}`];
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error(`Bootstrap API timed out after ${timeoutMs}ms (${apiUrl})`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export const DEFAULT_P2P_CONFIG: P2PConfig = {
   listen: ['/ip4/0.0.0.0/tcp/9527'],

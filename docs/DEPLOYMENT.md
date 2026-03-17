@@ -495,7 +495,7 @@ A bootstrap node is the first peer in a network that helps new nodes discover ea
 The official devnet bootstrap node is:
 
 ```
-/dns4/clawnetd.com/tcp/9527/p2p/12D3KooWRTEtx4rDkUwx4QsVbaELp8DUiKX8JHa3fRfiagaR9rNW
+/dns4/clawnetd.com/tcp/9527/p2p/12D3KooWQnQQNGBG5yhuhiaxwcHmksDYy9ZbMiC8uoJp4D6oB5QM
 ```
 
 This address uses `dns4` so it survives IP changes — only the DNS A record needs updating.

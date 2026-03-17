@@ -12,6 +12,7 @@ import { validateLiquidityPolicyFromEnv } from './policy/liquidity-policy.js';
 interface DaemonArgs {
   dataDir?: string;
   noApi: boolean;
+  noBootstrap: boolean;
   apiHost?: string;
   apiPort?: number;
   listen: string[];
@@ -24,6 +25,7 @@ interface DaemonArgs {
 function parseArgs(argv: string[]): DaemonArgs {
   let dataDir: string | undefined;
   let noApi = false;
+  let noBootstrap = false;
   let apiHost: string | undefined;
   let apiPort: number | undefined;
   const listen: string[] = [];
@@ -41,6 +43,10 @@ function parseArgs(argv: string[]): DaemonArgs {
     }
     if (arg === '--no-api') {
       noApi = true;
+      continue;
+    }
+    if (arg === '--no-bootstrap') {
+      noBootstrap = true;
       continue;
     }
     if (arg === '--api-host') {
@@ -104,6 +110,7 @@ function parseArgs(argv: string[]): DaemonArgs {
   return {
     dataDir,
     noApi,
+    noBootstrap,
     apiHost,
     apiPort,
     listen,
@@ -223,7 +230,7 @@ Example:
     },
     p2p: {
       listen: args.listen.length ? args.listen : config.p2p?.listen,
-      bootstrap: args.bootstrap.length ? args.bootstrap : config.p2p?.bootstrap,
+      bootstrap: args.noBootstrap ? [] : (args.bootstrap.length ? args.bootstrap : undefined),
       ...(relayOverrides ? { relay: relayOverrides } : {}),
     },
   });
@@ -304,6 +311,7 @@ Options:
   --api-port <port>          API port (default: 9528)
   --listen <multiaddr>       Add libp2p listen multiaddr (repeatable)
   --bootstrap <multiaddr>    Add bootstrap peer multiaddr (repeatable)
+  --no-bootstrap             Start with no bootstrap peers (for bootstrap nodes)
   --health-interval-ms <ms>  Health check interval (default: 30000, 0 to disable)
   --passphrase <str>         Passphrase for node identity key (REQUIRED, env: CLAW_PASSPHRASE)
   --network <type>           Network type: mainnet|testnet|devnet (overrides config.yaml, env: CLAW_NETWORK)
