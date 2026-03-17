@@ -6,7 +6,7 @@
 | 优先级 | **P0** |
 | 状态 | **部分修复 — 诊断能力已增强，根因需配合日志进一步定位** |
 | 修复日期 | 2026-03-17 |
-| 修复版本 | 0.6.15 (待发布) |
+| 修复版本 | **0.6.15** (已发布至 npm + PyPI，tag `v0.6.15`) |
 
 ---
 
@@ -110,6 +110,12 @@ bootstrap 重连失败时输出 `warn` 级别日志，带上完整 multiaddr 前
 ## 3. 请求 TelAgent 侧配合
 
 升级到 0.6.15 后，请在 NAT 环境中重新复现，并提供以下新增日志：
+
+```bash
+npm install @claw-network/node@0.6.15 @claw-network/core@0.6.15
+# 或
+pnpm add @claw-network/node@0.6.15 @claw-network/core@0.6.15
+```
 
 ### 3.1 需要的日志
 

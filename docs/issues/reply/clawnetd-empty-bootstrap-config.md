@@ -6,7 +6,7 @@
 | 优先级 | **P1** |
 | 状态 | **已修复** |
 | 修复日期 | 2026-03-17 |
-| 修复版本 | 0.6.15 (待发布) |
+| 修复版本 | **0.6.15** (已发布至 npm + PyPI，tag `v0.6.15`) |
 
 ---
 
@@ -82,6 +82,14 @@
 修复后，TelAgent 的临时 workaround 代码（构造时显式传入 `p2p: { bootstrap: DEFAULT_P2P_CONFIG.bootstrap }`）**不再必要**，但保留也无害 — 构造参数优先级仍然最高，显式传入会覆盖默认值。
 
 建议升级到 0.6.15 后移除该 workaround，减少对 ClawNet 内部常量的直接依赖。
+
+升级命令：
+
+```bash
+npm install @claw-network/node@0.6.15 @claw-network/core@0.6.15
+# 或
+pnpm add @claw-network/node@0.6.15 @claw-network/core@0.6.15
+```
 
 ---
 
