@@ -47,10 +47,37 @@ YEAR.SEQ.PATCH    — 补丁版本（patch）
 
 ### 关键设计决策
 
-1. **PATCH 从 1 开始**，不从 0 开始——避免 `2026.1.0` 与 `2026.1` 产生歧义。
+1. **PATCH 从 1 开始**，不从 0 开始——`.0` 保留给 npm 三段式存储（见下文）。
 2. **无 `v` 前缀**——Git tag 直接使用 `2026.1`，不带 `v`。
 3. **补丁不重置 SEQ**——`2026.1.3` 后做 release 得到 `2026.2`，而非 `2026.1`。
 4. **跨年重置 SEQ**——`2026.12` 后新年首次 release 得到 `2027.1`。
+
+### npm 双表示法
+
+npm 内部会将 `2026.1` 标准化为 `2026.1.0`。为保证 `npm install` / `npm publish` 行为完全正常，采用**双表示法**：
+
+| 场景 | 格式 | 示例 |
+|------|------|------|
+| `package.json` | 始终三段式 | `2026.1.0`、`2026.1.1` |
+| Git tag | 最简 CalVer | `2026.1`、`2026.1.1` |
+| `pyproject.toml` | 最简 CalVer | `2026.1`、`2026.1.1` |
+| CHANGELOG / 人类交流 | 最简 CalVer | `2026.1`、`2026.1.1` |
+
+转换规则很简单：
+
+```javascript
+// package.json → 补 .0
+function toNpmVersion(ver) {
+  return ver.split('.').length === 2 ? `${ver}.0` : ver;
+}
+
+// 显示 → 去掉尾部 .0
+function toDisplayVersion(ver) {
+  return ver.replace(/\.0$/, '');
+}
+```
+
+这样 PATCH `.0` 永远不会出现在人类可见的版本号中，实际补丁从 `.1` 开始，语义清晰无歧义。
 
 ---
 
@@ -90,7 +117,7 @@ patch   — Bug 修复、安全补丁、文档修正、紧急热修复
 ### Bump 脚本核心逻辑
 
 ```javascript
-// 解析 CalVer 版本
+// 解析 CalVer 版本（兼容 npm 三段式）
 function parseCalVer(version) {
   const parts = version.split('.').map(Number);
   if (parts.length === 2) return { year: parts[0], seq: parts[1], patch: null };
@@ -98,7 +125,7 @@ function parseCalVer(version) {
   return null;
 }
 
-// 计算下一个版本
+// 计算下一个版本（返回最简 CalVer 形式）
 function bumpVersion(current, type) {
   const currentYear = new Date().getFullYear();
   const parsed = parseCalVer(current);
@@ -110,7 +137,8 @@ function bumpVersion(current, type) {
   }
 
   if (type === 'patch') {
-    const nextPatch = parsed.patch == null ? 1 : parsed.patch + 1;
+    // patch=null (两段) 或 patch=0 (npm 三段式) 均视为无补丁
+    const nextPatch = (parsed.patch == null || parsed.patch === 0) ? 1 : parsed.patch + 1;
     return `${parsed.year}.${parsed.seq}.${nextPatch}`;
   }
 
@@ -118,9 +146,17 @@ function bumpVersion(current, type) {
   if (/^\d{4}\.\d+(\.\d+)?$/.test(type)) return type;
   throw new Error(`Invalid: "${type}"`);
 }
+
+// 写入 package.json 时补 .0；显示/tag/pyproject 用最简形式
+function toNpmVersion(ver) {
+  return ver.split('.').length === 2 ? `${ver}.0` : ver;
+}
+function toDisplayVersion(ver) {
+  return ver.replace(/\.0$/, '');
+}
 ```
 
-脚本遍历所有同步包的 `package.json`（及 Python 的 `pyproject.toml`），一次性写入统一版本。
+脚本遍历所有同步包的 `package.json`（写入三段式）和 Python 的 `pyproject.toml`（写入最简形式），一次性统一版本。
 
 ---
 
@@ -181,6 +217,8 @@ git push && git push origin 2026.2
 ### 迁移检查清单
 
 - [ ] bump 脚本支持 `release` / `patch` / 显式版本
+- [ ] bump 脚本写入 package.json 时使用三段式（`.0` 补齐）
+- [ ] bump 脚本 Git tag / pyproject.toml 使用最简 CalVer 形式
 - [ ] bump 脚本包含 `--dry` 预览模式
 - [ ] CI tag pattern 改为 `'20*'`
 - [ ] Release workflow 版本提取去掉 `v` 前缀处理
@@ -194,7 +232,7 @@ git push && git push origin 2026.2
 
 ### Q: 补丁号为什么从 1 开始而不是 0？
 
-`2026.1.0` 和 `2026.1` 在大多数包管理器中是**等价的**（npm 会将 `1.0.0` 标准化为 `1.0.0`，但 `2026.1` 和 `2026.1.0` 可能造成混淆）。从 1 开始避免歧义。
+`.0` 被保留用于 npm 三段式存储——`package.json` 中 release 版本存为 `2026.1.0`，但人类可见的版本号始终是 `2026.1`。补丁从 `.1` 开始，避免 `2026.1.0` 和 `2026.1` 的歧义。
 
 ### Q: 年中加入的项目，SEQ 从多少开始？
 
@@ -218,7 +256,7 @@ Ubuntu 用 `YY.MM`（如 `24.04`），pip 用 `YY.N`。本方案使用 4 位年 
 
 ### Q: 与 npm registry 兼容吗？
 
-兼容。npm 使用 SemVer 解析，但 `2026.1.0`（npm 内部标准化）可以正常发布和安装。CalVer 的三段式 `YEAR.SEQ.PATCH` 恰好符合 SemVer 的 `MAJOR.MINOR.PATCH` 结构。
+完全兼容。bump 脚本写入 `package.json` 时始终使用三段式（如 `2026.1.0`），npm 原生支持。Git tag 和人类交流中使用两段式（`2026.1`）保持 CalVer 简洁。补丁版本如 `2026.1.1` 在两个场景中格式一致，无需转换。
 
 ---
 
