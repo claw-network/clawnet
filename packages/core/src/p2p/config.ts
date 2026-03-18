@@ -69,6 +69,8 @@ export interface P2PConfig {
   /** Max inbound yamux streams per connection. Default: 256 */
   yamuxMaxInboundStreams?: number;
   pubsubTopics?: string[];
+  /** When true, this node acts as a bootstrap server and queries peer DIDs on connect. */
+  isBootstrap?: boolean;
 }
 
 /** Resolve the effective RelayConfig from a P2PConfig. */

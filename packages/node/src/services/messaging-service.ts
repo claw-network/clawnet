@@ -38,6 +38,10 @@ import {
   decodeDidResolveRequestBytes,
   encodeDidResolveResponseBytes,
   decodeDidResolveResponseBytes,
+  encodeDidQueryRequestBytes,
+  decodeDidQueryRequestBytes,
+  decodeDidQueryResponseBytes,
+  encodeDidQueryResponseBytes,
   encodeE2EEnvelope,
   decodeE2EEnvelope,
   encodeAttachmentMessageBytes,
@@ -68,6 +72,7 @@ const PROTO_DM = '/clawnet/1.0.0/dm';
 const PROTO_DID_ANNOUNCE = '/clawnet/1.0.0/did-announce';
 const PROTO_RECEIPT = '/clawnet/1.0.0/receipt';
 const PROTO_DID_RESOLVE = '/clawnet/1.0.0/did-resolve';
+const PROTO_DID_QUERY = '/clawnet/1.0.0/did-query';
 const PROTO_ATTACHMENT = '/clawnet/1.0.0/attachment';
 const PROTO_DELEGATED_MSG = '/clawnet/1.0.0/delegated-msg';
 const PROTO_DELIVERY_AUTH = DELIVERY_AUTH_PROTOCOL;
@@ -364,12 +369,15 @@ export class MessagingService {
   private x25519PrivateKey!: Uint8Array;
   private x25519PublicKey!: Uint8Array;
   private readonly keysDir: string;
+  /** When true, this node acts as a bootstrap server and actively queries peer DIDs on connect. */
+  private readonly isBootstrap: boolean;
 
-  constructor(p2p: P2PNode, store: MessageStore, localDid: string, dataDir?: string) {
+  constructor(p2p: P2PNode, store: MessageStore, localDid: string, dataDir?: string, isBootstrap = false) {
     this.log = createLogger({ level: 'info' });
     this.p2p = p2p;
     this.store = store;
     this.localDid = localDid;
+    this.isBootstrap = isBootstrap;
     this.attachmentsDir = dataDir ? join(dataDir, 'attachments') : join(process.cwd(), 'data', 'attachments');
     this.deliverableDataDir = dataDir ? join(dataDir, 'deliverables') : join(process.cwd(), 'data', 'deliverables');
     this.keysDir = dataDir ? join(dataDir, 'keys') : join(process.cwd(), 'data', 'keys');
@@ -407,6 +415,10 @@ export class MessagingService {
     await this.p2p.handleProtocol(PROTO_DID_RESOLVE, (incoming) => {
       void this.handleDidResolve(incoming);
     }, { maxInboundStreams: 128 });
+    // Bootstrap-only: handle did-query (peer asks us for our DID)
+    await this.p2p.handleProtocol(PROTO_DID_QUERY, (incoming) => {
+      void this.handleDidQuery(incoming);
+    }, { maxInboundStreams: 64 });
     await this.p2p.handleProtocol(PROTO_ATTACHMENT, (incoming) => {
       void this.handleInboundAttachment(incoming);
     }, { maxInboundStreams: 32 });
@@ -483,6 +495,9 @@ export class MessagingService {
     } catch { /* ignore */ }
     try {
       await this.p2p.unhandleProtocol(PROTO_DID_RESOLVE);
+    } catch { /* ignore */ }
+    try {
+      await this.p2p.unhandleProtocol(PROTO_DID_QUERY);
     } catch { /* ignore */ }
     try {
       await this.p2p.unhandleProtocol(PROTO_ATTACHMENT);
@@ -742,12 +757,49 @@ export class MessagingService {
     // Announce our DID to the new peer
     await this.announceDidToPeer(peerId);
 
+    // Bootstrap mode: actively query the remote peer's DID so we register it
+    // even if the peer's outbound did-announce was lost or dropped.
+    if (this.isBootstrap) {
+      await this.queryPeerDid(peerId);
+    }
+
     // Check if we know this peer's DID and flush outbox
     const did = this.peerIdToDid.get(peerId);
     if (did) {
       const flushed = await this.flushOutboxForDid(did);
       if (flushed > 0) {
         this.log.info('flushed outbox messages on reconnect', { peerId, did, flushed });
+      }
+    }
+  }
+
+  /**
+   * Bootstrap-only: actively query a newly connected peer for its own DID.
+   * Opens a did-query stream and registers the response. This ensures the
+   * bootstrap node always knows every peer's DID even if their outbound
+   * did-announce was lost due to a prior readStream bug (pre-2026.1.3).
+   */
+  private async queryPeerDid(peerId: string): Promise<void> {
+    let stream: StreamDuplex | null = null;
+    try {
+      stream = await this.p2p.newStream(peerId, PROTO_DID_QUERY);
+      const reqBytes = encodeDidQueryRequestBytes({});
+      await writeBinaryStream(stream.sink, reqBytes);
+      const raw = await readStream(stream.source, 1024, DID_RESOLVE_TIMEOUT_MS);
+      await stream.close();
+      const resp = decodeDidQueryResponseBytes(new Uint8Array(raw));
+      if (resp.did && DID_PATTERN.test(resp.did)) {
+        this.registerDidPeer(resp.did, peerId);
+        this.log.info('bootstrap registered peer DID via query', { did: resp.did, peerId });
+      }
+    } catch (err) {
+      // Best-effort: rely on the peer's outbound did-announce instead
+      this.log.debug('did query failed for peer, will rely on announce', {
+        peerId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      if (stream) {
+        try { await stream.close(); } catch { /* ignore */ }
       }
     }
   }
@@ -2070,6 +2122,28 @@ export class MessagingService {
       this.log.info('DID resolve handled', { did: msg.did, found: !!peerId, multiaddrs: multiaddrs.length });
     } catch (err) {
       this.log.warn('failed to handle DID resolve', { error: (err as Error).message });
+      try { await stream.close(); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Handle incoming DID-query request — peer is asking for our DID (self-query).
+   * Responds with our local DID so the peer can register us.
+   */
+  private async handleDidQuery(incoming: {
+    stream: StreamDuplex;
+    connection: { remotePeer?: { toString: () => string } };
+  }): Promise<void> {
+    const { stream, connection } = incoming;
+    try {
+      const raw = await readStream(stream.source, 1024);
+      decodeDidQueryRequestBytes(new Uint8Array(raw));
+      const respBytes = encodeDidQueryResponseBytes({ did: this.localDid });
+      await writeBinaryStream(stream.sink, respBytes);
+      await stream.close();
+      this.log.debug('did query handled', { peerId: connection.remotePeer?.toString() });
+    } catch (err) {
+      this.log.warn('failed to handle DID query', { error: (err as Error).message });
       try { await stream.close(); } catch { /* ignore */ }
     }
   }

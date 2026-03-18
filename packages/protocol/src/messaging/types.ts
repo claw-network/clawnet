@@ -52,6 +52,14 @@ export interface DidResolveResponse {
   multiaddrs?: string[];
 }
 
+/** Request for `/clawnet/1.0.0/did-query` (bootstrap self-query protocol). */
+export interface DidQueryRequest {}
+
+/** Response for `/clawnet/1.0.0/did-query` — peer returns its own DID. */
+export interface DidQueryResponse {
+  did: string;
+}
+
 /**
  * Binary E2E encryption envelope layout (60-byte fixed header):
  *

@@ -22,6 +22,8 @@
  * DidAnnounce:       0=did
  * DidResolveRequest: 0=did
  * DidResolveResponse:0=did, 1=controller, 2=public_key, 3=active
+ * DidQueryRequest:   0=did (empty = self-query)
+ * DidQueryResponse:  0=did
  * AttachmentMessage: 0=message_id, 1=attachment_id, 2=filename, 3=mime_type,
  *                    4=size_bytes, 5=checksum, 6=data, 7=thumbnail
  */
@@ -33,6 +35,8 @@ import type {
   DidAnnounce,
   DidResolveRequest,
   DidResolveResponse,
+  DidQueryRequest,
+  DidQueryResponse,
   DirectMessage,
   AttachmentMessage,
 } from './types.js';
@@ -129,6 +133,32 @@ export function encodeDidResolveRequest(builder: Builder, req: DidResolveRequest
 }
 
 export function decodeDidResolveRequest(reader: FlatBufferReader, table: number): DidResolveRequest {
+  return {
+    did: reader.readStringField(table, 0) ?? '',
+  };
+}
+
+// ── DidQueryRequest (0 fields, empty struct = self-query) ─────
+
+export function encodeDidQueryRequest(builder: Builder, _req: DidQueryRequest): number {
+  builder.startObject(0);
+  return builder.endObject();
+}
+
+export function decodeDidQueryRequest(_reader: FlatBufferReader, _table: number): DidQueryRequest {
+  return {};
+}
+
+// ── DidQueryResponse (1 field) ─────────────────────────────
+
+export function encodeDidQueryResponse(builder: Builder, resp: DidQueryResponse): number {
+  const did = builder.createString(resp.did);
+  builder.startObject(1);
+  builder.addFieldOffset(0, did, 0);
+  return builder.endObject();
+}
+
+export function decodeDidQueryResponse(reader: FlatBufferReader, table: number): DidQueryResponse {
   return {
     did: reader.readStringField(table, 0) ?? '',
   };

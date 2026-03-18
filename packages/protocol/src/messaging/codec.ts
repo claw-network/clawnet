@@ -11,6 +11,8 @@ import type {
   DidAnnounce,
   DidResolveRequest,
   DidResolveResponse,
+  DidQueryRequest,
+  DidQueryResponse,
   DirectMessage,
   E2EEnvelope,
 } from './types.js';
@@ -28,6 +30,10 @@ import {
   decodeDidResolveRequest,
   encodeDidResolveResponse,
   decodeDidResolveResponse,
+  encodeDidQueryRequest,
+  decodeDidQueryRequest,
+  encodeDidQueryResponse,
+  decodeDidQueryResponse,
   encodeAttachmentMessage,
   decodeAttachmentMessage,
 } from './flatbuffers.js';
@@ -95,6 +101,30 @@ export function encodeDidResolveResponseBytes(resp: DidResolveResponse): Uint8Ar
 export function decodeDidResolveResponseBytes(bytes: Uint8Array): DidResolveResponse {
   const reader = new FlatBufferReader(bytes);
   return decodeDidResolveResponse(reader, reader.rootTable());
+}
+
+// ── DidQueryRequest / DidQueryResponse ───────────────────────
+
+export function encodeDidQueryRequestBytes(_req: DidQueryRequest): Uint8Array {
+  const builder = new Builder(64);
+  const root = encodeDidQueryRequest(builder, _req);
+  return finishBytes(builder, root);
+}
+
+export function decodeDidQueryRequestBytes(bytes: Uint8Array): DidQueryRequest {
+  const reader = new FlatBufferReader(bytes);
+  return decodeDidQueryRequest(reader, reader.rootTable());
+}
+
+export function encodeDidQueryResponseBytes(resp: DidQueryResponse): Uint8Array {
+  const builder = new Builder(64);
+  const root = encodeDidQueryResponse(builder, resp);
+  return finishBytes(builder, root);
+}
+
+export function decodeDidQueryResponseBytes(bytes: Uint8Array): DidQueryResponse {
+  const reader = new FlatBufferReader(bytes);
+  return decodeDidQueryResponse(reader, reader.rootTable());
 }
 
 // ── Binary E2E Envelope ──────────────────────────────────────

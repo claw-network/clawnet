@@ -9,6 +9,8 @@ export interface NodeConfig {
   p2p?: {
     listen?: string[];
     bootstrap?: string[];
+    /** When true, this node acts as a bootstrap server and queries peer DIDs on connect. */
+    isBootstrap?: boolean;
   };
   logging?: {
     level?: 'debug' | 'info' | 'warn' | 'error';
