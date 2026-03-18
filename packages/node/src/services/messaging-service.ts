@@ -236,11 +236,29 @@ async function readStream(
 ): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  let timeoutId: NodeJS.Timeout | undefined;
+
+  // Create a promise that rejects when timeout fires — this actually
+  // interrupts a blocked `iterator.next()` via Promise.race, unlike the
+  // previous pattern which only checked the signal when chunks arrived.
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`Stream read timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
   try {
-    for await (const chunk of source) {
-      if (ac.signal.aborted) throw new Error(`Stream read timed out after ${timeoutMs}ms`);
+    const iterator = source[Symbol.asyncIterator]();
+
+    while (true) {
+      const result = await Promise.race([
+        iterator.next(),
+        timeoutPromise,
+      ]);
+
+      if (result.done) break;
+
+      const chunk = result.value;
       const bytes = chunk instanceof Uint8Array ? chunk : chunk.subarray();
       total += bytes.length;
       if (total > maxBytes) {
@@ -249,7 +267,9 @@ async function readStream(
       chunks.push(Buffer.from(bytes));
     }
   } finally {
-    clearTimeout(timer);
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
   }
   return Buffer.concat(chunks);
 }
@@ -2114,8 +2134,9 @@ export class MessagingService {
       const bytes = encodeDidAnnounceBytes({ did: this.localDid });
       await writeBinaryStream(stream.sink, bytes);
       await stream.close();
-    } catch {
+    } catch (err) {
       // Best-effort; the peer may not support this protocol yet
+      this.log.warn('Failed to announce DID to peer', { peerId, error: err instanceof Error ? err.message : String(err) });
       if (stream) {
         try { await stream.close(); } catch { /* ignore */ }
       }

@@ -212,7 +212,7 @@ export class ClawNetNode {
       ...DEFAULT_P2P_CONFIG,
       ...this.config.p2p,
       listen: this.config.p2p?.listen ?? persisted.p2p?.listen ?? DEFAULT_P2P_CONFIG.listen,
-      bootstrap: this.config.p2p?.bootstrap ?? DEFAULT_P2P_CONFIG.bootstrap,
+      bootstrap: this.config.p2p?.bootstrap ?? persisted.p2p?.bootstrap ?? DEFAULT_P2P_CONFIG.bootstrap,
     };
 
     // Dynamic bootstrap: resolve live PeerId from bootstrap API unless the
