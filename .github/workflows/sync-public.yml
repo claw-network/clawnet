@@ -3,8 +3,6 @@ name: Sync to Public Repo
 on:
   push:
     branches: [main]
-    tags:
-      - '20*'
   workflow_dispatch:
 
 permissions:
@@ -19,14 +17,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Always sync: manual dispatch, tag push
+          # Always sync: manual dispatch
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "Manual dispatch — syncing regardless of time."
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "Tag push — syncing regardless of time."
             echo "skip=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -99,6 +92,7 @@ jobs:
             --exclude='.github/copilot-instructions.md' \
             --exclude='.github/copilot-instructions.public.md' \
             --exclude='.github/workflows/sync-public.yml' \
+            --exclude='.github/workflows/publish-packages.yml' \
             ./ /tmp/public-repo/
 
           # Sync docs/api/ separately (only public part of docs/)
@@ -115,6 +109,7 @@ jobs:
           rm -f infra/README.md infra/TOKEN_DISTRIBUTION.md infra/ARCHITECTURE_OVERVIEW.md
           rm -f .github/copilot-instructions.public.md
           rm -f .github/workflows/sync-public.yml
+          rm -f .github/workflows/publish-packages.yml
 
           echo "=== Incremental sync complete ==="
           ls -d */ .github/ 2>/dev/null || true
@@ -185,12 +180,5 @@ jobs:
           # Ensure remote URL is set (for fresh init case)
           git remote set-url origin "$PUBLIC_REPO" 2>/dev/null || git remote add origin "$PUBLIC_REPO"
           git push origin main
-
-          # Sync tag if this is a tag push
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-            git tag "$TAG"
-            git push origin "$TAG" --force
-          fi
 
           echo "✅ Synced to public repo"

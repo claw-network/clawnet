@@ -52,7 +52,9 @@ Add to `~/.npmrc`:
 
 PAT needs `write:packages` scope. **Not needed for CI** — CI uses `GITHUB_TOKEN` automatically.
 
-### CI secrets (GitHub Actions)
+### CI secrets (GitHub Actions — on `clawnet-dev` private repo)
+
+All publishing happens from the **private repo** (`clawnet-dev`). The public repo (`clawnet`) does NOT have a publish workflow.
 
 | Secret | Purpose |
 |--------|---------|
@@ -104,7 +106,7 @@ git push --no-verify
 git push origin <VERSION> --no-verify
 ```
 
-Pushing a CalVer tag (e.g. `2026.1`) triggers the **`publish-packages`** CI workflow automatically.
+Pushing a CalVer tag (e.g. `2026.1`) triggers the **`publish-packages`** CI workflow on the **private repo** (`clawnet-dev`) automatically. The public repo does not publish — tags are not synced to it.
 
 ### Step 4: Publish (two options)
 
@@ -219,7 +221,7 @@ See `skills/upgrade-clawnetd-server.md` for full server deployment details.
 - **Version source of truth**: `packages/core/package.json` — the bump script reads from here.
 - **npm publish order matters**: core → protocol → sdk → node (dependency chain).
 - **Dual registry**: always use `--registry` flag when publishing locally to specify the target. Without it, the default npm registry is used.
-- **CI is the recommended publish path**: push a CalVer tag (e.g. `2026.1`) and let `publish-packages` workflow handle everything.
+- **CI is the recommended publish path**: push a CalVer tag (e.g. `2026.1`) to the **private repo** and let `publish-packages` workflow handle everything. The public repo has no publish workflow.
 - **Tag format**: CalVer without `v` prefix — `2026.1`, `2026.1.1`, NOT `v2026.1`.
 - **cli is private**: not published to any registry, but its version is synced for consistency.
 - **Python SDK pyproject.toml**: automatically updated by the bump script.
