@@ -5,6 +5,7 @@
 import { Router } from '../router.js';
 import { ok, created, noContent, notFound, badRequest, internalError } from '../response.js';
 import { validate } from '../schemas/common.js';
+import { z } from 'zod';
 import {
   IdentityRegisterSchema,
   IdentityRotateKeySchema,
@@ -26,6 +27,31 @@ import {
   createIdentityCapabilityRegisterEnvelope,
   type CapabilityCredential,
 } from '@claw-network/protocol';
+
+// M1: Zod schema for runtime validation of CapabilityCredential
+const VerifiableCredentialProofSchema = z.object({
+  type: z.string(),
+  created: z.string(),
+  verificationMethod: z.string(),
+  proofPurpose: z.string(),
+  proofValue: z.string(),
+});
+
+const CapabilityCredentialSubjectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  pricing: z.record(z.unknown()),
+  description: z.string().optional(),
+});
+
+const CapabilityCredentialSchema = z.object({
+  '@context': z.array(z.string()),
+  type: z.array(z.string()),
+  issuer: z.string(),
+  issuanceDate: z.string(),
+  credentialSubject: CapabilityCredentialSubjectSchema,
+  proof: VerifiableCredentialProofSchema,
+});
 
 export function identityRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
@@ -234,13 +260,16 @@ export function identityRoutes(ctx: RuntimeContext): Router {
     }
     const body = v.data;
 
-    const credential = body.credential as CapabilityCredential | undefined;
-    if (!credential) {
-      badRequest(res, 'Missing credential', route.url.pathname);
+    // M1: Use Zod for runtime validation of the credential
+    const credentialParsed = CapabilityCredentialSchema.safeParse(body.credential);
+    if (!credentialParsed.success) {
+      badRequest(res, `Invalid credential format: ${credentialParsed.error.message}`, route.url.pathname);
       return;
     }
+    const credential = credentialParsed.data as CapabilityCredential;
+
     if (!(await verifyCapabilityCredential(credential))) {
-      badRequest(res, 'Invalid capability credential', route.url.pathname);
+      badRequest(res, 'Invalid capability credential signature', route.url.pathname);
       return;
     }
 

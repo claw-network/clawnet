@@ -42,8 +42,33 @@ function loadAbi(contractName: string, artifactsDir: string): InterfaceAbi {
     `${contractName}.sol`,
     `${contractName}.json`,
   );
-  const raw = readFileSync(artifactPath, 'utf-8');
-  const artifact = JSON.parse(raw) as { abi: InterfaceAbi };
+
+  let raw: string;
+  try {
+    raw = readFileSync(artifactPath, 'utf-8');
+  } catch (err) {
+    throw new Error(
+      `Failed to read artifact for "${contractName}" at "${artifactPath}": ` +
+      `${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  let artifact: { abi: InterfaceAbi };
+  try {
+    artifact = JSON.parse(raw) as { abi: InterfaceAbi };
+  } catch {
+    throw new Error(
+      `Failed to parse artifact JSON for "${contractName}" at "${artifactPath}". ` +
+      'The artifact file may be corrupted or not valid JSON.',
+    );
+  }
+
+  if (!artifact.abi || !Array.isArray(artifact.abi)) {
+    throw new Error(
+      `Artifact for "${contractName}" is missing or has invalid "abi" field.`,
+    );
+  }
+
   return artifact.abi;
 }
 

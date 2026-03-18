@@ -142,10 +142,35 @@ export class EventIndexer {
 
     if (from > latest) return;
 
+    const distance = latest - from;
+
+    // H5: Warn if significantly behind
+    if (distance > this.batchSize * 2) {
+      this.log.warn(
+        'Indexer is behind by %d blocks (current: %d, indexing: %d–%d). ' +
+        'Consider increasing batch size or indexer polling frequency.',
+        distance,
+        latest,
+        from,
+        Math.min(from + this.batchSize - 1, latest),
+      );
+    }
+
     this.log.debug('Catching up: blocks %d → %d', from, latest);
 
+    // H5: Adaptive batch sizing — reduce batch if significantly behind
+    let effectiveBatch = this.batchSize;
+    if (distance > this.batchSize * 10) {
+      effectiveBatch = Math.max(Math.floor(this.batchSize / 2), 100);
+      this.log.info(
+        'Indexer backlog large (%d blocks), reducing batch size to %d',
+        distance,
+        effectiveBatch,
+      );
+    }
+
     while (from <= latest && this.running) {
-      const to = Math.min(from + this.batchSize - 1, latest);
+      const to = Math.min(from + effectiveBatch - 1, latest);
       await this.processBlockRange(from, to);
       from = to + 1;
     }

@@ -27,6 +27,10 @@ export function isAuthenticated(): boolean {
 }
 
 export function setAuthenticated(did: string, sessionToken: string) {
+  // L1 SECURITY NOTE: sessionStorage persists for the browser tab session.
+  // On shared computers, close all browser tabs when done to clear the token.
+  // For enhanced security on shared machines, consider implementing auto-logout
+  // after a timeout, or use memoryStorage instead.
   sessionStorage.setItem('console-token', sessionToken);
   sessionStorage.setItem('console-did', did);
 }

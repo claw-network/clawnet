@@ -29,6 +29,32 @@ const _RevokeKeySchema = z.object({
 // Helpers
 // ---------------------------------------------------------------------------
 
+// H3: Simple in-memory rate limiter for API key management endpoints.
+// 10 creates/revokes per minute per IP. For multi-instance deployments,
+// use a Redis-based rate limiter instead.
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+const rateLimitWindowMs = 60_000;
+const rateLimitMaxRequests = 10;
+const rateLimitStore = new Map<string, RateLimitEntry>();
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + rateLimitWindowMs });
+    return true;
+  }
+  if (entry.count >= rateLimitMaxRequests) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
 function isLocalhost(req: IncomingMessage): boolean {
   const remoteAddress = req.socket.remoteAddress ?? '';
   return (
@@ -71,6 +97,14 @@ export function adminRoutes(ctx: RuntimeContext): Router {
     }
     if (!isCsrfSafe(req)) {
       forbidden(res, 'Cross-origin admin requests are not allowed', route.url.pathname);
+      return;
+    }
+
+    // H3: Rate limit API key creation (10 req/min per IP)
+    const clientIp = req.socket.remoteAddress ?? 'unknown';
+    if (!checkRateLimit(`create:${clientIp}`)) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Too many requests. Rate limit: 10 creates per minute.' }));
       return;
     }
 
@@ -123,6 +157,14 @@ export function adminRoutes(ctx: RuntimeContext): Router {
     }
     if (!isCsrfSafe(req)) {
       forbidden(res, 'Cross-origin admin requests are not allowed', route.url.pathname);
+      return;
+    }
+
+    // H3: Rate limit API key revocation (10 req/min per IP)
+    const clientIp = req.socket.remoteAddress ?? 'unknown';
+    if (!checkRateLimit(`revoke:${clientIp}`)) {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Too many requests. Rate limit: 10 revokes per minute.' }));
       return;
     }
 

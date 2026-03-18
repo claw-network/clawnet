@@ -7,9 +7,13 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-const DEPLOYER_PRIVATE_KEY =
-  process.env.DEPLOYER_PRIVATE_KEY ||
-  "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"; // hardhat default #0
+const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
+if (!DEPLOYER_PRIVATE_KEY) {
+  throw new Error(
+    "DEPLOYER_PRIVATE_KEY environment variable is not set. " +
+    "Cannot deploy contracts without a valid private key.",
+  );
+}
 
 const config: HardhatUserConfig = {
   solidity: {

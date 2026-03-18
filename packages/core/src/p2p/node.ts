@@ -347,7 +347,7 @@ export class P2PNode {
       if (pid !== 'unknown') {
         this.knownPeers.add(pid);
         for (const handler of this.connectHandlers) {
-          try { handler(pid); } catch { /* best-effort */ }
+          try { handler(pid); } catch (err) { console.debug('[p2p] connect handler error: %s', err instanceof Error ? err.message : String(err)); }
         }
       }
     });
@@ -357,7 +357,7 @@ export class P2PNode {
       console.log(`[p2p] peer:disconnect ${pid}`);
       if (pid !== 'unknown') {
         for (const handler of this.disconnectHandlers) {
-          try { handler(pid); } catch { /* best-effort */ }
+          try { handler(pid); } catch (err) { console.debug('[p2p] connect handler error: %s', err instanceof Error ? err.message : String(err)); }
         }
       }
     });
@@ -534,8 +534,8 @@ export class P2PNode {
           }
         }
       }
-    } catch {
-      // peerStore enumeration not available in this libp2p version
+    } catch (err) {
+      console.debug('[p2p] peerStore enumeration error: %s', err instanceof Error ? err.message : String(err));
     }
 
     // ── Approach 2: KadDHT random walk (fallback) ──────────────────────
@@ -558,16 +558,16 @@ export class P2PNode {
                 await this.node.dial?.(id);
                 newPeers++;
                 currentPeers.add(pid);
-              } catch {
-                // dial failure expected for unreachable peers
+              } catch (err) {
+                console.debug('[p2p] discoverPeersViaDHT: dial %s failed (%s) — expected for unreachable peers', pid, err instanceof Error ? err.message : String(err));
               }
             }
           } finally {
             clearTimeout(timeout);
           }
         }
-      } catch {
-        // DHT walk can fail / timeout when node is still bootstrapping
+      } catch (err) {
+        console.debug('[p2p] discoverPeersViaDHT: DHT walk failed (%s) — expected during bootstrap', err instanceof Error ? err.message : String(err));
       }
     }
 
@@ -597,7 +597,8 @@ export class P2PNode {
         return publicKey.toBytes();
       }
       return null;
-    } catch {
+    } catch (err) {
+      console.debug('[p2p] getPeerPublicKey error: %s', err instanceof Error ? err.message : String(err));
       return null;
     }
   }
@@ -619,7 +620,8 @@ export class P2PNode {
           a.multiaddr?.toString?.() ?? a.toString?.() ?? '',
         )
         .filter(Boolean) as string[];
-    } catch {
+    } catch (err) {
+      console.debug('[p2p] getPeerAddresses error: %s', err instanceof Error ? err.message : String(err));
       return [];
     }
   }
@@ -651,16 +653,16 @@ export class P2PNode {
           try {
             const record = await peerStore.get(peerId);
             if (record?.id) peerIdObj = record.id;
-          } catch {
-            // peer not yet in store — proceed with string
+          } catch (err) {
+            console.debug('[p2p] addPeerAddresses: peer not yet in store (%s), proceeding with string', err instanceof Error ? err.message : String(err));
           }
         }
         await peerStore.merge(peerIdObj, {
           multiaddrs: fullAddrs.map((a) => multiaddr(a)),
         });
         return;
-      } catch {
-        // Merge failed (e.g. string PeerId rejected) — fall through to dial
+      } catch (err) {
+        console.debug('[p2p] addPeerAddresses: merge failed (%s), falling through to dial', err instanceof Error ? err.message : String(err));
       }
     }
 
@@ -670,8 +672,8 @@ export class P2PNode {
         try {
           await this.node.dial(multiaddr(addr));
           return; // one success is enough
-        } catch {
-          // continue to next addr
+        } catch (err) {
+          console.debug('[p2p] addPeerAddresses: dial %s failed (%s), trying next addr', addr, err instanceof Error ? err.message : String(err));
         }
       }
     }
@@ -798,8 +800,8 @@ export class P2PNode {
       if (!routing?.provide) return;
       const cid = await this.getRelayProviderCid();
       await routing.provide(cid);
-    } catch {
-      // DHT provide can fail during early bootstrap — non-fatal
+    } catch (err) {
+      console.debug('[p2p] provideRelayOnce: DHT provide failed (%s) — non-fatal during bootstrap', err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -831,8 +833,8 @@ export class P2PNode {
           clearTimeout(timeout);
         }
       }
-    } catch {
-      // DHT lookup timeout or failure — fall through to bootstrap fallback
+    } catch (err) {
+      console.debug('[p2p] discoverRelayNodes: DHT lookup failed (%s) — falling through to bootstrap fallback', err instanceof Error ? err.message : String(err));
     }
 
     // Fallback: extract peer IDs from bootstrap multiaddrs
@@ -869,7 +871,9 @@ export class P2PNode {
   async unregisterRelayInfoProtocol(): Promise<void> {
     try {
       await this.unhandleProtocol(RELAY_INFO_PROTOCOL);
-    } catch { /* may not be registered */ }
+    } catch (err) {
+      console.debug('[p2p] unregisterRelayInfoProtocol: %s', err instanceof Error ? err.message : String(err));
+    }
   }
 
   /**
@@ -898,7 +902,8 @@ export class P2PNode {
       let offset = 0;
       for (const c of chunks) { merged.set(c, offset); offset += c.length; }
       return JSON.parse(new TextDecoder().decode(merged)) as RelayInfoResponse;
-    } catch {
+    } catch (err) {
+      console.debug('[p2p] probeRelayInfo: %s', err instanceof Error ? err.message : String(err));
       return null;
     }
   }
@@ -919,7 +924,8 @@ export class P2PNode {
         return latency;
       }
       return -1;
-    } catch {
+    } catch (err) {
+      console.debug('[p2p] pingPeer: %s', err instanceof Error ? err.message : String(err));
       return -1;
     }
   }
@@ -958,7 +964,9 @@ export class P2PNode {
         try {
           const notice = JSON.parse(new TextDecoder().decode(merged)) as RelayMigrationNotice;
           this.migrationHandler?.(notice, fromPeer);
-        } catch { /* malformed notice — ignore */ }
+        } catch (err) {
+          console.debug('[p2p] registerRelayMigrationProtocol: malformed notice from %s (%s) — ignored', fromPeer, err instanceof Error ? err.message : String(err));
+        }
       })();
     });
   }
@@ -973,7 +981,8 @@ export class P2PNode {
       const data = new TextEncoder().encode(JSON.stringify(notice));
       await stream.sink((async function* () { yield data; })());
       return true;
-    } catch {
+    } catch (err) {
+      console.debug('[p2p] notifyRelayMigration to %s failed (%s)', peerId.slice(0, 16), err instanceof Error ? err.message : String(err));
       return false;
     }
   }
@@ -1048,7 +1057,9 @@ export class P2PNode {
           const response = await this.confirmHandler(request, fromPeer);
           const data = new TextEncoder().encode(JSON.stringify(response));
           await stream.sink((async function* () { yield data; })());
-        } catch { /* malformed request — ignore */ }
+        } catch (err) {
+          console.debug('[p2p] handleConfirmRequest: malformed request from %s (%s) — ignored', fromPeer, err instanceof Error ? err.message : String(err));
+        }
       })();
     });
   }
@@ -1085,7 +1096,8 @@ export class P2PNode {
       for (const c of chunks) { merged.set(c, offset); offset += c.length; }
       const response = JSON.parse(new TextDecoder().decode(merged)) as RelayConfirmResponse;
       return response.accepted ? response : null;
-    } catch {
+    } catch (err) {
+      console.debug('[p2p] confirmRelayTraffic: %s', err instanceof Error ? err.message : String(err));
       return null;
     }
   }

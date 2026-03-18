@@ -123,6 +123,21 @@ describe('IdentityService', () => {
       expect(provider.identity.rotateKey).toHaveBeenCalled();
       expect(result.txHash).toBe(TX_HASH);
     });
+
+    // L4 / C3: rotation proof validation
+    it('throws when rotation proof is invalid', async () => {
+      const newKey = '0x' + 'dd'.repeat(32);
+      const invalidProof = '0x' + 'ff'.repeat(65); // wrong signature
+      await expect(service.rotateKey(DID, newKey, invalidProof))
+        .rejects.toThrow('Invalid rotation proof');
+    });
+
+    it('accepts rotation when proof is not provided (legacy compatibility)', async () => {
+      const newKey = '0x' + 'dd'.repeat(32);
+      const result = await service.rotateKey(DID, newKey, '0x');
+      expect(provider.identity.rotateKey).toHaveBeenCalled();
+      expect(result.txHash).toBe(TX_HASH);
+    });
   });
 
   describe('revokeDID', () => {

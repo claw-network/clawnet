@@ -218,6 +218,14 @@ export class WalletService {
       memo ? ` (${memo})` : '',
     );
 
+    // H2: Validate amount is positive
+    if (typeof amount === 'bigint') {
+      if (amount <= 0n) throw new Error('Amount must be positive');
+    } else {
+      if (amount <= 0 || !Number.isFinite(amount)) throw new Error('Amount must be a positive finite number');
+      amount = BigInt(amount);
+    }
+
     const isSigner = from === 'faucet' ||
       from.toLowerCase() === this.contracts.signerAddress.toLowerCase();
 
@@ -227,11 +235,30 @@ export class WalletService {
       const tx = await this.contracts.token.transfer(to, amount);
       receipt = await tx.wait();
     } else {
-      // Burn from sender and mint to receiver (per-DID isolation)
+      // C2: Burn from sender and mint to receiver (per-DID isolation).
+      // If mint fails after burn succeeds, compensation mint back to sender
+      // ensures tokens are not permanently destroyed. Node holds MINTER_ROLE.
       const burnTx = await this.contracts.token.burn(from, amount);
-      await burnTx.wait();
-      const mintTx = await this.contracts.token.mint(to, amount);
-      receipt = await mintTx.wait();
+      const burnReceipt = await burnTx.wait();
+      if (burnReceipt.status !== 1) {
+        throw new Error('Transfer failed: burn transaction reverted');
+      }
+
+      try {
+        const mintTx = await this.contracts.token.mint(to, amount);
+        receipt = await mintTx.wait();
+        if (receipt.status !== 1) throw new Error('Mint reverted');
+      } catch (mintError) {
+        // C2: Mint failed after burn — compensate sender to prevent token destruction
+        this.log.error('Mint failed after burn — executing compensation mint to %s', from);
+        const compTx = await this.contracts.token.mint(from, amount);
+        await compTx.wait();
+        throw new Error(
+          mintError instanceof Error
+            ? `Transfer failed: ${mintError.message} (compensation minted to sender)`
+            : 'Transfer failed: mint reverted, compensation executed',
+        );
+      }
     }
 
     const timestamp = Date.now();

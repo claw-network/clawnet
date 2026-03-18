@@ -11,6 +11,10 @@
  *  - lastUsedAt: ISO-8601 timestamp (nullable)
  *
  * Uses the same `better-sqlite3` that IndexerStore already depends on.
+ *
+ * M3: NOTE: All SQLite operations in this module are synchronous and will block
+ * the Node.js event loop. For high-throughput production deployments, consider
+ * migrating to a worker thread or async queue.
  */
 
 import Database from 'better-sqlite3';

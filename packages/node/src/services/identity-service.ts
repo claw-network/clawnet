@@ -16,7 +16,7 @@
  *   addPlatformLink and their view counterparts.
  */
 
-import { getBytes, keccak256, solidityPacked, toUtf8Bytes } from 'ethers';
+import { getBytes, keccak256, recoverAddress, solidityPacked, toUtf8Bytes } from 'ethers';
 
 import { createLogger } from '../logger.js';
 import type { ContractProvider } from './contract-provider.js';
@@ -282,7 +282,7 @@ export class IdentityService {
    * @param did           Full DID string
    * @param newPublicKey  New Ed25519 public key (hex, 32 bytes)
    * @param rotationProof Signature proof from old key (hex).
-   *                      Not verified on-chain in current contract version.
+   *                      C3: Verified off-chain before the contract call.
    */
   async rotateKey(
     did: string,
@@ -290,6 +290,14 @@ export class IdentityService {
     rotationProof: string = '0x',
   ): Promise<KeyRotationResult> {
     const didHash = this.hashDid(did);
+
+    // C3: Verify rotation proof off-chain before making the transaction
+    if (rotationProof && rotationProof !== '0x') {
+      const isValid = await this.verifyRotationProof(did, newPublicKey, rotationProof);
+      if (!isValid) {
+        throw new Error('Invalid rotation proof: must be signed by current key controller');
+      }
+    }
 
     this.log.info('Identity rotate key: %s', did);
 
@@ -413,5 +421,57 @@ export class IdentityService {
    */
   private hashDid(did: string): string {
     return keccak256(toUtf8Bytes(did));
+  }
+
+  /**
+   * C3: Verify a key rotation proof off-chain.
+   *
+   * The proof must be a signature over:
+   *   keccak256(abi.encodePacked(
+   *     "clawnet:rotate:v1:",
+   *     keccak256(toUtf8Bytes(did)),
+   *     newPublicKey
+   *   ))
+   *
+   * Signed by the current key controller (recovered via ERC-191 prefix).
+   */
+  private async verifyRotationProof(
+    did: string,
+    newPublicKey: string,
+    proof: string,
+  ): Promise<boolean> {
+    try {
+      const didHash = this.hashDid(did);
+
+      // Build the rotation message that was signed
+      const message = solidityPacked(
+        ['string', 'bytes32', 'string'],
+        ['clawnet:rotate:v1:', didHash, newPublicKey],
+      );
+
+      // ERC-191 compliant signed message hash
+      const identityAddr = await this.contracts.identity.getAddress();
+      const { chainId } = await this.contracts.provider.getNetwork();
+      const digest = keccak256(
+        solidityPacked(
+          ['uint256', 'address', 'bytes'],
+          [chainId, identityAddr, message],
+        ),
+      );
+
+      // Standard ERC-191 prefix for personal messages
+      const erc191Prefix = toUtf8Bytes('\x19Ethereum Signed Message:\n32');
+      const erc191Digest = keccak256(Buffer.concat([erc191Prefix, getBytes(digest)]));
+
+      const recovered = recoverAddress(erc191Digest, proof);
+
+      // Get current controller and compare
+      const currentController = await this.getController(did);
+      if (!currentController) return false;
+
+      return recovered.toLowerCase() === currentController.toLowerCase();
+    } catch {
+      return false;
+    }
   }
 }

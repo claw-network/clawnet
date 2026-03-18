@@ -3,6 +3,27 @@
  *
  * Field indices MUST match the order in messaging-spec.fbs.
  * Reuses the FlatBufferReader from the p2p module (same package).
+ *
+ * M2: Explicit field index documentation to prevent silent misalignment:
+ *
+ * DirectMessage field indices (must match docs/implementation/p2p-spec.fbs DirectMessage table):
+ *  0: source_did    (string)
+ *  1: target_did   (string, optional)
+ *  2: topic         (string)
+ *  3: payload       (byte vector)
+ *  4: ttl_sec       (uint32)
+ *  5: sent_at_ms    (uint64)
+ *  6: priority      (uint8)
+ *  7: compressed    (bool)
+ *  8: encrypted     (bool)
+ *  9: idempotency_key (string, optional)
+ *
+ * DeliveryReceipt:  0=receipt_type, 1=request_id, 2=delivered_at_ms, 3=error, 4=metadata
+ * DidAnnounce:       0=did
+ * DidResolveRequest: 0=did
+ * DidResolveResponse:0=did, 1=controller, 2=public_key, 3=active
+ * AttachmentMessage: 0=message_id, 1=attachment_id, 2=filename, 3=mime_type,
+ *                    4=size_bytes, 5=checksum, 6=data, 7=thumbnail
  */
 
 import { Builder } from 'flatbuffers';

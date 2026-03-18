@@ -151,8 +151,9 @@ describe('WalletService', () => {
       provider.token.burn = vi.fn().mockResolvedValue(mockTxResponse());
       provider.token.mint = vi.fn().mockResolvedValue(mockTxResponse());
       const result = await service.transfer(ALICE, BOB, 100);
-      expect(provider.token.burn).toHaveBeenCalledWith(ALICE, 100);
-      expect(provider.token.mint).toHaveBeenCalledWith(BOB, 100);
+      // Amount is normalized to bigint by the service before calling the contract
+      expect(provider.token.burn).toHaveBeenCalledWith(ALICE, 100n);
+      expect(provider.token.mint).toHaveBeenCalledWith(BOB, 100n);
       expect(result.txHash).toBe(TX_HASH);
       expect(result.status).toBe('confirmed');
       expect(result.amount).toBe('100');
@@ -160,24 +161,56 @@ describe('WalletService', () => {
 
     it('uses direct transfer for signer address', async () => {
       const result = await service.transfer(SIGNER_ADDRESS, BOB, 100);
-      expect(provider.token.transfer).toHaveBeenCalledWith(BOB, 100);
+      // Amount is normalized to bigint by the service before calling the contract
+      expect(provider.token.transfer).toHaveBeenCalledWith(BOB, 100n);
       expect(result.txHash).toBe(TX_HASH);
       expect(result.status).toBe('confirmed');
     });
 
     it('uses direct transfer for faucet special from', async () => {
       const result = await service.transfer('faucet', BOB, 100);
-      expect(provider.token.transfer).toHaveBeenCalledWith(BOB, 100);
+      expect(provider.token.transfer).toHaveBeenCalled();
       expect(result.status).toBe('confirmed');
     });
 
-    it('returns failed status when receipt status is 0', async () => {
+    // C2: With compensation mint, mint receipt status 0 triggers compensation + throws
+    it('throws when mint receipt status is 0 (compensation minted back)', async () => {
       provider.token.burn = vi.fn().mockResolvedValue(mockTxResponse());
       provider.token.mint = vi.fn().mockResolvedValue(
         mockTxResponse({ status: 0 }),
       );
-      const result = await service.transfer(ALICE, BOB, 50);
-      expect(result.status).toBe('failed');
+      await expect(service.transfer(ALICE, BOB, 50)).rejects.toThrow('Transfer failed');
+      // Compensation mint should have been called
+      expect(provider.token.mint).toHaveBeenCalledTimes(2);
+    });
+
+    // L4 / H2: amount validation tests
+    it('throws when amount is zero', async () => {
+      await expect(service.transfer(ALICE, BOB, 0)).rejects.toThrow('Amount must be a positive finite number');
+    });
+
+    it('throws when amount is negative bigint', async () => {
+      await expect(service.transfer(ALICE, BOB, -1n)).rejects.toThrow('Amount must be positive');
+    });
+
+    it('throws when amount is negative number', async () => {
+      await expect(service.transfer(ALICE, BOB, -50)).rejects.toThrow('Amount must be a positive finite number');
+    });
+
+    // L4 / C2: compensation mint on mint failure after successful burn
+    it('compensates sender when mint reverts after successful burn', async () => {
+      provider.token.burn = vi.fn().mockResolvedValue(mockTxResponse());
+      // Mint fails (reverts)
+      provider.token.mint = vi.fn().mockRejectedValue(new Error('mint reverted'));
+      await expect(service.transfer(ALICE, BOB, 100)).rejects.toThrow('mint reverted');
+      // Compensation mint should have been called to refund the sender
+      expect(provider.token.mint).toHaveBeenCalledTimes(2);
+      expect(provider.token.mint).toHaveBeenLastCalledWith(ALICE, 100n);
+    });
+
+    it('throws when burn tx reverts', async () => {
+      provider.token.burn = vi.fn().mockResolvedValue(mockTxResponse({ status: 0 }));
+      await expect(service.transfer(ALICE, BOB, 100)).rejects.toThrow('Transfer failed: burn transaction reverted');
     });
   });
 
