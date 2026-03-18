@@ -222,8 +222,13 @@ export class ClawNetNode {
     ) ?? false;
     if (isDefaultBootstrap) {
       console.log('[clawnetd] Resolving bootstrap PeerId from API…');
-      p2pConfig.bootstrap = await resolveBootstrapMultiaddrs();
-      console.log(`[clawnetd] Bootstrap resolved: ${p2pConfig.bootstrap[0]}`);
+      const resolved = await resolveBootstrapMultiaddrs();
+      // Preserve non-default bootstrap entries (e.g. explicit peer addrs)
+      const custom = (p2pConfig.bootstrap ?? []).filter(
+        addr => !addr.startsWith(BOOTSTRAP_MULTIADDR),
+      );
+      p2pConfig.bootstrap = [...resolved, ...custom];
+      console.log(`[clawnetd] Bootstrap resolved: ${p2pConfig.bootstrap.join(', ')}`);
     }
 
     try {
