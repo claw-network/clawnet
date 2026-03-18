@@ -8,7 +8,9 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY;
-if (!DEPLOYER_PRIVATE_KEY) {
+// Skip validation in test mode — hardhat test loads config but doesn't deploy
+const isTest = process.env.NODE_ENV === 'test' || process.env.HARDHAT_NO_IMPERSONATION !== undefined;
+if (!DEPLOYER_PRIVATE_KEY && !isTest) {
   throw new Error(
     "DEPLOYER_PRIVATE_KEY environment variable is not set. " +
     "Cannot deploy contracts without a valid private key.",
