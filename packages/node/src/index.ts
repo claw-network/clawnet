@@ -327,7 +327,13 @@ export class ClawNetNode {
           const storagePaths3 = resolveStoragePaths(this.config.dataDir);
           const msgDbPath = join(storagePaths3.root, 'messages.sqlite');
           this.messageStore = new MessageStore(msgDbPath);
-          this.messagingService = new MessagingService(this.p2p, this.messageStore, this.cachedDid, storagePaths3.root, this.config.p2p?.isBootstrap ?? false);
+          // Auto-enable isBootstrap when the node is NOT connecting to the official bootstrap address.
+          // If the bootstrap list contains BOOTSTRAP_MULTIADDR (/dns4/clawnetd.com/tcp/9527),
+          // this node is a CLIENT of the official bootstrap → isBootstrap = false.
+          // If the list is empty or contains custom addresses, this node IS the bootstrap server → isBootstrap = true.
+          // Explicit config always wins.
+          const isBootstrapNode = this.config.p2p?.isBootstrap ?? !isDefaultBootstrap;
+          this.messagingService = new MessagingService(this.p2p, this.messageStore, this.cachedDid, storagePaths3.root, isBootstrapNode);
           await this.messagingService.start();
 
           // Wire peer:connect to messaging announce + outbox flush
