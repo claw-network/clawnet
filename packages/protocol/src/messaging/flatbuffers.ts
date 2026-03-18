@@ -113,16 +113,29 @@ export function decodeDidResolveRequest(reader: FlatBufferReader, table: number)
   };
 }
 
-// ── DidResolveResponse (3 fields) ────────────────────────────
+// ── DidResolveResponse (4 fields) ────────────────────────────
 
 export function encodeDidResolveResponse(builder: Builder, resp: DidResolveResponse): number {
   const did = builder.createString(resp.did);
   const peerId = resp.peerId ? builder.createString(resp.peerId) : 0;
 
-  builder.startObject(3);
+  // String vector for multiaddrs (must be created before startObject)
+  const addrs = resp.multiaddrs ?? [];
+  let addrsVector = 0;
+  if (addrs.length > 0) {
+    const addrOffsets = addrs.map(a => builder.createString(a));
+    builder.startVector(4, addrOffsets.length, 4);
+    for (let i = addrOffsets.length - 1; i >= 0; i--) {
+      builder.addOffset(addrOffsets[i]);
+    }
+    addrsVector = builder.endVector();
+  }
+
+  builder.startObject(4);
   builder.addFieldOffset(0, did, 0);                // did
   if (peerId) builder.addFieldOffset(1, peerId, 0); // peer_id
   builder.addFieldInt8(2, resp.found ? 1 : 0, 0);   // found (bool = byte)
+  if (addrsVector) builder.addFieldOffset(3, addrsVector, 0); // multiaddrs
   return builder.endObject();
 }
 
@@ -131,6 +144,7 @@ export function decodeDidResolveResponse(reader: FlatBufferReader, table: number
     did: reader.readStringField(table, 0) ?? '',
     peerId: reader.readStringField(table, 1) ?? '',
     found: reader.readUint8Field(table, 2, 0) !== 0,
+    multiaddrs: reader.readStringVectorField(table, 3) ?? [],
   };
 }
 
