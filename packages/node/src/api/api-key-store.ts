@@ -170,6 +170,21 @@ export class ApiKeyStore {
     return { ...row, key: rawKey };
   }
 
+  /**
+   * Import a pre-existing API key (e.g. from CLAW_API_KEY env var).
+   * No-op if the key already exists in the store.
+   * Returns true if the key was inserted, false if it already existed.
+   */
+  importKey(rawKey: string, label: string): boolean {
+    const keyHash = hashKey(rawKey);
+    const existing = this.stmtLookup.get(keyHash) as ApiKeyRecord | undefined;
+    if (existing) return false;
+    const prefix = rawKey.slice(0, 8) + '…';
+    const now = new Date().toISOString();
+    this.stmtInsert.run(keyHash, prefix, label, now);
+    return true;
+  }
+
   /** Validate an API key. Returns the record if active, null otherwise. */
   validate(key: string): ApiKeyRecord | null {
     const keyHash = hashKey(key);

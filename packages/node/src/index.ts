@@ -306,6 +306,15 @@ export class ClawNetNode {
           const apiKeysDbPath = join(storagePaths2.root, 'api-keys.sqlite');
           this.apiKeyStore = new ApiKeyStore(apiKeysDbPath);
           this.totpStore = new TotpStore(apiKeysDbPath);
+
+          // Auto-import CLAW_API_KEY env var into the store if set
+          const envKey = process.env.CLAW_API_KEY;
+          if (envKey && envKey.length >= 32) {
+            const imported = this.apiKeyStore.importKey(envKey, 'env');
+            if (imported) {
+              console.log('[clawnetd] Imported API key from CLAW_API_KEY environment variable');
+            }
+          }
         }
 
         // ── Messaging service (P2P direct messaging) ─────────────────

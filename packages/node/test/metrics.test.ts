@@ -64,9 +64,12 @@ describe('Prometheus metrics', () => {
     expect(output).toContain('/api/v1/escrows/:id');
     expect(output).toContain('/api/v1/identities/:did');
     expect(output).toContain('/api/v1/wallets/:id/balance');
-    // Should NOT contain raw IDs
-    expect(output).not.toContain('123');
-    expect(output).not.toContain('zFy3Ed8bYu5SRHq5YK1YRz58iUpWxL27exCwngDwuH8gR');
+    // Route labels should NOT contain raw IDs (filter to route-related lines
+    // to avoid false positives from process_cpu_* or timestamp values)
+    const routeLines = output.split('\n').filter((l) => l.includes('route='));
+    const routeBlock = routeLines.join('\n');
+    expect(routeBlock).not.toContain('/123');
+    expect(routeBlock).not.toContain('zFy3Ed8bYu5SRHq5YK1YRz58iUpWxL27exCwngDwuH8gR');
   });
 
   it('gauge values can be set and appear in output', async () => {
