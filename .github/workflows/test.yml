@@ -23,3 +23,5 @@ jobs:
         run: pnpm install
       - name: Test
         run: pnpm test
+        env:
+          NODE_ENV: test

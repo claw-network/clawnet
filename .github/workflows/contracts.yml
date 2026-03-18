@@ -36,6 +36,8 @@ jobs:
 
       - name: Run tests
         run: pnpm --filter @claw-network/contracts test
+        env:
+          NODE_ENV: test
 
       - name: Run coverage
         run: pnpm --filter @claw-network/contracts coverage
