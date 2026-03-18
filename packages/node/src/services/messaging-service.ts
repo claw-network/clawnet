@@ -548,11 +548,11 @@ export class MessagingService {
       }
       // Delivery failed — if mapping is stale, try re-resolving
       if (this.isStalePeerMapping(targetDid)) {
-        const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
-        if (resolvedPeerId && resolvedPeerId !== peerId) {
-          this.registerDidPeer(targetDid, resolvedPeerId);
-          try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
-          const reDelivered = await this.deliverDirect(resolvedPeerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
+        const resolved = await this.resolveDidViaPeers(targetDid);
+        if (resolved && resolved.peerId !== peerId) {
+          this.registerDidPeer(targetDid, resolved.peerId);
+          try { await this.p2p.dialPeer(resolved.peerId); } catch { /* ignore */ }
+          const reDelivered = await this.deliverDirect(resolved.peerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
           if (reDelivered) {
             return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
           }
@@ -562,22 +562,32 @@ export class MessagingService {
 
     // DID unknown locally — ask connected peers (bootstrap/others) to resolve
     if (!peerId) {
-      const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
-      if (resolvedPeerId) {
-        this.registerDidPeer(targetDid, resolvedPeerId);
+      const resolved = await this.resolveDidViaPeers(targetDid);
+      if (resolved) {
+        this.registerDidPeer(targetDid, resolved.peerId);
         try {
-          await this.p2p.dialPeer(resolvedPeerId);
+          await this.p2p.dialPeer(resolved.peerId);
         } catch { /* peer may already be connected or unreachable */ }
-        const delivered = await this.deliverDirect(resolvedPeerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
+        const delivered = await this.deliverDirect(resolved.peerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
         if (delivered) {
           return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
         }
       }
     }
 
+    // Phase 3: try relay path through connected bootstrap before giving up
+    const targetPeerId = this.didToPeerId.get(targetDid);
+    if (targetPeerId) {
+      const relayDelivered = await this.tryDeliverViaRelay(targetPeerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
+      if (relayDelivered) {
+        return { messageId: `msg_relay_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
+      }
+    }
+
     // Queue in outbox for later delivery (raw bytes stored as BLOB)
     const messageId = this.store.addToOutbox({ targetDid, topic, payload: Buffer.from(payloadBytes), ttlSec, priority, compressed, encrypted });
-    this.log.info('message queued in outbox', { messageId, targetDid, topic });
+    const reason = !this.didToPeerId.has(targetDid) ? 'peer_unknown' : 'delivery_failed';
+    this.log.info('message queued in outbox', { messageId, targetDid, topic, reason, peers: this.p2p.getConnections().length });
     return { messageId, delivered: false, compressed, encrypted };
   }
 
@@ -630,7 +640,18 @@ export class MessagingService {
 
   /** Flush outbox: attempt to deliver all pending messages for a specific DID with bounded concurrency. */
   async flushOutboxForDid(targetDid: string): Promise<number> {
-    const peerId = this.didToPeerId.get(targetDid);
+    let peerId = this.didToPeerId.get(targetDid);
+
+    // Phase 2: if PeerId unknown, try resolving before giving up
+    if (!peerId) {
+      const resolved = await this.resolveDidViaPeers(targetDid);
+      if (resolved) {
+        this.registerDidPeer(targetDid, resolved.peerId);
+        try { await this.p2p.dialPeer(resolved.peerId); } catch { /* ignore */ }
+        peerId = resolved.peerId;
+        this.log.info('outbox re-resolved DID', { targetDid, peerId });
+      }
+    }
     if (!peerId) return 0;
 
     const entries = this.store.getOutboxForTarget(targetDid);
@@ -653,13 +674,14 @@ export class MessagingService {
 
     // Deliver in batches of MULTICAST_CONCURRENCY using Promise.allSettled
     let delivered = 0;
+    let consecutiveFailures = 0;
     for (let i = 0; i < eligible.length; i += MULTICAST_CONCURRENCY) {
       const batch = eligible.slice(i, i + MULTICAST_CONCURRENCY);
       const settled = await Promise.allSettled(
         batch.map(async (entry) => {
           this.store.recordAttempt(entry.id);
           // Outbox payload is raw BLOB bytes; flags come from columns
-          const ok = await this.deliverDirect(peerId, targetDid, entry.topic, new Uint8Array(entry.payload), entry.ttlSec, undefined, entry.compressed, entry.encrypted);
+          const ok = await this.deliverDirect(peerId!, targetDid, entry.topic, new Uint8Array(entry.payload), entry.ttlSec, undefined, entry.compressed, entry.encrypted);
           if (ok) {
             this.store.removeFromOutbox(entry.id);
             return true;
@@ -668,7 +690,25 @@ export class MessagingService {
         }),
       );
       for (const result of settled) {
-        if (result.status === 'fulfilled' && result.value) delivered++;
+        if (result.status === 'fulfilled' && result.value) {
+          delivered++;
+          consecutiveFailures = 0;
+        } else {
+          consecutiveFailures++;
+        }
+      }
+
+      // Phase 2: re-resolve addresses after 5 consecutive failures
+      if (consecutiveFailures >= 5 && i + MULTICAST_CONCURRENCY < eligible.length) {
+        const reResolved = await this.resolveDidViaPeers(targetDid);
+        if (reResolved && reResolved.peerId) {
+          if (reResolved.peerId !== peerId) {
+            this.registerDidPeer(targetDid, reResolved.peerId);
+            peerId = reResolved.peerId;
+          }
+          try { await this.p2p.dialPeer(peerId); } catch { /* ignore */ }
+          consecutiveFailures = 0;
+        }
       }
     }
     return delivered;
@@ -721,12 +761,22 @@ export class MessagingService {
       if (targetDids.length === 0) return;
 
       let totalDelivered = 0;
+      let totalFailed = 0;
+      let totalResolved = 0;
       for (const did of targetDids) {
+        const peerKnown = this.didToPeerId.has(did);
         const delivered = await this.flushOutboxForDid(did);
         totalDelivered += delivered;
+        if (!peerKnown && this.didToPeerId.has(did)) totalResolved++;
+        if (delivered === 0) totalFailed++;
       }
-      if (totalDelivered > 0) {
-        this.log.info('[messaging] outbox sweep delivered', { delivered: totalDelivered, targets: targetDids.length });
+      if (totalDelivered > 0 || totalResolved > 0) {
+        this.log.info('[messaging] outbox sweep', {
+          delivered: totalDelivered,
+          failed: totalFailed,
+          reResolved: totalResolved,
+          targets: targetDids.length,
+        });
       }
     } catch (err) {
       this.log.warn('[messaging] outbox sweep failed', { error: (err as Error).message });
@@ -903,11 +953,11 @@ export class MessagingService {
       }
       // Try re-resolve if stale
       if (this.isStalePeerMapping(targetDid)) {
-        const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
-        if (resolvedPeerId && resolvedPeerId !== peerId) {
-          this.registerDidPeer(targetDid, resolvedPeerId);
-          try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
-          const reDelivered = await this.deliverAttachment(resolvedPeerId, targetDid, attachmentId, data, contentType, fileName ?? '');
+        const resolved = await this.resolveDidViaPeers(targetDid);
+        if (resolved && resolved.peerId !== peerId) {
+          this.registerDidPeer(targetDid, resolved.peerId);
+          try { await this.p2p.dialPeer(resolved.peerId); } catch { /* ignore */ }
+          const reDelivered = await this.deliverAttachment(resolved.peerId, targetDid, attachmentId, data, contentType, fileName ?? '');
           if (reDelivered) {
             return { attachmentId, delivered: true };
           }
@@ -917,11 +967,11 @@ export class MessagingService {
 
     // DID unknown — try resolve via connected peers
     if (!peerId) {
-      const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
-      if (resolvedPeerId) {
-        this.registerDidPeer(targetDid, resolvedPeerId);
-        try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
-        const delivered = await this.deliverAttachment(resolvedPeerId, targetDid, attachmentId, data, contentType, fileName ?? '');
+      const resolved = await this.resolveDidViaPeers(targetDid);
+      if (resolved) {
+        this.registerDidPeer(targetDid, resolved.peerId);
+        try { await this.p2p.dialPeer(resolved.peerId); } catch { /* ignore */ }
+        const delivered = await this.deliverAttachment(resolved.peerId, targetDid, attachmentId, data, contentType, fileName ?? '');
         if (delivered) {
           return { attachmentId, delivered: true };
         }
@@ -1260,16 +1310,68 @@ export class MessagingService {
       this.log.info('message delivered', { peerId, targetDid, topic });
       return true;
     } catch (err) {
+      const errMsg = (err as Error).message;
+      const category = errMsg.includes('no address')
+        ? 'no_address'
+        : errMsg.includes('timed out') || errMsg.includes('timeout')
+          ? 'timeout'
+          : errMsg.includes('connection refused')
+            ? 'connection_refused'
+            : 'unknown';
       this.log.warn('direct delivery failed', {
         peerId,
         targetDid,
-        error: (err as Error).message,
+        category,
+        error: errMsg,
       });
       if (stream) {
         try { await stream.close(); } catch { /* ignore */ }
       }
       return false;
     }
+  }
+
+  /**
+   * Phase 3: Attempt delivery via circuit-relay through a connected peer (e.g. bootstrap).
+   * Constructs a relay multiaddr `/p2p/<relayPeerId>/p2p-circuit/p2p/<targetPeerId>`
+   * and dials through it.
+   */
+  private async tryDeliverViaRelay(
+    targetPeerId: string,
+    targetDid: string,
+    topic: string,
+    payload: Uint8Array,
+    ttlSec: number,
+    priority: number = MessagePriority.NORMAL,
+    compressed = false,
+    encrypted = false,
+    idempotencyKey?: string,
+  ): Promise<boolean> {
+    const connectedPeers = this.p2p.getConnections();
+    if (connectedPeers.length === 0) return false;
+
+    for (const relayPeerId of connectedPeers) {
+      if (relayPeerId === targetPeerId) continue; // skip the target itself
+      try {
+        // Add relay multiaddr to peerStore so dialProtocol can use it
+        const relayAddr = `/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId}`;
+        await this.p2p.addPeerAddresses(targetPeerId, [relayAddr]);
+
+        // Attempt delivery through this relay path
+        const ok = await this.deliverDirect(
+          targetPeerId, targetDid, topic, payload, ttlSec,
+          priority, compressed, encrypted, idempotencyKey,
+        );
+        if (ok) {
+          this.log.info('message delivered via relay', { relayPeerId, targetPeerId, targetDid, topic });
+          return true;
+        }
+      } catch {
+        // relay path failed — try next connected peer as relay
+      }
+    }
+
+    return false;
   }
 
   // ── Private: Inbound Delivery-Auth Handler ──────────────────────
@@ -1936,15 +2038,16 @@ export class MessagingService {
       }
 
       const peerId = this.didToPeerId.get(msg.did);
+      const multiaddrs = peerId ? await this.p2p.getPeerAddresses(peerId) : [];
       const respBytes = encodeDidResolveResponseBytes(
         peerId
-          ? { did: msg.did, peerId, found: true }
+          ? { did: msg.did, peerId, found: true, multiaddrs }
           : { did: msg.did, peerId: '', found: false },
       );
 
       await writeBinaryStream(stream.sink, respBytes);
       await stream.close();
-      this.log.info('DID resolve handled', { did: msg.did, found: !!peerId });
+      this.log.info('DID resolve handled', { did: msg.did, found: !!peerId, multiaddrs: multiaddrs.length });
     } catch (err) {
       this.log.warn('failed to handle DID resolve', { error: (err as Error).message });
       try { await stream.close(); } catch { /* ignore */ }
@@ -1954,9 +2057,9 @@ export class MessagingService {
   /**
    * Query connected peers to resolve an unknown DID → PeerId.
    * Sends DID resolve requests to up to DID_RESOLVE_MAX_PEERS peers concurrently.
-   * Returns the first PeerId found, or null if none of the queried peers know the DID.
+   * Returns the resolved PeerId and multiaddrs, or null if none of the queried peers know the DID.
    */
-  private async resolveDidViaPeers(targetDid: string): Promise<string | null> {
+  private async resolveDidViaPeers(targetDid: string): Promise<{ peerId: string; multiaddrs: string[] } | null> {
     const connectedPeers = this.p2p.getConnections().slice(0, DID_RESOLVE_MAX_PEERS);
     if (connectedPeers.length === 0) return null;
 
@@ -1977,7 +2080,9 @@ export class MessagingService {
               const raw = await readStream(stream.source, 1024, DID_RESOLVE_TIMEOUT_MS);
               await stream.close();
               const resp = decodeDidResolveResponseBytes(new Uint8Array(raw));
-              if (resp.found && resp.peerId) return resp.peerId;
+              if (resp.found && resp.peerId) {
+                return { peerId: resp.peerId, multiaddrs: resp.multiaddrs ?? [] };
+              }
               throw new Error('not found');
             } catch (err) {
               if (stream) { try { await stream.close(); } catch { /* ignore */ } }
@@ -1987,6 +2092,12 @@ export class MessagingService {
         ),
         timeout,
       ]);
+
+      // Store resolved addresses in peerStore so subsequent dials can find the peer
+      if (result.multiaddrs.length > 0) {
+        await this.p2p.addPeerAddresses(result.peerId, result.multiaddrs);
+      }
+
       return result;
     } catch {
       return null;
@@ -2061,11 +2172,11 @@ export class MessagingService {
             }
             // Delivery failed — if mapping is stale, try re-resolving
             if (this.isStalePeerMapping(targetDid)) {
-              const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
-              if (resolvedPeerId && resolvedPeerId !== peerId) {
-                this.registerDidPeer(targetDid, resolvedPeerId);
-                try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
-                const reDelivered = await this.deliverDirect(resolvedPeerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, idempotencyKey);
+              const resolved = await this.resolveDidViaPeers(targetDid);
+              if (resolved && resolved.peerId !== peerId) {
+                this.registerDidPeer(targetDid, resolved.peerId);
+                try { await this.p2p.dialPeer(resolved.peerId); } catch { /* ignore */ }
+                const reDelivered = await this.deliverDirect(resolved.peerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, idempotencyKey);
                 if (reDelivered) {
                   return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
                 }
@@ -2075,11 +2186,11 @@ export class MessagingService {
 
           // DID unknown — try resolve via connected peers
           if (!peerId) {
-            const resolvedPeerId = await this.resolveDidViaPeers(targetDid);
-            if (resolvedPeerId) {
-              this.registerDidPeer(targetDid, resolvedPeerId);
-              try { await this.p2p.dialPeer(resolvedPeerId); } catch { /* ignore */ }
-              const delivered = await this.deliverDirect(resolvedPeerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, idempotencyKey);
+            const resolved = await this.resolveDidViaPeers(targetDid);
+            if (resolved) {
+              this.registerDidPeer(targetDid, resolved.peerId);
+              try { await this.p2p.dialPeer(resolved.peerId); } catch { /* ignore */ }
+              const delivered = await this.deliverDirect(resolved.peerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, idempotencyKey);
               if (delivered) {
                 return { targetDid, messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
               }

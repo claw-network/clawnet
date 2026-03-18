@@ -48,6 +48,8 @@ export interface DidResolveResponse {
   did: string;
   peerId: string;
   found: boolean;
+  /** Known multiaddrs for the resolved peer (added in v0.6.17). */
+  multiaddrs?: string[];
 }
 
 /**

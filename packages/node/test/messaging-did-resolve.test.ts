@@ -60,12 +60,16 @@ function createMockP2P() {
     getConnections: vi.fn(() => [] as string[]),
     newStream: vi.fn(async () => fakeStream(new Uint8Array(0)) as StreamDuplex),
     dialPeer: vi.fn(async () => true),
+    getPeerAddresses: vi.fn(async () => [] as string[]),
+    addPeerAddresses: vi.fn(async () => {}),
     _protocolHandlers: protocolHandlers,
   } as unknown as P2PNode & {
     _protocolHandlers: Map<string, (incoming: unknown) => void>;
     getConnections: ReturnType<typeof vi.fn>;
     newStream: ReturnType<typeof vi.fn>;
     dialPeer: ReturnType<typeof vi.fn>;
+    getPeerAddresses: ReturnType<typeof vi.fn>;
+    addPeerAddresses: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -106,6 +110,10 @@ describe('DID Resolve Protocol', () => {
       // Register Bob's mapping directly
       registerDid(service, BOB_DID, PEER_BOB);
 
+      // Mock getPeerAddresses to return known addresses
+      const bobAddrs = ['/ip4/203.0.113.1/tcp/9527/p2p/' + PEER_BOB];
+      p2p.getPeerAddresses.mockResolvedValue(bobAddrs);
+
       // Now resolve Bob's DID
       const resolveHandler = getResolveHandler()!;
       const stream = fakeStream(encodeDidResolveRequestBytes({ did: BOB_DID }));
@@ -123,6 +131,7 @@ describe('DID Resolve Protocol', () => {
       expect(resp.found).toBe(true);
       expect(resp.peerId).toBe(PEER_BOB);
       expect(resp.did).toBe(BOB_DID);
+      expect(resp.multiaddrs).toEqual(bobAddrs);
     });
 
     it('returns found:false when DID is unknown', async () => {
@@ -164,11 +173,12 @@ describe('DID Resolve Protocol', () => {
 
   describe('send() with DID resolve fallback', () => {
     it('resolves unknown DID via peers before outbox', async () => {
-      // Setup: bootstrap knows Bob's peerId
+      // Setup: bootstrap knows Bob's peerId and multiaddrs
+      const bobAddrs = ['/ip4/203.0.113.1/tcp/9527/p2p/' + PEER_BOB];
       p2p.getConnections.mockReturnValue([PEER_BOOTSTRAP]);
       p2p.newStream.mockImplementation(async (_peerId: string, proto: string) => {
         if (proto === '/clawnet/1.0.0/did-resolve') {
-          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB, found: true }));
+          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB, found: true, multiaddrs: bobAddrs }));
         }
         // DM stream — capture but don't fail
         return fakeStream(new Uint8Array(0));
@@ -180,6 +190,8 @@ describe('DID Resolve Protocol', () => {
       expect(result.delivered).toBe(true);
       expect(p2p.newStream).toHaveBeenCalledWith(PEER_BOOTSTRAP, '/clawnet/1.0.0/did-resolve');
       expect(p2p.dialPeer).toHaveBeenCalledWith(PEER_BOB);
+      // multiaddrs should have been stored in peerStore
+      expect(p2p.addPeerAddresses).toHaveBeenCalledWith(PEER_BOB, bobAddrs);
     });
 
     it('falls back to outbox when resolve fails', async () => {
@@ -256,7 +268,7 @@ describe('DID Resolve Protocol', () => {
           return fakeStream(new Uint8Array(0));
         }
         if (proto === '/clawnet/1.0.0/did-resolve') {
-          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true }));
+          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true, multiaddrs: [] }));
         }
         return fakeStream(new Uint8Array(0));
       });
@@ -281,7 +293,7 @@ describe('DID Resolve Protocol', () => {
           throw new Error('connection reset');
         }
         if (proto === '/clawnet/1.0.0/did-resolve') {
-          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true }));
+          return fakeStream(encodeDidResolveResponseBytes({ did: BOB_DID, peerId: PEER_BOB_NEW, found: true, multiaddrs: [] }));
         }
         return fakeStream(new Uint8Array(0));
       });
@@ -293,6 +305,77 @@ describe('DID Resolve Protocol', () => {
       expect(p2p.newStream).not.toHaveBeenCalledWith(
         expect.anything(), '/clawnet/1.0.0/did-resolve',
       );
+    });
+  });
+
+  // ── Multiaddrs round-trip ───────────────────────────────────────
+
+  describe('multiaddrs round-trip', () => {
+    it('encodes and decodes multiaddrs in DidResolveResponse', () => {
+      const addrs = [
+        '/ip4/203.0.113.1/tcp/9527/p2p/12D3KooWBob',
+        '/dns4/bess.telagent.org/tcp/9527/p2p/12D3KooWBob',
+      ];
+      const encoded = encodeDidResolveResponseBytes({
+        did: BOB_DID,
+        peerId: PEER_BOB,
+        found: true,
+        multiaddrs: addrs,
+      });
+      const decoded = decodeDidResolveResponseBytes(encoded);
+      expect(decoded.did).toBe(BOB_DID);
+      expect(decoded.peerId).toBe(PEER_BOB);
+      expect(decoded.found).toBe(true);
+      expect(decoded.multiaddrs).toEqual(addrs);
+    });
+
+    it('handles empty multiaddrs (backward compat)', () => {
+      const encoded = encodeDidResolveResponseBytes({
+        did: BOB_DID,
+        peerId: PEER_BOB,
+        found: true,
+      });
+      const decoded = decodeDidResolveResponseBytes(encoded);
+      expect(decoded.multiaddrs).toEqual([]);
+    });
+  });
+
+  // ── Outbox re-resolution ────────────────────────────────────────
+
+  describe('outbox re-resolution', () => {
+    it('flushOutboxForDid resolves unknown DID via peers', async () => {
+      // Queue a message to Bob (unknown DID — not in didToPeerId)
+      const storeAny = store as unknown as { addToOutbox: (entry: Record<string, unknown>) => string };
+      storeAny.addToOutbox({
+        targetDid: BOB_DID,
+        topic: 'test/topic',
+        payload: Buffer.from('hello'),
+        ttlSec: 3600,
+        priority: 1,
+        compressed: false,
+        encrypted: false,
+      });
+
+      // Setup: bootstrap can resolve Bob
+      p2p.getConnections.mockReturnValue([PEER_BOOTSTRAP]);
+      p2p.newStream.mockImplementation(async (_peerId: string, proto: string) => {
+        if (proto === '/clawnet/1.0.0/did-resolve') {
+          return fakeStream(encodeDidResolveResponseBytes({
+            did: BOB_DID,
+            peerId: PEER_BOB,
+            found: true,
+            multiaddrs: ['/ip4/203.0.113.1/tcp/9527/p2p/' + PEER_BOB],
+          }));
+        }
+        // DM delivery succeeds
+        return fakeStream(new Uint8Array(0));
+      });
+      p2p.dialPeer.mockResolvedValue(true);
+
+      const delivered = await service.flushOutboxForDid(BOB_DID);
+
+      expect(delivered).toBe(1);
+      expect(p2p.newStream).toHaveBeenCalledWith(PEER_BOOTSTRAP, '/clawnet/1.0.0/did-resolve');
     });
   });
 

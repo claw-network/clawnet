@@ -603,6 +603,81 @@ export class P2PNode {
   }
 
   /**
+   * Retrieve the known multiaddrs for a peer from the peerStore.
+   * Returns an array of multiaddr strings, or empty if unknown.
+   */
+  async getPeerAddresses(peerId: string): Promise<string[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const peerStore = (this.node as any)?.peerStore;
+    if (!peerStore?.get) return [];
+    try {
+      const record = await peerStore.get(peerId);
+      const addrs = record?.addresses ?? record?.multiaddrs;
+      if (!addrs || !Array.isArray(addrs)) return [];
+      return addrs
+        .map((a: { multiaddr?: { toString: () => string }; toString?: () => string }) =>
+          a.multiaddr?.toString?.() ?? a.toString?.() ?? '',
+        )
+        .filter(Boolean) as string[];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Merge multiaddrs into the peerStore for a given peer.
+   * This allows subsequent dials to find the peer's address.
+   * Uses dial() with a full multiaddr as the reliable path — libp2p
+   * automatically stores addresses in peerStore on dial.
+   */
+  async addPeerAddresses(peerId: string, multiaddrs: string[]): Promise<void> {
+    if (multiaddrs.length === 0 || !this.node) return;
+
+    // Ensure each multiaddr ends with /p2p/<peerId> so libp2p can index it
+    const fullAddrs = multiaddrs.map((a) =>
+      a.includes('/p2p/') ? a : `${a}/p2p/${peerId}`,
+    );
+
+    // Try peerStore.merge first (peerStore.merge(peerId, { multiaddrs }) is the
+    // canonical API but requires a PeerId object; we try the string version and
+    // fall back to peerStore.patch which may accept strings in some versions)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const peerStore = (this.node as any)?.peerStore;
+    if (peerStore?.merge) {
+      try {
+        // Attempt to get the PeerId object from an existing peerStore record
+        let peerIdObj: unknown = peerId;
+        if (peerStore.get) {
+          try {
+            const record = await peerStore.get(peerId);
+            if (record?.id) peerIdObj = record.id;
+          } catch {
+            // peer not yet in store — proceed with string
+          }
+        }
+        await peerStore.merge(peerIdObj, {
+          multiaddrs: fullAddrs.map((a) => multiaddr(a)),
+        });
+        return;
+      } catch {
+        // Merge failed (e.g. string PeerId rejected) — fall through to dial
+      }
+    }
+
+    // Fallback: dial one full multiaddr to let libp2p store it automatically
+    if (this.node.dial) {
+      for (const addr of fullAddrs) {
+        try {
+          await this.node.dial(multiaddr(addr));
+          return; // one success is enough
+        } catch {
+          // continue to next addr
+        }
+      }
+    }
+  }
+
+  /**
    * Register a stream protocol handler.
    * When a remote peer opens a stream for the given protocol ID, `handler` is called.
    */

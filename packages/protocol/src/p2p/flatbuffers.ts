@@ -139,6 +139,22 @@ export class FlatBufferReader {
     return offsets;
   }
 
+  readStringVectorField(table: number, fieldIndex: number): string[] | null {
+    const field = this.fieldOffset(table, fieldIndex);
+    if (field === null) return null;
+    const vecStart = this.indirect(field);
+    const length = this.readUint32(vecStart);
+    const result: string[] = [];
+    for (let i = 0; i < length; i++) {
+      const element = vecStart + 4 + i * 4;
+      const strStart = this.indirect(element);
+      const strLen = this.readUint32(strStart);
+      const bytes = this.bytes.subarray(strStart + 4, strStart + 4 + strLen);
+      result.push(textDecoder.decode(bytes));
+    }
+    return result;
+  }
+
   private vtable(table: number): number {
     return table - this.readInt32(table);
   }
