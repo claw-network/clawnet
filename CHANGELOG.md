@@ -2,6 +2,57 @@
 
 All notable changes to the ClawNet packages will be documented in this file.
 
+## 2026.1.2 (2026-03-18)
+
+### @claw-network/core
+
+#### Added
+
+- `P2PNode.getPeerAddresses(peerId)` — queries peerStore for known multiaddrs of a peer.
+- `P2PNode.addPeerAddresses(peerId, multiaddrs)` — stores peer addresses via `peerStore.merge()` with dial fallback.
+
+### @claw-network/protocol
+
+#### Added
+
+- `DidResolveResponse.multiaddrs` — optional string array field for peer multiaddresses in DID resolve responses.
+- `FlatBufferReader.readStringVectorField()` — decodes string vector fields from FlatBuffer tables.
+
+#### Changed
+
+- `encodeDidResolveResponse` / `decodeDidResolveResponse` updated to 4 fields (backward-compatible).
+
+### @claw-network/node
+
+#### Fixed
+
+- **[P0] NAT message routing failure** — NAT nodes with a bootstrap connection (`peers=1`) could not deliver P2P messages. Messages always returned `delivered: false` and sat in the outbox forever. Root cause: DID resolution returned no multiaddrs, outbox never re-resolved unknown DIDs, and no relay path was attempted.
+- **API key not recognized despite `CLAW_API_KEY` env var** — `CLAW_API_KEY` is now auto-imported into the SQLite `ApiKeyStore` on startup. Previously the env var was ignored because the store had 0 keys, causing 401 on all authenticated endpoints.
+- Flaky `metrics.test.ts` assertion (narrowed `"123"` check to route-label lines only).
+
+#### Added
+
+- `tryDeliverViaRelay()` — constructs `/p2p/<relay>/p2p-circuit/p2p/<target>` relay paths through connected peers when direct delivery fails.
+- `ApiKeyStore.importKey(rawKey, label)` — imports a pre-existing API key into the store (no-op if already present).
+- Enhanced delivery failure logging with `category` (no_address / timeout / connection_refused / unknown).
+- Outbox sweep now logs `totalFailed`, `totalResolved`, `reResolved` counts.
+
+#### Changed
+
+- `resolveDidViaPeers()` now returns `{ peerId, multiaddrs }` instead of `string | null`, stores resolved addresses in peerStore.
+- `flushOutboxForDid()` re-resolves unknown DIDs via peers (instead of returning 0) and re-resolves after 5 consecutive failures.
+- `send()` uses resolved multiaddrs, falls back to relay delivery before outbox queue.
+- `handleDidResolve()` returns multiaddrs in response.
+
+## 2026.1.1 (2026-03-17)
+
+### All Packages
+
+#### Changed
+
+- Switched from semver (`0.6.x`) to CalVer (`YEAR.SEQ.PATCH`) versioning scheme.
+- Unified bump script updates all synced packages (core, protocol, sdk, node, cli, sdk-python) together.
+
 ## 0.6.16 (2026-03-17)
 
 ### @claw-network/core
