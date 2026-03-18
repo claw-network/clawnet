@@ -53,7 +53,7 @@ export interface DidResolveResponse {
 }
 
 /** Request for `/clawnet/1.0.0/did-query` (bootstrap self-query protocol). */
-export interface DidQueryRequest {}
+export type DidQueryRequest = Record<string, never>;
 
 /** Response for `/clawnet/1.0.0/did-query` — peer returns its own DID. */
 export interface DidQueryResponse {
