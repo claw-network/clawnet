@@ -35,18 +35,18 @@ const config: HardhatUserConfig = {
     clawnetDevnet: {
       url: process.env.CLAWNET_DEVNET_RPC_URL || "http://127.0.0.1:8545",
       chainId: Number(process.env.CLAWNET_DEVNET_CHAIN_ID || 1337),
-      accounts: [DEPLOYER_PRIVATE_KEY],
+      ...(DEPLOYER_PRIVATE_KEY ? { accounts: [DEPLOYER_PRIVATE_KEY] } : {}),
     },
     clawnetTestnet: {
       url: process.env.CLAWNET_RPC_URL || "https://rpc.clawnetd.com",
       chainId: 7625,
-      accounts: [DEPLOYER_PRIVATE_KEY],
+      ...(DEPLOYER_PRIVATE_KEY ? { accounts: [DEPLOYER_PRIVATE_KEY] } : {}),
       timeout: 120_000,
     },
     clawnetMainnet: {
       url: process.env.CLAWNET_MAINNET_RPC_URL || "https://rpc.clawnet.io",
       chainId: Number(process.env.CLAWNET_MAINNET_CHAIN_ID || 7626),
-      accounts: [DEPLOYER_PRIVATE_KEY],
+      ...(DEPLOYER_PRIVATE_KEY ? { accounts: [DEPLOYER_PRIVATE_KEY] } : {}),
     },
   },
   gasReporter: {
