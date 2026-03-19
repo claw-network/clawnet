@@ -4,157 +4,170 @@
 | --- | --- |
 | 原始 Issue | `clawnetd-did-query-not-working-after-2026-1-4-upgrade.md` |
 | 优先级 | **P0** |
-| 状态 | **分析中，发现新的根因** |
-| 修复版本 | 2026.1.5（计划中）|
+| 状态 | **已修复** |
+| 修复日期 | 2026-03-19 |
+| 修复版本 | **2026.1.7** |
 
 ---
 
-感谢 TelAgent 项目组提供详细的验证数据。根据 Bootstrap 日志分析，我们发现了两个独立的根因，需要一起修复才能使 DID resolve 完整生效。
+感谢 TelAgent 项目组提供详细的验证数据。根据 Bootstrap 日志分析，我们确认了问题根因并已完成修复。
 
 ---
 
-## 1. 发现的新根因
+## 1. 根因确认
 
-### 根因 1：`peer:connect` 事件未在 Bootstrap 侧触发
+### 根因 1：`peer:connect` 事件在旧版本中未触发
 
 **观察**：Bootstrap 日志中没有任何 `peer:connect` 事件记录，尽管 API 显示有 5 个 peers。
 
-```
-# Bootstrap 日志中缺失以下内容：
-[p2p] peer:connect 12D3KooW...
-```
+**说明**：2026.1.4 升级后 Bootstrap 节点**未重启**（代码已升级但进程仍是旧版本），因此 `peer:connect` 事件监听未注册。2026.1.5/6/7 升级后已重启，`peer:connect` 事件正常触发。
 
-这导致 `onPeerConnected` 从未被调用，因此 `queryPeerDid` 也没有执行——**即使 2026.1.4 的代码正确，did-query 也没有机会运行**。
+### 根因 2：peer store 无法存储 relay peer 地址
 
-**可能原因**：在 Circuit Relay v2 连接场景下，libp2p 的 `peer:connect` 事件行为与直连场景不同。当 Bootstrap 作为 relay 服务器接收穿透连接时，连接事件可能不会以相同方式触发。
+**观察**：Bootstrap 日志显示 `getPeerAddresses error: Invalid PeerId` 错误。
 
-### 根因 2：peerId 在 peer store 中无效
-
-**观察**：Bootstrap 日志显示大量 `getPeerAddresses error: Invalid PeerId` 错误。
-
-```
-[p2p] getPeerAddresses error: Invalid PeerId
-```
-
-这发生在 `handleDidResolve` 中：Bootstrap 在 `didToPeerId` 映射中找到了目标 DID 对应的 peerId，但 `peerStore.get(peerId)` 抛出 "Invalid PeerId"，导致无法获取 peer 的地址。
-
-**分析**：这说明 `didToPeerId` 映射中的 peerId 来自有效的 DID announce（在 `handleDidAnnounce` 中从 `connection.remotePeer` 获取），但 bootstrap 的 libp2p peer store 无法识别这些 peerId——它们可能通过 relay 连接注册，而 peer store 没有正确存储对应的地址记录。
+**分析**：`handleDidAnnounce` 和 `queryPeerDid` 注册了 DID→peerId 映射，但 libp2p 的 peer store 无法直接用字符串 peerId 存储地址。当调用 `addPeerAddresses` 和 `dialPeer` 时，传入字符串 peerId 会导致 "Invalid PeerId" 错误。
 
 ### 根因 3：Circuit Relay 穿透连接的地址缺失
 
-**观察**：即使 `didToPeerId` 有 Alex 的映射，Bootstrap 返回 `multiaddrs: 0`：
+**观察**：即使 `didToPeerId` 有 Alex 的映射，Bootstrap 返回 `multiaddrs: 0`。
 
-```
-[INFO] DID resolve handled {
-  did: 'did:claw:z8MifVfD6GGBeNE4ThZfM3R8tK1daNvrEHWSjRzQuELPA',
-  found: true,
-  multiaddrs: 0   ← Bootstrap 知道 Alex 的 DID，但没有 Alex 的地址
-}
-```
-
-**分析**：
-
-```
-Alex（NAT 后） → 连接 → Relay Server → Bootstrap
-                                    ↑
-                              Bootstrap 有 Alex 的 peerId（来自 DID announce）
-                              但 Bootstrap 没有 Alex 的可拨号地址
-```
-
-当 Alex 穿透连接 Bootstrap 时，Bootstrap 收到了 Alex 的 DID announce 并注册了 `did→peerId` 映射，但 Alex 的**可拨号地址**（circuit relay 地址或公网地址）没有被存储到 Bootstrap 的 peer store 中。
-
-**结果**：即使 Bootstrap 知道 Alex 的 peerId，也无法通过 relay 发送消息给 Alex。
+**分析**：Bootstrap 收到了 Alex 的 DID announce 并注册了 `did→peerId` 映射，但 relay 连接的场景下，peer 的可拨号地址（circuit relay 地址）没有被存储到 peer store 中。
 
 ---
 
-## 2. 修复方案（2026.1.5）
+## 2. 修复内容（2026.1.5 → 2026.1.7）
 
-### 修复 1：主动 dialing 获取 peer 地址
-
-在 `queryPeerDid` 中，如果 did-query 成功获取到 peer 的 DID，还需要**主动 dial 一次该 peer**，以触发 libp2p 存储 peer 的 relay 地址：
+### 修复 1：`handleDidAnnounce` 存储 peer 地址
 
 ```typescript
-private async queryPeerDid(peerId: string): Promise<void> {
-  let stream: StreamDuplex | null = null;
-  try {
-    stream = await this.p2p.newStream(peerId, PROTO_DID_QUERY);
-    const reqBytes = encodeDidQueryRequestBytes({});
-    await writeBinaryStream(stream.sink, reqBytes);
-    const raw = await readStream(stream.source, 1024, DID_RESOLVE_TIMEOUT_MS);
-    await stream.close();
-    const resp = decodeDidQueryResponseBytes(new Uint8Array(raw));
-    if (resp.did && DID_PATTERN.test(resp.did)) {
-      this.registerDidPeer(resp.did, peerId);
-      this.log.info('bootstrap registered peer DID via query', { did: resp.did, peerId });
+// 从 connection.remoteAddr 提取 peer 的 relay 地址
+const remoteAddr = connection.remoteAddr?.toString();
+if (remoteAddr) {
+  await this.p2p.addPeerAddresses(remotePeerId, [remoteAddr]);
+}
+```
 
-      // 主动 dial 一次该 peer，触发 libp2p 存储其 relay 地址
-      // 这样后续 relay 消息投递可以使用该地址
-      try {
-        await this.p2p.dial(peerId);
-      } catch {
-        // 非致命：dial 失败不代表 relay 不可用
-      }
-    }
-  } catch (err) {
-    this.log.debug('did query failed for peer', { peerId, error: err instanceof Error ? err.message : String(err) });
-    if (stream) { try { await stream.close(); } catch { /* ignore */ } }
+### 修复 2：`queryPeerDid` 注册后存储地址
+
+```typescript
+if (resp.did && DID_PATTERN.test(resp.did)) {
+  this.registerDidPeer(resp.did, peerId);
+  // 从 stream.connection 获取 relay 地址
+  const conn = (stream as any).connection;
+  const remoteAddr = conn?.remoteAddr?.toString();
+  if (remoteAddr) {
+    await this.p2p.addPeerAddresses(peerId, [remoteAddr]);
   }
 }
 ```
 
-### 修复 2：从连接对象直接提取 peer 地址
-
-在 `onPeerConnected` 中，除了 query DID，还应该从连接对象获取并存储 peer 的地址：
+### 修复 3：`onPeerConnected` 先 dial 再 query
 
 ```typescript
-async onPeerConnected(peerId: string): Promise<void> {
-  await this.announceDidToPeer(peerId);
+if (this.isBootstrap) {
+  // 先 dial 触发地址存储（如果 peerStore 中已有地址）
+  try { await this.p2p.dialPeer(peerId); } catch { /* 非致命 */ }
+  await this.queryPeerDid(peerId);
+}
+```
 
-  if (this.isBootstrap) {
-    // 主动 dial 以触发地址存储
-    try {
-      await this.p2p.dial(peerId);
-    } catch {
-      // Best-effort
+### 修复 4：Bootstrap 周期性连接同步
+
+新增每 30 秒轮询 `getConnections()` 的机制，确保即使 `peer:connect` 事件漏掉的 relay 连接也能被发现：
+
+```typescript
+private async syncBootstrapConnections(): Promise<void> {
+  const connectedPeers = this.p2p.getConnections();
+  for (const peerId of connectedPeers) {
+    if (!this.peerIdToDid.has(peerId)) {
+      await this.queryPeerDid(peerId);
     }
-    await this.queryPeerDid(peerId);
-  }
-
-  const did = this.peerIdToDid.get(peerId);
-  if (did) {
-    await this.flushOutboxForDid(did);
   }
 }
 ```
 
-### 修复 3：修复 `peer:connect` 事件处理
+### 修复 5：`dialPeer` 移除无效的 string fallback
 
-如果 `peer:connect` 事件在 relay 场景下不触发，我们需要在连接建立时**主动触发** `onPeerConnected`。可以通过监听 `connectionManager` 事件或在使用 peer 之前主动触发地址解析。
+`this.node.dial(peerId)` 不能传入字符串 bare peerId（libp2p 要求 multiaddr 或 PeerId 对象），移除了该 fallback。
 
 ---
 
-## 3. 当前状态
+## 3. 当前状态（2026.1.7 @ clawnetd.com）
+
+```bash
+# Bootstrap 日志（2026.1.7）
+[p2p] peer:connect 12D3KooWFy67jH6FGQSaADj7Aw577s7VdsfwaP8vpm4ptJuMABUt
+[INFO] peer DID registered { did: 'did:claw:zCZ3PRXxkHBPtjbzeFB3ZS9f332Fu3KPq7Pvxvx3gy2Z9', peerId: '12D3KooWFy67jH6FG...' }
+[p2p] peer:connect 12D3KooWN7bYDnFUZNMHhSBimvA3Nd2LSZWxZ1W75AhRrk85gfur
+[INFO] peer DID registered { ... }
+```
 
 | 项目 | 状态 |
 |------|------|
-| Bootstrap 版本 | ✅ 2026.1.4 |
-| did-query 协议注册 | ✅ 已注册（代码层面）|
-| did-query 触发 | ❌ `peer:connect` 未触发，导致 query 未执行 |
-| peer 地址存储 | ❌ relay 地址未存储 |
-| DID→peerId 映射 | ✅ 有（found: true）|
-| peerId→地址映射 | ❌ 无（multiaddrs: 0）|
+| Bootstrap 版本 | ✅ 2026.1.7 |
+| `peer:connect` 事件 | ✅ 正常触发 |
+| DID→peerId 映射 | ✅ 已注册 |
+| peer 地址存储 | ✅ 通过 remoteAddr 存储 |
+| Bootstrap 连接同步 | ✅ 每 30s 轮询 |
 
 ---
 
-## 4. 下一步
+## 4. 升级方法
 
-我们正在准备 2026.1.5 修复补丁，修复以下内容：
+### Bootstrap（clawnetd.com）
 
-1. **主动 dial** 触发 peer 地址存储
-2. **从连接对象提取** peer 的 relay 地址
-3. **备用 peer 地址获取** — 如果 dial 失败，通过其他方式获取 relay 地址
+已升级至 **2026.1.7**，无需 TelAgent 侧操作。
 
-预计完成时间：今日内。
+```bash
+curl https://api.clawnetd.com/api/v1/node | python3 -m json.tool | grep version
+# → "version": "2026.1.7"
+```
+
+### TelAgent 节点（Alex / Bess / Local）
+
+建议升级以获得完整功能：
+
+```bash
+npm install @claw-network/sdk@2026.1.7
+npm install @claw-network/node@2026.1.7
+```
+
+---
+
+## 5. 验证步骤
+
+升级后，在 **Alex / Bess / Local** 上执行：
+
+```bash
+# 1. 确认版本
+curl http://127.0.0.1:9528/api/v1/node | python3 -m json.tool | grep version
+# → "version": "2026.1.7"
+
+# 2. 确认 Bootstrap 上的 didPeerMap 包含所有节点
+# （需要在 Bootstrap 侧通过 ClawNet 团队确认）
+```
+
+**协议级测试**：
+
+```python
+# Local -> Alex DID（应返回 delivered=true）
+POST /api/v1/messaging/send
+targetDid = did:claw:z8MifVfD6GGBeNE4ThZfM3R8tK1daNvrEHWSjRzQuELPA
+payload = {"test": True}
+
+# 预期：delivered = true
+```
+
+---
+
+## 6. 后续工作
+
+如升级到 2026.1.7 后仍有 `peer_unknown` 问题，请提供：
+
+1. Bootstrap 和 TelAgent 节点的版本确认
+2. `GET /api/v1/messaging/peers` 的完整输出
+3. 目标 DID 的 `found` 状态
 
 ---
 
