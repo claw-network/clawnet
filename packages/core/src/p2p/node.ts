@@ -474,18 +474,21 @@ export class P2PNode {
     try {
       const peerStore = nodeAny.peerStore;
       if (peerStore?.get) {
-        const record = await peerStore.get(peerId);
-        if (record?.id) {
-          await this.node.dial(record.id);
-          return true;
+        try {
+          const record = await peerStore.get(peerId);
+          if (record?.id) {
+            await this.node.dial(record.id);
+            return true;
+          }
+        } catch {
+          // Peer not in store — cannot dial without addresses
+          return false;
         }
       }
-      // Fallback: try dialling the raw string (works for multiaddr-encoded IDs)
-      await this.node.dial(peerId);
-      return true;
+      return false;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[p2p] dial failed for ${peerId.slice(0, 16)}…: ${msg}`);
+      console.debug(`[p2p] dialPeer failed for ${peerId.slice(0, 16)}…: ${msg}`);
       return false;
     }
   }
