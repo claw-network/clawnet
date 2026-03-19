@@ -640,33 +640,9 @@ export class P2PNode {
       a.includes('/p2p/') ? a : `${a}/p2p/${peerId}`,
     );
 
-    // Try peerStore.merge first (peerStore.merge(peerId, { multiaddrs }) is the
-    // canonical API but requires a PeerId object; we try the string version and
-    // fall back to peerStore.patch which may accept strings in some versions)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const peerStore = (this.node as any)?.peerStore;
-    if (peerStore?.merge) {
-      try {
-        // Attempt to get the PeerId object from an existing peerStore record
-        let peerIdObj: unknown = peerId;
-        if (peerStore.get) {
-          try {
-            const record = await peerStore.get(peerId);
-            if (record?.id) peerIdObj = record.id;
-          } catch (err) {
-            console.debug('[p2p] addPeerAddresses: peer not yet in store (%s), proceeding with string', err instanceof Error ? err.message : String(err));
-          }
-        }
-        await peerStore.merge(peerIdObj, {
-          multiaddrs: fullAddrs.map((a) => multiaddr(a)),
-        });
-        return;
-      } catch (err) {
-        console.debug('[p2p] addPeerAddresses: merge failed (%s), falling through to dial', err instanceof Error ? err.message : String(err));
-      }
-    }
-
-    // Fallback: dial one full multiaddr to let libp2p store it automatically
+    // Dial one full multiaddr to let libp2p store it automatically in peerStore.
+    // This works for both direct connections and relay connections (libp2p
+    // will use existing connection if already connected, or dial the relay path).
     if (this.node.dial) {
       for (const addr of fullAddrs) {
         try {
