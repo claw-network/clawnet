@@ -112,6 +112,9 @@ const CLEANUP_INTERVAL_MS = 5 * 60_000;
 /** Outbox sweep interval: attempt re-delivery of queued messages (30 seconds). */
 const OUTBOX_SWEEP_INTERVAL_MS = 30_000;
 
+/** Bootstrap sync interval: query DIDs for unknown connected peers (30 seconds). */
+const BOOTSTRAP_SYNC_INTERVAL_MS = 30_000;
+
 /** Max attempts before giving up on an outbox message. */
 const MAX_DELIVERY_ATTEMPTS = 50;
 
@@ -344,6 +347,7 @@ export class MessagingService {
   private readonly deliverableDataDir: string;
   private cleanupTimer?: NodeJS.Timeout;
   private outboxSweepTimer?: NodeJS.Timeout;
+  private bootstrapSyncTimer?: NodeJS.Timeout;
 
   /**
    * DID → PeerId mapping. Populated via the did-announce protocol when
@@ -475,6 +479,9 @@ export class MessagingService {
     // Periodic outbox sweep: retry delivery for all queued messages
     this.startOutboxSweep();
 
+    // Bootstrap-only: periodic sync of connected peers' DIDs (fallback for relay connections)
+    this.startBootstrapSync();
+
     this.log.info('[messaging] service started', { localDid: this.localDid });
   }
 
@@ -484,6 +491,7 @@ export class MessagingService {
       this.cleanupTimer = undefined;
     }
     this.stopOutboxSweep();
+    this.stopBootstrapSync();
     try {
       await this.p2p.unhandleProtocol(PROTO_DM);
     } catch { /* ignore */ }
@@ -757,9 +765,16 @@ export class MessagingService {
     // Announce our DID to the new peer
     await this.announceDidToPeer(peerId);
 
-    // Bootstrap mode: actively query the remote peer's DID so we register it
-    // even if the peer's outbound did-announce was lost or dropped.
+    // Bootstrap mode: ensure we have the peer's address in peerStore and query DID.
+    // This is critical for NAT/relay scenarios where peer:connect may not fire
+    // and peerStore lacks the peer's relay addresses.
     if (this.isBootstrap) {
+      // Dial the peer to trigger address storage in peerStore (even if already connected)
+      try {
+        await this.p2p.dialPeer(peerId);
+      } catch {
+        // Non-fatal: dial may fail if peer is not reachable directly
+      }
       await this.queryPeerDid(peerId);
     }
 
@@ -791,6 +806,30 @@ export class MessagingService {
       if (resp.did && DID_PATTERN.test(resp.did)) {
         this.registerDidPeer(resp.did, peerId);
         this.log.info('bootstrap registered peer DID via query', { did: resp.did, peerId });
+
+        // Trigger address storage by dialling the peer — this ensures libp2p
+        // stores the relay address in peerStore so subsequent messages can be sent.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const conn = (stream as any).connection;
+        const remoteAddr = conn?.remoteAddr?.toString();
+        if (remoteAddr) {
+          try {
+            await this.p2p.addPeerAddresses(peerId, [remoteAddr]);
+            this.log.debug('bootstrap stored peer address from query', { peerId, addr: remoteAddr });
+          } catch (err) {
+            this.log.debug('failed to store peer address from query', {
+              peerId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+
+        // Also try dialPeer to ensure addresses are in peerStore
+        try {
+          await this.p2p.dialPeer(peerId);
+        } catch {
+          // Non-fatal: relay addresses may not be dialable directly
+        }
       }
     } catch (err) {
       // Best-effort: rely on the peer's outbound did-announce instead
@@ -852,6 +891,41 @@ export class MessagingService {
       }
     } catch (err) {
       this.log.warn('[messaging] outbox sweep failed', { error: (err as Error).message });
+    }
+  }
+
+  /**
+   * Bootstrap-only: periodically query DIDs for connected peers we don't know yet.
+   * This is a fallback for when peer:connect events don't fire (e.g., relay connections).
+   */
+  private startBootstrapSync(): void {
+    if (!this.isBootstrap) return;
+    this.bootstrapSyncTimer = setInterval(() => void this.syncBootstrapConnections(), BOOTSTRAP_SYNC_INTERVAL_MS);
+  }
+
+  private stopBootstrapSync(): void {
+    if (this.bootstrapSyncTimer) {
+      clearInterval(this.bootstrapSyncTimer);
+      this.bootstrapSyncTimer = undefined;
+    }
+  }
+
+  private async syncBootstrapConnections(): Promise<void> {
+    if (!this.isBootstrap) return;
+    try {
+      const connectedPeers = this.p2p.getConnections();
+      let synced = 0;
+      for (const peerId of connectedPeers) {
+        if (!this.peerIdToDid.has(peerId)) {
+          await this.queryPeerDid(peerId);
+          synced++;
+        }
+      }
+      if (synced > 0) {
+        this.log.info('[messaging] bootstrap sync discovered peers', { count: synced });
+      }
+    } catch (err) {
+      this.log.debug('bootstrap sync failed', { error: (err as Error).message });
     }
   }
 
@@ -2035,7 +2109,7 @@ export class MessagingService {
 
   private async handleDidAnnounce(incoming: {
     stream: StreamDuplex;
-    connection: { remotePeer?: { toString: () => string } };
+    connection: { remotePeer?: { toString: () => string }; remoteAddr?: { toString: () => string } };
   }): Promise<void> {
     const { stream, connection } = incoming;
     try {
@@ -2066,6 +2140,21 @@ export class MessagingService {
       if (msg.did && remotePeerId) {
         this.registerDidPeer(msg.did, remotePeerId);
         this.log.info('peer DID registered', { did: msg.did, peerId: remotePeerId });
+
+        // Store the peer's address from the connection so we can dial it later
+        // (critical for NAT/relay scenarios where peerStore doesn't have addresses)
+        const remoteAddr = connection.remoteAddr?.toString();
+        if (remoteAddr) {
+          try {
+            await this.p2p.addPeerAddresses(remotePeerId, [remoteAddr]);
+            this.log.debug('stored peer address from announce', { peerId: remotePeerId, addr: remoteAddr });
+          } catch (err) {
+            this.log.debug('failed to store peer address from announce', {
+              peerId: remotePeerId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
 
         // Flush any pending outbox messages for this DID
         const flushed = await this.flushOutboxForDid(msg.did);
