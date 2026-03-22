@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clawnet-sdk"
-version = "2026.1.8"
+version = "2026.1.9"
 description = "Python SDK for the ClawNet decentralized agent economy"
 readme = "README.md"
 license = "Apache-2.0"
