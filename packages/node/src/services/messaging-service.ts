@@ -1564,22 +1564,35 @@ export class MessagingService {
 
     for (const relayPeerId of connectedPeers) {
       if (relayPeerId === targetPeerId) continue; // skip the target itself
+      let stream: StreamDuplex | null = null;
       try {
-        // Add relay multiaddr to peerStore so dialProtocol can use it
-        const relayAddr = `/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId}`;
-        await this.p2p.addPeerAddresses(targetPeerId, [relayAddr]);
+        // Dial through the relay using a full circuit-relay multiaddr.
+        // This opens a stream through the relay peer to reach the target NAT node.
+        const relayMultiaddr = `/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId}`;
+        stream = await this.p2p.newStreamMultiaddr(relayMultiaddr, PROTO_DM);
 
-        // Attempt delivery through this relay path
-        const ok = await this.deliverDirect(
-          targetPeerId, targetDid, topic, payload, ttlSec,
-          priority, compressed, encrypted, idempotencyKey,
-        );
-        if (ok) {
-          this.log.info('message delivered via relay', { relayPeerId, targetPeerId, targetDid, topic });
-          return true;
+        const bytes = encodeDirectMessageBytes({
+          sourceDid: this.localDid,
+          targetDid,
+          topic,
+          payload,
+          ttlSec,
+          sentAtMs: BigInt(Date.now()),
+          priority,
+          compressed,
+          encrypted,
+          idempotencyKey: idempotencyKey ?? '',
+        });
+
+        await writeBinaryStream(stream.sink, bytes);
+        await stream.close();
+        this.log.info('message delivered via relay', { relayPeerId, targetPeerId, targetDid, topic });
+        return true;
+      } catch (err) {
+        this.log.debug('[messaging] relay delivery via %s failed: %s', relayPeerId.slice(0, 16), err instanceof Error ? err.message : String(err));
+        if (stream) {
+          try { await stream.close(); } catch { /* ignore */ }
         }
-      } catch {
-        // relay path failed — try next connected peer as relay
       }
     }
 

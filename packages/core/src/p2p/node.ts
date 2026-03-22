@@ -715,6 +715,18 @@ export class P2PNode {
   }
 
   /**
+   * Open a protocol stream to a full multiaddr (supports /p2p-circuit relay paths).
+   * Use this instead of newStream() when you need to dial through a relay.
+   */
+  async newStreamMultiaddr(multiaddrStr: string, protocol: string): Promise<StreamDuplex> {
+    if (!this.node?.dialProtocol) {
+      throw new Error('node not started or does not support dialProtocol()');
+    }
+    const rawStream = await this.node.dialProtocol(multiaddr(multiaddrStr), protocol);
+    return adaptStream(rawStream);
+  }
+
+  /**
    * Re-dial all configured bootstrap multiaddrs.
    * Useful when connections have been lost and the node needs to rejoin the mesh.
    * Returns the number of successfully (re-)connected bootstrap peers.
