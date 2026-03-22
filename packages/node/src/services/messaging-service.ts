@@ -2304,9 +2304,11 @@ export class MessagingService {
       }
       if (newMappings > 0) {
         this.log.info('[messaging] peer directory learned new mappings', { count: newMappings, total: this.didToPeerId.size });
+      } else {
+        this.log.info('[messaging] peer directory returned no new entries from peer', { peerId, total: this.didToPeerId.size });
       }
     } catch (err) {
-      this.log.debug('peer directory fetch failed', { peerId, error: (err as Error).message });
+      this.log.warn('[messaging] peer directory fetch failed', { peerId, error: (err as Error).message });
       try { if (stream) await stream.close(); } catch { /* ignore */ }
     }
     return newMappings;

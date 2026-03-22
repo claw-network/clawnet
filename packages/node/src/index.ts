@@ -1023,18 +1023,27 @@ export class ClawNetNode {
       try {
         const n = await this.p2p?.amplifyMesh() ?? 0;
         if (n > 0) {
-          console.log(`[mesh] +${n} new peer(s) discovered via DHT walk`);
+          console.log(`[mesh] +${n} new peer(s) discovered via DHT/peerStore`);
         } else {
-          // DHT walk failed — try fetching peer directory from Bootstrap as fallback
-          const connections = this.p2p?.getConnections() ?? [];
+          console.log(`[mesh] amplify: no new peers discovered`);
+        }
+        // Always try peer directory fallback to learn DIDs even if amplifyMesh found peers.
+        // fetchPeerDirectory only adds new entries (never overwrites), so this is safe.
+        const connections = this.p2p?.getConnections() ?? [];
+        if (connections.length === 0) {
+          console.log('[mesh] peer directory fallback: no connections available');
+        } else {
           for (const peerId of connections) {
             try {
+              console.log(`[mesh] fetching peer directory from ${peerId.slice(0, 16)}…`);
               const learned = await this.messagingService?.fetchPeerDirectory(peerId) ?? 0;
               if (learned > 0) {
                 console.log(`[mesh] +${learned} peer(s) discovered via peer directory fallback`);
+              } else {
+                console.log(`[mesh] peer directory from ${peerId.slice(0, 16)}…: no new entries`);
               }
-            } catch {
-              // best-effort — try next peer
+            } catch (err) {
+              console.log(`[mesh] peer directory fallback failed for ${peerId.slice(0, 16)}…: ${err instanceof Error ? err.message : String(err)}`);
             }
           }
         }
@@ -1084,19 +1093,19 @@ export class ClawNetNode {
           }
           const n = await this.p2p?.amplifyMesh() ?? 0;
           if (n > 0) {
-            console.log(`[mesh] +${n} additional peer(s) via DHT walk`);
-          } else {
-            // DHT walk failed — try fetching peer directory from Bootstrap as fallback
-            const connections = this.p2p?.getConnections() ?? [];
-            for (const peerId of connections) {
-              try {
-                const learned = await this.messagingService?.fetchPeerDirectory(peerId) ?? 0;
-                if (learned > 0) {
-                  console.log(`[mesh] +${learned} peer(s) discovered via peer directory fallback`);
-                }
-              } catch {
-                // best-effort — try next peer
+            console.log(`[mesh] +${n} additional peer(s) via DHT/peerStore`);
+          }
+          // Always try peer directory fallback to learn DIDs of peers we can't reach via relay.
+          const connections = this.p2p?.getConnections() ?? [];
+          for (const peerId of connections) {
+            try {
+              console.log(`[mesh] watchdog: fetching peer directory from ${peerId.slice(0, 16)}…`);
+              const learned = await this.messagingService?.fetchPeerDirectory(peerId) ?? 0;
+              if (learned > 0) {
+                console.log(`[mesh] +${learned} peer(s) discovered via peer directory fallback`);
               }
+            } catch (err) {
+              console.log(`[mesh] watchdog peer directory failed for ${peerId.slice(0, 16)}…: ${err instanceof Error ? err.message : String(err)}`);
             }
           }
           if (bootstrapCount === 0 && n === 0 && recovered === 0) {
