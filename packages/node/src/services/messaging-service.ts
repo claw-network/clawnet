@@ -119,6 +119,9 @@ const OUTBOX_SWEEP_INTERVAL_MS = 30_000;
 /** Bootstrap sync interval: query DIDs for unknown connected peers (30 seconds). */
 const BOOTSTRAP_SYNC_INTERVAL_MS = 30_000;
 
+/** Peer directory push interval: Bootstrap pushes directory to all peers (60 seconds). */
+const PEER_DIRECTORY_PUSH_INTERVAL_MS = 60_000;
+
 /** Max attempts before giving up on an outbox message. */
 const MAX_DELIVERY_ATTEMPTS = 50;
 
@@ -352,6 +355,7 @@ export class MessagingService {
   private cleanupTimer?: NodeJS.Timeout;
   private outboxSweepTimer?: NodeJS.Timeout;
   private bootstrapSyncTimer?: NodeJS.Timeout;
+  private peerDirectoryPushTimer?: NodeJS.Timeout;
 
   /**
    * DID → PeerId mapping. Populated via the did-announce protocol when
@@ -490,6 +494,9 @@ export class MessagingService {
     // Bootstrap-only: periodic sync of connected peers' DIDs (fallback for relay connections)
     this.startBootstrapSync();
 
+    // Bootstrap-only: periodically push peer directory to all connected peers (for NAT nodes)
+    this.startPeerDirectoryPush();
+
     this.log.info('[messaging] service started', { localDid: this.localDid });
   }
 
@@ -500,6 +507,7 @@ export class MessagingService {
     }
     this.stopOutboxSweep();
     this.stopBootstrapSync();
+    this.stopPeerDirectoryPush();
     try {
       await this.p2p.unhandleProtocol(PROTO_DM);
     } catch { /* ignore */ }
@@ -787,6 +795,8 @@ export class MessagingService {
         // Non-fatal: dial may fail if peer is not reachable directly
       }
       await this.queryPeerDid(peerId);
+      // Push the full peer directory to the new peer (for NAT nodes that cannot pull)
+      void this.pushPeerDirectory(peerId);
     }
 
     // Check if we know this peer's DID and flush outbox
@@ -918,6 +928,51 @@ export class MessagingService {
     if (this.bootstrapSyncTimer) {
       clearInterval(this.bootstrapSyncTimer);
       this.bootstrapSyncTimer = undefined;
+    }
+  }
+
+  /**
+   * Bootstrap-only: push the full peer directory to a specific connected peer.
+   * Opens a stream to the peer and sends all known DID→PeerId mappings.
+   * This is the push complement to fetchPeerDirectory — used to deliver
+   * the directory to NAT nodes that cannot reliably initiate pull requests.
+   */
+  private async pushPeerDirectory(peerId: string): Promise<void> {
+    let stream: StreamDuplex | null = null;
+    try {
+      stream = await this.p2p.newStream(peerId, PROTO_PEER_DIRECTORY);
+      const entries = Array.from(this.didToPeerId.entries());
+      const json = JSON.stringify(entries);
+      const jsonBytes = new TextEncoder().encode(json);
+      // Non-blocking write: don't wait for the remote to consume before closing.
+      const writePromise = stream.sink((async function* () {
+        yield jsonBytes;
+      })());
+      writePromise.then(() => stream?.close()).catch(() => { /* ignore close errors */ });
+      this.log.info('[messaging] pushed peer directory to %s (%d entries)', peerId.slice(0, 16), entries.length);
+    } catch (err) {
+      this.log.debug('[messaging] pushPeerDirectory failed for %s: %s', peerId.slice(0, 16), err instanceof Error ? err.message : String(err));
+      try { if (stream) await stream.close(); } catch { /* ignore */ }
+    }
+  }
+
+  private startPeerDirectoryPush(): void {
+    if (!this.isBootstrap) return;
+    // Push immediately to all connected peers, then every PEER_DIRECTORY_PUSH_INTERVAL_MS
+    const push = () => {
+      const connectedPeers = this.p2p.getConnections();
+      for (const peerId of connectedPeers) {
+        void this.pushPeerDirectory(peerId);
+      }
+    };
+    push();
+    this.peerDirectoryPushTimer = setInterval(push, PEER_DIRECTORY_PUSH_INTERVAL_MS);
+  }
+
+  private stopPeerDirectoryPush(): void {
+    if (this.peerDirectoryPushTimer) {
+      clearInterval(this.peerDirectoryPushTimer);
+      this.peerDirectoryPushTimer = undefined;
     }
   }
 
@@ -2260,14 +2315,18 @@ export class MessagingService {
   }): Promise<void> {
     const { stream, connection } = incoming;
     try {
-      const raw = await readStream(stream.source, 256, PEER_DIRECTORY_TIMEOUT_MS);
-      decodeDidQueryRequestBytes(new Uint8Array(raw)); // reuse same request format (empty)
-      // Return all known DID→PeerId mappings as JSON
+      // Return all known DID→PeerId mappings as JSON.
+      // Write directly without waiting for the remote to consume (avoids deadlock with NAT nodes
+      // whose read may be blocked waiting for our response).
       const entries = Array.from(this.didToPeerId.entries());
       const json = JSON.stringify(entries);
       const jsonBytes = new TextEncoder().encode(json);
-      await writeBinaryStream(stream.sink, jsonBytes);
-      await stream.close();
+      // Use sink() directly: pass an async iterable and collect once, then close.
+      // This writes the data to the stream buffer without blocking on consumption.
+      const writePromise = stream.sink((async function* () {
+        yield jsonBytes;
+      })());
+      writePromise.then(() => stream.close()).catch(() => { /* ignore close errors */ });
       this.log.debug('peer directory handled', { peerId: connection.remotePeer?.toString(), count: entries.length });
     } catch (err) {
       this.log.warn('failed to handle peer directory', { error: (err as Error).message });
