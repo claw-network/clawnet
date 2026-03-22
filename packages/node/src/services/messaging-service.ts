@@ -92,6 +92,9 @@ const DELEGATION_FORWARD_QUEUE_DEPTH = 200;
 /** Timeout for DID resolve queries (ms). */
 const DID_RESOLVE_TIMEOUT_MS = 15_000;
 
+/** Timeout for reading peer directory requests — larger to accommodate NAT nodes. */
+const PEER_DIRECTORY_TIMEOUT_MS = 30_000;
+
 /** Maximum number of peers to query in parallel for DID resolve. */
 const DID_RESOLVE_MAX_PEERS = 3;
 
@@ -2257,7 +2260,7 @@ export class MessagingService {
   }): Promise<void> {
     const { stream, connection } = incoming;
     try {
-      const raw = await readStream(stream.source, 256);
+      const raw = await readStream(stream.source, 256, PEER_DIRECTORY_TIMEOUT_MS);
       decodeDidQueryRequestBytes(new Uint8Array(raw)); // reuse same request format (empty)
       // Return all known DID→PeerId mappings as JSON
       const entries = Array.from(this.didToPeerId.entries());
