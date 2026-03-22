@@ -977,8 +977,8 @@ export class ClawNetNode {
    */
   private startMeshAmplifier(): void {
     let attempts = 0;
-    const aggressiveAttempts = 12; // 12 × 5 s = 60 s
-    const aggressiveIntervalMs = 5_000;
+    const aggressiveAttempts = 8; // 8 × 15 s = 120 s (reduced from 12 × 5s = 60s)
+    const aggressiveIntervalMs = 15_000; // Increased from 5s to reduce DHT spam in small networks
     const watchdogIntervalMs = 60_000; // Reduced from 30s to lower DHT spam in small networks
     const reconnectDelayMs = 5_000; // delay before re-dial after disconnect
     let reconnectTimer: NodeJS.Timeout | undefined;

@@ -90,7 +90,10 @@ const timeout = setTimeout(() => controller.abort(), DHT_PEER_DISCOVERY_TIMEOUT_
 
 ### 修复 2：降低 DHT discovery 频率 ✅ (已实现)
 
-在 aggressive phase 结束后（60 秒后），将 DHT discovery 间隔从 30 秒减少到 60 秒，避免无效查询。
+**aggressive phase**：`amplifyMesh()` 调用间隔从 5 秒增加到 15 秒（8 次 = 2 分钟）
+**watchdog phase**：DHT discovery 间隔从 30 秒减少到 60 秒
+
+这显著减少了 DHT walk 的频率，从每 5 秒一次降到每 15 秒（aggressive）或每 60 秒（watchdog）。
 
 ### 修复 3：增加 DID query timeout ✅ (已实现)
 
@@ -119,7 +122,8 @@ ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 \
 | 根因分析完成 | ✅ |
 | 修复方案设计 | ✅ |
 | DHT timeout 3s → 15s | ✅ 已实现 (core) |
-| DHT discovery 频率 30s → 60s | ✅ 已实现 (node) |
+| DHT discovery 频率 (aggressive) 5s → 15s | ✅ 已实现 (node) |
+| DHT discovery 频率 (watchdog) 30s → 60s | ✅ 已实现 (node) |
 | DID query timeout 5s → 15s | ✅ 已实现 (node) |
 | Bootstrap peer directory fallback | ⏳ 2026.2.0+ |
 | 回归测试通过 | ⏳ 待验证 |
