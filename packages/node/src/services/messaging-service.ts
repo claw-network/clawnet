@@ -2281,37 +2281,55 @@ export class MessagingService {
    * Returns the number of new mappings learned.
    */
   async fetchPeerDirectory(peerId: string): Promise<number> {
-    let stream: StreamDuplex | null = null;
-    let newMappings = 0;
-    try {
-      stream = await this.p2p.newStream(peerId, PROTO_PEER_DIRECTORY);
-      const reqBytes = encodeDidQueryRequestBytes({});
-      await writeBinaryStream(stream.sink, reqBytes);
-      const raw = await readStream(stream.source, 8192, DID_RESOLVE_TIMEOUT_MS);
-      await stream.close();
-      const json = new TextDecoder().decode(raw);
-      const entries: [string, string][] = JSON.parse(json);
-      for (const [did, pId] of entries) {
-        if (!this.didToPeerId.has(did)) {
-          this.didToPeerId.set(did, pId);
-          this.peerIdToDid.set(pId, did);
-          this.didPeerUpdatedAt.set(did, Date.now());
-          try {
-            this.store.upsertDidPeer(did, pId);
-          } catch { /* best-effort persistence */ }
-          newMappings++;
+    const MAX_RETRIES = 3;
+    const BASE_DELAY_MS = 2_000;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      let stream: StreamDuplex | null = null;
+      let newMappings = 0;
+      try {
+        this.log.info('[messaging] fetchPeerDirectory attempt %d/%d to %s', attempt, MAX_RETRIES, peerId.slice(0, 16));
+        stream = await this.p2p.newStream(peerId, PROTO_PEER_DIRECTORY);
+        const reqBytes = encodeDidQueryRequestBytes({});
+        await writeBinaryStream(stream.sink, reqBytes);
+        // Overall timeout for the entire fetch operation
+        const raw = await Promise.race([
+          readStream(stream.source, 8192, DID_RESOLVE_TIMEOUT_MS),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('fetchPeerDirectory: stream read timeout')), 20_000),
+          ),
+        ]);
+        await stream.close();
+        const json = new TextDecoder().decode(raw);
+        const entries: [string, string][] = JSON.parse(json);
+        this.log.info('[messaging] fetchPeerDirectory received %d entries from %s', entries.length, peerId.slice(0, 16));
+        for (const [did, pId] of entries) {
+          if (!this.didToPeerId.has(did)) {
+            this.didToPeerId.set(did, pId);
+            this.peerIdToDid.set(pId, did);
+            this.didPeerUpdatedAt.set(did, Date.now());
+            try {
+              this.store.upsertDidPeer(did, pId);
+            } catch { /* best-effort persistence */ }
+            newMappings++;
+          }
+        }
+        if (newMappings > 0) {
+          this.log.info('[messaging] peer directory learned %d new mapping(s)', { count: newMappings, total: this.didToPeerId.size });
+        } else {
+          this.log.info('[messaging] peer directory: no new entries (peer has %d total, all already known)', { entries: entries.length, total: this.didToPeerId.size });
+        }
+        return newMappings;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.log.warn('[messaging] fetchPeerDirectory attempt %d/%d failed: %s', attempt, MAX_RETRIES, msg);
+        try { if (stream) await stream.close(); } catch { /* ignore */ }
+        if (attempt < MAX_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, BASE_DELAY_MS * attempt));
         }
       }
-      if (newMappings > 0) {
-        this.log.info('[messaging] peer directory learned new mappings', { count: newMappings, total: this.didToPeerId.size });
-      } else {
-        this.log.info('[messaging] peer directory returned no new entries from peer', { peerId, total: this.didToPeerId.size });
-      }
-    } catch (err) {
-      this.log.warn('[messaging] peer directory fetch failed', { peerId, error: (err as Error).message });
-      try { if (stream) await stream.close(); } catch { /* ignore */ }
     }
-    return newMappings;
+    return 0;
   }
 
   /**
