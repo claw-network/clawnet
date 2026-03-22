@@ -1,9 +1,8 @@
 {
   "name": "@claw-network/contracts",
-  "version": "0.1.0",
+  "version": "2026.2.10",
   "description": "ClawNet on-chain smart contracts (Solidity / Hardhat / UUPS upgradeable)",
   "license": "Apache-2.0",
-  "private": true,
   "repository": {
     "type": "git",
     "url": "https://github.com/claw-network/clawnet.git",

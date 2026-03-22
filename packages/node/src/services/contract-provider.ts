@@ -6,6 +6,7 @@
  * Solidity contract.
  */
 
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -30,18 +31,52 @@ import {
 // ---------------------------------------------------------------------------
 
 /**
+ * Resolve the artifact file path, checking the local artifacts directory first,
+ * then falling back to the `@claw-network/contracts` npm package.
+ */
+function resolveArtifactPath(contractName: string, artifactsDir: string | undefined): string {
+  // If artifactsDir is provided, try local path first
+  if (artifactsDir !== undefined) {
+    const localPath = join(
+      artifactsDir,
+      'contracts',
+      `${contractName}.sol`,
+      `${contractName}.json`,
+    );
+
+    try {
+      readFileSync(localPath, 'utf-8');
+      return localPath;
+    } catch {
+      // Fall through to npm package fallback
+    }
+  }
+
+  // Fallback: resolve from @claw-network/contracts npm package
+  // The npm package ships artifacts at:
+  // node_modules/@claw-network/contracts/artifacts/contracts/<Name>.sol/<Name>.json
+  const npmRequire = createRequire(import.meta.url);
+  const npmPath = npmRequire.resolve(
+    `@claw-network/contracts/artifacts/contracts/${contractName}.sol/${contractName}.json`,
+  );
+  console.warn(
+    `[ContractProvider] Artifact not found locally for "${contractName}" — using @claw-network/contracts npm package`,
+  );
+  return npmPath;
+}
+
+/**
  * Load a single contract ABI from the hardhat artifacts directory.
  *
+ * Tries the local `artifactsDir` first; if the artifact is not found there,
+ * falls back to the `@claw-network/contracts` npm package which ships the
+ * official ClawNet contract artifacts.
+ *
  * @param contractName Solidity contract name (e.g. `ClawToken`)
- * @param artifactsDir Path to `packages/contracts/artifacts`
+ * @param artifactsDir Path to `packages/contracts/artifacts` (optional, falls back to npm package)
  */
-function loadAbi(contractName: string, artifactsDir: string): InterfaceAbi {
-  const artifactPath = join(
-    artifactsDir,
-    'contracts',
-    `${contractName}.sol`,
-    `${contractName}.json`,
-  );
+function loadAbi(contractName: string, artifactsDir: string | undefined): InterfaceAbi {
+  const artifactPath = resolveArtifactPath(contractName, artifactsDir);
 
   let raw: string;
   try {
