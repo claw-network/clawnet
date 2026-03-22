@@ -150,6 +150,7 @@ export type PeerConnectHandler = (peerId: string) => void;
 // ── F2: Relay discovery constants ──────────────────────────────
 const RELAY_PROVIDER_KEY = '/clawnet/relay-providers/v1';
 const RELAY_ADVERTISE_INTERVAL_MS = 30 * 60_000; // 30 minutes
+const RELAY_PROVIDE_TIMEOUT_MS = 15_000;
 const RELAY_DISCOVER_TIMEOUT_MS = 15_000;
 const RELAY_DISCOVER_MAX = 10;
 
@@ -778,7 +779,13 @@ export class P2PNode {
       const routing = nodeAny.contentRouting ?? nodeAny.services?.dht;
       if (!routing?.provide) return;
       const cid = await this.getRelayProviderCid();
-      await routing.provide(cid);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), RELAY_PROVIDE_TIMEOUT_MS);
+      try {
+        await routing.provide(cid);
+      } finally {
+        clearTimeout(timeout);
+      }
     } catch (err) {
       console.debug('[p2p] provideRelayOnce: DHT provide failed (%s) — non-fatal during bootstrap', err instanceof Error ? err.message : String(err));
     }
