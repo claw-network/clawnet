@@ -102,9 +102,9 @@ private async provideRelayOnce(): Promise<void> {
 | 根因分析完成 | ✅ |
 | 修复代码已提交 | ✅ |
 | 编译通过 | ✅ |
-| 发布版本 2026.1.8 | ⏳ 进行中 |
-| 回归测试通过 | ⏳ 待验证 |
-| Bootstrap DHT 健康指标 | ⏳ 待 TelAgent 验证 |
+| 发布版本 2026.1.8 | ✅ |
+| Bootstrap 已升级 | ✅ (2026-03-22 04:33 UTC) |
+| 回归测试通过 | ⏳ 待 TelAgent 验证 |
 
 ---
 
