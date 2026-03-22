@@ -99,6 +99,23 @@ const timeout = setTimeout(() => controller.abort(), DHT_PEER_DISCOVERY_TIMEOUT_
 
 将 `DID_RESOLVE_TIMEOUT_MS` 从 5 秒增加到 15 秒，与 DHT timeout 保持一致。
 
+### 修复 4：Bootstrap Peer Directory Fallback ✅ (已实现)
+
+当 DHT peer discovery 失败时，节点通过 `/clawnet/1.0.0/peer-directory` 协议向 Bootstrap 查询所有已知 DID→PeerId 映射。
+
+**新增协议**：`/clawnet/1.0.0/peer-directory`
+
+**实现位置**：
+- `packages/node/src/services/messaging-service.ts`: `handlePeerDirectory()` 和 `fetchPeerDirectory()`
+- `packages/node/src/index.ts`: `amplify()` 和 `watchdog()` 中的 fallback 调用
+
+**工作流程**：
+1. `amplifyMesh()` 调用 DHT `getClosestPeers`，超时或无结果返回 0
+2. 节点遍历所有连接，调用 `fetchPeerDirectory(peerId)`
+3. Bootstrap 返回所有已知 DID→PeerId 映射的 JSON
+4. 节点更新本地 `didToPeerId` 和 `peerIdToDid` 映射
+5. 节点尝试 dial 新发现的 peers
+
 ---
 
 ## 3. 临时缓解措施
@@ -125,8 +142,8 @@ ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 \
 | DHT discovery 频率 (aggressive) 5s → 15s | ✅ 已实现 (node) |
 | DHT discovery 频率 (watchdog) 30s → 60s | ✅ 已实现 (node) |
 | DID query timeout 5s → 15s | ✅ 已实现 (node) |
-| Bootstrap peer directory fallback | ⏳ 2026.2.0+ |
-| 回归测试通过 | ⏳ 待验证 |
+| Bootstrap peer directory fallback | ✅ 已实现 (node) |
+| 回归测试通过 | ⏳ 待 TelAgent 验证 |
 
 ---
 

@@ -73,6 +73,7 @@ const PROTO_DID_ANNOUNCE = '/clawnet/1.0.0/did-announce';
 const PROTO_RECEIPT = '/clawnet/1.0.0/receipt';
 const PROTO_DID_RESOLVE = '/clawnet/1.0.0/did-resolve';
 const PROTO_DID_QUERY = '/clawnet/1.0.0/did-query';
+const PROTO_PEER_DIRECTORY = '/clawnet/1.0.0/peer-directory';
 const PROTO_ATTACHMENT = '/clawnet/1.0.0/attachment';
 const PROTO_DELEGATED_MSG = '/clawnet/1.0.0/delegated-msg';
 const PROTO_DELIVERY_AUTH = DELIVERY_AUTH_PROTOCOL;
@@ -423,6 +424,10 @@ export class MessagingService {
     await this.p2p.handleProtocol(PROTO_DID_QUERY, (incoming) => {
       void this.handleDidQuery(incoming);
     }, { maxInboundStreams: 64 });
+    // Bootstrap-only: handle peer-directory (peer asks for all known DID→PeerId mappings)
+    await this.p2p.handleProtocol(PROTO_PEER_DIRECTORY, (incoming) => {
+      void this.handlePeerDirectory(incoming);
+    }, { maxInboundStreams: 64 });
     await this.p2p.handleProtocol(PROTO_ATTACHMENT, (incoming) => {
       void this.handleInboundAttachment(incoming);
     }, { maxInboundStreams: 32 });
@@ -506,6 +511,9 @@ export class MessagingService {
     } catch { /* ignore */ }
     try {
       await this.p2p.unhandleProtocol(PROTO_DID_QUERY);
+    } catch { /* ignore */ }
+    try {
+      await this.p2p.unhandleProtocol(PROTO_PEER_DIRECTORY);
     } catch { /* ignore */ }
     try {
       await this.p2p.unhandleProtocol(PROTO_ATTACHMENT);
@@ -2235,6 +2243,70 @@ export class MessagingService {
       this.log.warn('failed to handle DID query', { error: (err as Error).message });
       try { await stream.close(); } catch { /* ignore */ }
     }
+  }
+
+  /**
+   * Handle incoming peer-directory request — peer is asking for all known DID→PeerId mappings.
+   * Bootstrap nodes maintain a full directory of all connected peers' DIDs.
+   * Non-bootstrap nodes return their local mappings only.
+   * Response format: JSON array of [did, peerId] pairs.
+   */
+  private async handlePeerDirectory(incoming: {
+    stream: StreamDuplex;
+    connection: { remotePeer?: { toString: () => string } };
+  }): Promise<void> {
+    const { stream, connection } = incoming;
+    try {
+      const raw = await readStream(stream.source, 256);
+      decodeDidQueryRequestBytes(new Uint8Array(raw)); // reuse same request format (empty)
+      // Return all known DID→PeerId mappings as JSON
+      const entries = Array.from(this.didToPeerId.entries());
+      const json = JSON.stringify(entries);
+      const jsonBytes = new TextEncoder().encode(json);
+      await writeBinaryStream(stream.sink, jsonBytes);
+      await stream.close();
+      this.log.debug('peer directory handled', { peerId: connection.remotePeer?.toString(), count: entries.length });
+    } catch (err) {
+      this.log.warn('failed to handle peer directory', { error: (err as Error).message });
+      try { await stream.close(); } catch { /* ignore */ }
+    }
+  }
+
+  /**
+   * Query a peer (typically Bootstrap) for its known DID→PeerId directory.
+   * Updates local mappings with any new entries discovered.
+   * Returns the number of new mappings learned.
+   */
+  async fetchPeerDirectory(peerId: string): Promise<number> {
+    let stream: StreamDuplex | null = null;
+    let newMappings = 0;
+    try {
+      stream = await this.p2p.newStream(peerId, PROTO_PEER_DIRECTORY);
+      const reqBytes = encodeDidQueryRequestBytes({});
+      await writeBinaryStream(stream.sink, reqBytes);
+      const raw = await readStream(stream.source, 8192, DID_RESOLVE_TIMEOUT_MS);
+      await stream.close();
+      const json = new TextDecoder().decode(raw);
+      const entries: [string, string][] = JSON.parse(json);
+      for (const [did, pId] of entries) {
+        if (!this.didToPeerId.has(did)) {
+          this.didToPeerId.set(did, pId);
+          this.peerIdToDid.set(pId, did);
+          this.didPeerUpdatedAt.set(did, Date.now());
+          try {
+            this.store.upsertDidPeer(did, pId);
+          } catch { /* best-effort persistence */ }
+          newMappings++;
+        }
+      }
+      if (newMappings > 0) {
+        this.log.info('[messaging] peer directory learned new mappings', { count: newMappings, total: this.didToPeerId.size });
+      }
+    } catch (err) {
+      this.log.debug('peer directory fetch failed', { peerId, error: (err as Error).message });
+      try { if (stream) await stream.close(); } catch { /* ignore */ }
+    }
+    return newMappings;
   }
 
   /**

@@ -1024,6 +1024,19 @@ export class ClawNetNode {
         const n = await this.p2p?.amplifyMesh() ?? 0;
         if (n > 0) {
           console.log(`[mesh] +${n} new peer(s) discovered via DHT walk`);
+        } else {
+          // DHT walk failed — try fetching peer directory from Bootstrap as fallback
+          const connections = this.p2p?.getConnections() ?? [];
+          for (const peerId of connections) {
+            try {
+              const learned = await this.messagingService?.fetchPeerDirectory(peerId) ?? 0;
+              if (learned > 0) {
+                console.log(`[mesh] +${learned} peer(s) discovered via peer directory fallback`);
+              }
+            } catch {
+              // best-effort — try next peer
+            }
+          }
         }
       } catch {
         // best-effort
@@ -1072,6 +1085,19 @@ export class ClawNetNode {
           const n = await this.p2p?.amplifyMesh() ?? 0;
           if (n > 0) {
             console.log(`[mesh] +${n} additional peer(s) via DHT walk`);
+          } else {
+            // DHT walk failed — try fetching peer directory from Bootstrap as fallback
+            const connections = this.p2p?.getConnections() ?? [];
+            for (const peerId of connections) {
+              try {
+                const learned = await this.messagingService?.fetchPeerDirectory(peerId) ?? 0;
+                if (learned > 0) {
+                  console.log(`[mesh] +${learned} peer(s) discovered via peer directory fallback`);
+                }
+              } catch {
+                // best-effort — try next peer
+              }
+            }
           }
           if (bootstrapCount === 0 && n === 0 && recovered === 0) {
             console.log(`[mesh] reconnect failed — will retry in ${watchdogIntervalMs / 1000}s`);
