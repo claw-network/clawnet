@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/protocol",
-  "version": "2026.2.7",
+  "version": "2026.2.8",
   "description": "Protocol definitions and event envelopes for the ClawNet network",
   "type": "module",
   "main": "dist/index.js",

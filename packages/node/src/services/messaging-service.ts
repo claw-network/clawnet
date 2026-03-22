@@ -2165,6 +2165,31 @@ export class MessagingService {
       });
 
       this.notifyDelegatedMsgSubscribers({ ...msg, seq });
+
+      // Bootstrap relay: if the original target is a connected peer, immediately
+      // forward the message so NAT nodes can receive messages without needing
+      // inbound-capable connections. Use non-blocking write to avoid deadlock.
+      const targetPeerId = this.didToPeerId.get(msg.originalTargetDid);
+      if (targetPeerId && this.p2p.getConnections().includes(targetPeerId)) {
+        const forwardData = Buffer.from(JSON.stringify(msg), 'utf-8');
+        // Non-blocking: don't await send, don't wait for ack. Message is already persisted in delegatedInbox.
+        this.sendDelegatedMsg(targetPeerId, forwardData)
+          .then((ok) => {
+            if (ok) {
+              this.log.info('[messaging] delegated msg forwarded to target', {
+                targetDid: msg.originalTargetDid,
+                peerId: targetPeerId.slice(0, 16),
+                topic: msg.topic,
+              });
+            }
+          })
+          .catch((err) => {
+            this.log.debug('[messaging] delegated msg forward failed (will retry via outbox)', {
+              targetDid: msg.originalTargetDid,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+      }
     } catch (err) {
       this.log.warn('failed to handle delegated message', { error: (err as Error).message });
       try { await stream.close(); } catch { /* ignore */ }
