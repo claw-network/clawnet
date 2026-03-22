@@ -979,7 +979,7 @@ export class ClawNetNode {
     let attempts = 0;
     const aggressiveAttempts = 12; // 12 × 5 s = 60 s
     const aggressiveIntervalMs = 5_000;
-    const watchdogIntervalMs = 30_000;
+    const watchdogIntervalMs = 60_000; // Reduced from 30s to lower DHT spam in small networks
     const reconnectDelayMs = 5_000; // delay before re-dial after disconnect
     let reconnectTimer: NodeJS.Timeout | undefined;
 

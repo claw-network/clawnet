@@ -154,6 +154,9 @@ const RELAY_PROVIDE_TIMEOUT_MS = 15_000;
 const RELAY_DISCOVER_TIMEOUT_MS = 15_000;
 const RELAY_DISCOVER_MAX = 10;
 
+// ── DHT peer discovery constants ─────────────────────────────────
+const DHT_PEER_DISCOVERY_TIMEOUT_MS = 15_000;
+
 // ── F5 / F12 / F10: Protocol IDs ──────────────────────────────
 export const RELAY_INFO_PROTOCOL = '/clawnet/1.0.0/relay-info';
 export const RELAY_MIGRATION_PROTOCOL = '/clawnet/1.0.0/relay-migration';
@@ -550,7 +553,7 @@ export class P2PNode {
           const randomKey = new Uint8Array(32);
           globalThis.crypto.getRandomValues(randomKey);
           const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 3_000);
+          const timeout = setTimeout(() => controller.abort(), DHT_PEER_DISCOVERY_TIMEOUT_MS);
           try {
             for await (const peer of routing.getClosestPeers(randomKey, {
               signal: controller.signal,

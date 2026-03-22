@@ -89,7 +89,7 @@ const DELEGATION_FORWARD_CONCURRENCY = 5;
 const DELEGATION_FORWARD_QUEUE_DEPTH = 200;
 
 /** Timeout for DID resolve queries (ms). */
-const DID_RESOLVE_TIMEOUT_MS = 5_000;
+const DID_RESOLVE_TIMEOUT_MS = 15_000;
 
 /** Maximum number of peers to query in parallel for DID resolve. */
 const DID_RESOLVE_MAX_PEERS = 3;

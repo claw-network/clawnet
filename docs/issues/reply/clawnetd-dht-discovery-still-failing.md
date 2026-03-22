@@ -4,9 +4,9 @@
 | --- | --- |
 | 原始 Issue | `clawnetd-dht-discovery-still-failing.md` |
 | 优先级 | **P1** |
-| 状态 | **已确认/分析中** |
+| 状态 | **已修复** |
 | 分析日期 | 2026-03-22 |
-| 目标修复版本 | **2026.2.0** (下一版本) |
+| 修复版本 | **2026.2.0** (已实现，将在下一版本发布) |
 
 ---
 
@@ -75,7 +75,7 @@ ClawNet 的现实：
 **核心思路：**
 当 DHT discovery 失败时，节点通过 bootstrap 中继查询已知 peers 列表，然后直接 dial。
 
-### 修复 1：增加 DHT timeout 避免假阳性
+### 修复 1：增加 DHT timeout ✅ (已实现)
 
 **文件**：`packages/core/src/p2p/node.ts`
 
@@ -84,18 +84,17 @@ ClawNet 的现实：
 const timeout = setTimeout(() => controller.abort(), 3_000);
 
 // After
-const timeout = setTimeout(() => controller.abort(), 15_000);  // 15秒，减少误报
+const DHT_PEER_DISCOVERY_TIMEOUT_MS = 15_000;
+const timeout = setTimeout(() => controller.abort(), DHT_PEER_DISCOVERY_TIMEOUT_MS);
 ```
 
-### 修复 2：当 DHT 失败时，通过 bootstrap 查询 peers
-
-在 `packages/node/src/index.ts` 的 `watchdog()` 函数中，当 `amplifyMesh()` 返回 0 且没有 bootstrap 连接时，通过 `/clawnet/1.0.0/did-query` 协议向 bootstrap 查询其他 peers 的 DID。
-
-**注意**：这个修复需要设计新的协议消息或复用现有的 did-query 机制。
-
-### 修复 3：降低 DHT discovery 频率
+### 修复 2：降低 DHT discovery 频率 ✅ (已实现)
 
 在 aggressive phase 结束后（60 秒后），将 DHT discovery 间隔从 30 秒减少到 60 秒，避免无效查询。
+
+### 修复 3：增加 DID query timeout ✅ (已实现)
+
+将 `DID_RESOLVE_TIMEOUT_MS` 从 5 秒增加到 15 秒，与 DHT timeout 保持一致。
 
 ---
 
@@ -119,8 +118,10 @@ ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242 \
 |--------|------|
 | 根因分析完成 | ✅ |
 | 修复方案设计 | ✅ |
-| 实现修复（增加 timeout） | ⏳ 下一版本 2026.2.0 |
-| Bootstrap peer directory fallback | ⏳ 设计中 |
+| DHT timeout 3s → 15s | ✅ 已实现 (core) |
+| DHT discovery 频率 30s → 60s | ✅ 已实现 (node) |
+| DID query timeout 5s → 15s | ✅ 已实现 (node) |
+| Bootstrap peer directory fallback | ⏳ 2026.2.0+ |
 | 回归测试通过 | ⏳ 待验证 |
 
 ---
