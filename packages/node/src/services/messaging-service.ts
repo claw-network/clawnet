@@ -826,7 +826,7 @@ export class MessagingService {
       stream = await this.p2p.newStream(peerId, PROTO_DID_QUERY);
       const reqBytes = encodeDidQueryRequestBytes({});
       await writeBinaryStream(stream.sink, reqBytes);
-      const raw = await readStream(stream.source, 1024, DID_RESOLVE_TIMEOUT_MS);
+      const raw = await readStream(stream.source, 1024, DID_QUERY_TIMEOUT_MS);
       await stream.close();
       const resp = decodeDidQueryResponseBytes(new Uint8Array(raw));
       if (resp.did && DID_PATTERN.test(resp.did)) {
@@ -2009,7 +2009,7 @@ export class MessagingService {
       }
 
       // readStream enforces size limit before reading all into memory
-      const raw = await readStream(stream.source);
+      const raw = await readStream(stream.source, MAX_PAYLOAD_BYTES, STREAM_READ_TIMEOUT_MS);
       await stream.close();
 
       const msg = decodeDirectMessageBytes(new Uint8Array(raw));
@@ -2304,7 +2304,7 @@ export class MessagingService {
         }
       }
 
-      const raw = await readStream(stream.source, 1024);
+      const raw = await readStream(stream.source, 1024, DID_RESOLVE_TIMEOUT_MS);
       const msg = decodeDidResolveRequestBytes(new Uint8Array(raw));
 
       if (!msg.did || !DID_PATTERN.test(msg.did)) {
