@@ -6,7 +6,7 @@
 | 优先级 | **P0** |
 | 状态 | **已修复** |
 | 修复日期 | 2026-03-23 |
-| 修复版本 | **2026.3.4** |
+| 修复版本 | **2026.3.5** |
 
 ---
 
@@ -44,42 +44,50 @@ async function writeBinaryStream(sink, data) {
 
 ---
 
-## 2. 修复内容（2026.3.4）
+## 2. 修复内容（2026.3.4/2026.3.5）
 
-### P0-1：Fire-and-forget 写入改为非阻塞模式
+### P0-1：Fire-and-forget 写入改为带超时的非阻塞模式
 
-**修改的函数**（18+ 处调用点）：
+**关键问题发现**：最初的修复使用完全非阻塞（fire-and-forget）模式，但这会导致 `deliverDirect` 和 `tryDeliverViaRelay` 即使写入失败也返回 `true`，导致调用方认为消息已送达而跳过 fallback 路径。
 
-| 函数 | 修改 |
-|------|------|
-| `deliverDirect` | 改为非阻塞 |
-| `tryDeliverViaRelay` | 改为非阻塞 |
-| `deliverAttachment` | 改为非阻塞 |
-| `sendDelegatedMsg` | 改为非阻塞 |
-| `sendDeliveryReceipt` | 改为非阻塞 |
-| `announceDidToPeer` | 改为非阻塞 |
-| `handleInboundDeliveryAuth` | 改为非阻塞 |
-| `handleInboundDeliveryExternal` | 改为非阻塞 |
-| `handleDidResolve` | 改为非阻塞 |
-| `handleDidQuery` | 改为非阻塞 |
-
-**新的非阻塞辅助函数**：
+**最终修复**：使用带超时的写入模式 `writeBinaryStreamWithTimeout`：
 
 ```typescript
-function writeBinaryStreamNonBlocking(
-  sink, data, stream, onError?
-): void {
+async function writeBinaryStreamWithTimeout(
+  sink, data, timeoutMs = 10_000,
+): Promise<boolean> {
   const writePromise = sink((async function* () { yield data; })());
-  writePromise.then(() => stream.close()).catch((err) => {
-    try { stream.close(); } catch { /* ignore */ }
-    if (onError) onError(err);
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Stream write timed out after ${timeoutMs}ms`)), timeoutMs);
   });
+  try {
+    await Promise.race([writePromise, timeoutPromise]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 ```
 
+**修改的函数**：
+
+| 函数 | 修改 | 超时 |
+|------|------|------|
+| `deliverDirect` | 改为 `writeBinaryStreamWithTimeout` | 30s |
+| `tryDeliverViaRelay` | 改为 `writeBinaryStreamWithTimeout` | 30s |
+| `deliverAttachment` | 改为 `writeBinaryStreamWithTimeout` | 60s |
+| `sendDelegatedMsg` | 改为 `writeBinaryStreamWithTimeout` | 30s |
+| `handleInboundDeliveryAuth` | 保持非阻塞（handler 响应路径） | - |
+| `handleInboundDeliveryExternal` | 保持非阻塞（handler 响应路径） | - |
+| `handleDidResolve` | 保持非阻塞（handler 响应路径） | - |
+| `handleDidQuery` | 保持非阻塞（handler 响应路径） | - |
+| `announceDidToPeer` | 保持非阻塞（fire-and-forget） | - |
+| `sendDeliveryReceipt` | 保持非阻塞（fire-and-forget） | - |
+
 **关键区别**：
-- 阻塞版本：`await writeBinaryStream()` → 等待 drain → 等待期间无法取消
-- 非阻塞版本：立即返回，`.then()` 处理关闭，错误传到 `onError` 回调
+- 阻塞版本：`await writeBinaryStream()` → 等待 drain → 无限等待 → 死锁风险
+- 完全非阻塞：立即返回 → 无法知道写入是否成功 → 返回值不可靠
+- **带超时**：等待 drain 最多 N 秒 → 超时则返回 false → 返回值可靠
 
 ### P1-1：resolveDidViaPeers 添加失败日志
 
@@ -128,7 +136,8 @@ if (connectedPeers.length === 0) {
 
 | 场景 | 旧行为（≤2026.3.3） | 新行为（2026.3.4+） |
 |------|---------------------|---------------------|
-| 发送直接消息（deliverDirect） | 阻塞等待 drain，可能死锁 | 非阻塞，立即返回 |
+| 发送直接消息（deliverDirect） | 阻塞等待 drain，可能死锁 | 带超时等待（30s），超时则返回 false |
+| 发送 relay 消息（tryDeliverViaRelay） | 阻塞等待 drain，可能死锁 | 带超时等待（30s），超时则返回 false |
 | 发送 relay 消息（tryDeliverViaRelay） | 阻塞等待 drain，可能死锁 | 非阻塞，立即返回 |
 | DID 解析失败 | 静默返回 null | 输出 WARN 日志 |
 | 无 relay peers 可用 | 静默返回 false | 输出 INFO 日志 |
@@ -179,8 +188,15 @@ journalctl -u clawnetd.service | grep "no relay peers"
 
 ---
 
-## 8. 2026.3.4 Commit
+## 8. Commits
 
+### 2026.3.5 Commit（关键修复）
+```
+f87eec2 fix(node): use writeBinaryStreamWithTimeout for deliverDirect/relay to prevent false positives
+```
+**重要**：此修复将完全非阻塞改为带超时模式，确保 `deliverDirect`/`tryDeliverViaRelay` 返回值可靠。
+
+### 2026.3.4 Commit
 ```
 89ecf4f fix(node): make fire-and-forget message writes non-blocking to prevent sender deadlock
 fix(logging): add warn log when resolveDidViaPeers fails silently
