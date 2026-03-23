@@ -89,14 +89,14 @@ const DELEGATION_CLEANUP_INTERVAL_MS = 5 * 60_000;
 const DELEGATION_FORWARD_CONCURRENCY = 5;
 const DELEGATION_FORWARD_QUEUE_DEPTH = 200;
 
-/** Timeout for DID resolve queries (ms). */
-const DID_RESOLVE_TIMEOUT_MS = 15_000;
+/** Timeout for DID resolve queries (ms) — 60s to accommodate slow circuit relay transfers. */
+const DID_RESOLVE_TIMEOUT_MS = 60_000;
 
 /** Timeout for reading peer directory requests — larger to accommodate NAT nodes. */
 const PEER_DIRECTORY_TIMEOUT_MS = 30_000;
 
-/** Timeout for reading DID query requests — larger to accommodate NAT nodes. */
-const DID_QUERY_TIMEOUT_MS = 30_000;
+/** Timeout for reading DID query requests — 60s to accommodate slow circuit relay transfers. */
+const DID_QUERY_TIMEOUT_MS = 60_000;
 
 /** Maximum number of peers to query in parallel for DID resolve. */
 const DID_RESOLVE_MAX_PEERS = 3;
@@ -2424,9 +2424,9 @@ export class MessagingService {
           }
         }
         if (newMappings > 0) {
-          this.log.info('[messaging] peer directory learned %d new mapping(s)', { count: newMappings, total: this.didToPeerId.size });
+          this.log.info('[messaging] peer directory learned %d new mapping(s) (total: %d)', newMappings, this.didToPeerId.size);
         } else {
-          this.log.info('[messaging] peer directory: no new entries (peer has %d total, all already known)', { entries: entries.length, total: this.didToPeerId.size });
+          this.log.info('[messaging] peer directory: no new entries (total: %d, all already known)', this.didToPeerId.size);
         }
         return newMappings;
       } catch (err) {
