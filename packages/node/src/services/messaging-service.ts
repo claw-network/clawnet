@@ -302,9 +302,36 @@ async function writeBinaryStream(sink: StreamDuplex['sink'], data: Uint8Array): 
 }
 
 /**
- * Write raw binary data to a stream sink — NON-BLOCKING.
+ * Write raw binary data to a stream sink — with TIMEOUT.
+ * Times out if drain is not received within timeoutMs.
+ * Returns true if write succeeded, false if it timed out or failed.
+ * Use this for fire-and-forget messages where blocking indefinitely is unacceptable.
+ */
+async function writeBinaryStreamWithTimeout(
+  sink: StreamDuplex['sink'],
+  data: Uint8Array,
+  timeoutMs: number = 10_000,
+): Promise<boolean> {
+  const writePromise = sink(
+    (async function* () {
+      yield data;
+    })(),
+  );
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Stream write timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    await Promise.race([writePromise, timeoutPromise]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Write raw binary data to a stream sink — NON-BLOCKING (fire-and-forget).
  * Does NOT wait for drain. Errors are passed to `onError` if provided.
- * Use this for sending data where blocking indefinitely on slow/unreliable peers is unacceptable.
+ * Use this only when the caller does not need to know if the write succeeded.
  */
 function writeBinaryStreamNonBlocking(
   sink: StreamDuplex['sink'],
@@ -1278,7 +1305,11 @@ export class MessagingService {
         sentAtMs: BigInt(Date.now()),
       });
 
-      writeBinaryStreamNonBlocking(stream.sink, bytes, stream);
+      const delivered = await writeBinaryStreamWithTimeout(stream.sink, bytes, 60_000);
+      await stream.close();
+      if (!delivered) {
+        throw new Error('Attachment stream write timed out after 60000ms');
+      }
       this.log.info('attachment delivered', { peerId, targetDid, attachmentId, size: data.length });
       return true;
     } catch (err) {
@@ -1543,7 +1574,11 @@ export class MessagingService {
         idempotencyKey: idempotencyKey ?? '',
       });
 
-      writeBinaryStreamNonBlocking(stream.sink, bytes, stream);
+      const delivered = await writeBinaryStreamWithTimeout(stream.sink, bytes, 30_000);
+      await stream.close();
+      if (!delivered) {
+        throw new Error('Stream write timed out after 30000ms');
+      }
       this.log.info('message delivered', { peerId, targetDid, topic });
       return true;
     } catch (err) {
@@ -1612,7 +1647,11 @@ export class MessagingService {
           idempotencyKey: idempotencyKey ?? '',
         });
 
-        writeBinaryStreamNonBlocking(stream.sink, bytes, stream);
+        const delivered = await writeBinaryStreamWithTimeout(stream.sink, bytes, 30_000);
+        await stream.close();
+        if (!delivered) {
+          throw new Error('Stream write timed out after 30000ms');
+        }
         this.log.info('message delivered via relay', { relayPeerId, targetPeerId, targetDid, topic });
         return true;
       } catch (err) {
@@ -2157,7 +2196,11 @@ export class MessagingService {
     let stream: StreamDuplex | null = null;
     try {
       stream = await this.p2p.newStream(peerId, PROTO_DELEGATED_MSG);
-      writeBinaryStreamNonBlocking(stream.sink, data, stream);
+      const delivered = await writeBinaryStreamWithTimeout(stream.sink, data, 30_000);
+      await stream.close();
+      if (!delivered) {
+        throw new Error('Delegated-msg write timed out after 30000ms');
+      }
       return true;
     } catch (err) {
       this.log.warn('delegated-msg send failed', { peerId, error: (err as Error).message });
