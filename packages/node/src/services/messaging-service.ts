@@ -611,16 +611,14 @@ export class MessagingService {
       if (delivered) {
         return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
       }
-      // Delivery failed — if mapping is stale, try re-resolving
-      if (this.isStalePeerMapping(targetDid)) {
-        const resolved = await this.resolveDidViaPeers(targetDid);
-        if (resolved && resolved.peerId !== peerId) {
-          this.registerDidPeer(targetDid, resolved.peerId);
-          try { await this.p2p.dialPeer(resolved.peerId); } catch { /* ignore */ }
-          const reDelivered = await this.deliverDirect(resolved.peerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
-          if (reDelivered) {
-            return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
-          }
+      // Delivery failed — always try re-resolving regardless of TTL (P0 fix)
+      const resolved = await this.resolveDidViaPeers(targetDid);
+      if (resolved && resolved.peerId !== peerId) {
+        this.registerDidPeer(targetDid, resolved.peerId);
+        try { await this.p2p.dialPeer(resolved.peerId); } catch { /* ignore */ }
+        const reDelivered = await this.deliverDirect(resolved.peerId, targetDid, topic, payloadBytes, ttlSec, priority, compressed, encrypted, opts.idempotencyKey);
+        if (reDelivered) {
+          return { messageId: `msg_direct_${Date.now().toString(36)}`, delivered: true, compressed, encrypted };
         }
       }
     }
@@ -746,7 +744,11 @@ export class MessagingService {
         batch.map(async (entry) => {
           this.store.recordAttempt(entry.id);
           // Outbox payload is raw BLOB bytes; flags come from columns
-          const ok = await this.deliverDirect(peerId!, targetDid, entry.topic, new Uint8Array(entry.payload), entry.ttlSec, undefined, entry.compressed, entry.encrypted);
+          let ok = await this.deliverDirect(peerId!, targetDid, entry.topic, new Uint8Array(entry.payload), entry.ttlSec, undefined, entry.compressed, entry.encrypted);
+          // Try relay delivery as fallback if direct fails
+          if (!ok) {
+            ok = await this.tryDeliverViaRelay(peerId!, targetDid, entry.topic, new Uint8Array(entry.payload), entry.ttlSec, undefined, entry.compressed, entry.encrypted);
+          }
           if (ok) {
             this.store.removeFromOutbox(entry.id);
             return true;
@@ -1567,11 +1569,11 @@ export class MessagingService {
 
     for (const relayPeerId of connectedPeers) {
       if (relayPeerId === targetPeerId) continue; // skip the target itself
+      const relayMultiaddr = `/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId}`;
       let stream: StreamDuplex | null = null;
       try {
         // Dial through the relay using a full circuit-relay multiaddr.
         // This opens a stream through the relay peer to reach the target NAT node.
-        const relayMultiaddr = `/p2p/${relayPeerId}/p2p-circuit/p2p/${targetPeerId}`;
         stream = await this.p2p.newStreamMultiaddr(relayMultiaddr, PROTO_DM);
 
         const bytes = encodeDirectMessageBytes({
@@ -1592,7 +1594,14 @@ export class MessagingService {
         this.log.info('message delivered via relay', { relayPeerId, targetPeerId, targetDid, topic });
         return true;
       } catch (err) {
-        this.log.debug('[messaging] relay delivery via %s failed: %s', relayPeerId.slice(0, 16), err instanceof Error ? err.message : String(err));
+        this.log.info('[messaging] relay delivery failed', {
+          relayPeerId,
+          targetPeerId,
+          targetDid,
+          error: err instanceof Error ? err.message : String(err),
+          errorType: (err as any).code || 'unknown',
+          relayMultiaddr,
+        });
         if (stream) {
           try { await stream.close(); } catch { /* ignore */ }
         }
@@ -2577,6 +2586,7 @@ export class MessagingService {
           }
 
           const messageId = this.store.addToOutbox({ targetDid, topic, payload: Buffer.from(payloadBytes), ttlSec, priority, compressed, encrypted });
+          this.log.info('[messaging] message queued in outbox (multicast)', { messageId, targetDid, topic, reason: 'delivery_failed', peers: this.p2p.getConnections().length });
           return { targetDid, messageId, delivered: false, compressed, encrypted };
         }),
       );
