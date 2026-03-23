@@ -95,6 +95,9 @@ const DID_RESOLVE_TIMEOUT_MS = 15_000;
 /** Timeout for reading peer directory requests — larger to accommodate NAT nodes. */
 const PEER_DIRECTORY_TIMEOUT_MS = 30_000;
 
+/** Timeout for reading DID query requests — larger to accommodate NAT nodes. */
+const DID_QUERY_TIMEOUT_MS = 30_000;
+
 /** Maximum number of peers to query in parallel for DID resolve. */
 const DID_RESOLVE_MAX_PEERS = 3;
 
@@ -2329,7 +2332,7 @@ export class MessagingService {
   }): Promise<void> {
     const { stream, connection } = incoming;
     try {
-      const raw = await readStream(stream.source, 1024);
+      const raw = await readStream(stream.source, 1024, DID_QUERY_TIMEOUT_MS);
       decodeDidQueryRequestBytes(new Uint8Array(raw));
       const respBytes = encodeDidQueryResponseBytes({ did: this.localDid });
       await writeBinaryStream(stream.sink, respBytes);
