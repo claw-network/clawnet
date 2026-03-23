@@ -1,139 +1,191 @@
-# 回复：ClawNet Bootstrap NAT-to-NAT Delivery Still Failing After 2026.3.2
+# 回复：NAT-to-NAT 消息投递仍然失败（2026.3.2）— Circuit Relay 数据传输效率问题
 
 | 字段 | 值 |
 | --- | --- |
 | 原始 Issue | `clawnetd-nat-to-nat-delivery-still-failing-2026-3-2.md` |
 | 优先级 | **P0** |
-| 状态 | **部分修复** |
+| 状态 | **已修复** |
 | 修复日期 | 2026-03-23 |
-| 修复版本 | **2026.3.3** |
+| 修复版本 | **2026.3.4** |
 
 ---
 
-感谢 TelAgent 项目组的详细报告。你们正确指出了 30s/15s 超时仍然不足的问题。
+感谢 TelAgent 项目组的详细分析。你们正确指出了"60s 超时只是掩盖症状，不是解决根本原因"。
+
+经过深入调查，我们发现了真正的根本原因并实施了修复。
 
 ---
 
-## 1. 已修复内容（2026.3.3）
+## 1. 根本原因分析
 
-### P0-1: 超时增加到 60s
+### 根本原因：writeBinaryStream 阻塞模式导致死锁
+
+**问题代码** (`messaging-service.ts`)：
 
 ```typescript
-// 改前
-const DID_RESOLVE_TIMEOUT_MS = 15_000;   // 15s
-const DID_QUERY_TIMEOUT_MS = 30_000;      // 30s
-
-// 改后
-const DID_RESOLVE_TIMEOUT_MS = 60_000;   // 60s
-const DID_QUERY_TIMEOUT_MS = 60_000;      // 60s
+async function writeBinaryStream(sink, data) {
+  await sink(  // ← 阻塞等待 drain 事件
+    (async function* () { yield data; })(),
+  );
+}
 ```
 
-### P1-3: Peer Directory NaN total 日志修复
+`await sink(...)` 会阻塞直到远程消费完数据并触发 'drain' 事件。问题链条：
+
+1. 发送端调用 `await writeBinaryStream(stream.sink, data)` → 阻塞等待 drain
+2. 接收端 `readStream` 设置 60s 超时
+3. 如果 circuit relay 传输极慢，接收端在 60s 后超时放弃读取
+4. 接收端关闭流，但发送端仍阻塞在 `await sink(...)`
+5. **死锁**：发送端永远等待 drain，接收端已放弃
+
+### 次要问题：resolveDidViaPeers 静默失败
+
+当所有 peer 都无法解析 DID 时，`resolveDidViaPeers()` 返回 `null` 但**没有任何日志**。无法区分失败发生在解析阶段还是后续投递阶段。
+
+---
+
+## 2. 修复内容（2026.3.4）
+
+### P0-1：Fire-and-forget 写入改为非阻塞模式
+
+**修改的函数**（18+ 处调用点）：
+
+| 函数 | 修改 |
+|------|------|
+| `deliverDirect` | 改为非阻塞 |
+| `tryDeliverViaRelay` | 改为非阻塞 |
+| `deliverAttachment` | 改为非阻塞 |
+| `sendDelegatedMsg` | 改为非阻塞 |
+| `sendDeliveryReceipt` | 改为非阻塞 |
+| `announceDidToPeer` | 改为非阻塞 |
+| `handleInboundDeliveryAuth` | 改为非阻塞 |
+| `handleInboundDeliveryExternal` | 改为非阻塞 |
+| `handleDidResolve` | 改为非阻塞 |
+| `handleDidQuery` | 改为非阻塞 |
+
+**新的非阻塞辅助函数**：
 
 ```typescript
-// 改前（日志格式错误，对象被误解析为 NaN）
-this.log.info('...(peer has %d total, all already known)', { entries, total: this.didToPeerId.size });
+function writeBinaryStreamNonBlocking(
+  sink, data, stream, onError?
+): void {
+  const writePromise = sink((async function* () { yield data; })());
+  writePromise.then(() => stream.close()).catch((err) => {
+    try { stream.close(); } catch { /* ignore */ }
+    if (onError) onError(err);
+  });
+}
+```
 
-// 改后（直接传数值）
-this.log.info('...(total: %d, all already known)', this.didToPeerId.size);
+**关键区别**：
+- 阻塞版本：`await writeBinaryStream()` → 等待 drain → 等待期间无法取消
+- 非阻塞版本：立即返回，`.then()` 处理关闭，错误传到 `onError` 回调
+
+### P1-1：resolveDidViaPeers 添加失败日志
+
+```typescript
+// 改前（静默失败）
+} catch {
+  return null;
+}
+
+// 改后（有日志）
+} catch (err) {
+  this.log.warn('[messaging] DID resolution failed for %s via %d peer(s): %s',
+    targetDid, connectedPeers.length, err.message);
+  return null;
+}
+```
+
+### P1-2：tryDeliverViaRelay 添加无 relay peers 日志
+
+```typescript
+if (connectedPeers.length === 0) {
+  this.log.info('[messaging] no relay peers available (not connected to any peer)');
+  return false;
+}
 ```
 
 ---
 
-## 2. 关于"更深层问题"的说明
+## 3. 保留阻塞的调用点（request-response 模式）
 
-TelAgent 团队问得很对：**60s 超时只是在掩盖症状，不是解决根本原因。**
+以下 5 处保持阻塞，因为它们需要等待响应：
 
-我们分析了以下可能的深层根因：
+| 函数 | 原因 |
+|------|------|
+| `queryPeerDid` | 写 DID query 请求 → 读 DID query 响应 |
+| `fetchAttachment` | 写 attachment 请求 → 读 attachment 数据 |
+| `requestDeliveryAuth` | 写 auth 请求 → 读 auth 响应 |
+| `fetchPeerDirectory` | 写 directory 请求 → 读 directory 数据 |
+| `resolveDidViaPeers` | 写 resolve 请求 → 读 resolve 响应 |
 
-### 可能性 A：Circuit Relay 带宽严重受限
-
-NAT 节点通过 circuit relay 传输数据极慢，可能是因为：
-- Relay 连接本身就是低带宽的（libp2p circuit relay v2 默认带宽限制）
-- NAT 节点到 relay 节点的网络路径质量差
-- Relay 节点负载过高
-
-**调查方法**：在 Bootstrap 侧添加 relay 带宽监控日志。
-
-### 可能性 B：writeBinaryStream 死锁模式残留
-
-如果 `for await (yield data)` 模式存在于 relay 读取路径中：
-- 远程消费完才返回（'drain' 事件）
-- 双方同时等待对方发送+读取会死锁
-
-**调查方法**：检查所有 `readStream` 调用点是否都使用了非阻塞写入模式。
-
-### 可能性 C：Store-and-Forward Relay 模式缺失
-
-当前 relay 机制要求两端同时在线，且 relay 路径必须存在。但 circuit relay 本身就不是为"存储-转发"消息传递设计的。
-
-**建议**：Bootstrap 应该支持消息暂存和转发，类似 outbox 的设计，但由 Bootstrap 主动推送。
+这些模式的重构需要更复杂的异步控制流，将在后续版本中处理。
 
 ---
 
-## 3. 当前 60s 超时的理由
+## 4. 行为变化
 
-增加超时到 60s 是为了：
-1. **争取时间**：让慢速 NAT 节点有更多时间完成数据传输
-2. **避免频繁超时**：减少因超时导致的投递失败日志
-3. **为调查争取时间**：在找到根因之前，保证基本可用性
-
-但这不解决根本问题。
-
----
-
-## 4. 后续调查计划
-
-| 优先级 | 调查项 | 预期产出 |
-|--------|--------|----------|
-| P1 | 添加 relay 带宽监控日志 | 确认是否是带宽问题 |
-| P1 | 检查 `writeBinaryStream` 所有调用点 | 排除死锁残留 |
-| P2 | 实现 Store-and-Forward Relay | 根本性解决方案 |
+| 场景 | 旧行为（≤2026.3.3） | 新行为（2026.3.4+） |
+|------|---------------------|---------------------|
+| 发送直接消息（deliverDirect） | 阻塞等待 drain，可能死锁 | 非阻塞，立即返回 |
+| 发送 relay 消息（tryDeliverViaRelay） | 阻塞等待 drain，可能死锁 | 非阻塞，立即返回 |
+| DID 解析失败 | 静默返回 null | 输出 WARN 日志 |
+| 无 relay peers 可用 | 静默返回 false | 输出 INFO 日志 |
+| 发送附件（deliverAttachment） | 阻塞等待 drain，可能死锁 | 非阻塞，立即返回 |
 
 ---
 
 ## 5. TelAgent 升级步骤
 
-升级 `@claw-network/node` 到 `2026.3.3`：
+升级 `@claw-network/node` 到 `2026.3.4`：
 
 ```bash
-npm install @claw-network/node@2026.3.3
+npm install @claw-network/node@2026.3.4
 # 或
-pnpm update @claw-network/node@2026.3.3
+pnpm update @claw-network/node@2026.3.4
 ```
-
-重启节点后，观察超时日志是否减少：
-
-```bash
-# Bootstrap 端
-journalctl -u clawnetd.service | grep "failed to handle DID"
-
-# 本地节点端
-grep "failed to handle DID" ~/.telagent/logs/*.log
-```
-
-如果 60s 后仍然大量超时，说明存在更深层的架构问题，需要进一步调查。
 
 ---
 
-## 6. 附加信息
+## 6. 验证方法
 
-### 2026.3.3 commit
+### 检查服务器日志
+
+```bash
+# Bootstrap 端
+journalctl -u clawnetd.service | grep "DID resolution failed"
+journalctl -u clawnetd.service | grep "no relay peers"
+
+# 应该看到新的 WARN 和 INFO 日志，而不是之前的静默失败
+```
+
+### NAT-to-NAT 消息测试
+
+1. 启动两个 NAT 节点
+2. 节点 A 发送消息到节点 B
+3. 观察日志中是否还有 `Stream read timed out` 或死锁迹象
+
+---
+
+## 7. 关于更深层架构问题的说明
+
+虽然本次修复解决了阻塞死锁问题，但 circuit relay 本身不适合作为主要消息通道的根本问题仍然存在：
+
+1. **Relay 带宽限制**：circuit relay 设计用于穿透 NAT，不是大量数据传输
+2. **Store-and-Forward 缺失**：如果目标不在线，消息无法送达
+
+后续版本将考虑实现 Store-and-Forward Relay 模式作为根本性解决方案。
+
+---
+
+## 8. 2026.3.4 Commit
 
 ```
-17b3071 fix(node): increase DID resolve/query timeouts to 60s for slow circuit relay
-fix(logging): correct peer directory log format string to avoid NaN
+89ecf4f fix(node): make fire-and-forget message writes non-blocking to prevent sender deadlock
+fix(logging): add warn log when resolveDidViaPeers fails silently
+fix(logging): add info log when no relay peers available for delivery
 ```
-
-### 当前超时配置
-
-| Handler | 超时 | 备注 |
-|---------|------|------|
-| `handleDidResolve` | 60s | 2026.3.3 新增 |
-| `handleDidQuery` | 60s | 2026.3 → 30s → 2026.3.3 → 60s |
-| `handlePeerDirectory` | 30s | 2026.2.3 新增 |
-| `handleInboundMessage` | 10s | 2026.3.2 新增 |
-| `handleInboundDeliveryExternal` | 30s | ATTACHMENT_STREAM_TIMEOUT_MS |
 
 ---
 
