@@ -292,13 +292,35 @@ async function readStream(
   return Buffer.concat(chunks);
 }
 
-/** Write raw binary data to a stream sink. */
+/** Write raw binary data to a stream sink — BLOCKING (waits for drain). */
 async function writeBinaryStream(sink: StreamDuplex['sink'], data: Uint8Array): Promise<void> {
   await sink(
     (async function* () {
       yield data;
     })(),
   );
+}
+
+/**
+ * Write raw binary data to a stream sink — NON-BLOCKING.
+ * Does NOT wait for drain. Errors are passed to `onError` if provided.
+ * Use this for sending data where blocking indefinitely on slow/unreliable peers is unacceptable.
+ */
+function writeBinaryStreamNonBlocking(
+  sink: StreamDuplex['sink'],
+  data: Uint8Array,
+  stream: StreamDuplex,
+  onError?: (err: Error) => void,
+): void {
+  const writePromise = sink(
+    (async function* () {
+      yield data;
+    })(),
+  );
+  writePromise.then(() => stream.close()).catch((err) => {
+    try { stream.close(); } catch { /* ignore */ }
+    if (onError) onError(err as Error);
+  });
 }
 
 // ── Delegation Forwarder ─────────────────────────────────────────
@@ -1256,8 +1278,7 @@ export class MessagingService {
         sentAtMs: BigInt(Date.now()),
       });
 
-      await writeBinaryStream(stream.sink, bytes);
-      await stream.close();
+      writeBinaryStreamNonBlocking(stream.sink, bytes, stream);
       this.log.info('attachment delivered', { peerId, targetDid, attachmentId, size: data.length });
       return true;
     } catch (err) {
@@ -1522,8 +1543,7 @@ export class MessagingService {
         idempotencyKey: idempotencyKey ?? '',
       });
 
-      await writeBinaryStream(stream.sink, bytes);
-      await stream.close();
+      writeBinaryStreamNonBlocking(stream.sink, bytes, stream);
       this.log.info('message delivered', { peerId, targetDid, topic });
       return true;
     } catch (err) {
@@ -1565,7 +1585,10 @@ export class MessagingService {
     idempotencyKey?: string,
   ): Promise<boolean> {
     const connectedPeers = this.p2p.getConnections();
-    if (connectedPeers.length === 0) return false;
+    if (connectedPeers.length === 0) {
+      this.log.info('[messaging] no relay peers available (not connected to any peer)');
+      return false;
+    }
 
     for (const relayPeerId of connectedPeers) {
       if (relayPeerId === targetPeerId) continue; // skip the target itself
@@ -1589,8 +1612,7 @@ export class MessagingService {
           idempotencyKey: idempotencyKey ?? '',
         });
 
-        await writeBinaryStream(stream.sink, bytes);
-        await stream.close();
+        writeBinaryStreamNonBlocking(stream.sink, bytes, stream);
         this.log.info('message delivered via relay', { relayPeerId, targetPeerId, targetDid, topic });
         return true;
       } catch (err) {
@@ -1638,15 +1660,13 @@ export class MessagingService {
         request = JSON.parse(raw.toString('utf-8'));
       } catch {
         const errResp: DeliveryAuthResponse = { accepted: false, reason: 'Invalid JSON' };
-        await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(errResp)));
-        await stream.close();
+        writeBinaryStreamNonBlocking(stream.sink, Buffer.from(JSON.stringify(errResp)), stream);
         return;
       }
 
       if (!isDeliveryAuthRequest(request)) {
         const errResp: DeliveryAuthResponse = { accepted: false, reason: 'Invalid request format' };
-        await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(errResp)));
-        await stream.close();
+        writeBinaryStreamNonBlocking(stream.sink, Buffer.from(JSON.stringify(errResp)), stream);
         return;
       }
 
@@ -1673,8 +1693,7 @@ export class MessagingService {
         payload = parsed;
       } catch (err) {
         const errResp: DeliveryAuthResponse = { accepted: false, reason: 'Decryption failed' };
-        await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(errResp)));
-        await stream.close();
+        writeBinaryStreamNonBlocking(stream.sink, Buffer.from(JSON.stringify(errResp)), stream);
         this.log.warn('delivery-auth decryption failed', { error: (err as Error).message });
         return;
       }
@@ -1730,8 +1749,7 @@ export class MessagingService {
 
       // Send acceptance response
       const okResp: DeliveryAuthResponse = { accepted: true };
-      await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(okResp)));
-      await stream.close();
+      writeBinaryStreamNonBlocking(stream.sink, Buffer.from(JSON.stringify(okResp)), stream);
     } catch (err) {
       this.log.warn('failed to handle delivery-auth', { error: (err as Error).message });
       try { await stream.close(); } catch { /* ignore */ }
@@ -1793,8 +1811,7 @@ export class MessagingService {
         };
         const outStream = await this.p2p.newStream(remotePeer ?? '', PROTO_DELIVERY_EXTERNAL).catch(() => null);
         if (outStream) {
-          await writeBinaryStream(outStream.sink, encodeDeliveryHeader(notFound as unknown as Record<string, unknown>));
-          await outStream.close();
+          writeBinaryStreamNonBlocking(outStream.sink, encodeDeliveryHeader(notFound as unknown as Record<string, unknown>), outStream);
         }
         this.log.info('delivery-external: not found', { deliverableId: req.deliverableId });
         return;
@@ -1829,8 +1846,7 @@ export class MessagingService {
         const msg = new Uint8Array(hdrBytes.length + content.length);
         msg.set(hdrBytes, 0);
         msg.set(content, hdrBytes.length);
-        await writeBinaryStream(outStream.sink, msg);
-        await outStream.close();
+        writeBinaryStreamNonBlocking(outStream.sink, msg, outStream);
         this.log.info('delivery-external: content sent', {
           deliverableId: req.deliverableId,
           size: content.length,
@@ -2141,8 +2157,7 @@ export class MessagingService {
     let stream: StreamDuplex | null = null;
     try {
       stream = await this.p2p.newStream(peerId, PROTO_DELEGATED_MSG);
-      await writeBinaryStream(stream.sink, data);
-      await stream.close();
+      writeBinaryStreamNonBlocking(stream.sink, data, stream);
       return true;
     } catch (err) {
       this.log.warn('delegated-msg send failed', { peerId, error: (err as Error).message });
@@ -2309,8 +2324,7 @@ export class MessagingService {
 
       if (!msg.did || !DID_PATTERN.test(msg.did)) {
         const respBytes = encodeDidResolveResponseBytes({ did: msg.did ?? '', peerId: '', found: false });
-        await writeBinaryStream(stream.sink, respBytes);
-        await stream.close();
+        writeBinaryStreamNonBlocking(stream.sink, respBytes, stream);
         return;
       }
 
@@ -2322,8 +2336,7 @@ export class MessagingService {
           : { did: msg.did, peerId: '', found: false },
       );
 
-      await writeBinaryStream(stream.sink, respBytes);
-      await stream.close();
+      writeBinaryStreamNonBlocking(stream.sink, respBytes, stream);
       this.log.info('DID resolve handled', { did: msg.did, found: !!peerId, multiaddrs: multiaddrs.length });
     } catch (err) {
       this.log.warn('failed to handle DID resolve', { error: (err as Error).message });
@@ -2344,8 +2357,7 @@ export class MessagingService {
       const raw = await readStream(stream.source, 1024, DID_QUERY_TIMEOUT_MS);
       decodeDidQueryRequestBytes(new Uint8Array(raw));
       const respBytes = encodeDidQueryResponseBytes({ did: this.localDid });
-      await writeBinaryStream(stream.sink, respBytes);
-      await stream.close();
+      writeBinaryStreamNonBlocking(stream.sink, respBytes, stream);
       this.log.debug('did query handled', { peerId: connection.remotePeer?.toString() });
     } catch (err) {
       this.log.warn('failed to handle DID query', { error: (err as Error).message });
@@ -2486,7 +2498,8 @@ export class MessagingService {
       }
 
       return result;
-    } catch {
+    } catch (err) {
+      this.log.warn('[messaging] DID resolution failed for %s via %d peer(s): %s', targetDid, connectedPeers.length, (err as Error).message);
       return null;
     } finally {
       clearTimeout(timer!);
@@ -2499,8 +2512,7 @@ export class MessagingService {
     try {
       stream = await this.p2p.newStream(peerId, PROTO_DID_ANNOUNCE);
       const bytes = encodeDidAnnounceBytes({ did: this.localDid });
-      await writeBinaryStream(stream.sink, bytes);
-      await stream.close();
+      writeBinaryStreamNonBlocking(stream.sink, bytes, stream);
     } catch (err) {
       // Best-effort; the peer may not support this protocol yet
       this.log.warn('Failed to announce DID to peer', { peerId, error: err instanceof Error ? err.message : String(err) });
@@ -2639,8 +2651,7 @@ export class MessagingService {
         senderDid: recipientDid,
         deliveredAtMs: BigInt(Date.now()),
       });
-      await writeBinaryStream(stream.sink, bytes);
-      await stream.close();
+      writeBinaryStreamNonBlocking(stream.sink, bytes, stream);
       this.log.info('delivery receipt sent', { peerId, messageId });
     } catch {
       // Best-effort — receipts are not critical
