@@ -51,8 +51,8 @@ echo "  ✓ All tests passed"
 echo ""
 
 # ── Step 3: Publish npm packages (order matters) ────────────
-#    core → protocol → sdk → node (dependency order)
-NPM_PKGS=("packages/core" "packages/protocol" "packages/sdk" "packages/node")
+#    core → protocol → sdk → node → contracts
+NPM_PKGS=("packages/core" "packages/protocol" "packages/sdk" "packages/node" "packages/contracts")
 
 NPMJS_REGISTRY="https://registry.npmjs.org"
 GPR_REGISTRY="https://npm.pkg.github.com"

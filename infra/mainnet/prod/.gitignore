@@ -1,7 +1,0 @@
-# Secrets — NEVER commit
-secrets.env
-*.key
-*.pem
-
-# Contract deployment record is OK to commit
-# !contracts.json

@@ -90,6 +90,7 @@ describe('DID Resolve Protocol', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await service.stop();
     store.close();
     await rm(tmpDir, { recursive: true, force: true });
@@ -219,6 +220,7 @@ describe('DID Resolve Protocol', () => {
     });
 
     it('resolve timeout does not block send', async () => {
+      vi.useFakeTimers();
       p2p.getConnections.mockReturnValue([PEER_BOOTSTRAP]);
       // Simulate a stream that never provides a response (hangs)
       p2p.newStream.mockImplementation(async (_peerId: string, proto: string) => {
@@ -235,11 +237,11 @@ describe('DID Resolve Protocol', () => {
         return fakeStream('{}');
       });
 
-      // Should complete (fall back to outbox) — not hang forever.
-      // The 5s resolve timeout should kick in.
-      const result = await service.send(BOB_DID, 'test/topic', 'hello');
+      const promise = service.send(BOB_DID, 'test/topic', 'hello');
+      await vi.advanceTimersByTimeAsync(60_000);
+      const result = await promise;
       expect(result.delivered).toBe(false);
-    }, 15_000); // generous test timeout
+    });
   });
 
   // ── TTL-based stale mapping re-resolve ──────────────────────────
@@ -282,11 +284,11 @@ describe('DID Resolve Protocol', () => {
       expect(p2p.dialPeer).toHaveBeenCalledWith(PEER_BOB_NEW);
     });
 
-    it('does NOT re-resolve when mapping is fresh and delivery fails', async () => {
+    it('re-resolves even when mapping is fresh and delivery fails (P0 fix)', async () => {
       // Register Bob just now (fresh mapping)
       registerDid(service, BOB_DID, PEER_BOB);
 
-      // DM fails, but mapping is fresh — should NOT attempt resolve, go straight to outbox
+      // DM fails, and the service now always re-resolves before falling back to relay/outbox.
       p2p.getConnections.mockReturnValue([PEER_BOOTSTRAP]);
       p2p.newStream.mockImplementation(async (_peerId: string, proto: string) => {
         if (proto === '/clawnet/1.0.0/dm') {
@@ -301,10 +303,7 @@ describe('DID Resolve Protocol', () => {
       const result = await service.send(BOB_DID, 'test/topic', 'hello');
 
       expect(result.delivered).toBe(false);
-      // Resolve should NOT have been called since mapping is fresh
-      expect(p2p.newStream).not.toHaveBeenCalledWith(
-        expect.anything(), '/clawnet/1.0.0/did-resolve',
-      );
+      expect(p2p.newStream).toHaveBeenCalledWith(PEER_BOOTSTRAP, '/clawnet/1.0.0/did-resolve');
     });
   });
 

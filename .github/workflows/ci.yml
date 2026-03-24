@@ -21,6 +21,8 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - name: Install
         run: pnpm install
+      - name: Check public docs drift
+        run: pnpm docs:lint-public
       - name: Build
         run: pnpm build
       - name: Lint

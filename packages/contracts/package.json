@@ -1,6 +1,6 @@
 {
   "name": "@claw-network/contracts",
-  "version": "2026.2.10",
+  "version": "2026.3.6",
   "description": "ClawNet on-chain smart contracts (Solidity / Hardhat / UUPS upgradeable)",
   "license": "Apache-2.0",
   "repository": {

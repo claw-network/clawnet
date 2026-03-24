@@ -15,9 +15,15 @@ packages/contracts  — Solidity (Hardhat + OZ UUPS upgradeable proxies), chainI
 packages/wallet     — Wallet webapp
 ```
 
-**Data flow**: Agent/User → SDK/CLI → REST API (:9528) → Node service layer → Smart contracts (Geth PoA) + SQLite indexer.
+**Data flow**: Agent/User → SDK/CLI → REST API (:9528) → Node service layer → Smart contracts (Hyperledger Besu QBFT) + SQLite indexer.
 
 All chain interaction is encapsulated in `packages/node/src/services/`. The SDK and CLI never touch ethers.js directly.
+
+### Documentation Source Of Truth
+
+- **Public canonical docs** live in `packages/docs/content/docs` and are published at `https://docs.clawnetd.com`.
+- `README`, homepage copy, package READMEs, and `.github` instructions may summarize, but must not invent alternate route families or chain descriptions.
+- Root `docs/` is for architecture, implementation, operations, reviews, handover, and historical material. Public guide pages in root `docs/` are thin entry pages only.
 
 ### Key Internal Patterns
 
@@ -87,72 +93,14 @@ docker compose -f docker-compose.testnet.yml up --build -d
 node scripts/integration-test.mjs [--verbose]
 ```
 
-**Deploy to server** (testnet):
-```bash
-git push origin main
-ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main && pnpm build && systemctl restart clawnetd"
-```
-
-## Testnet Server & Credentials
-
-| Item | Value |
-|------|-------|
-| **Server IP** | `66.94.125.242` (Ubuntu 24.04) |
-| **SSH** | `ssh -i ~/.ssh/id_ed25519_clawnet root@66.94.125.242` |
-| **Code path** | `/opt/clawnet/` |
-| **Node service** | `clawnetd.service` (⚠️ `clawnetd`, NOT `clawnet`) |
-| **API Key** | `401ca444cbe821f7799e505c26df7f9ee3226f9082f9da2c464236b0b2034ae2` |
-| **Deployer / Node Signer** | `0xA9b95A4fDCD673f6aE0D2a873E0f4771CA7D0119` |
-| **Deployer Private Key** | `0xb82233d82380d02515be20629f27539001cf8227a811eba90117333e84fe30fc` |
-| **Chain** | Docker container `clawnet-geth` (Geth v1.13.15, Clique PoA, chainId 7625) |
-| **Docker Compose (chain)** | `/opt/clawnet/docker-compose.chain.yml` |
-| **Reverse proxy** | Caddy (`caddy.service`), Caddyfile at `/etc/caddy/Caddyfile` |
-
-Test DID: `did:claw:zFy3Ed8bYu5SRHq5YK1YRz58iUpWxL27exCwngDwuH8gR` → derived EVM `0x130Eb2b6C2CA8193c159c824fccE472BB48F0De3`
-
 ## Smart Contracts
 
 Solidity 0.8.28, Hardhat, OpenZeppelin UUPS upgradeable. Key contracts: ClawToken (ERC-20, 0 decimals), ClawIdentity (DID registry), ClawEscrow, ClawStaking, ClawDAO, ClawContracts, ClawReputation, ClawRouter, ParamRegistry.
 
-Production proxy addresses are in `infra/testnet/prod/contracts.json` (authoritative, NOT `packages/contracts/deployments/`).
-
 UUPS upgrades bypass OZ manifest — use `packages/contracts/scripts/upgrade-identity.ts` pattern (direct `upgradeToAndCall`).
-
-## Web Apps Deployment
-
-All web apps are on the same server (`66.94.125.242`), behind Caddy with auto-TLS.
-
-### Wallet (`packages/wallet`) — wallet.clawnetd.com
-
-Static SPA (Vite 6). Caddy serves from `packages/wallet/dist` with `try_files {path} /index.html`.
-
-```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main && pnpm --filter @claw-network/wallet build"
-```
-
-### Homepage (`packages/homepage`) — clawnetd.com
-
-Static SPA (Vite 6). Caddy serves from `packages/homepage/dist`. Note: `/install.sh` is served separately from `/var/www/clawnetd/install.sh`.
-
-```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main && pnpm --filter @claw-network/homepage build"
-```
-
-### Docs (`packages/docs`) — docs.clawnetd.com
-
-Next.js 15 + Fumadocs (Tailwind v4). Runs as a systemd service (`clawnet-docs.service`) on port 3001, reverse-proxied by Caddy.
-
-```bash
-ssh root@66.94.125.242 "cd /opt/clawnet && git pull origin main && cd packages/docs && pnpm build && systemctl restart clawnet-docs"
-```
-
-Detailed deployment procedures: `skills/deploy-wallet.md`, `skills/deploy-homepage.md`, `skills/deploy-docs.md`.
 
 ## Reference Documents
 
 - [CONVENTIONS.md](../../CONVENTIONS.md) — Full canonical conventions (frozen spec)
-- [protocol-spec.md](../../docs/implementation/protocol-spec.md) — Protocol specification
-- [SPEC_FREEZE.md](../../docs/implementation/SPEC_FREEZE.md) — Frozen spec constraints
 - [docs/api/openapi.yaml](../../docs/api/openapi.yaml) — OpenAPI spec (48 endpoints)
 - [TESTING.md](../../TESTING.md) — Testing guide (unit + Docker integration)
-- [docs/handover/](../../docs/handover/) — Agent handover notes with system state

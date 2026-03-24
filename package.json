@@ -10,6 +10,7 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
+    "docs:lint-public": "node scripts/check-public-docs.mjs",
     "ci:local": "bash scripts/ci-local.sh",
     "test:partition": "node scripts/partition-test.mjs",
     "test:cluster": "bash scripts/cluster-test.sh",

@@ -6,6 +6,25 @@
 #        SKIP_TESTS=1 git push
 #
 
+# ── capture push context for post-push wrapper scripts ────────
+PUSH_REMOTE_NAME="${1:-}"
+PUSH_REMOTE_URL="${2:-}"
+PUSH_REFS=()
+
+while IFS=' ' read -r LOCAL_REF LOCAL_OID REMOTE_REF REMOTE_OID; do
+  [ -z "${LOCAL_REF:-}" ] && continue
+  PUSH_REFS+=("${LOCAL_REF} ${LOCAL_OID} ${REMOTE_REF} ${REMOTE_OID}")
+done
+
+if [ "${CLAWNET_CAPTURE_PUSH_CONTEXT:-0}" = "1" ] && [ -n "${CLAWNET_PUSH_CONTEXT_FILE:-}" ]; then
+  {
+    printf '%s\t%s\n' "$PUSH_REMOTE_NAME" "$PUSH_REMOTE_URL"
+    for REF_LINE in "${PUSH_REFS[@]}"; do
+      printf '%s\n' "$REF_LINE"
+    done
+  } > "${CLAWNET_PUSH_CONTEXT_FILE}"
+fi
+
 # ── allow skipping ──────────────────────────────────────────────
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
   echo "⚠️  SKIP_TESTS=1 — skipping pre-push tests"

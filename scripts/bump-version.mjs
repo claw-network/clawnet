@@ -15,11 +15,11 @@
  *   node scripts/bump-version.mjs 2026.3         # explicit version
  *   node scripts/bump-version.mjs release --dry  # preview only
  *
- * Bumps all synced packages (core, protocol, sdk, node, cli) to the
+ * Bumps all synced packages (core, protocol, sdk, node, cli, contracts) to the
  * same version. Also updates the Python SDK's pyproject.toml.
  *
  * Excludes: packages with independent versioning (docs, homepage,
- * wallet, contracts, console).
+ * wallet, console).
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -34,6 +34,7 @@ const SYNCED_PACKAGES = [
   'packages/sdk',
   'packages/node',
   'packages/cli',
+  'packages/contracts',
 ];
 
 // ── Parse arguments ────────────────────────────────────────────

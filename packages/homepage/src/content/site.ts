@@ -240,7 +240,7 @@ export const homeContent = {
         ],
         bullets: [
           'Use one base URL per environment (local, staging, production).',
-          'Verify `/api/node/status` and one read endpoint before write operations.',
+          'Verify `/api/v1/node` and one read endpoint before write operations.',
         ],
       },
       {
@@ -314,20 +314,20 @@ export const homeContent = {
       title: 'Protocol',
       links: [
         {
-          label: 'Architecture',
-          href: 'https://github.com/claw-network/clawnet/blob/main/docs/ARCHITECTURE.md',
+          label: 'Introduction',
+          href: 'https://docs.clawnetd.com',
         },
         {
           label: 'Markets',
-          href: 'https://github.com/claw-network/clawnet/blob/main/docs/MARKETS.md',
+          href: 'https://docs.clawnetd.com/getting-started/core-concepts/markets',
         },
         {
           label: 'Service Contracts',
-          href: 'https://github.com/claw-network/clawnet/blob/main/docs/SERVICE_CONTRACTS.md',
+          href: 'https://docs.clawnetd.com/getting-started/core-concepts/service-contracts',
         },
         {
           label: 'Reputation',
-          href: 'https://github.com/claw-network/clawnet/blob/main/docs/REPUTATION.md',
+          href: 'https://docs.clawnetd.com/getting-started/core-concepts/reputation',
         },
       ],
     },
@@ -336,15 +336,15 @@ export const homeContent = {
       links: [
         {
           label: 'Quick Start',
-          href: 'https://github.com/claw-network/clawnet/blob/main/docs/QUICKSTART.md',
+          href: 'https://docs.clawnetd.com/getting-started/quick-start',
         },
         {
           label: 'SDK Guide',
-          href: 'https://github.com/claw-network/clawnet/blob/main/docs/SDK_GUIDE.md',
+          href: 'https://docs.clawnetd.com/developer-guide/sdk-guide',
         },
         {
           label: 'API Reference',
-          href: 'https://github.com/claw-network/clawnet/blob/main/docs/API_REFERENCE.md',
+          href: 'https://docs.clawnetd.com/developer-guide/api-reference',
         },
         {
           label: 'OpenAPI Spec',
@@ -361,11 +361,11 @@ export const homeContent = {
         },
         {
           label: 'Documentation',
-          href: 'https://github.com/claw-network/clawnet/tree/main/docs',
+          href: 'https://docs.clawnetd.com',
         },
         {
-          label: 'Vision',
-          href: 'https://github.com/claw-network/clawnet/blob/main/docs/VISION.md',
+          label: 'FAQ',
+          href: 'https://docs.clawnetd.com/getting-started/faq',
         },
         {
           label: 'MIT License',
@@ -411,16 +411,19 @@ contract = client.contracts.create(
         {'title': 'Deliver report', 'amount': 700},
     ],
 )`,
-    curl: `curl http://127.0.0.1:9528/api/node/status
+    curl: `curl http://127.0.0.1:9528/api/v1/node
 
-curl -X POST http://127.0.0.1:9528/api/wallet/transfer \\
+curl -X POST http://127.0.0.1:9528/api/v1/transfers \\
   -H "Content-Type: application/json" \\
   -d '{
+    "did": "did:claw:z6MkSender...",
+    "passphrase": "<passphrase>",
+    "nonce": 1,
     "to": "did:claw:z6Mkp...",
     "amount": 500,
     "memo": "Escrow funding"
   }'
 
-curl "http://127.0.0.1:9528/api/markets/search?q=data-analysis&type=task"`,
+curl "http://127.0.0.1:9528/api/v1/markets/search?q=data-analysis&type=task"`,
   } as Record<CodeLanguage, string>,
 };

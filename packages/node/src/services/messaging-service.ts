@@ -113,6 +113,9 @@ const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 /** Attachment stream read timeout (30s — larger than DM for big files). */
 const ATTACHMENT_STREAM_TIMEOUT_MS = 30_000;
 
+/** Timeout for writing small request/response-control payloads. */
+const REQUEST_WRITE_TIMEOUT_MS = 20_000;
+
 /** Cleanup interval for expired messages (5 minutes). */
 const CLEANUP_INTERVAL_MS = 5 * 60_000;
 
@@ -246,7 +249,7 @@ type Logger = ReturnType<typeof createLogger>;
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-/** Read all data from a stream source into a single Buffer, enforcing a size limit and timeout. */
+/** Read all data from a stream source into a single Buffer, enforcing a size limit and idle timeout. */
 async function readStream(
   source: AsyncIterable<{ subarray: () => Uint8Array } | Uint8Array>,
   maxBytes: number = MAX_PAYLOAD_BYTES * 2,
@@ -254,25 +257,23 @@ async function readStream(
 ): Promise<Buffer> {
   const chunks: Buffer[] = [];
   let total = 0;
-  let timeoutId: NodeJS.Timeout | undefined;
+  const iterator = source[Symbol.asyncIterator]();
 
-  // Create a promise that rejects when timeout fires — this actually
-  // interrupts a blocked `iterator.next()` via Promise.race, unlike the
-  // previous pattern which only checked the signal when chunks arrived.
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(`Stream read timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-
-  try {
-    const iterator = source[Symbol.asyncIterator]();
-
-    while (true) {
+  while (true) {
+    let timeoutId: NodeJS.Timeout | undefined;
+    try {
       const result = await Promise.race([
         iterator.next(),
-        timeoutPromise,
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error(`Stream read timed out after ${timeoutMs}ms`));
+          }, timeoutMs);
+        }),
       ]);
+
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
 
       if (result.done) break;
 
@@ -283,48 +284,50 @@ async function readStream(
         throw new Error(`Stream exceeded size limit: ${total} > ${maxBytes}`);
       }
       chunks.push(Buffer.from(bytes));
-    }
-  } finally {
-    if (timeoutId !== undefined) {
-      clearTimeout(timeoutId);
+    } catch (err) {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+      throw err;
     }
   }
   return Buffer.concat(chunks);
 }
 
-/** Write raw binary data to a stream sink — BLOCKING (waits for drain). */
-async function writeBinaryStream(sink: StreamDuplex['sink'], data: Uint8Array): Promise<void> {
-  await sink(
-    (async function* () {
-      yield data;
-    })(),
-  );
+class StreamWriteTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Stream write timed out after ${timeoutMs}ms`);
+    this.name = 'StreamWriteTimeoutError';
+  }
 }
 
 /**
  * Write raw binary data to a stream sink — with TIMEOUT.
  * Times out if drain is not received within timeoutMs.
- * Returns true if write succeeded, false if it timed out or failed.
- * Use this for fire-and-forget messages where blocking indefinitely is unacceptable.
+ * Resolves on success and rejects on timeout or underlying sink failure.
  */
 async function writeBinaryStreamWithTimeout(
   sink: StreamDuplex['sink'],
   data: Uint8Array,
   timeoutMs: number = 10_000,
-): Promise<boolean> {
+): Promise<void> {
   const writePromise = sink(
     (async function* () {
       yield data;
     })(),
   );
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`Stream write timed out after ${timeoutMs}ms`)), timeoutMs);
-  });
+  let timeoutId: NodeJS.Timeout | undefined;
   try {
-    await Promise.race([writePromise, timeoutPromise]);
-    return true;
-  } catch {
-    return false;
+    await Promise.race([
+      writePromise,
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new StreamWriteTimeoutError(timeoutMs)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -874,7 +877,7 @@ export class MessagingService {
     try {
       stream = await this.p2p.newStream(peerId, PROTO_DID_QUERY);
       const reqBytes = encodeDidQueryRequestBytes({});
-      await writeBinaryStream(stream.sink, reqBytes);
+      await writeBinaryStreamWithTimeout(stream.sink, reqBytes, REQUEST_WRITE_TIMEOUT_MS);
       const raw = await readStream(stream.source, 1024, DID_QUERY_TIMEOUT_MS);
       await stream.close();
       const resp = decodeDidQueryResponseBytes(new Uint8Array(raw));
@@ -1305,11 +1308,8 @@ export class MessagingService {
         sentAtMs: BigInt(Date.now()),
       });
 
-      const delivered = await writeBinaryStreamWithTimeout(stream.sink, bytes, 60_000);
+      await writeBinaryStreamWithTimeout(stream.sink, bytes, 60_000);
       await stream.close();
-      if (!delivered) {
-        throw new Error('Attachment stream write timed out after 60000ms');
-      }
       this.log.info('attachment delivered', { peerId, targetDid, attachmentId, size: data.length });
       return true;
     } catch (err) {
@@ -1574,11 +1574,8 @@ export class MessagingService {
         idempotencyKey: idempotencyKey ?? '',
       });
 
-      const delivered = await writeBinaryStreamWithTimeout(stream.sink, bytes, 30_000);
+      await writeBinaryStreamWithTimeout(stream.sink, bytes, 30_000);
       await stream.close();
-      if (!delivered) {
-        throw new Error('Stream write timed out after 30000ms');
-      }
       this.log.info('message delivered', { peerId, targetDid, topic });
       return true;
     } catch (err) {
@@ -1647,20 +1644,21 @@ export class MessagingService {
           idempotencyKey: idempotencyKey ?? '',
         });
 
-        const delivered = await writeBinaryStreamWithTimeout(stream.sink, bytes, 30_000);
+        await writeBinaryStreamWithTimeout(stream.sink, bytes, 30_000);
         await stream.close();
-        if (!delivered) {
-          throw new Error('Stream write timed out after 30000ms');
-        }
         this.log.info('message delivered via relay', { relayPeerId, targetPeerId, targetDid, topic });
         return true;
       } catch (err) {
+        const errorType =
+          typeof err === 'object' && err !== null && 'code' in err
+            ? String((err as { code?: unknown }).code ?? 'unknown')
+            : 'unknown';
         this.log.info('[messaging] relay delivery failed', {
           relayPeerId,
           targetPeerId,
           targetDid,
           error: err instanceof Error ? err.message : String(err),
-          errorType: (err as any).code || 'unknown',
+          errorType,
           relayMultiaddr,
         });
         if (stream) {
@@ -1924,7 +1922,11 @@ export class MessagingService {
         deliverableId,
         requesterDid: this.localDid,
       };
-      await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(req)));
+      await writeBinaryStreamWithTimeout(
+        stream.sink,
+        Buffer.from(JSON.stringify(req)),
+        REQUEST_WRITE_TIMEOUT_MS,
+      );
 
       // Read response (header + body together)
       const raw = await readStream(stream.source, MAX_DELIVERABLE_BYTES + 4096, ATTACHMENT_STREAM_TIMEOUT_MS);
@@ -2017,7 +2019,11 @@ export class MessagingService {
       };
 
       stream = await this.p2p.newStream(peerId, PROTO_DELIVERY_AUTH);
-      await writeBinaryStream(stream.sink, Buffer.from(JSON.stringify(request)));
+      await writeBinaryStreamWithTimeout(
+        stream.sink,
+        Buffer.from(JSON.stringify(request)),
+        REQUEST_WRITE_TIMEOUT_MS,
+      );
 
       // Read response
       const respRaw = await readStream(stream.source, MAX_PAYLOAD_BYTES, DID_RESOLVE_TIMEOUT_MS);
@@ -2196,11 +2202,8 @@ export class MessagingService {
     let stream: StreamDuplex | null = null;
     try {
       stream = await this.p2p.newStream(peerId, PROTO_DELEGATED_MSG);
-      const delivered = await writeBinaryStreamWithTimeout(stream.sink, data, 30_000);
+      await writeBinaryStreamWithTimeout(stream.sink, data, 30_000);
       await stream.close();
-      if (!delivered) {
-        throw new Error('Delegated-msg write timed out after 30000ms');
-      }
       return true;
     } catch (err) {
       this.log.warn('delegated-msg send failed', { peerId, error: (err as Error).message });
@@ -2455,12 +2458,15 @@ export class MessagingService {
         this.log.info('[messaging] fetchPeerDirectory attempt %d/%d to %s', attempt, MAX_RETRIES, peerId.slice(0, 16));
         stream = await this.p2p.newStream(peerId, PROTO_PEER_DIRECTORY);
         const reqBytes = encodeDidQueryRequestBytes({});
-        await writeBinaryStream(stream.sink, reqBytes);
+        await writeBinaryStreamWithTimeout(stream.sink, reqBytes, REQUEST_WRITE_TIMEOUT_MS);
         // Overall timeout for the entire fetch operation
         const raw = await Promise.race([
           readStream(stream.source, 8192, DID_RESOLVE_TIMEOUT_MS),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('fetchPeerDirectory: stream read timeout')), 20_000),
+            setTimeout(
+              () => reject(new Error('fetchPeerDirectory: stream read timeout')),
+              PEER_DIRECTORY_TIMEOUT_MS,
+            ),
           ),
         ]);
         await stream.close();
@@ -2518,7 +2524,7 @@ export class MessagingService {
             try {
               stream = await this.p2p.newStream(peerId, PROTO_DID_RESOLVE);
               const reqBytes = encodeDidResolveRequestBytes({ did: targetDid });
-              await writeBinaryStream(stream.sink, reqBytes);
+              await writeBinaryStreamWithTimeout(stream.sink, reqBytes, REQUEST_WRITE_TIMEOUT_MS);
               const raw = await readStream(stream.source, 1024, DID_RESOLVE_TIMEOUT_MS);
               await stream.close();
               const resp = decodeDidResolveResponseBytes(new Uint8Array(raw));

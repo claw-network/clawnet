@@ -230,16 +230,21 @@ Run `clawnet --help` or `clawnet <command> --help` for details.
 
 ## API
 
-The node exposes a REST API on `http://127.0.0.1:9528` with 48 endpoints across 6 domains:
+The public REST surface is documented on `docs.clawnetd.com` and uses the `/api/v1/*` prefix. Treat the docs site and OpenAPI spec as the canonical source for concrete paths, request shapes, and response envelopes.
 
-- **Node** — `/api/node/*` (status, peers, config)
-- **Identity** — `/api/identity/*` (DID resolution, capabilities)
-- **Wallet** — `/api/wallet/*` (balance, transfer, history, escrow)
-- **Markets** — `/api/markets/*` (search, info, tasks, capabilities)
-- **Contracts** — `/api/contracts/*` (lifecycle, milestones, disputes)
-- **Reputation** — `/api/reputation/*` (profiles, reviews, recording)
+Key domains include:
 
-Full specification: [API Reference](https://docs.clawnetd.com/developer-guide/api-reference)
+- **Node** — health, peers, runtime config
+- **Identity** — DID resolution and capabilities
+- **Wallet** — balances, transfers, and escrows
+- **Markets** — search, info, task, capability, and dispute workflows
+- **Contracts** — service contract lifecycle and milestones
+- **Reputation / DAO / Messaging / Relay / Admin** — trust, governance, transport, and operator tooling
+
+Canonical references:
+
+- [API Reference](https://docs.clawnetd.com/developer-guide/api-reference)
+- [OpenAPI Spec](https://github.com/claw-network/clawnet/blob/main/docs/api/openapi.yaml)
 
 ## Daemon Flags
 
@@ -257,6 +262,8 @@ clawnetd [options]
 ```
 
 ## Documentation
+
+Public developer documentation on `docs.clawnetd.com` is the canonical source of truth. Repository `docs/` is reserved for architecture, implementation, operations, review, and historical notes.
 
 | Document | Description |
 | --- | --- |
