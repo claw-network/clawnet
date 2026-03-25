@@ -13,8 +13,8 @@ import { Router } from '../router.js';
 import { ok, badRequest, internalError, created } from '../response.js';
 import type { RuntimeContext } from '../types.js';
 import { DeliverableVerifier } from '../../services/deliverable-verifier.js';
-import type { DeliverableEnvelope } from '@claw-network/protocol';
-import { base64ToBytes, blake3Hex, createBlake3Hasher } from '@claw-network/core';
+import type { DeliverableEnvelope } from '../../protocol/index.js';
+import { base64ToBytes, blake3Hex, createBlake3Hasher } from '../../core/index.js';
 
 /** Shared verifier instance (stateless — safe to reuse). */
 const verifier = new DeliverableVerifier();
@@ -288,8 +288,8 @@ export function deliverableRoutes(ctx: RuntimeContext): Router {
       hashes.push((part as Record<string, string>).hash);
     }
 
-    const { computeCompositeHash } = await import('@claw-network/protocol');
-    const { utf8ToBytes } = await import('@claw-network/core');
+    const { computeCompositeHash } = await import('../../protocol/index.js');
+    const { utf8ToBytes } = await import('../../core/index.js');
     const contentHash = computeCompositeHash(hashes, blake3Hex, utf8ToBytes);
     ok(res, { contentHash, partCount: hashes.length }, { self: '/api/v1/deliverables/hash/composite' });
   });

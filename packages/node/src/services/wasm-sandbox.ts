@@ -20,7 +20,7 @@
  * Spec: docs/implementation/deliverable-spec.md §3.2
  */
 
-import { blake3Hex } from '@claw-network/core';
+import { blake3Hex } from '../core/index.js';
 import createPlugin, { type Plugin, type CallContext } from '@extism/extism';
 
 // ---------------------------------------------------------------------------

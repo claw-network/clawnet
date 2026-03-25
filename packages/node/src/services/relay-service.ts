@@ -8,9 +8,9 @@
  * Phase 3: F4 (period proof), F10 (co-sign collection), F11 (reward formula).
  */
 
-import type { RelayConfig, P2PNode, RelayConfirmRequest } from '@claw-network/core';
-import { DEFAULT_RELAY_CONFIG } from '@claw-network/core';
-import type { RelayScore } from '@claw-network/core';
+import type { RelayConfig, P2PNode, RelayConfirmRequest } from '../core/index.js';
+import { DEFAULT_RELAY_CONFIG } from '../core/index.js';
+import type { RelayScore } from '../core/index.js';
 
 // ── Public types ────────────────────────────────────────────────
 

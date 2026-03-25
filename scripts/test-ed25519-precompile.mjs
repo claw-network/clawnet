@@ -37,11 +37,11 @@ execFileSync(
   "pnpm",
   [
     "--filter",
-    "@claw-network/contracts",
+    "@claw-network/node",
     "exec",
     "hardhat",
     "run",
-    "scripts/test-ed25519-precompile.ts",
+    "scripts/contracts/test-ed25519-precompile.ts",
     "--network",
     network,
   ],

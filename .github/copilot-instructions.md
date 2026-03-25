@@ -5,14 +5,9 @@
 pnpm monorepo (`pnpm-workspace.yaml`) with layered packages:
 
 ```
-packages/core       — Crypto (Ed25519, @noble), storage (LevelDB), encoding, P2P primitives
-packages/protocol   — Event-sourced reducers: identity, wallet, markets, contracts, reputation, DAO
-packages/node       — Daemon: HTTP API (node:http custom router), services (ethers.js ↔ chain), P2P (libp2p), indexer (SQLite)
-packages/cli        — CLI binary (`clawnet`)
+packages/node       — Unified runtime: daemon, CLI, internal core/protocol modules, Hardhat contracts, P2P, indexer
 packages/sdk        — TypeScript SDK (`ClawNetClient`) — REST only, NO ethers.js
 packages/sdk-python — Python SDK (httpx)
-packages/contracts  — Solidity (Hardhat + OZ UUPS upgradeable proxies), chainId 7625
-packages/wallet     — Wallet webapp
 ```
 
 **Data flow**: Agent/User → SDK/CLI → REST API (:9528) → Node service layer → Smart contracts (Hyperledger Besu QBFT) + SQLite indexer.
@@ -21,7 +16,7 @@ All chain interaction is encapsulated in `packages/node/src/services/`. The SDK 
 
 ### Documentation Source Of Truth
 
-- **Public canonical docs** live in `packages/docs/content/docs` and are published at `https://docs.clawnetd.com`.
+- **Public canonical docs** live in `apps/docs/content/docs` and are published at `https://docs.clawnetd.com`.
 - `README`, homepage copy, package READMEs, and `.github` instructions may summarize, but must not invent alternate route families or chain descriptions.
 - Root `docs/` is for architecture, implementation, operations, reviews, handover, and historical material. Public guide pages in root `docs/` are thin entry pages only.
 
@@ -80,8 +75,8 @@ pnpm install && pnpm build          # Full build (tsc -b across packages)
 pnpm test                            # All tests (vitest across packages)
 pnpm --filter @claw-network/node test           # Single package
 pnpm --filter @claw-network/node test:services  # Service-layer tests only
-pnpm --filter @claw-network/contracts test      # Hardhat Solidity tests
-pnpm --filter @claw-network/contracts compile   # Compile contracts
+pnpm --filter @claw-network/node contracts:test      # Hardhat Solidity tests
+pnpm --filter @claw-network/node contracts:compile   # Compile contracts
 pnpm lint                            # ESLint across monorepo
 ```
 
@@ -97,7 +92,7 @@ node scripts/integration-test.mjs [--verbose]
 
 Solidity 0.8.28, Hardhat, OpenZeppelin UUPS upgradeable. Key contracts: ClawToken (ERC-20, 0 decimals), ClawIdentity (DID registry), ClawEscrow, ClawStaking, ClawDAO, ClawContracts, ClawReputation, ClawRouter, ParamRegistry.
 
-UUPS upgrades bypass OZ manifest — use `packages/contracts/scripts/upgrade-identity.ts` pattern (direct `upgradeToAndCall`).
+UUPS upgrades bypass OZ manifest — use `packages/node/scripts/contracts/upgrade-identity.ts` pattern (direct `upgradeToAndCall`).
 
 ## Reference Documents
 

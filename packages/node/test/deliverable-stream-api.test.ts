@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import WebSocket from 'ws';
 import { attachDeliveryStreamHandler } from '../src/api/ws-delivery-stream.js';
-import { blake3Hex, utf8ToBytes, bytesToBase64 } from '@claw-network/core';
+import { blake3Hex, utf8ToBytes, bytesToBase64 } from '../src/core/index.js';
 
 // ── Test server setup ──────────────────────────────────────────
 

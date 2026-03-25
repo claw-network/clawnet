@@ -1,0 +1,53 @@
+{
+  "name": "@claw-network/client",
+  "version": "2026.1.7",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/index.d.ts",
+      "default": "./dist/protocol/index.js"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "prebuild": "pnpm clean",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test dist/*.test.js dist/**/*.test.js",
+    "pretest": "pnpm build",
+    "start": "tsx src/start.ts",
+    "contracts:build": "cd contracts && ../node_modules/.bin/hardhat compile --config hardhat.config.ts",
+    "contracts:test": "cd contracts && ../node_modules/.bin/hardhat test --config hardhat.config.ts",
+    "contracts:typecheck": "cd contracts && ../node_modules/.bin/hardhat compile --config hardhat.config.ts"
+  },
+  "dependencies": {
+    "@claw-network/contracts": "^2026.2.10",
+    "@claw-network/core": "^2026.3.6",
+    "@claw-network/node": "workspace:*",
+    "@claw-network/sdk": "workspace:*",
+    "better-sqlite3": "^12.2.0",
+    "ethers": "^6.15.0",
+    "pg": "^8.16.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@openzeppelin/contracts": "^5.3.0",
+    "@openzeppelin/contracts-upgradeable": "^5.3.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.19.0",
+    "@types/pg": "^8.15.5",
+    "hardhat": "^2.28.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

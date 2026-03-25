@@ -46,12 +46,8 @@ fi
 
 # ── package list (keep in dependency order) ─────────────────────
 PACKAGES=(
-  "core"
-  "protocol"
-  "contracts"
   "node"
   "sdk"
-  "cli"
 )
 
 TOTAL=${#PACKAGES[@]}
@@ -110,14 +106,7 @@ for PKG in "${PACKAGES[@]}"; do
 
   BUILD_LOG=$(mktemp)
 
-  # contracts uses "compile" (hardhat); others use "build" (tsc)
-  if [ "$PKG" = "contracts" ]; then
-    BUILD_CMD="compile"
-  else
-    BUILD_CMD="build"
-  fi
-
-  pnpm --filter "$FILTER" "$BUILD_CMD" > "$BUILD_LOG" 2>&1
+  pnpm --filter "$FILTER" build > "$BUILD_LOG" 2>&1
   BUILD_EC=$?
   BUILD_END=$(date +%s)
   BUILD_SECS=$((BUILD_END - BUILD_START))
@@ -134,6 +123,26 @@ for PKG in "${PACKAGES[@]}"; do
   fi
   rm -f "$BUILD_LOG"
 done
+
+CONTRACTS_BUILD_LOG=$(mktemp)
+CONTRACTS_BUILD_START=$(date +%s)
+printf "  ${DIM}[%d/%d]${RESET} %-28s " "$TOTAL" "$TOTAL" "@claw-network/node contracts"
+pnpm --filter @claw-network/node contracts:compile > "$CONTRACTS_BUILD_LOG" 2>&1
+CONTRACTS_BUILD_EC=$?
+CONTRACTS_BUILD_END=$(date +%s)
+CONTRACTS_BUILD_SECS=$((CONTRACTS_BUILD_END - CONTRACTS_BUILD_START))
+
+if [ $CONTRACTS_BUILD_EC -eq 0 ]; then
+  echo -e "${GREEN}✅ built${RESET} ${DIM}(${CONTRACTS_BUILD_SECS}s)${RESET}"
+else
+  BUILD_FAILED=$((BUILD_FAILED + 1))
+  BUILD_FAILED_NAMES="${BUILD_FAILED_NAMES}  • @claw-network/node contracts\n"
+  echo -e "${RED}❌ BUILD FAILED${RESET} ${DIM}(${CONTRACTS_BUILD_SECS}s)${RESET}"
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  tail -30 "$CONTRACTS_BUILD_LOG" | sed 's/^/    /'
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+fi
+rm -f "$CONTRACTS_BUILD_LOG"
 
 if [ $BUILD_FAILED -gt 0 ]; then
   TOTAL_END=$(date +%s)
@@ -180,6 +189,27 @@ for PKG in "${PACKAGES[@]}"; do
   fi
   rm -f "$LOG"
 done
+
+CONTRACTS_TEST_LOG=$(mktemp)
+CONTRACTS_TEST_START=$(date +%s)
+printf "  ${DIM}[%d/%d]${RESET} %-28s " "$TOTAL" "$TOTAL" "@claw-network/node contracts"
+pnpm --filter @claw-network/node contracts:test > "$CONTRACTS_TEST_LOG" 2>&1
+CONTRACTS_TEST_EC=$?
+CONTRACTS_TEST_END=$(date +%s)
+CONTRACTS_TEST_SECS=$((CONTRACTS_TEST_END - CONTRACTS_TEST_START))
+
+if [ $CONTRACTS_TEST_EC -eq 0 ]; then
+  PASSED=$((PASSED + 1))
+  echo -e "${GREEN}✅ passed${RESET} ${DIM}(${CONTRACTS_TEST_SECS}s)${RESET}"
+else
+  FAILED=$((FAILED + 1))
+  FAILED_NAMES="${FAILED_NAMES}  • @claw-network/node contracts\n"
+  echo -e "${RED}❌ FAILED${RESET} ${DIM}(${CONTRACTS_TEST_SECS}s)${RESET}"
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+  tail -30 "$CONTRACTS_TEST_LOG" | sed 's/^/    /'
+  echo -e "${DIM}┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${RESET}"
+fi
+rm -f "$CONTRACTS_TEST_LOG"
 
 # ── summary ─────────────────────────────────────────────────────
 TOTAL_END=$(date +%s)

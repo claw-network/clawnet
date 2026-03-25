@@ -9,10 +9,10 @@ import { describe, it, expect } from 'vitest';
 import {
   computeCompositeHash,
   validateEnvelopeStructure,
-} from '@claw-network/protocol';
-import { parseMarketSubmissionSubmitPayload } from '@claw-network/protocol';
-import { blake3Hex, utf8ToBytes } from '@claw-network/core';
-import type { DeliverableEnvelope } from '@claw-network/protocol';
+} from '../src/protocol/index.js';
+import { parseMarketSubmissionSubmitPayload } from '../src/protocol/index.js';
+import { blake3Hex, utf8ToBytes } from '../src/core/index.js';
+import type { DeliverableEnvelope } from '../src/protocol/index.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

@@ -40,7 +40,7 @@ import {
   TOPIC_EVENTS,
   TOPIC_MARKETS,
   utf8ToBytes,
-} from '@claw-network/core';
+} from './core/index.js';
 import {
   CONTENT_TYPE,
   encodeP2PEnvelopeBytes,
@@ -51,7 +51,7 @@ import {
   MemoryDaoStore,
   MemoryReputationStore,
   signP2PEnvelope,
-} from '@claw-network/protocol';
+} from './protocol/index.js';
 import { P2PSync, P2PSyncConfig } from './p2p/sync.js';
 import { ApiServer, ApiServerConfig } from './api/server.js';
 import { type ChainConfig, ContractProvider } from './services/index.js';
@@ -65,7 +65,7 @@ import { MessagingService } from './services/messaging-service.js';
 import { MessageStore } from './services/message-store.js';
 import { RelayService } from './services/relay-service.js';
 import { RelayRewardService } from './services/relay-reward-service.js';
-import { RelayScorer } from '@claw-network/core';
+import { RelayScorer } from './core/index.js';
 import { IndexerStore, EventIndexer, IndexerQuery, type EventIndexerConfig } from './indexer/index.js';
 import { ApiKeyStore } from './api/api-key-store.js';
 import { TotpStore } from './api/totp-store.js';
@@ -81,7 +81,7 @@ export interface NodeRuntimeConfig {
     requestRangeOnStart?: boolean;
     requestSnapshotOnStart?: boolean;
     validateSnapshotState?: (
-      snapshot: import('@claw-network/core').SnapshotRecord,
+      snapshot: import('./core/index.js').SnapshotRecord,
       events: Uint8Array[],
     ) => Promise<boolean> | boolean;
   };

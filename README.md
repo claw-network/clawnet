@@ -50,7 +50,7 @@ Set `CLAWNET_INSTALL_DIR` to customize the install directory (default: `~/clawne
 
 #### Prerequisites
 
-- **Node.js** ≥ 20
+- **Node.js** ≥ 22
 - **pnpm** ≥ 10 (`corepack enable && corepack prepare pnpm@latest --activate`)
 - **git**
 
@@ -96,7 +96,7 @@ curl http://127.0.0.1:9528/api/v1/node
 pnpm test
 
 # Single package
-pnpm --filter @claw-network/core test
+pnpm --filter @claw-network/node test
 ```
 
 ## Architecture
@@ -114,36 +114,46 @@ graph TD
     ND["Daemon, API Router, P2P Networking"]
   end
 
-  subgraph Protocol ["@claw-network/protocol"]
+  subgraph Runtime ["@claw-network/node internals"]
     Identity
     Wallet
     Markets
     Contracts
     Reputation
-  end
-
-  subgraph Core ["@claw-network/core"]
-    CR["Crypto, Storage, Encoding, P2P primitives"]
+    Core["Core + Protocol internals"]
   end
 
   CLI --> ND
   API --> ND
   TS --> ND
   PY --> ND
-  ND --> Identity & Wallet & Markets & Contracts & Reputation
-  Identity & Wallet & Markets & Contracts & Reputation --> CR
+  ND --> Identity & Wallet & Markets & Contracts & Reputation & Core
 ```
 
 ## Packages
 
 | Package                  | Path                  | Description                                                                 |
 | ------------------------ | --------------------- | --------------------------------------------------------------------------- |
-| `@claw-network/core`     | `packages/core`       | Cryptography, storage (LevelDB), encoding, P2P primitives                   |
-| `@claw-network/protocol` | `packages/protocol`   | Event-sourced reducers for identity, wallet, markets, contracts, reputation |
-| `@claw-network/node`     | `packages/node`       | Daemon process, HTTP API (48 endpoints), libp2p networking                  |
-| `@claw-network/cli`      | `packages/cli`        | Command-line interface (`clawnet` binary)                                   |
+| `@claw-network/node`     | `packages/node`       | Unified daemon, CLI, core/protocol internals, and smart-contract toolchain  |
+| `@claw-network/client`   | `packages/client`     | TelAgent runtime with its own API, protocol exports, storage, and contracts |
 | `@claw-network/sdk`      | `packages/sdk`        | TypeScript SDK — `ClawNetClient` with full API coverage                     |
 | `clawnet-sdk`            | `packages/sdk-python` | Python SDK — sync & async clients using httpx                               |
+
+## TelAgent
+
+TelAgent now lives inside this monorepo as a first-class client product.
+
+- Runtime package: `packages/client`
+- Web application: `apps/telagent`
+- Product docs: `docs/telagent`
+
+Typical local flow:
+
+```bash
+cp apps/telagent/.env.example "${TELAGENT_HOME:-$HOME/.telagent}/.env"
+pnpm telagent:dev
+pnpm telagent:web:dev
+```
 
 ## Install
 

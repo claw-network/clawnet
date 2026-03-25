@@ -11,7 +11,7 @@ import { validate } from '../schemas/common.js';
 import { z } from 'zod';
 import type { RuntimeContext } from '../types.js';
 import { publicKeyFromDid, bytesToHex } from '../types.js';
-import { verifySignature, utf8ToBytes } from '@claw-network/core';
+import { verifySignature, utf8ToBytes } from '../../core/index.js';
 import type { IncomingMessage } from 'node:http';
 
 // ── Config ──────────────────────────────────────────────────────

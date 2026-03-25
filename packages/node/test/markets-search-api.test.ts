@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { ApiServer } from '../src/api/server.js';
-import { MarketListing, MarketSearchIndex } from '@claw-network/protocol';
+import { MarketListing, MarketSearchIndex } from '../src/protocol/index.js';
 
 async function readData<T>(res: Response): Promise<T> {
   const payload = (await res.json()) as { data?: T };

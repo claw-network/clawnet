@@ -59,10 +59,10 @@ export const ChainConfigSchema = z.object({
   /**
    * Path to hardhat artifacts directory.
    * Used to load contract ABIs at runtime.
-   * In monorepo dev: typically `packages/contracts/artifacts`.
+   * In monorepo dev: typically `packages/node/artifacts`.
    *
-   * Optional — when omitted, ContractProvider will fall back to the
-   * `@claw-network/contracts` npm package to resolve ABIs.
+   * Optional — when omitted, ContractProvider falls back to the
+   * package-local `packages/node/artifacts` directory.
    */
   artifactsDir: z.string().min(1).optional(),
 });

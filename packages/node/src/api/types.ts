@@ -2,8 +2,8 @@
  * Shared types and helper functions for route modules.
  */
 
-import type { EventStore } from '@claw-network/core';
-import type { P2PNode, RelayScorer } from '@claw-network/core';
+import type { EventStore } from '../core/index.js';
+import type { P2PNode, RelayScorer } from '../core/index.js';
 import type {
   ContractStore,
   MarketSearchStore,
@@ -14,7 +14,7 @@ import type {
   DaoStore,
   WalletState,
   ServiceContract,
-} from '@claw-network/protocol';
+} from '../protocol/index.js';
 
 import type { WalletService } from '../services/wallet-service.js';
 import type { IdentityService } from '../services/identity-service.js';
@@ -27,7 +27,7 @@ import type { RelayRewardService } from '../services/relay-reward-service.js';
 import type { StakingService } from '../services/staking-service.js';
 import type { ApiKeyStore } from './api-key-store.js';
 import type { IndexerQuery } from '../indexer/query.js';
-import type { SnapshotStore, SnapshotRecord } from '@claw-network/core';
+import type { SnapshotStore, SnapshotRecord } from '../core/index.js';
 
 export {
   addressFromDid,
@@ -46,7 +46,7 @@ export {
   resolveStoragePaths,
   utf8ToBytes,
   verifyCapabilityCredential,
-} from '@claw-network/core';
+} from '../core/index.js';
 
 // ─── Runtime Context ────────────────────────────────────────────
 
@@ -112,7 +112,7 @@ import {
   resolveStoragePaths as _resolveStoragePaths,
   loadKeyRecord as _loadKeyRecord,
   decryptKeyRecord as _decryptKeyRecord,
-} from '@claw-network/core';
+} from '../core/index.js';
 
 export function isValidDid(value: string): boolean {
   if (!value) return false;
@@ -273,9 +273,9 @@ import {
   createWalletState,
   applyWalletEvent,
   getWalletBalance,
-} from '@claw-network/protocol';
+} from '../protocol/index.js';
 
-import type { EventEnvelope } from '@claw-network/core';
+import type { EventEnvelope } from '../core/index.js';
 
 export async function buildWalletState(eventStore: EventStore): Promise<WalletState> {
   const state = createWalletState();

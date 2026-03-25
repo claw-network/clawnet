@@ -7,7 +7,7 @@
 
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
-import type { DelegationRecord } from '@claw-network/protocol/messaging';
+import type { DelegationRecord } from '../protocol/messaging/index.js';
 
 // ── Types ────────────────────────────────────────────────────────
 

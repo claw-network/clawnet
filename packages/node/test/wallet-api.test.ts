@@ -13,9 +13,9 @@ import {
   MemoryStore,
   resolveStoragePaths,
   saveKeyRecord,
-} from '@claw-network/core';
-import { generateKeypair } from '@claw-network/core/crypto';
-import { addressFromDid, didFromPublicKey } from '@claw-network/core/identity';
+} from '../src/core/index.js';
+import { generateKeypair } from '../src/core/crypto/index.js';
+import { addressFromDid, didFromPublicKey } from '../src/core/identity/index.js';
 
 async function readData<T>(res: Response): Promise<T> {
   const payload = (await res.json()) as { data?: T };

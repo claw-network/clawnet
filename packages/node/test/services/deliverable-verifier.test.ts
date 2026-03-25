@@ -15,8 +15,8 @@ import {
   bytesToHex,
   signDeliverable,
   didFromPublicKey,
-} from '@claw-network/core';
-import type { DeliverableEnvelope } from '@claw-network/protocol';
+} from '../../src/core/index.js';
+import type { DeliverableEnvelope } from '../../src/protocol/index.js';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

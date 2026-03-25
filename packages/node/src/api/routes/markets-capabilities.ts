@@ -29,7 +29,7 @@ import {
   createMarketCapabilityLeaseResumeEnvelope,
   createMarketCapabilityLeaseTerminateEnvelope,
   createMarketListingRemoveEnvelope,
-} from '@claw-network/protocol';
+} from '../../protocol/index.js';
 import { SlaMonitor } from '../../services/sla-monitor.js';
 
 /** Shared SLA monitor instance for capability leases. */

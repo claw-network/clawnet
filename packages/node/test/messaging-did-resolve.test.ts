@@ -4,12 +4,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MessagingService } from '../src/services/messaging-service.js';
 import { MessageStore } from '../src/services/message-store.js';
-import type { P2PNode, StreamDuplex } from '@claw-network/core';
+import type { P2PNode, StreamDuplex } from '../src/core/index.js';
 import {
   encodeDidResolveRequestBytes,
   encodeDidResolveResponseBytes,
   decodeDidResolveResponseBytes,
-} from '@claw-network/protocol/messaging';
+} from '../src/protocol/messaging/index.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
 

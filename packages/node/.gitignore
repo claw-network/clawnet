@@ -1,0 +1,14 @@
+# Generated contract outputs
+artifacts/
+cache/
+typechain-types/
+
+# Coverage and reports
+coverage/
+coverage.json
+gas-report.txt
+slither-report.json
+
+# Runtime and local state
+.env
+data/

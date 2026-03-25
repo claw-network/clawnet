@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { RelayService } from '../src/services/relay-service.js';
-import type { P2PNode, RelayConfirmResponse } from '@claw-network/core';
+import type { P2PNode, RelayConfirmResponse } from '../src/core/index.js';
 
 describe('RelayService', () => {
   let service: RelayService;

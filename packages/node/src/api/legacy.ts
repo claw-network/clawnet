@@ -5,13 +5,13 @@
  * Extracted from the original server.ts monolith.
  */
 
-import type { EventStore, EventEnvelope } from '@claw-network/core';
+import type { EventStore, EventEnvelope } from '../core/index.js';
 import {
   didFromPublicKey,
   listKeyRecords,
   multibaseDecode,
   resolveStoragePaths,
-} from '@claw-network/core';
+} from '../core/index.js';
 import {
   createWalletState,
   applyWalletEvent,
@@ -25,7 +25,7 @@ import {
   isContentFormat,
   isAccessMethodType,
   isCapabilityType,
-} from '@claw-network/protocol';
+} from '../protocol/index.js';
 import { parseCsv, parseBoolean } from './types.js';
 
 // ─── Event Parsing ──────────────────────────────────────────────

@@ -1,0 +1,12 @@
+export { IdentityModule } from './identity.js';
+export { ConversationsModule } from './conversations.js';
+export { ContactsModule } from './contacts.js';
+export { ProfileModule } from './profile.js';
+export { GroupsModule } from './groups.js';
+export { MessagesModule } from './messages.js';
+export { AttachmentsModule } from './attachments.js';
+export { SessionModule } from './session.js';
+export { WalletModule } from './wallet.js';
+export { ClawnetModule } from './clawnet.js';
+export { MarketplaceModule } from './marketplace.js';
+export { FaucetModule } from './faucet.js';

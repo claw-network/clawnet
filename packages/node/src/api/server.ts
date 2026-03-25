@@ -110,20 +110,20 @@ export class ApiServer {
     private readonly config: ApiServerConfig,
     private readonly runtime: {
       publishEvent: (envelope: Record<string, unknown>) => Promise<string>;
-      eventStore?: import('@claw-network/core').EventStore;
-      contractStore?: import('@claw-network/protocol').ContractStore;
-      reputationStore?: import('@claw-network/protocol').ReputationStore;
-      daoStore?: import('@claw-network/protocol').DaoStore;
-      marketStore?: import('@claw-network/protocol').MarketSearchStore;
-      infoContentStore?: import('@claw-network/protocol').InfoContentStore;
+      eventStore?: import('../core/index.js').EventStore;
+      contractStore?: import('../protocol/index.js').ContractStore;
+      reputationStore?: import('../protocol/index.js').ReputationStore;
+      daoStore?: import('../protocol/index.js').DaoStore;
+      marketStore?: import('../protocol/index.js').MarketSearchStore;
+      infoContentStore?: import('../protocol/index.js').InfoContentStore;
       walletService?: import('../services/wallet-service.js').WalletService;
       identityService?: import('../services/identity-service.js').IdentityService;
       reputationService?: import('../services/reputation-service.js').ReputationService;
       contractsService?: import('../services/contracts-service.js').ContractsService;
       daoService?: import('../services/dao-service.js').DaoService;
       searchMarkets?: (
-        query: import('@claw-network/protocol').SearchQuery,
-      ) => import('@claw-network/protocol').SearchResult;
+        query: import('../protocol/index.js').SearchQuery,
+      ) => import('../protocol/index.js').SearchResult;
       getNodeStatus?: () => Promise<Record<string, unknown>>;
       getNodePeers?: () => Promise<{ peers: Record<string, unknown>[]; total: number }>;
       getNodeConfig?: () => Promise<Record<string, unknown>>;
@@ -132,12 +132,12 @@ export class ApiServer {
       relayService?: import('../services/relay-service.js').RelayService;
       relayRewardService?: import('../services/relay-reward-service.js').RelayRewardService;
       stakingService?: import('../services/staking-service.js').StakingService;
-      p2pNode?: import('@claw-network/core').P2PNode;
-      relayScorer?: import('@claw-network/core').RelayScorer;
+      p2pNode?: import('../core/index.js').P2PNode;
+      relayScorer?: import('../core/index.js').RelayScorer;
       signProof?: (data: Uint8Array) => Promise<string>;
       indexerQuery?: import('../indexer/query.js').IndexerQuery;
-      snapshotStore?: import('@claw-network/core').SnapshotStore;
-      takeSnapshot?: () => Promise<import('@claw-network/core').SnapshotRecord | null>;
+      snapshotStore?: import('../core/index.js').SnapshotStore;
+      takeSnapshot?: () => Promise<import('../core/index.js').SnapshotRecord | null>;
       totpStore?: import('./totp-store.js').TotpStore;
     },
   ) {

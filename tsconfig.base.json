@@ -15,13 +15,10 @@
     "resolveJsonModule": true,
     "useDefineForClassFields": true,
     "paths": {
-      "@claw-network/core": ["packages/core/src/index.ts"],
-      "@claw-network/core/*": ["packages/core/src/*"],
-      "@claw-network/protocol": ["packages/protocol/src/index.ts"],
-      "@claw-network/protocol/*": ["packages/protocol/src/*"],
+      "@claw-network/client": ["packages/client/src/index.ts"],
+      "@claw-network/client/protocol": ["packages/client/src/protocol/index.ts"],
       "@claw-network/node": ["packages/node/src/index.ts"],
-      "@claw-network/sdk": ["packages/sdk/src/index.ts"],
-      "@claw-network/contracts": ["packages/contracts/typechain-types"]
+      "@claw-network/sdk": ["packages/sdk/src/index.ts"]
     }
   }
 }

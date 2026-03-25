@@ -37,7 +37,7 @@ import {
   createMarketListingRemoveEnvelope,
   createMarketSubscriptionStartEnvelope,
   createMarketSubscriptionCancelEnvelope,
-} from '@claw-network/protocol';
+} from '../../protocol/index.js';
 
 export function marketsInfoRoutes(ctx: RuntimeContext): Router {
   const r = new Router();

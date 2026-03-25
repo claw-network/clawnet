@@ -1,0 +1,11 @@
+{
+  "contract": "TelagentGroupRegistry",
+  "networkName": "clawnetTestnet",
+  "chainId": 7625,
+  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  "identityAddress": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+  "proxyAddress": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
+  "implementationAddress": "0x610178dA211FEF7D417bC0e6FeD39F05609AD788",
+  "note": "Uses MockClawIdentity with pre-registered DIDs (alex + bess)",
+  "generatedAt": "2026-03-07T11:04:00.000Z"
+}

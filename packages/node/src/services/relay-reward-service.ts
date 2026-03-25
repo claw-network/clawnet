@@ -17,7 +17,7 @@ import {
   computeRelayReward,
   type RewardInput,
   type RewardResult,
-} from '@claw-network/core';
+} from '../core/index.js';
 
 import { createLogger } from '../logger.js';
 import type { ContractProvider } from './contract-provider.js';

@@ -320,7 +320,7 @@ export class ContractsService {
    *
    * @param envelopeDigest  Pre-computed BLAKE3(JCS(envelope)) hex — passed
    *   directly to the contract with **no** re-hashing.  Callers compute the
-   *   digest themselves (see `envelopeDigest()` in @claw-network/core).
+   *   digest themselves (see `envelopeDigest()` in `src/core`).
    */
   async submitMilestone(
     contractId: string,

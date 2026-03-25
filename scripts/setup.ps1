@@ -12,7 +12,7 @@
 #   2. Clones the ClawNet repo (or pulls if already cloned)
 #   3. Installs dependencies via pnpm
 #   4. Generates passphrase, API key, and optional EVM signer key
-#   5. Creates .env with generated values
+#   5. Creates $CLAWNET_HOME/.env with generated values
 #   6. Builds workspace packages
 #   7. Installs and starts ClawNet as a Windows service (NSSM)
 # ============================================================================
@@ -36,6 +36,7 @@ $NodeMin    = 20
 $NodeMax    = 24
 $PnpmMin    = 10
 $DataDir    = Join-Path $env:USERPROFILE ".clawnet"
+$EnvFile    = Join-Path $DataDir ".env"
 
 Write-Host ""
 Write-Host "  ClawNet Local Setup (Windows)" -ForegroundColor Cyan
@@ -107,12 +108,16 @@ pnpm install --frozen-lockfile
 if ($LASTEXITCODE -ne 0) { Write-Fail "pnpm install failed" }
 Write-Ok "Dependencies installed"
 
-# ── Step 4: Generate secrets & .env ───────────────────────────────────
+# ── Step 4: Generate secrets & $CLAWNET_HOME/.env ─────────────────────
 
-if (Test-Path ".env") {
-    $backup = ".env.backup.$(Get-Date -Format 'yyyyMMddHHmmss')"
-    Write-Warn ".env already exists, backing up to $backup"
-    Copy-Item ".env" $backup
+if (-not (Test-Path $DataDir)) {
+    New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
+}
+
+if (Test-Path $EnvFile) {
+    $backup = "$EnvFile.backup.$(Get-Date -Format 'yyyyMMddHHmmss')"
+    Write-Warn "$EnvFile already exists, backing up to $backup"
+    Copy-Item $EnvFile $backup
 }
 
 Write-Info "Generating secrets..."
@@ -142,7 +147,7 @@ try {
     $evmAddress = $evmObj.address
 } catch {
     Pop-Location -ErrorAction SilentlyContinue
-    Write-Warn "Could not generate EVM key (ethers not available yet). You can set CLAW_PRIVATE_KEY manually in .env."
+    Write-Warn "Could not generate EVM key (ethers not available yet). You can set CLAW_PRIVATE_KEY manually in $EnvFile."
 }
 
 # Determine chain RPC URL
@@ -163,7 +168,7 @@ if (Test-Path $contractsFile) {
     } catch {}
 }
 
-Write-Info "Creating .env..."
+Write-Info "Creating $EnvFile..."
 
 $timestamp = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
 $identityLine = if ($identityContract) { "CLAW_CHAIN_IDENTITY_CONTRACT=$identityContract" } else { "# CLAW_CHAIN_IDENTITY_CONTRACT=  # Set after contract deployment" }
@@ -195,7 +200,7 @@ CLAW_PRIVATE_KEY=$privateKey
 $identityLine
 
 # -- Storage -------------------------------------------------------------------
-# CLAWNET_HOME=$DataDir
+CLAWNET_HOME=$DataDir
 
 # -- API Server ----------------------------------------------------------------
 # CLAW_API_HOST=127.0.0.1
@@ -205,9 +210,9 @@ $identityLine
 # CLAW_P2P_LISTEN=/ip4/0.0.0.0/tcp/9527
 "@
 
-Set-Content ".env" $envContent -NoNewline
+Set-Content $EnvFile $envContent -NoNewline
 
-Write-Ok ".env created"
+Write-Ok "$EnvFile created"
 Write-Host ""
 Write-Host "  Passphrase:    $passphrase" -ForegroundColor White
 Write-Host "  API Key:       $apiKey" -ForegroundColor White
@@ -215,13 +220,10 @@ if ($evmAddress) {
     Write-Host "  EVM Address:   $evmAddress" -ForegroundColor White
 }
 Write-Host ""
-Write-Warn "Save these credentials! They are stored in .env - do not commit it to git."
+Write-Warn "Save these credentials! They are stored in $EnvFile - do not commit them to git."
 
 # ── Step 5: Create data directory ─────────────────────────────────────
 
-if (-not (Test-Path $DataDir)) {
-    New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
-}
 Write-Ok "Data directory: $DataDir"
 
 # ── Step 6: Build workspace packages ─────────────────────────────────
@@ -306,11 +308,7 @@ function Install-WindowsService {
     # Set environment variables for the service
     & $nssmPath set ClawNet AppEnvironmentExtra `
         "NODE_ENV=production" `
-        "CLAW_PASSPHRASE=$passphrase" `
-        "CLAW_API_KEY=$apiKey" `
-        "CLAW_PRIVATE_KEY=$privateKey" `
-        "CLAW_NETWORK=$Network" `
-        "CLAW_CHAIN_RPC_URL=$chainRpcUrl"
+        "CLAWNET_HOME=$DataDir"
 
     # Start the service
     & $nssmPath start ClawNet

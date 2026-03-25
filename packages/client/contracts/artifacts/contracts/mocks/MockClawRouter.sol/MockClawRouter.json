@@ -1,0 +1,67 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockClawRouter",
+  "sourceName": "contracts/mocks/MockClawRouter.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "key",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "module",
+          "type": "address"
+        }
+      ],
+      "name": "ModuleRegistered",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "key",
+          "type": "bytes32"
+        }
+      ],
+      "name": "getModuleOrZero",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "key",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "addr",
+          "type": "address"
+        }
+      ],
+      "name": "registerModule",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080604052348015600f57600080fd5b506101798061001f6000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c8063a78e922b1461003b578063c96575d614610050575b600080fd5b61004e6100493660046100ee565b610095565b005b61007961005e36600461012a565b6000908152602081905260409020546001600160a01b031690565b6040516001600160a01b03909116815260200160405180910390f35b60008281526020819052604080822080546001600160a01b0319166001600160a01b0385169081179091559051909184917fd63be02155b46636309fb0a4a79647c60971aecaad53cbc83aad90cd75fd9d549190a35050565b6000806040838503121561010157600080fd5b8235915060208301356001600160a01b038116811461011f57600080fd5b809150509250929050565b60006020828403121561013c57600080fd5b503591905056fea26469706673582212207e820672a122a62d9a3b7ca3020b1dd2c14ea5dc1bf8b42adbbecd9391616c4a64736f6c634300081c0033",
+  "deployedBytecode": "0x608060405234801561001057600080fd5b50600436106100365760003560e01c8063a78e922b1461003b578063c96575d614610050575b600080fd5b61004e6100493660046100ee565b610095565b005b61007961005e36600461012a565b6000908152602081905260409020546001600160a01b031690565b6040516001600160a01b03909116815260200160405180910390f35b60008281526020819052604080822080546001600160a01b0319166001600160a01b0385169081179091559051909184917fd63be02155b46636309fb0a4a79647c60971aecaad53cbc83aad90cd75fd9d549190a35050565b6000806040838503121561010157600080fd5b8235915060208301356001600160a01b038116811461011f57600080fd5b809150509250929050565b60006020828403121561013c57600080fd5b503591905056fea26469706673582212207e820672a122a62d9a3b7ca3020b1dd2c14ea5dc1bf8b42adbbecd9391616c4a64736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

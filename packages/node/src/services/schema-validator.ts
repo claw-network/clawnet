@@ -24,7 +24,7 @@ async function getAjv(): Promise<AjvInstance> {
   return _ajv;
 }
 
-import type { DeliverableEnvelope } from '@claw-network/protocol';
+import type { DeliverableEnvelope } from '../protocol/index.js';
 import { ssrfSafeFetch } from './ssrf-guard.js';
 
 // ── SSRF-safe schema fetcher (delegates to shared guard) ──────────

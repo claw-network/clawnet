@@ -13,7 +13,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CONTRACTS_DIR="$REPO_ROOT/packages/contracts"
 
-source "$SCRIPT_DIR/.env"
+# shellcheck source=../../scripts/lib/clawnet-env.sh
+source "$REPO_ROOT/scripts/lib/clawnet-env.sh"
+clawnet_require_env_file
 
 # Export env vars for Hardhat
 export CLAWNET_DEVNET_RPC_URL

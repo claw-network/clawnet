@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { blake3Hex } from '@claw-network/core';
+import { blake3Hex } from '../../src/core/index.js';
 
 // ---------------------------------------------------------------------------
 // Mock @extism/extism — vi.hoisted ensures these are available during factory

@@ -6,7 +6,7 @@
  *
  * Prerequisites:
  *   - Hardhat node running on localhost:8545
- *   - All contracts deployed (run `pnpm --filter @claw-network/contracts deploy:local`)
+ *   - All contracts deployed (run `pnpm --filter @claw-network/node contracts:deploy:local`)
  *
  * Run with:
  *   pnpm --filter @claw-network/node test:integration

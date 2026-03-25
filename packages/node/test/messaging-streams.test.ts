@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { P2PNode, StreamDuplex } from '@claw-network/core';
-import { encodeHeader as encodeDeliveryHeader } from '@claw-network/core';
+import type { P2PNode, StreamDuplex } from '../src/core/index.js';
+import { encodeHeader as encodeDeliveryHeader } from '../src/core/index.js';
 import { MessagingService } from '../src/services/messaging-service.js';
 import { MessageStore } from '../src/services/message-store.js';
 

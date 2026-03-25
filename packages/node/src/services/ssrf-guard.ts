@@ -167,7 +167,7 @@ export async function ssrfSafeFetchBytes(
   }
 
   if (expectedHash) {
-    const { blake3Hex } = await import('@claw-network/core');
+    const { blake3Hex } = await import('../core/index.js');
     const actual = blake3Hex(result);
     if (actual !== expectedHash) {
       throw new Error(`Content hash mismatch: expected ${expectedHash.slice(0, 16)}… got ${actual.slice(0, 16)}…`);

@@ -1,7 +1,7 @@
 /**
  * Static file middleware for the embedded Console SPA.
  *
- * Serves files from `packages/console/dist/` at `/console/*`.
+ * Serves files from `apps/console/dist/` at `/console/*`.
  * Falls back to `index.html` for SPA client-side routing.
  * Sets appropriate Cache-Control headers.
  */
@@ -33,14 +33,14 @@ const HASHED_ASSET_RE = /\.[a-f0-9]{8}\.\w+$/;
 /**
  * Resolve the console dist directory. Tries:
  * 1. CONSOLE_DIST_PATH env var
- * 2. Relative from node package: ../../console/dist
- * 3. Relative from cwd: packages/console/dist
+ * 2. Relative from node package: ../../../apps/console/dist
+ * 3. Relative from cwd: apps/console/dist
  */
 function resolveDistDir(): string | null {
   const candidates = [
     process.env.CONSOLE_DIST_PATH,
-    resolve(__dirname, '..', '..', '..', 'console', 'dist'),
-    resolve(process.cwd(), 'packages', 'console', 'dist'),
+    resolve(__dirname, '..', '..', '..', '..', 'apps', 'console', 'dist'),
+    resolve(process.cwd(), 'apps', 'console', 'dist'),
   ].filter(Boolean) as string[];
 
   for (const dir of candidates) {

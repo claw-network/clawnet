@@ -4,11 +4,19 @@ on:
   push:
     branches: ['**']
     paths:
-      - 'packages/contracts/**'
+      - 'packages/node/contracts/**'
+      - 'packages/node/scripts/contracts/**'
+      - 'packages/node/test/contracts/**'
+      - 'packages/node/hardhat.config.cjs'
+      - 'packages/client/contracts/**'
       - '.github/workflows/contracts.yml'
   pull_request:
     paths:
-      - 'packages/contracts/**'
+      - 'packages/node/contracts/**'
+      - 'packages/node/scripts/contracts/**'
+      - 'packages/node/test/contracts/**'
+      - 'packages/node/hardhat.config.cjs'
+      - 'packages/client/contracts/**'
       - '.github/workflows/contracts.yml'
 
 jobs:
@@ -24,7 +32,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -32,21 +40,26 @@ jobs:
         run: pnpm install
 
       - name: Compile contracts
-        run: pnpm --filter @claw-network/contracts compile
+        run: pnpm --filter @claw-network/node contracts:compile
 
-      - name: Run tests
-        run: pnpm --filter @claw-network/contracts test
+      - name: Run ClawNet contract tests
+        run: pnpm --filter @claw-network/node contracts:test
+        env:
+          NODE_ENV: test
+
+      - name: Run TelAgent contract tests
+        run: pnpm --filter @claw-network/client contracts:test
         env:
           NODE_ENV: test
 
       - name: Run coverage
-        run: pnpm --filter @claw-network/contracts coverage
+        run: pnpm --filter @claw-network/node contracts:coverage
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: packages/contracts/coverage/
+          path: packages/node/coverage/
 
   gas-report:
     runs-on: ubuntu-latest
@@ -60,7 +73,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -68,13 +81,13 @@ jobs:
         run: pnpm install
 
       - name: Generate gas report
-        run: pnpm --filter @claw-network/contracts gas-report
+        run: pnpm --filter @claw-network/node contracts:gas-report
 
       - name: Upload gas report
         uses: actions/upload-artifact@v4
         with:
           name: gas-report
-          path: packages/contracts/gas-report.txt
+          path: packages/node/gas-report.txt
 
   slither:
     runs-on: ubuntu-latest
@@ -88,7 +101,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
@@ -104,5 +117,5 @@ jobs:
         run: pip3 install slither-analyzer
 
       - name: Run Slither
-        working-directory: packages/contracts
+        working-directory: packages/node
         run: slither . --config-file slither.config.json || true

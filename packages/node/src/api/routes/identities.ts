@@ -26,7 +26,7 @@ import { resolveLocalIdentity, buildIdentityView, buildIdentityCapabilities } fr
 import {
   createIdentityCapabilityRegisterEnvelope,
   type CapabilityCredential,
-} from '@claw-network/protocol';
+} from '../../protocol/index.js';
 
 // M1: Zod schema for runtime validation of CapabilityCredential
 const VerifiableCredentialProofSchema = z.object({

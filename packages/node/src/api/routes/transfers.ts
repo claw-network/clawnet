@@ -8,7 +8,7 @@ import { validate } from '../schemas/common.js';
 import { TransferSchema } from '../schemas/wallet.js';
 import type { RuntimeContext } from '../types.js';
 import { resolveAddress, resolvePrivateKey, addressFromDid } from '../types.js';
-import { createWalletTransferEnvelope } from '@claw-network/protocol';
+import { createWalletTransferEnvelope } from '../../protocol/index.js';
 import { deriveAddressForDid } from '../../services/identity-service.js';
 
 /**

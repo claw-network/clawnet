@@ -38,7 +38,7 @@ import {
   createDaoTreasuryDepositEnvelope,
   type ProposalAction,
   type DelegationScope,
-} from '@claw-network/protocol';
+} from '../../protocol/index.js';
 
 export function daoRoutes(ctx: RuntimeContext): Router {
   const r = new Router();

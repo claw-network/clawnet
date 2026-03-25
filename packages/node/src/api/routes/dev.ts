@@ -11,7 +11,7 @@ import { z } from 'zod';
 import type { RuntimeContext } from '../types.js';
 import { resolveAddress, resolvePrivateKey, publicKeyFromDid, bytesToHex } from '../types.js';
 import { getApiKeyAuth } from '../auth.js';
-import { createWalletMintEnvelope } from '@claw-network/protocol';
+import { createWalletMintEnvelope } from '../../protocol/index.js';
 import type { IncomingMessage } from 'node:http';
 
 /**

@@ -28,7 +28,7 @@ import {
   createWalletEscrowFundEnvelope,
   createWalletEscrowReleaseEnvelope,
   createWalletEscrowRefundEnvelope,
-} from '@claw-network/protocol';
+} from '../../protocol/index.js';
 
 export function escrowRoutes(ctx: RuntimeContext): Router {
   const r = new Router();

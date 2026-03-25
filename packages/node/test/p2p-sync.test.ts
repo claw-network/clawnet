@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { generateKeypair } from '@claw-network/core/crypto';
-import { utf8ToBytes } from '@claw-network/core/utils';
-import { EventStore, MemoryStore, SnapshotStore, signSnapshot } from '@claw-network/core/storage';
-import { eventHashHex } from '@claw-network/core/protocol';
+import { generateKeypair } from '../src/core/crypto/index.js';
+import { utf8ToBytes } from '../src/core/utils/index.js';
+import { EventStore, MemoryStore, SnapshotStore, signSnapshot } from '../src/core/storage/index.js';
+import { eventHashHex } from '../src/core/protocol/index.js';
 import { P2PSync } from '../src/p2p/sync.js';
-import type { P2PNode } from '@claw-network/core/p2p';
+import type { P2PNode } from '../src/core/p2p/index.js';
 
 // Use dynamic import for canonicalize since it's a CJS module
 import canonicalizeModule from 'canonicalize';

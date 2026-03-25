@@ -11,6 +11,7 @@
  */
 
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -22,7 +23,7 @@ import { join } from 'node:path';
 
 const CONTRACTS_DIR = resolve(
   new URL('.', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1'),
-  '../../../../packages/contracts',
+  '../..',
 );
 const HARDHAT_RPC = 'http://127.0.0.1:8545';
 const HARDHAT_CHAIN_ID = 31337;
@@ -95,7 +96,7 @@ export function stopHardhatNode(): void {
  * Returns the deployment record (contract addresses).
  */
 export function deployContracts(): Record<string, string> {
-  const output = execSync('npx hardhat run scripts/deploy-all.ts --network localhost', {
+  const output = execSync('npx hardhat run scripts/contracts/deploy-all.ts --network localhost', {
     cwd: CONTRACTS_DIR,
     encoding: 'utf-8',
     timeout: 120_000,
@@ -108,8 +109,6 @@ export function deployContracts(): Record<string, string> {
   // Parse addresses from deploy output or read deployment file
   // Deploy script writes to deployments/<network>.json
   const deploymentPath = join(CONTRACTS_DIR, 'deployments', 'localhost.json');
-  const { readFileSync } = require('node:fs');
-
   try {
     const deployment = JSON.parse(readFileSync(deploymentPath, 'utf-8'));
     const addresses: Record<string, string> = {};

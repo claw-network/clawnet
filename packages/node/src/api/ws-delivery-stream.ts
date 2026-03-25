@@ -17,7 +17,7 @@
 
 import { WebSocketServer, type WebSocket } from 'ws';
 import type { Server, IncomingMessage } from 'node:http';
-import { createBlake3Hasher, base64ToBytes } from '@claw-network/core';
+import { createBlake3Hasher, base64ToBytes } from '../core/index.js';
 import type { ApiKeyStore } from './api-key-store.js';
 import { createBlobWriter, type BlobWriter } from '../services/blob-stage.js';
 

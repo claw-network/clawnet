@@ -8,7 +8,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-source "$SCRIPT_DIR/.env"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# shellcheck source=../../scripts/lib/clawnet-env.sh
+source "$REPO_ROOT/scripts/lib/clawnet-env.sh"
+clawnet_require_env_file
 
 DATADIR="$SCRIPT_DIR/data"
 PIDFILE="$SCRIPT_DIR/besu.pid"

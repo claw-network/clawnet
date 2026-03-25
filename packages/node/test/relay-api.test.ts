@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import { ApiServer } from '../src/api/server.js';
 import { RelayService } from '../src/services/relay-service.js';
-import type { P2PNode } from '@claw-network/core';
+import type { P2PNode } from '../src/core/index.js';
 
 async function readData<T>(res: Response): Promise<T> {
   const payload = (await res.json()) as { data?: T };

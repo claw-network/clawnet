@@ -38,6 +38,7 @@ fail()  { printf "${RED}✖${NC} %s\n" "$*" >&2; exit 1; }
 # ─── Defaults ───────────────────────────────────────────────────────────────
 INSTALL_DIR="${CLAWNET_DIR:-/opt/clawnet}"
 DATA_DIR="${CLAWNET_DATA_DIR:-/var/lib/clawnet}"
+ENV_FILE="${DATA_DIR}/.env"
 BRANCH="${CLAWNET_BRANCH:-main}"
 PASSPHRASE="${CLAW_PASSPHRASE:-}"
 API_KEY="${CLAW_API_KEY:-}"
@@ -70,6 +71,8 @@ while [ $# -gt 0 ]; do
     *) fail "Unknown flag: $1 (use --help)" ;;
   esac
 done
+
+ENV_FILE="${DATA_DIR}/.env"
 
 # ─── Detect OS & privilege ──────────────────────────────────────────────────
 OS="$(uname -s)"
@@ -232,6 +235,17 @@ fi
 $SUDO mkdir -p "$DATA_DIR"
 ok "Data directory: $DATA_DIR"
 
+info "Writing ${ENV_FILE}..."
+$SUDO tee "$ENV_FILE" > /dev/null << ENVEOF
+CLAWNET_HOME=${DATA_DIR}
+CLAW_PASSPHRASE=${PASSPHRASE}
+CLAW_API_KEY=${API_KEY}
+CLAW_PRIVATE_KEY=${PRIVATE_KEY}
+CLAW_FAUCET_URL=${FAUCET_URL}
+ENVEOF
+$SUDO chmod 600 "$ENV_FILE"
+ok "Env file ready: $ENV_FILE"
+
 # ─── Step 7: Create systemd service (Linux only) ────────────────────────────
 if [ "$OS" = "linux" ] && { [ "$SETUP_SYSTEMD" = "true" ] || [ -d /run/systemd/system ]; }; then
   info "Setting up systemd service..."
@@ -253,12 +267,7 @@ ExecStart=${NODE_BIN} packages/node/dist/daemon.js --data-dir ${DATA_DIR} --api-
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
-Environment=CLAW_DATA_DIR=${DATA_DIR}
-Environment=CLAW_PASSPHRASE=${PASSPHRASE}
-Environment=CLAW_API_KEY=${API_KEY}
-Environment=CLAW_PRIVATE_KEY=${PRIVATE_KEY}
-# Faucet URL for auto-claiming initial Tokens on first startup (empty = disabled)
-Environment=CLAW_FAUCET_URL=${FAUCET_URL}
+Environment=CLAWNET_HOME=${DATA_DIR}
 LimitNOFILE=65536
 
 [Install]
@@ -283,12 +292,7 @@ else
   if [ "$OS" = "macos" ]; then
     info "To start the node manually:"
     echo ""
-    echo "  export CLAW_PASSPHRASE=\"${PASSPHRASE}\""
-    echo "  export CLAW_API_KEY=\"${API_KEY}\""
-    if [ -n "$PRIVATE_KEY" ]; then
-    echo "  export CLAW_PRIVATE_KEY=\"${PRIVATE_KEY}\""
-    fi
-    echo "  export CLAW_FAUCET_URL=\"${FAUCET_URL}\""
+    echo "  export CLAWNET_HOME=\"${DATA_DIR}\""
     echo "  cd ${INSTALL_DIR}"
     echo "  node packages/node/dist/daemon.js --data-dir ${DATA_DIR} --api-host 127.0.0.1 --api-port 9528"
     echo ""

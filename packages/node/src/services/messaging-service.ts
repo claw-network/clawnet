@@ -9,7 +9,7 @@
  * - Periodic TTL cleanup of expired messages
  */
 
-import type { P2PNode, StreamDuplex } from '@claw-network/core';
+import type { P2PNode, StreamDuplex } from '../core/index.js';
 import {
   generateX25519Keypair,
   x25519PublicKeyFromPrivateKey,
@@ -26,7 +26,7 @@ import {
   type DeliveryExternalRequest,
   type DeliveryExternalResponseHeader,
   type DeliveryExternalNotFound,
-} from '@claw-network/core';
+} from '../core/index.js';
 import {
   encodeDirectMessageBytes,
   decodeDirectMessageBytes,
@@ -47,18 +47,18 @@ import {
   encodeAttachmentMessageBytes,
   decodeAttachmentMessageBytes,
   ReceiptType,
-} from '@claw-network/protocol/messaging';
-import type { DelegationRecord, DelegatedMessage } from '@claw-network/protocol/messaging';
+} from '../protocol/messaging/index.js';
+import type { DelegationRecord, DelegatedMessage } from '../protocol/messaging/index.js';
 import {
   DELIVERY_AUTH_PROTOCOL,
   isDeliveryAuthRequest,
   isDeliveryAuthPayload,
-} from '@claw-network/protocol';
+} from '../protocol/index.js';
 import type {
   DeliveryAuthRequest,
   DeliveryAuthPayload,
   DeliveryAuthResponse,
-} from '@claw-network/protocol';
+} from '../protocol/index.js';
 import { MessageStore } from './message-store.js';
 import { createLogger } from '../logger.js';
 import { brotliCompressSync, brotliDecompressSync } from 'node:zlib';

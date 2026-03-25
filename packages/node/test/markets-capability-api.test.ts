@@ -11,11 +11,11 @@ import {
   resolveStoragePaths,
   saveKeyRecord,
   eventHashHex,
-} from '@claw-network/core';
-import { canonicalizeBytes, generateKeypair } from '@claw-network/core/crypto';
-import { didFromPublicKey } from '@claw-network/core/identity';
-import { MarketSearchStore } from '@claw-network/protocol';
-import type { EventEnvelope } from '@claw-network/core/protocol';
+} from '../src/core/index.js';
+import { canonicalizeBytes, generateKeypair } from '../src/core/crypto/index.js';
+import { didFromPublicKey } from '../src/core/identity/index.js';
+import { MarketSearchStore } from '../src/protocol/index.js';
+import type { EventEnvelope } from '../src/core/protocol/index.js';
 
 async function readData<T>(res: Response): Promise<T> {
   const payload = (await res.json()) as { data?: T };

@@ -20,7 +20,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import type { Server, IncomingMessage } from 'node:http';
 import type { MessagingService, InboxMessage, DelegatedMsgSubscriber } from '../services/messaging-service.js';
 import { RECEIPT_TOPIC } from '../services/messaging-service.js';
-import type { DelegatedMessage } from '@claw-network/protocol/messaging';
+import type { DelegatedMessage } from '../protocol/messaging/index.js';
 import type { ApiKeyStore } from './api-key-store.js';
 
 const WS_PATH = '/api/v1/messaging/subscribe';

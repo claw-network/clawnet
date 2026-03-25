@@ -15,10 +15,10 @@ const PUBLIC_FILES = [
   'docs/QUICKSTART.md',
   'docs/DEPLOYMENT.md',
   'docs/FAQ.md',
-  'packages/homepage/src/content/site.ts',
+  'apps/homepage/src/content/site.ts',
 ];
 
-const PUBLIC_DIRS = ['packages/docs/content/docs'];
+const PUBLIC_DIRS = ['apps/docs/content/docs'];
 
 const RULES = [
   {
@@ -61,13 +61,15 @@ function walk(dir) {
 }
 
 function collectPackageReadmes() {
-  const packagesDir = join(ROOT, 'packages');
   const results = [];
-  for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const candidate = join(packagesDir, entry.name, 'README.md');
-    if (existsSync(candidate) && statSync(candidate).isFile()) {
-      results.push(candidate);
+  for (const baseDir of [join(ROOT, 'packages'), join(ROOT, 'apps')]) {
+    if (!existsSync(baseDir)) continue;
+    for (const entry of readdirSync(baseDir, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const candidate = join(baseDir, entry.name, 'README.md');
+      if (existsSync(candidate) && statSync(candidate).isFile()) {
+        results.push(candidate);
+      }
     }
   }
   return results;

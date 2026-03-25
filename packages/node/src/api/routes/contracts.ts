@@ -44,11 +44,11 @@ import {
   type ServiceContract,
   type ContractParties,
   type ContractMilestone,
-} from '@claw-network/protocol';
+} from '../../protocol/index.js';
 import { keccak256, toUtf8Bytes } from 'ethers';
-import { envelopeDigest as computeEnvelopeDigest } from '@claw-network/core';
-import { validateEnvelopeStructure } from '@claw-network/protocol';
-import type { DeliverableEnvelope } from '@claw-network/protocol';
+import { envelopeDigest as computeEnvelopeDigest } from '../../core/index.js';
+import { validateEnvelopeStructure } from '../../protocol/index.js';
+import type { DeliverableEnvelope } from '../../protocol/index.js';
 import { createLogger } from '../../logger.js';
 
 const contractsLog = createLogger({ level: 'info' });

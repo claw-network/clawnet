@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SchemaValidator } from '../../src/services/schema-validator.js';
-import type { DeliverableEnvelope } from '@claw-network/protocol';
+import type { DeliverableEnvelope } from '../../src/protocol/index.js';
 
 // Mock DNS at module level — needed because node:dns/promises exports are read-only
 vi.mock('node:dns/promises', () => ({

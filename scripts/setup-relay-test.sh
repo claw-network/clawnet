@@ -20,7 +20,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-CONTRACTS_DIR="$REPO_ROOT/packages/contracts"
+CONTRACTS_DIR="$REPO_ROOT/packages/node"
 CONFIG_DIR="$REPO_ROOT/localdev/relay-test-config"
 
 # Besu dev chain config
@@ -89,7 +89,7 @@ else
   export EMERGENCY_SIGNERS
 
   cd "$CONTRACTS_DIR"
-  npx hardhat run scripts/deploy-all.ts --network clawnetDevnet
+  npx hardhat run scripts/contracts/deploy-all.ts --network clawnetDevnet
 
   echo ""
   echo "✓ Contracts deployed"
@@ -118,7 +118,7 @@ export LIQUIDITY_ADDRESS="0x92B31D0F96aAD0962Ebe382Be7fe096FfA36C503"
 export RESERVE_ADDRESS="0xC141d90fd860e20391F9bF93bEfeC6d1e071bf35"
 
 cd "$CONTRACTS_DIR"
-npx hardhat run scripts/bootstrap-mint.ts --network clawnetDevnet || {
+npx hardhat run scripts/contracts/bootstrap-mint.ts --network clawnetDevnet || {
   echo "WARNING: bootstrap-mint failed (may be OK if already run)"
 }
 
@@ -171,7 +171,7 @@ chain:
   signer:
     type: env
     envVar: DEPLOYER_PRIVATE_KEY
-  artifactsDir: /app/packages/contracts/artifacts
+  artifactsDir: /app/packages/node/artifacts
 EOF
 
 echo "✓ Config written to $CONFIG_DIR/config.yaml"

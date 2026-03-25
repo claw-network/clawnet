@@ -10,7 +10,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-source "$SCRIPT_DIR/.env"
+# shellcheck source=../../scripts/lib/clawnet-env.sh
+source "$REPO_ROOT/scripts/lib/clawnet-env.sh"
+clawnet_require_env_file
 
 RPC="${CLAWNET_DEVNET_RPC_URL:-http://127.0.0.1:8545}"
 DEPLOYER="${DEPLOYER_ADDRESS:-0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266}"

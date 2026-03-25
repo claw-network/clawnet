@@ -14,7 +14,7 @@ import {
   applyReputationEvent,
   buildReputationProfile,
   getReputationRecords,
-} from '@claw-network/protocol';
+} from '../../protocol/index.js';
 import { parseEvent } from '../legacy.js';
 
 export function reputationRoutes(ctx: RuntimeContext): Router {

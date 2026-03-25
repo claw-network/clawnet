@@ -42,10 +42,10 @@ import {
   createInfoOrderCompletionEnvelope,
   createInfoOrderReviewEnvelope,
   validateEnvelopeStructure,
-} from '@claw-network/protocol';
-import type { DeliverableEnvelope } from '@claw-network/protocol';
-import type { AcceptanceTest } from '@claw-network/protocol';
-import { envelopeDigest as computeEnvelopeDigest, base64ToBytes, bytesToUtf8 } from '@claw-network/core';
+} from '../../protocol/index.js';
+import type { DeliverableEnvelope } from '../../protocol/index.js';
+import type { AcceptanceTest } from '../../protocol/index.js';
+import { envelopeDigest as computeEnvelopeDigest, base64ToBytes, bytesToUtf8 } from '../../core/index.js';
 import { DeliverableVerifier } from '../../services/deliverable-verifier.js';
 import { createLogger } from '../../logger.js';
 

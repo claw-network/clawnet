@@ -7,7 +7,7 @@ import { ok, badRequest, internalError, paginated, parsePagination } from '../re
 import type { RuntimeContext } from '../types.js';
 import { resolveAddress } from '../types.js';
 import { buildWalletState } from '../legacy.js';
-import { getWalletBalance } from '@claw-network/protocol';
+import { getWalletBalance } from '../../protocol/index.js';
 import { deriveAddressForDid } from '../../services/identity-service.js';
 
 /**

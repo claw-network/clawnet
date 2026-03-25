@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { parse } from 'yaml';
 import { ClawNetNode } from './index.js';
 import { createLogger } from './logger.js';
-import { loadConfig, resolveStoragePaths } from '@claw-network/core';
-import type { RelayConfig } from '@claw-network/core';
+import { loadConfig, loadRequiredClawnetEnv, resolveStoragePaths } from './core/index.js';
+import type { RelayConfig } from './core/index.js';
 import { type ChainConfig, ChainConfigSchema } from './services/chain-config.js';
 import { validateLiquidityPolicyFromEnv } from './policy/liquidity-policy.js';
 
@@ -133,6 +133,10 @@ export async function startDaemon(
   logger: ReturnType<typeof createLogger>;
   stop: () => Promise<void>;
 }> {
+  if (!argv.includes('--help') && !argv.includes('-h')) {
+    await loadRequiredClawnetEnv();
+  }
+
   const args = parseArgs(argv);
   const liquidityPolicyValidation = validateLiquidityPolicyFromEnv();
 

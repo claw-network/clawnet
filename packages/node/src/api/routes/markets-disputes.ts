@@ -16,7 +16,7 @@ import {
   createMarketDisputeOpenEnvelope,
   createMarketDisputeResponseEnvelope,
   createMarketDisputeResolveEnvelope,
-} from '@claw-network/protocol';
+} from '../../protocol/index.js';
 
 export function marketsDisputeRoutes(ctx: RuntimeContext): Router {
   const r = new Router();
