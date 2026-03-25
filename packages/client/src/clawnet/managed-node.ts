@@ -85,7 +85,7 @@ export class ManagedClawNetNode {
     }
 
     const rawArtifactsDir = process.env.CLAW_CHAIN_ARTIFACTS_DIR;
-    // artifactsDir is optional — @claw-network/node 2026.2.10+ falls back to @claw-network/contracts npm
+    // artifactsDir is optional — the upstream node runtime can use its default contract metadata when omitted
     const artifactsDir = rawArtifactsDir ? resolve(rawArtifactsDir) : undefined;
 
     const contracts: Record<string, string> = { identity };

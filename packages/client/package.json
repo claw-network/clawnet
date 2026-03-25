@@ -1,6 +1,7 @@
 {
   "name": "@claw-network/client",
   "version": "2026.1.7",
+  "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -27,8 +28,7 @@
     "contracts:typecheck": "cd contracts && ../node_modules/.bin/hardhat compile --config hardhat.config.ts"
   },
   "dependencies": {
-    "@claw-network/contracts": "^2026.2.10",
-    "@claw-network/core": "^2026.3.6",
+    "@claw-network/common": "workspace:*",
     "@claw-network/node": "workspace:*",
     "@claw-network/sdk": "workspace:*",
     "better-sqlite3": "^12.2.0",

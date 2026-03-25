@@ -12,13 +12,16 @@
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
-import { ClawNetClient, ClawNetError } from '@claw-network/sdk';
-import { getGlobalLogger } from '../logger.js';
-const logger = getGlobalLogger();
 import {
-  signBytes, utf8ToBytes, bytesToHex,
-  resolveStoragePaths, listKeyRecords, decryptKeyRecord,
-} from '@claw-network/core';
+  bytesToHex,
+  decryptKeyRecord,
+  listKeyRecords,
+  resolveStoragePaths,
+  signBytes,
+  utf8ToBytes,
+} from '@claw-network/common';
+import { ClawNetClient, ClawNetError } from '@claw-network/sdk';
+
 import { ErrorCodes, TelagentError } from '../protocol/index.js';
 import type { SessionManager, OperationScope } from './session-manager.js';
 import type { NonceManager } from './nonce-manager.js';

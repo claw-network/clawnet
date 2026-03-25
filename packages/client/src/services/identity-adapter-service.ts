@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
+import { bytesToHex, publicKeyFromDid } from '@claw-network/common';
 import { ErrorCodes, TelagentError, hashDid, isDidClaw, type AgentDID } from '../protocol/index.js';
-import { publicKeyFromDid, bytesToHex } from '@claw-network/core';
 import { ethers } from 'ethers';
 
 import type { ClawNetGatewayService, IdentityInfo } from '../clawnet/gateway-service.js';

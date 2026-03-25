@@ -34,6 +34,8 @@
     "contracts:test": "corepack pnpm --filter @claw-network/node contracts:test",
     "contracts:test:ed25519:besu": "corepack pnpm --filter @claw-network/node contracts:test:ed25519:besu",
     "contracts:coverage": "corepack pnpm --filter @claw-network/node contracts:coverage",
+    "release:build": "node scripts/release-check.mjs build",
+    "release:test": "node scripts/release-check.mjs test",
     "publish:dry": "bash scripts/publish.sh",
     "publish:release": "bash scripts/publish.sh --release",
     "bump:patch": "node scripts/bump-version.mjs patch",

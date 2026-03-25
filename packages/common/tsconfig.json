@@ -8,5 +8,5 @@
     "composite": true
   },
   "include": ["src"],
-  "exclude": ["dist", "test"]
+  "exclude": ["dist"]
 }

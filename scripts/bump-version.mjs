@@ -25,13 +25,12 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { releaseManifest } from './lib/release-manifest.mjs';
+
 const ROOT = resolve(import.meta.dirname, '..');
 
 // ── Packages to bump (all share the same version) ──────────────
-const SYNCED_PACKAGES = [
-  'packages/sdk',
-  'packages/node',
-];
+const SYNCED_PACKAGES = releaseManifest.versionedPackageDirs;
 
 // ── Parse arguments ────────────────────────────────────────────
 const args = process.argv.slice(2);

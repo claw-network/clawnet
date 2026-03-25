@@ -260,12 +260,9 @@ importers:
 
   packages/client:
     dependencies:
-      '@claw-network/contracts':
-        specifier: ^2026.2.10
-        version: 2026.3.6
-      '@claw-network/core':
-        specifier: ^2026.3.6
-        version: 2026.3.6
+      '@claw-network/common':
+        specifier: workspace:*
+        version: link:../common
       '@claw-network/node':
         specifier: workspace:*
         version: link:../node
@@ -322,6 +319,15 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/common:
+    dependencies:
+      '@noble/ed25519':
+        specifier: ^2.1.0
+        version: 2.3.0
+      '@noble/hashes':
+        specifier: ^1.6.3
+        version: 1.8.0
+
   packages/node:
     dependencies:
       '@chainsafe/libp2p-gossipsub':
@@ -333,6 +339,9 @@ importers:
       '@chainsafe/libp2p-yamux':
         specifier: ^8.0.1
         version: 8.0.1
+      '@claw-network/common':
+        specifier: workspace:*
+        version: link:../common
       '@libp2p/autonat':
         specifier: ^3.0.10
         version: 3.0.13
@@ -790,12 +799,6 @@ packages:
 
   '@chevrotain/utils@11.1.2':
     resolution: {integrity: sha512-4mudFAQ6H+MqBTfqLmU7G1ZwRzCLfJEooL/fsF6rCX5eePMbGhoy5n4g+G4vlh2muDcsCTJtL+uKbOzWxs5LHA==}
-
-  '@claw-network/contracts@2026.3.6':
-    resolution: {integrity: sha512-ffYkKTufEiYP4nbobL7/rY7VtfffNmxZGANHaMS6pngGu7Dl3outUFKbhaJKLgn6Cb3ZrI6cL/fIAStZ1v4Jyw==}
-
-  '@claw-network/core@2026.3.6':
-    resolution: {integrity: sha512-P30EmWglxzTQCWVPEwTJqg3k7c91r6+vi6fhluy3ar917DtUSoFUFVHvrSg4waV0UU8GMiWu8n0UT9jqPeLtKg==}
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -8727,34 +8730,6 @@ snapshots:
   '@chevrotain/types@11.1.2': {}
 
   '@chevrotain/utils@11.1.2': {}
-
-  '@claw-network/contracts@2026.3.6': {}
-
-  '@claw-network/core@2026.3.6':
-    dependencies:
-      '@chainsafe/libp2p-gossipsub': 14.1.2
-      '@chainsafe/libp2p-noise': 17.0.0
-      '@chainsafe/libp2p-yamux': 8.0.1
-      '@libp2p/autonat': 3.0.13
-      '@libp2p/bootstrap': 12.0.14
-      '@libp2p/circuit-relay-v2': 4.1.6
-      '@libp2p/dcutr': 3.0.13
-      '@libp2p/identify': 4.0.13
-      '@libp2p/kad-dht': 16.1.6
-      '@libp2p/mdns': 12.0.14
-      '@libp2p/ping': 3.0.13
-      '@libp2p/tcp': 11.0.13
-      '@multiformats/multiaddr': 13.0.1
-      '@noble/curves': 1.9.7
-      '@noble/ed25519': 2.3.0
-      '@noble/hashes': 1.8.0
-      '@scure/base': 1.2.6
-      '@scure/bip39': 1.6.0
-      canonicalize: 2.1.0
-      level: 9.0.0
-      libp2p: 3.1.6
-      multiformats: 13.4.2
-      yaml: 2.8.3
 
   '@colors/colors@1.5.0':
     optional: true

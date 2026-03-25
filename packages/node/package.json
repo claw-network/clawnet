@@ -73,6 +73,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@claw-network/common": "workspace:*",
     "@chainsafe/libp2p-gossipsub": "^14.1.2",
     "@chainsafe/libp2p-noise": "^17.0.0",
     "@chainsafe/libp2p-yamux": "^8.0.1",

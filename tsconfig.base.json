@@ -15,6 +15,7 @@
     "resolveJsonModule": true,
     "useDefineForClassFields": true,
     "paths": {
+      "@claw-network/common": ["packages/common/src/index.ts"],
       "@claw-network/client": ["packages/client/src/index.ts"],
       "@claw-network/client/protocol": ["packages/client/src/protocol/index.ts"],
       "@claw-network/node": ["packages/node/src/index.ts"],
